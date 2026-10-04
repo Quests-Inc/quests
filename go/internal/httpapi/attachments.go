@@ -221,6 +221,9 @@ func (s *Server) attachmentsForOwner(ctx context.Context, ownerType string, owne
 	ownerUpdated := s.ownerUpdatedAt(ctx, ownerType, ownerID)
 	out := make([]store.AttachmentRead, 0, len(rows))
 	for _, a := range rows {
+		if a.Hidden {
+			continue
+		}
 		out = append(out, s.decorateAttachment(ctx, a, ownerUpdated, probe))
 	}
 	return out
@@ -470,6 +473,13 @@ func (s *Server) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 503, "attachment storage is not configured")
 		return
 	}
+	// Hidden cards live only on the Attachments tab: inline views 404 so a
+	// markdown image falls back to the placeholder. ?preview=1 is the
+	// Attachments tab's own thumbnail/preview and bypasses that.
+	if a.Hidden && r.URL.Query().Get("preview") != "1" {
+		writeErr(w, 404, "attachment not found")
+		return
+	}
 	pathToGet := a.WebDAVPath
 	detected := a.ContentTypeDetected
 	size := a.SizeBytes
@@ -562,6 +572,7 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 	var body struct {
 		Comment         *string `json:"comment"`
 		CurrentRevision *int    `json:"current_revision"`
+		Hidden          *bool   `json:"hidden"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "invalid JSON")
@@ -586,7 +597,14 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 			return
 		}
 	}
-	if body.Comment == nil && body.CurrentRevision == nil {
+	if body.Hidden != nil {
+		updated, err = s.Store.SetAttachmentHidden(r.Context(), a.ID, *body.Hidden)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+	}
+	if body.Comment == nil && body.CurrentRevision == nil && body.Hidden == nil {
 		writeJSON(w, 200, store.AttachmentToRead(a))
 		return
 	}

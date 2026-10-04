@@ -1,12 +1,14 @@
 <script>
   import Icon from '../ui/Icon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
+  import ConfirmModal from '../modals/ConfirmModal.svelte'
   import {
     deleteAttachment,
     deleteAttachmentRevision,
     listAttachments,
     listAttachmentRevisions,
     setAttachmentCurrentRevision,
+    setAttachmentHidden,
     updateAttachmentComment,
     uploadAttachment,
     uploadAttachmentRevision,
@@ -28,6 +30,11 @@
 
   /** @type {any[]} */
   let items = $state([])
+  /** Hidden cards live only on the Attachments tab. */
+  let visible = $derived(items.filter((a) => !a.hidden))
+  /** @type {{ att: any, revision: number | null } | null} */
+  let pendingDelete = $state(null)
+  let deleteBusy = $state(false)
   let uploading = $state(false)
   let error = $state('')
   let dragOver = $state(false)
@@ -66,8 +73,9 @@
     if (onOpenOwner) items.push({ id: 'open', label: 'Открыть владельца' })
     items.push(
       { id: 'copy-id', label: `Копировать attachment=${a.id}` },
+      { id: 'hide', label: 'Скрыть' },
       { id: 'sep-danger', sep: true },
-      { id: 'delete', label: 'Удалить', danger: true },
+      { id: 'delete', label: 'Удалить…', danger: true },
     )
     return items
   })
@@ -130,6 +138,40 @@
     }
   }
 
+  async function confirmDelete() {
+    const p = pendingDelete
+    if (!p) return
+    deleteBusy = true
+    try {
+      if (p.revision == null) {
+        await remove(p.att)
+        if (!error) toast('Вложение удалено', { kind: 'success' })
+      } else {
+        await removeRevision(p.att, p.revision)
+      }
+    } finally {
+      deleteBusy = false
+      pendingDelete = null
+    }
+  }
+
+  async function hide(a) {
+    error = ''
+    try {
+      const updated = await setAttachmentHidden(ownerType, ownerId, a.id, true)
+      applyRows(
+        ownerType,
+        ownerId,
+        items.map((row) => (row.id === a.id ? { ...row, ...updated } : row)),
+        { probed: peekAttachmentList(ownerType, ownerId)?.probed ?? true },
+      )
+      if (historyOpenId === a.id) historyOpenId = null
+      toast('Вложение скрыто — вернуть можно на вкладке «Вложения»', { kind: 'success' })
+    } catch (e) {
+      error = e?.message || String(e)
+    }
+  }
+
   async function removeRevision(a, revision) {
     error = ''
     try {
@@ -175,10 +217,11 @@
       }
       return
     }
-    if (action === 'delete') {
-      await remove(a)
-      if (!error) toast('Вложение удалено', { kind: 'success' })
+    if (action === 'hide') {
+      await hide(a)
+      return
     }
+    if (action === 'delete') pendingDelete = { att: a, revision: null }
   }
 
   function draftsFrom(rows) {
@@ -352,23 +395,23 @@
     <p class="attach__error">{error}</p>
   {/if}
 
-  {#if items.length}
+  {#if visible.length}
     <button
       type="button"
       class="{labelClass} attach__toggle"
       onclick={() => (open = !open)}
       aria-expanded={open}
     >
-      {label} ({items.length})
+      {label} ({visible.length})
       <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
     </button>
   {:else}
     <span class="{labelClass} attach__toggle attach__toggle--static">{label}</span>
   {/if}
 
-  {#if items.length && open}
+  {#if visible.length && open}
     <ul class="attach__list">
-      {#each items as a (a.id)}
+      {#each visible as a (a.id)}
         {@const unavailable = a.available === false}
         {@const revCount = Number(a.revision_count) || 1}
         {@const rev = Number(a.revision) || 1}
@@ -452,10 +495,19 @@
           {/if}
           <button
             type="button"
+            class="attach__act"
+            title="Скрыть"
+            aria-label="Скрыть вложение"
+            onclick={() => hide(a)}
+          >
+            <Icon name="eye-off" size={16} />
+          </button>
+          <button
+            type="button"
             class="attach__act attach__act--danger"
             title="Удалить"
             aria-label="Удалить вложение"
-            onclick={() => remove(a)}
+            onclick={() => (pendingDelete = { att: a, revision: null })}
           >
             <Icon name="delete" size={16} />
           </button>
@@ -497,7 +549,7 @@
                         type="button"
                         class="attach__act attach__act--danger"
                         title="Удалить версию"
-                        onclick={() => removeRevision(a, rev.revision)}
+                        onclick={() => (pendingDelete = { att: a, revision: rev.revision })}
                       >
                         <Icon name="delete" size={14} />
                       </button>
@@ -537,6 +589,21 @@
     />
   </div>
 </div>
+
+<ConfirmModal
+  open={pendingDelete != null}
+  title={pendingDelete?.revision == null ? 'Удалить вложение?' : 'Удалить версию?'}
+  message={pendingDelete
+    ? pendingDelete.revision == null
+      ? `Удалить «${pendingDelete.att.filename}» вместе со всеми версиями? Это необратимо. Если файл просто не нужен — лучше скрыть его.`
+      : `Удалить версию ${pendingDelete.revision} файла «${pendingDelete.att.filename}»? Это необратимо.`
+    : ''}
+  busy={deleteBusy}
+  onCancel={() => {
+    if (!deleteBusy) pendingDelete = null
+  }}
+  onConfirm={confirmDelete}
+/>
 
 <ContextMenu
   open={ctxOpen}

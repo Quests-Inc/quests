@@ -29,6 +29,7 @@ type Attachment struct {
 	ScanStatus          string
 	ScannedAt           *time.Time
 	CurrentRevision     int
+	Hidden              bool
 	RevisionCount       int // filled by list/get helpers; not a DB column
 }
 
@@ -52,7 +53,7 @@ type AttachmentRead map[string]any
 
 const attachmentCols = `id, owner_type, owner_id, filename, webdav_path, size_bytes,
 	content_type_declared, content_type_detected, comment, uploaded_at, scan_status, scanned_at,
-	current_revision`
+	current_revision, hidden`
 
 const revisionCols = `id, attachment_id, revision, filename, webdav_path, size_bytes,
 	content_type_declared, content_type_detected, comment, uploaded_at, scan_status, scanned_at`
@@ -63,7 +64,7 @@ func scanAttachment(row rowScanner) (Attachment, error) {
 	var scanned sql.NullString
 	err := row.Scan(&a.ID, &a.OwnerType, &a.OwnerID, &a.Filename, &a.WebDAVPath, &a.SizeBytes,
 		&a.ContentTypeDeclared, &a.ContentTypeDetected, &a.Comment, &uploaded, &a.ScanStatus, &scanned,
-		&a.CurrentRevision)
+		&a.CurrentRevision, &a.Hidden)
 	if err != nil {
 		return a, err
 	}
@@ -125,6 +126,7 @@ func AttachmentToRead(a Attachment) AttachmentRead {
 		"scanned_at":            timeutil.ToUTCISO(a.ScannedAt),
 		"revision":              rev,
 		"revision_count":        count,
+		"hidden":                a.Hidden,
 	}
 }
 
@@ -291,11 +293,11 @@ func (s *Store) CreateAttachment(ctx context.Context, a Attachment) (Attachment,
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO attachment (owner_type, owner_id, filename, webdav_path, size_bytes,
 			content_type_declared, content_type_detected, comment, uploaded_at, scan_status, scanned_at,
-			current_revision)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			current_revision, hidden)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.OwnerType, a.OwnerID, a.Filename, a.WebDAVPath, a.SizeBytes,
 		a.ContentTypeDeclared, a.ContentTypeDetected, a.Comment,
-		timeutil.ToDBUTC(a.UploadedAt), a.ScanStatus, scanned, a.CurrentRevision)
+		timeutil.ToDBUTC(a.UploadedAt), a.ScanStatus, scanned, a.CurrentRevision, a.Hidden)
 	if err != nil {
 		return Attachment{}, err
 	}
@@ -429,6 +431,17 @@ func (s *Store) SetCurrentAttachmentRevision(ctx context.Context, attachmentID i
 		return Attachment{}, ErrNotFound
 	}
 	return s.GetAttachment(ctx, attachmentID)
+}
+
+func (s *Store) SetAttachmentHidden(ctx context.Context, id int64, hidden bool) (Attachment, error) {
+	res, err := s.DB.ExecContext(ctx, `UPDATE attachment SET hidden = ? WHERE id = ?`, hidden, id)
+	if err != nil {
+		return Attachment{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Attachment{}, ErrNotFound
+	}
+	return s.GetAttachment(ctx, id)
 }
 
 func (s *Store) SetAttachmentComment(ctx context.Context, id int64, comment string) (Attachment, error) {

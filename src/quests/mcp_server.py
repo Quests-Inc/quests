@@ -138,6 +138,8 @@ server = MCPServer(
         "new revision of an existing card instead of a sibling *_v2 file. "
         "Needs the API's WebDAV storage and ClamAV scanning configured "
         "server-side, and fails otherwise. "
+        "set_attachment_hidden hides/restores a card (soft delete: hidden files "
+        "vanish from lists and contexts, remain on the web Attachments tab). "
         "If you're blocked on the user's input and they may not be watching this "
         "conversation, use ping_user — it's the only tool guaranteed to interrupt "
         "them via the overlay HUD."
@@ -292,6 +294,8 @@ def _attachments_brief(owner_type: str, owner_id: int) -> list[dict[str, Any]]:
         return []
     out: list[dict[str, Any]] = []
     for a in rows:
+        if a.get("hidden"):
+            continue  # hidden cards are for the web Attachments tab only
         out.append(
             {
                 "id": a.get("id"),
@@ -2014,6 +2018,7 @@ def get_attachment(
         "content_type": (meta or {}).get("content_type_detected")
         or (meta or {}).get("content_type_declared"),
         "comment": (meta or {}).get("comment"),
+        "hidden": bool((meta or {}).get("hidden")),
         "revision": revision if revision is not None else (meta or {}).get("revision"),
         "revision_count": (meta or {}).get("revision_count"),
         "truncated": False,
@@ -2032,6 +2037,46 @@ def get_attachment(
         out["base64"] = base64.standard_b64encode(raw).decode("ascii")
         out["encoding"] = "base64"
     return out
+
+
+@server.tool(
+    description=(
+        "Hide or unhide an attachment (PATCH …/attachments/{id} hidden=bool). "
+        "A hidden attachment is not deleted: it disappears from quest/note "
+        "blocks, markdown images, @-suggestions, PDF export and the *_context "
+        "tools, and stays visible only on the journal's Attachments tab "
+        "(crossed-eye icon), where it can be restored. Prefer this over "
+        "deleting when a file is merely stale. get_attachment still reads a "
+        "hidden file by id. Pass attachment_id, hidden (true/false) and "
+        "exactly one of quest / questline / note."
+    )
+)
+def set_attachment_hidden(
+    attachment_id: int,
+    hidden: bool,
+    quest: int | None = None,
+    questline: int | None = None,
+    note: int | None = None,
+) -> dict[str, Any]:
+    chosen = [
+        (k, v)
+        for k, v in (("quest", quest), ("questline", questline), ("note", note))
+        if v is not None
+    ]
+    if len(chosen) != 1:
+        raise ValueError("provide exactly one of: quest, questline, note")
+    kind, owner_id = chosen[0]
+    seg = {"quest": "quests", "questline": "questlines", "note": "notes"}[kind]
+    row = _api(
+        "PATCH",
+        f"/api/{seg}/{owner_id}/attachments/{int(attachment_id)}",
+        body={"hidden": bool(hidden)},
+    )
+    return {
+        "id": row.get("id"),
+        "filename": row.get("filename"),
+        "hidden": row.get("hidden"),
+    }
 
 
 @server.tool(

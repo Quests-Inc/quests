@@ -14,6 +14,8 @@
   import document from '../../assets/icons/document.svg?raw'
   import download from '../../assets/icons/download.svg?raw'
   import edit from '../../assets/icons/edit.svg?raw'
+  import eye from '../../assets/icons/eye.svg?raw'
+  import eyeOff from '../../assets/icons/eye-off.svg?raw'
   import fileDownload from '../../assets/icons/file-download.svg?raw'
   import filter from '../../assets/icons/filter.svg?raw'
   import flag from '../../assets/icons/flag.svg?raw'
@@ -53,6 +55,8 @@
     document,
     download,
     edit,
+    eye,
+    'eye-off': eyeOff,
     'file-download': fileDownload,
     filter,
     flag,

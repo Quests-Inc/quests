@@ -590,6 +590,13 @@ export function updateAttachmentComment(ownerType, ownerId, attachmentId, commen
   })
 }
 
+export function setAttachmentHidden(ownerType, ownerId, attachmentId, hidden) {
+  return request(ownerAttachmentsPath(ownerType, ownerId, attachmentId), {
+    method: 'PATCH',
+    body: JSON.stringify({ hidden: !!hidden }),
+  })
+}
+
 export function deleteAttachment(ownerType, ownerId, attachmentId) {
   return request(ownerAttachmentsPath(ownerType, ownerId, attachmentId), {
     method: 'DELETE',

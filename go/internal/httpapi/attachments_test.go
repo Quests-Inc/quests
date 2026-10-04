@@ -114,7 +114,8 @@ CREATE TABLE attachment (
 	uploaded_at DATETIME NOT NULL,
 	scan_status TEXT NOT NULL DEFAULT 'pending',
 	scanned_at DATETIME,
-	current_revision INTEGER NOT NULL DEFAULT 1
+	current_revision INTEGER NOT NULL DEFAULT 1,
+	hidden INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE attachment_revision (
 	id INTEGER PRIMARY KEY,
@@ -757,5 +758,70 @@ func TestAttachmentImageInline(t *testing.T) {
 	}
 	if w := get(png, "?revision=7"); w.Code != http.StatusNotFound {
 		t.Fatalf("unknown revision = %d, want 404", w.Code)
+	}
+}
+
+func TestAttachmentHidden(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	qid := seedQuest(t, s)
+	h := s.Handler()
+
+	w := postFile(t, h, fmt.Sprintf("/api/quests/%d/attachments", qid), "pic.png", "", tinyPNG)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("upload = %d %s", w.Code, w.Body.String())
+	}
+	var m map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &m)
+	aid := int64(m["id"].(float64))
+	if m["hidden"] != false {
+		t.Fatalf("new card hidden = %v, want false", m["hidden"])
+	}
+
+	patch := func(body string) *httptest.ResponseRecorder {
+		rw := httptest.NewRecorder()
+		h.ServeHTTP(rw, httptest.NewRequest(http.MethodPatch,
+			fmt.Sprintf("/api/quests/%d/attachments/%d", qid, aid), strings.NewReader(body)))
+		return rw
+	}
+	image := func() int {
+		rw := httptest.NewRecorder()
+		h.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/attachments/%d/image", aid), nil))
+		return rw.Code
+	}
+
+	if rw := patch(`{"hidden":true}`); rw.Code != 200 || !strings.Contains(rw.Body.String(), `"hidden":true`) {
+		t.Fatalf("hide = %d %s", rw.Code, rw.Body.String())
+	}
+	if c := image(); c != http.StatusNotFound {
+		t.Fatalf("hidden image = %d, want 404", c)
+	}
+	pw := httptest.NewRecorder()
+	h.ServeHTTP(pw, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/attachments/%d/image?preview=1", aid), nil))
+	if pw.Code != 200 {
+		t.Fatalf("hidden preview = %d, want 200", pw.Code)
+	}
+	// Still listed (the Attachments tab needs it) and still downloadable.
+	lw := httptest.NewRecorder()
+	h.ServeHTTP(lw, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/quests/%d/attachments?stat=0", qid), nil))
+	if !strings.Contains(lw.Body.String(), `"hidden":true`) {
+		t.Fatalf("list lost hidden card: %s", lw.Body.String())
+	}
+	dw := httptest.NewRecorder()
+	h.ServeHTTP(dw, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/quests/%d/attachments/%d", qid, aid), nil))
+	if dw.Code != 200 {
+		t.Fatalf("hidden download = %d", dw.Code)
+	}
+	// Context payloads (MCP) skip hidden cards.
+	if got := s.attachmentsForOwner(t.Context(), ownerQuest, qid, false); len(got) != 0 {
+		t.Fatalf("attachmentsForOwner returned %d hidden cards", len(got))
+	}
+
+	if rw := patch(`{"hidden":false}`); rw.Code != 200 {
+		t.Fatalf("unhide = %d", rw.Code)
+	}
+	if c := image(); c != 200 {
+		t.Fatalf("unhidden image = %d, want 200", c)
 	}
 }

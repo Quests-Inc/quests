@@ -10,7 +10,7 @@ import (
 
 // expectedAlembic is the schema revision this binary was built against.
 // Keep in sync with alembic heads; append new ids to alembicOrder when adding migrations.
-const expectedAlembic = "f1a2b3c4d5e6"
+const expectedAlembic = "a0b1c2d3e4f5"
 
 // alembicOrder is oldest→newest. Unknown DB revisions are treated as ahead of
 // this binary (deploy race: migrate applied before the new image lands).
@@ -50,6 +50,7 @@ var alembicOrder = []string{
 	"d3e4f5a6b7c8",
 	"e4f5a6b7c8d9",
 	"f1a2b3c4d5e6",
+	"a0b1c2d3e4f5",
 }
 
 // SchemaStatus is the alembic check outcome for health probes / logs.

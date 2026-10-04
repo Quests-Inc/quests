@@ -2589,7 +2589,7 @@
 
   .attach__row {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto auto;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto auto auto;
     gap: var(--space-2, 0.5rem);
     align-items: center;
   }
@@ -2776,7 +2776,7 @@
 
   @media (max-width: 720px) {
     .attach__row {
-      grid-template-columns: 1fr auto auto auto;
+      grid-template-columns: 1fr auto auto auto auto;
     }
 
     .attach__comment {

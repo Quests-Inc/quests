@@ -360,7 +360,9 @@
     }),
   )
   let selected = $derived(quests.find((q) => q.id === selectedId) ?? null)
-  let attachments = $derived(flattenAttachmentIndex(attachmentIndex))
+  /** Every card, hidden included — only the Attachments tab shows hidden ones. */
+  let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
+  let attachments = $derived(allAttachments.filter((a) => !a.hidden))
   let refLabels = $derived.by(() => {
     /** @type {Record<string, string>} */
     const m = {}
@@ -373,7 +375,7 @@
     }
     for (const l of questlines) m[`questline:${l.id}`] = l.title || `questline=${l.id}`
     for (const t of templateStore.list) m[`template:${t.id}`] = t.title || `template=${t.id}`
-    for (const a of attachments) {
+    for (const a of allAttachments) {
       m[`attachment:${a.id}`] = a.filename || `attachment=${a.id}`
     }
     return m
@@ -1628,7 +1630,7 @@
   {:else if view === 'attachments'}
     <div class="journal__attachments">
       <AttachmentsPage
-        {attachments}
+        attachments={allAttachments}
         {quests}
         {questlines}
         {notes}

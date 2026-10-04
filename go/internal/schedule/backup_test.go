@@ -72,7 +72,8 @@ CREATE TABLE attachment (
 	uploaded_at DATETIME,
 	scan_status TEXT,
 	scanned_at DATETIME,
-	current_revision INTEGER NOT NULL DEFAULT 1
+	current_revision INTEGER NOT NULL DEFAULT 1,
+	hidden INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE attachment_revision (
 	id INTEGER PRIMARY KEY,

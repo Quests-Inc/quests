@@ -703,6 +703,8 @@ class Attachment(SQLModel, table=True):
     scanned_at: Optional[datetime] = Field(default=None)
     # 1-based index of the revision currently mirrored on this row.
     current_revision: int = Field(default=1)
+    # Hidden cards show only on the Attachments tab (soft alternative to delete).
+    hidden: bool = Field(default=False)
 
 
 class AttachmentRevision(SQLModel, table=True):
@@ -741,6 +743,7 @@ class AttachmentRead(SQLModel):
     scanned_at: Optional[datetime] = None
     current_revision: int = 1
     revision_count: int = 1
+    hidden: bool = False
 
     @field_serializer("uploaded_at", "scanned_at", when_used="json")
     def _ser_utc(self, value: Optional[datetime]) -> Optional[str]:

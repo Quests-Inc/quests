@@ -286,7 +286,7 @@ export async function downloadQuestPdf(quest, opts = {}) {
   if (!quest) return
   let attachments = []
   try {
-    attachments = await listAttachments('quest', quest.id, { stat: false })
+    attachments = (await listAttachments('quest', quest.id, { stat: false })).filter((a) => !a.hidden)
   } catch {
     // attachments are a nice-to-have in the export; don't block on them
   }
