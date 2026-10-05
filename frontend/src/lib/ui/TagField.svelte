@@ -28,6 +28,8 @@
   let draft = $state('')
   let busy = $state(false)
   let err = $state('')
+  /** Highlighted typed match for arrow-key selection; -1 = none. */
+  let active = $state(-1)
 
   let selected = $derived(Array.isArray(value) ? value : [])
   let exclude = $derived(selected.map((t) => t.slug))
@@ -38,6 +40,33 @@
       ? suggestTags(index, { title, description }, { excludeSlugs: exclude, limit: 5 })
       : [],
   )
+
+  /** Catalog tags matching what's typed so far: slug/label prefix first, then substring. */
+  let matches = $derived.by(() => {
+    const q = normalizeSlug(draft)
+    const raw = draft.trim().toLowerCase().replace(/ё/g, 'е')
+    if (!q && !raw) return []
+    const taken = new Set(selected.map((t) => t.id))
+    /** @type {{ tag: any, rank: number }[]} */
+    const out = []
+    for (const c of catalog) {
+      if (taken.has(c.id)) continue
+      const slug = String(c.slug || '').toLowerCase()
+      const label = String(c.label || '').toLowerCase().replace(/ё/g, 'е')
+      let rank = -1
+      if (slug === q || label === raw) rank = 0
+      else if (slug.startsWith(q) || label.startsWith(raw)) rank = 1
+      else if (slug.includes(q) || label.includes(raw)) rank = 2
+      if (rank >= 0) out.push({ tag: c, rank })
+    }
+    out.sort((a, b) => a.rank - b.rank || a.tag.slug.localeCompare(b.tag.slug))
+    return out.slice(0, 8).map((m) => m.tag)
+  })
+
+  $effect(() => {
+    void draft
+    active = -1
+  })
 
   function normalizeSlug(raw) {
     return String(raw || '')
@@ -109,7 +138,17 @@
   }
 
   async function onKeydown(e) {
-    if (e.key === 'Enter') {
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && matches.length) {
+      e.preventDefault()
+      const n = matches.length
+      active = e.key === 'ArrowDown' ? (active + 1) % n : (active - 1 + n) % n
+    } else if (e.key === 'Escape' && active >= 0) {
+      e.stopPropagation()
+      active = -1
+    } else if (e.key === 'Enter' && active >= 0 && matches[active]) {
+      e.preventDefault()
+      pick(matches[active])
+    } else if (e.key === 'Enter') {
       e.preventDefault()
       const tag = await resolveToken(draft)
       if (tag) {
@@ -123,6 +162,13 @@
 
   function remove(id) {
     onChange(selected.filter((t) => t.id !== id))
+  }
+
+  /** Accept a typed match: clears the draft so the next tag can be typed. */
+  function pick(tag) {
+    acceptHint(tag)
+    draft = ''
+    active = -1
   }
 
   function acceptHint(tag) {
@@ -163,7 +209,24 @@
   {#if err}
     <p class="tag-field__err">{err}</p>
   {/if}
-  {#if hints.length}
+  {#if matches.length}
+    <div class="tag-field__hints" role="listbox" aria-label="Подходящие теги">
+      {#each matches as m, i (m.id)}
+        <button
+          type="button"
+          class="tag-hint tag-hint--match"
+          class:tag-hint--active={i === active}
+          style:--tag={m.color || '#9a9a9a'}
+          role="option"
+          aria-selected={i === active}
+          onmousedown={(e) => e.preventDefault()}
+          onclick={() => pick(m)}
+        >
+          {m.slug}
+        </button>
+      {/each}
+    </div>
+  {:else if hints.length}
     <div class="tag-field__hints" role="list">
       {#each hints as h (h.tag.id)}
         <button
@@ -248,6 +311,15 @@
     font-family: var(--font-mono, monospace);
     font-size: 0.68rem;
     cursor: pointer;
+  }
+
+  .tag-hint--match {
+    border-style: solid;
+  }
+
+  .tag-hint--active {
+    color: var(--color-fg, #e8e8e8);
+    background: color-mix(in srgb, var(--tag, #9a9a9a) 22%, transparent);
   }
 
   .tag-hint:hover {
