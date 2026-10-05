@@ -985,45 +985,6 @@
     <button type="button" class="graph__btn" onclick={fit}>Вписать</button>
   </div>
 
-  {#if draft.ops.length}
-    <div class="gdraft">
-      <button type="button" class="gdraft__toggle" aria-expanded={draftOpen} onclick={() => (draftOpen = !draftOpen)}>
-        Журнал изменений · {draft.ops.length}
-        <Icon name={draftOpen ? 'chevron-down' : 'chevron-right'} size={12} />
-      </button>
-      <span class="gdraft__hint">
-        {#if ownerless.size}
-          Нужно исправить: {ownerless.size} (красная рамка): шаг или файл без владельца, квест без шагов. Пока не исправлено, сохранить нельзя.
-        {:else}
-          В базе пока ничего нет — сохраните или отмените.
-        {/if}
-      </span>
-      <button
-        type="button"
-        class="graph__btn graph__btn--primary"
-        disabled={committing || ownerless.size > 0}
-        title={ownerless.size ? 'Есть невалидные элементы (красная рамка)' : 'Применить все изменения'}
-        onclick={saveDraft}
-      >
-        {committing ? 'Сохраняю…' : 'Сохранить'}
-      </button>
-      <button type="button" class="graph__btn" onclick={() => (cancelAsk = true)}>Отменить всё</button>
-    </div>
-    {#if draftOpen}
-      <ol class="gdraft__list">
-        {#each draft.ops as op (op.id)}
-          <li class:gdraft__row--bad={opProblems[op.id]}>
-            <span class="gdraft__text">{describeOp(op, titleOf)}</span>
-            {#if opProblems[op.id]}<span class="gdraft__msg">{opProblems[op.id]}</span>{/if}
-            <button type="button" class="gdraft__x" title="Убрать из черновика" aria-label="Убрать из черновика" onclick={() => askDrop(op)}>
-              <Icon name="close" size={12} />
-            </button>
-          </li>
-        {/each}
-      </ol>
-    {/if}
-  {/if}
-
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="graph__stage"
@@ -1186,6 +1147,65 @@
         </div>
       {/each}
     </div>
+
+    {#if draft.ops.length}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="gdraft"
+        class:gdraft--strip={!draftOpen}
+        onpointerdown={(e) => e.stopPropagation()}
+        onwheel={(e) => e.stopPropagation()}
+        oncontextmenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+      >
+        <div class="gdraft__head">
+          <button
+            type="button"
+            class="gdraft__toggle"
+            aria-expanded={draftOpen}
+            title={draftOpen ? 'Свернуть в полоску' : 'Развернуть журнал'}
+            onclick={() => (draftOpen = !draftOpen)}
+          >
+            <Icon name={draftOpen ? 'chevron-down' : 'chevron-right'} size={12} />
+            Журнал ({draft.ops.length})
+          </button>
+          <span class="gdraft__btns">
+            <button
+              type="button"
+              class="graph__btn graph__btn--primary"
+              disabled={committing || ownerless.size > 0}
+              title={ownerless.size ? 'Есть невалидные элементы (красная рамка)' : 'Применить все изменения'}
+              onclick={saveDraft}
+            >
+              {committing ? 'Сохраняю…' : 'Сохранить'}
+            </button>
+            <button type="button" class="graph__btn" onclick={() => (cancelAsk = true)}>Отменить всё</button>
+          </span>
+        </div>
+        {#if draftOpen}
+          <p class="gdraft__hint">
+            {#if ownerless.size}
+              Нужно исправить: {ownerless.size} (красная рамка) — шаг или файл без владельца, квест без шагов. Пока не исправлено, сохранить нельзя.
+            {:else}
+              В базе пока ничего нет — сохраните или отмените.
+            {/if}
+          </p>
+          <ol class="gdraft__list">
+            {#each draft.ops as op (op.id)}
+              <li class:gdraft__row--bad={opProblems[op.id]}>
+                <span class="gdraft__text">{describeOp(op, titleOf)}</span>
+                {#if opProblems[op.id]}<span class="gdraft__msg">{opProblems[op.id]}</span>{/if}
+                <button type="button" class="gdraft__x" title="Убрать из черновика" aria-label="Убрать из черновика" onclick={() => askDrop(op)}>
+                  <Icon name="close" size={12} />
+                </button>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+      </div>
+    {/if}
 
     {#if data?.truncated}
       <p class="graph__trunc">Показаны не все узлы — уменьшите глубину</p>
@@ -1605,16 +1625,44 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, #e0443e 22%, transparent);
   }
 
+  /* The change log floats over the top-right of the field; folded it is a strip. */
   .gdraft {
+    position: absolute;
+    z-index: 6;
+    top: 0.6rem;
+    right: 0.6rem;
+    width: min(24rem, calc(100% - 1.2rem));
+    max-height: calc(100% - 1.2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 9%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: 0 4px 18px color-mix(in srgb, #000 45%, transparent);
+    font-size: var(--text-sm, 0.875rem);
+    cursor: default;
+  }
+
+  .gdraft--strip {
+    width: auto;
+    max-width: calc(100% - 1.2rem);
+    padding: 0.3rem 0.5rem;
+    border-radius: 999px;
+  }
+
+  .gdraft__head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.4rem 0.7rem;
-    border: 1px solid color-mix(in srgb, var(--color-accent, #c9a227) 55%, transparent);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 8%, transparent);
-    font-size: var(--text-sm, 0.875rem);
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .gdraft__btns {
+    display: inline-flex;
+    gap: 0.4rem;
   }
 
   .gdraft__toggle {
@@ -1630,7 +1678,7 @@
   }
 
   .gdraft__hint {
-    flex: 1 1 14rem;
+    margin: 0;
     font-size: var(--text-xs, 0.75rem);
     color: var(--color-fg-muted, #9a9a9a);
   }
@@ -1651,10 +1699,11 @@
     list-style: none;
     margin: 0;
     padding: 0.2rem 0.4rem;
-    max-height: 11rem;
+    min-height: 0;
     overflow: auto;
     border: 1px solid var(--color-border, #333);
     border-radius: 10px;
+    background: color-mix(in srgb, #000 18%, transparent);
     font-size: var(--text-xs, 0.75rem);
   }
 
