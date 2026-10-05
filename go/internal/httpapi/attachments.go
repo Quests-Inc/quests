@@ -105,11 +105,10 @@ func (s *Server) listAttachments(w http.ResponseWriter, r *http.Request, ownerTy
 		writeErr(w, 500, err.Error())
 		return
 	}
-	ownerUpdated := s.ownerUpdatedAt(r.Context(), ownerType, id)
 	probe := r.URL.Query().Get("stat") != "0"
 	out := make([]store.AttachmentRead, 0, len(rows))
 	for _, a := range rows {
-		out = append(out, s.decorateAttachment(r.Context(), a, ownerUpdated, probe))
+		out = append(out, s.decorateAttachment(r.Context(), a, probe))
 	}
 	writeJSON(w, 200, out)
 }
@@ -128,65 +127,27 @@ func (s *Server) listAllAttachments(w http.ResponseWriter, r *http.Request) {
 		"questline": {},
 		"note":      {},
 	}
-	updated := map[string]*time.Time{}
 	for _, a := range rows {
 		bucket, ok := out[a.OwnerType]
 		if !ok {
 			continue
 		}
-		var ownerUpdated *time.Time
-		if probe {
-			ukey := a.OwnerType + ":" + strconv.FormatInt(a.OwnerID, 10)
-			if t, hit := updated[ukey]; hit {
-				ownerUpdated = t
-			} else {
-				ownerUpdated = s.ownerUpdatedAt(r.Context(), a.OwnerType, a.OwnerID)
-				updated[ukey] = ownerUpdated
-			}
-		}
 		oid := strconv.FormatInt(a.OwnerID, 10)
-		bucket[oid] = append(bucket[oid], s.decorateAttachment(r.Context(), a, ownerUpdated, probe))
+		bucket[oid] = append(bucket[oid], s.decorateAttachment(r.Context(), a, probe))
 	}
 	writeJSON(w, 200, out)
 }
 
-func (s *Server) ownerUpdatedAt(ctx context.Context, ownerType string, id int64) *time.Time {
-	if ownerType == ownerQuestline {
-		row, err := s.Store.GetQuestline(ctx, id)
-		if err != nil {
-			return nil
-		}
-		raw, _ := row["updated_at"].(string)
-		if raw == "" {
-			return nil
-		}
-		t, err := timeutil.ParseFlexible(raw)
-		if err != nil {
-			return nil
-		}
-		return &t
-	}
-	if ownerType == ownerNote {
-		n, err := s.Store.GetNote(ctx, id)
-		if err != nil {
-			return nil
-		}
-		t := n.UpdatedAt
-		return &t
-	}
-	q, err := s.Store.GetQuest(ctx, id)
-	if err != nil {
-		return nil
-	}
-	t := q.UpdatedAt
-	return &t
-}
+// sourceUpdatedSlack absorbs the gap between the upload timestamp (taken before
+// the PUT) and the file server's own mtime, which may be second-granular.
+const sourceUpdatedSlack = time.Minute
 
 // decorateAttachment adds live file-server facts. available is false (and the
 // download link should hide) when WebDAV is down — not an error on the listing.
 // source_updated is the "актуализируй" marker: the file's Last-Modified is
-// newer than the quest/questline it is attached to.
-func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, ownerUpdated *time.Time, probe bool) store.AttachmentRead {
+// newer than the moment the current revision was uploaded, i.e. the source
+// file changed on the file server after we took it.
+func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, probe bool) store.AttachmentRead {
 	out := store.AttachmentToRead(a)
 	if !probe {
 		// Leave available/source_updated off: unknown is not "missing", and a
@@ -206,7 +167,7 @@ func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, own
 	out["available"] = true
 	if !info.LastModified.IsZero() {
 		out["last_modified"] = timeutil.ToUTCISO(&info.LastModified)
-		if ownerUpdated != nil && info.LastModified.After(ownerUpdated.UTC()) {
+		if info.LastModified.After(a.UploadedAt.UTC().Add(sourceUpdatedSlack)) {
 			out["source_updated"] = true
 		}
 	}
@@ -218,13 +179,12 @@ func (s *Server) attachmentsForOwner(ctx context.Context, ownerType string, owne
 	if err != nil {
 		return []store.AttachmentRead{}
 	}
-	ownerUpdated := s.ownerUpdatedAt(ctx, ownerType, ownerID)
 	out := make([]store.AttachmentRead, 0, len(rows))
 	for _, a := range rows {
 		if a.Hidden {
 			continue
 		}
-		out = append(out, s.decorateAttachment(ctx, a, ownerUpdated, probe))
+		out = append(out, s.decorateAttachment(ctx, a, probe))
 	}
 	return out
 }

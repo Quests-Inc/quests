@@ -1,5 +1,6 @@
 <script>
   import Icon from '../ui/Icon.svelte'
+  import FileKindIcon from '../ui/FileKindIcon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import ConfirmModal from '../modals/ConfirmModal.svelte'
   import {
@@ -586,7 +587,10 @@
       {#if isRaster(a)}
         <img src={thumbSrc(a)} alt="" loading="lazy" />
       {:else}
-        <span class="attpage__ext">{extOf(a) || '···'}</span>
+        <span class="attpage__kind">
+          <FileKindIcon att={a} size={20} />
+          <span class="attpage__ext">{extOf(a) || '···'}</span>
+        </span>
       {/if}
     </div>
     <div class="attpage__main">
@@ -887,6 +891,12 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  .attpage__kind {
+    display: grid;
+    justify-items: center;
+    gap: 0.1rem;
   }
 
   .attpage__ext {

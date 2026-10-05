@@ -614,8 +614,21 @@ func TestAttachmentSourceUpdatedMarker(t *testing.T) {
 	if up.Code != 201 {
 		t.Fatalf("upload = %d %s", up.Code, up.Body.String())
 	}
-	// File Last-Modified is "now"; backdate the quest so the marker fires.
-	_, err := s.Store.DB.Exec(`UPDATE quest SET updated_at = ? WHERE id = ?`,
+	listRows := func() []map[string]any {
+		list := httptest.NewRecorder()
+		h.ServeHTTP(list, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/quests/%d/attachments", qid), nil))
+		var rows []map[string]any
+		if err := json.Unmarshal(list.Body.Bytes(), &rows); err != nil {
+			t.Fatal(err)
+		}
+		return rows
+	}
+	// Fresh upload (even after the quest was last edited) is not "source updated".
+	if rows := listRows(); len(rows) != 1 || rows[0]["source_updated"] != false {
+		t.Fatalf("fresh upload flagged: %v", rows)
+	}
+	// File Last-Modified is "now"; backdate the upload so the marker fires.
+	_, err := s.Store.DB.Exec(`UPDATE attachment SET uploaded_at = ? WHERE owner_id = ?`,
 		timeutil.ToDBUTC(time.Now().UTC().Add(-2*time.Hour)), qid)
 	if err != nil {
 		t.Fatal(err)

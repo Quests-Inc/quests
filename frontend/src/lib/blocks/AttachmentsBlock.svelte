@@ -1,5 +1,6 @@
 <script>
   import Icon from '../ui/Icon.svelte'
+  import FileKindIcon from '../ui/FileKindIcon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import ConfirmModal from '../modals/ConfirmModal.svelte'
   import {
@@ -14,6 +15,7 @@
     uploadAttachmentRevision,
     attachmentDownloadUrl,
   } from '../js/api.js'
+  import { formatLocal } from '../js/time.js'
   import { copyText } from '../js/clipboard.js'
   import { toast } from '../js/toasts.svelte.js'
   import {
@@ -422,6 +424,7 @@
         >
           <span class="attach__file">
             <span class="attach__name">
+              <FileKindIcon att={a} size={16} />
               {a.filename}
               {#if revCount > 1}
                 <button
@@ -443,6 +446,9 @@
                 · {a.scan_status}
               {/if}
             </span>
+            {#if a.uploaded_at}
+              <span class="attach__meta">загружен {formatLocal(a.uploaded_at)}</span>
+            {/if}
             {#if a.source_updated}
               <span class="attach__flag">источник обновился</span>
             {/if}
@@ -523,6 +529,7 @@
                     <span class="attach__rev-label">
                       v{rev.revision}
                       {#if rev.is_current} · текущая{/if}
+                      · {formatLocal(rev.uploaded_at, { year: '2-digit' })}
                       · {formatSize(rev.size_bytes)}
                       {#if rev.comment}
                         · {rev.comment}
