@@ -38,8 +38,7 @@ func (s *Server) registerParity(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/templates/{id}/emit-attempts", s.listEmitAttempts)
 	s.registerSecretRoutes(mux)
 
-	mux.HandleFunc("GET /api/hero", s.getHero)
-	mux.HandleFunc("GET /api/stats", s.getStats)
+	mux.HandleFunc("GET /api/templates/{id}/streak", s.getTemplateStreak)
 	mux.HandleFunc("GET /api/quest-log", s.getQuestLog)
 	mux.HandleFunc("GET /api/context", s.getContext)
 }
@@ -355,29 +354,13 @@ func (s *Server) emitTemplate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, out)
 }
 
-func (s *Server) getHero(w http.ResponseWriter, r *http.Request) {
-	row, err := s.Store.GetHero(r.Context())
+func (s *Server) getTemplateStreak(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		writeErr(w, 400, "bad template id")
 		return
 	}
-	writeJSON(w, 200, row)
-}
-
-func (s *Server) getStats(w http.ResponseWriter, r *http.Request) {
-	days := 30
-	if v := r.URL.Query().Get("days"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			days = n
-		}
-	}
-	var tid *int64
-	if v := r.URL.Query().Get("template_id"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			tid = &n
-		}
-	}
-	row, err := s.Store.BuildStats(r.Context(), days, tid)
+	row, err := s.Store.TemplateStreak(r.Context(), id, timeutil.NowUTC())
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Template not found")
 		return

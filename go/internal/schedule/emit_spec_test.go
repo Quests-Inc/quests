@@ -76,7 +76,6 @@ CREATE TABLE questtemplate (
 	emit_window_end TEXT,
 	emit_pool_command TEXT,
 	emit_limits TEXT,
-	reward_attrs TEXT,
 	category_id INTEGER,
 	questline_id INTEGER,
 	automated INTEGER NOT NULL DEFAULT 0

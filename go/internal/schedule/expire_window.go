@@ -75,7 +75,6 @@ func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int
 		if err != nil {
 			return expired, err
 		}
-		_ = st.ApplyQuestStatusRewards(ctx, updated, domain.StatusExpired)
 		qid := updated.ID
 		hub.Publish("quest_expired", events.PublishOpts{
 			QuestID:      &qid,

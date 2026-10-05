@@ -46,8 +46,6 @@
   import ConfirmModal from './lib/modals/ConfirmModal.svelte'
   import ContextMenu from './lib/ui/ContextMenu.svelte'
   import ToastHost from './lib/ui/ToastHost.svelte'
-  import HeroPanel from './lib/blocks/HeroPanel.svelte'
-  import StatsPanel from './lib/blocks/StatsPanel.svelte'
   import JournalHeader from './lib/blocks/JournalHeader.svelte'
   import QuestSidebar from './lib/blocks/QuestSidebar.svelte'
   import QuestDetail from './lib/blocks/QuestDetail.svelte'
@@ -84,7 +82,7 @@
     db: 'unknown',
   })
   let searchQuery = $state('')
-  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'hero' | 'stats'} */
+  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar'} */
   let view = $state('journal')
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
@@ -132,10 +130,6 @@
   function revealListOnNarrow(key) {
     if (isNarrowViewport()) setSidebarCollapsed(key, false)
   }
-  /** Bump to refresh hero silently after quest events. */
-  let heroNonce = $state(0)
-  /** Bump to refresh stats silently after quest events. */
-  let statsNonce = $state(0)
   /** @type {{ id: number, slug: string, label: string, sort_order: number, color?: string }[]} */
   let categories = $state([])
   /** @type {{ id: number, title: string, category_id?: number | null, color?: string, icon?: string }[]} */
@@ -1017,9 +1011,7 @@
         raw === 'toc' ||
         raw === 'notes' ||
         raw === 'attachments' ||
-        raw === 'calendar' ||
-        raw === 'hero' ||
-        raw === 'stats'
+        raw === 'calendar'
       ) {
         return raw
       }
@@ -1061,7 +1053,7 @@
   }
 
   // Header tab order; drives which way a tab switch slides.
-  const TAB_ORDER = ['journal', 'toc', 'notes', 'attachments', 'calendar', 'hero', 'stats']
+  const TAB_ORDER = ['journal', 'toc', 'notes', 'attachments', 'calendar']
   let navDir = $state(1)
 
   /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
@@ -1240,8 +1232,6 @@
         }
         if (msg?.type === 'quests_changed') {
           load({ silent: true })
-          if (view === 'hero') heroNonce += 1
-          if (view === 'stats') statsNonce += 1
         }
       },
       {
@@ -1251,8 +1241,6 @@
           void load({ silent: true })
           void refreshTemplates()
           void refreshHealth()
-          if (view === 'hero') heroNonce += 1
-          if (view === 'stats') statsNonce += 1
         },
       },
     )
@@ -1383,8 +1371,8 @@
       {
         id: 'tabs',
         group: 'Вкладки',
-        label: 'Журнал, оглавление, заметки, вложения, календарь, герой, статистика',
-        keys: '1–7',
+        label: 'Журнал, оглавление, заметки, вложения, календарь',
+        keys: '1–5',
         codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
         run: (event) => {
           const i = Number(event.code.slice(-1)) - 1
@@ -1576,15 +1564,7 @@
     in:slideTab={{ dir: navDir }}
     out:slideTab={{ dir: navDir, out: true }}
   >
-  {#if view === 'hero'}
-    <div class="journal__hero">
-      <HeroPanel active={view === 'hero'} nonce={heroNonce} />
-    </div>
-  {:else if view === 'stats'}
-    <div class="journal__stats">
-      <StatsPanel active={view === 'stats'} nonce={statsNonce} />
-    </div>
-  {:else if view === 'calendar'}
+  {#if view === 'calendar'}
     <div class="journal__calendar">
       <ActivityCalendar
         {quests}

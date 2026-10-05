@@ -3,12 +3,12 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
 
   /** @type {{
-   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'hero' | 'stats',
+   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar',
    *   liveStatus: string,
    *   health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
    *   sidebarCollapsed?: boolean,
    *   onToggleSidebar?: (() => void) | null,
-   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'hero' | 'stats') => void,
+   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar') => void,
    *   onOpenSettings: () => void,
    *   onOpenTemplates: () => void,
    *   onOpenSecrets: () => void,
@@ -334,8 +334,7 @@
       </button>
     {/if}
     <!-- No section label here: tabbed views show theirs via the tab
-         highlight, and hero/stats open with their own page heading right
-         below — a header copy just repeated it and, on a phone, collided
+         highlight — a header copy just repeated it and, on a phone, collided
          with the health chips. -->
     <div class="brand" bind:this={brandEl}></div>
 

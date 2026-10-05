@@ -16,7 +16,6 @@ type QuestRead struct {
 	SortOrder        int          `json:"sort_order"`
 	DeadlineAt       *string      `json:"deadline_at"`
 	DurationSeconds  *int         `json:"duration_seconds"`
-	RewardAttrs      *string      `json:"reward_attrs"`
 	CategoryID       *int64       `json:"category_id"`
 	CategorySlug     *string      `json:"category_slug"`
 	CategoryLabel    *string      `json:"category_label"`
@@ -101,7 +100,6 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 		SortOrder:        q.SortOrder,
 		DeadlineAt:       toISO(q.DeadlineAt),
 		DurationSeconds:  q.DurationSeconds,
-		RewardAttrs:      q.RewardAttrs,
 		CategoryID:       q.CategoryID,
 		CategorySlug:     q.CategorySlug,
 		CategoryLabel:    q.CategoryLabel,

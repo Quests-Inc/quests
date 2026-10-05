@@ -82,8 +82,8 @@ _guide_pointer = (
 server = MCPServer(
     "quests",
     instructions=(
-        "Quests is a personal task/quest journal with light gamification "
-        "(significance, rewards) for one user, conversing in Russian — a web "
+        "Quests is a personal task/quest journal (significance levels) "
+        "for one user, conversing in Russian — a web "
         "journal, desktop GTK/Wayland HUD, Telegram bot, and Android app all "
         "hit the same REST API this MCP server wraps. "
         + _guide_pointer +

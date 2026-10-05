@@ -58,7 +58,6 @@ type templateRow struct {
 	EmitWindowEnd   sql.NullString
 	EmitPoolCommand sql.NullString
 	EmitLimits      sql.NullString
-	RewardAttrs     sql.NullString
 	CategoryID      sql.NullInt64
 	QuestlineID     sql.NullInt64
 	Automated       bool
@@ -94,7 +93,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		SELECT id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
 			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
 			emit_window_start, emit_window_end, emit_pool_command, emit_limits,
-			reward_attrs, category_id, questline_id, automated
+			category_id, questline_id, automated
 		FROM questtemplate WHERE enabled = 1 ORDER BY sort_order, id`)
 	if err != nil {
 		return nil, err
@@ -108,7 +107,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
 			&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
 			&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits,
-			&t.RewardAttrs, &t.CategoryID, &t.QuestlineID, &automated,
+			&t.CategoryID, &t.QuestlineID, &automated,
 		); err != nil {
 			return nil, err
 		}
@@ -259,10 +258,6 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		}
 		if tmpl.Significance == "" {
 			q.Significance = domain.SigCommon
-		}
-		if tmpl.RewardAttrs.Valid {
-			s := tmpl.RewardAttrs.String
-			q.RewardAttrs = &s
 		}
 		if tmpl.CategoryID.Valid {
 			v := tmpl.CategoryID.Int64
@@ -908,12 +903,12 @@ func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRo
 		SELECT id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
 			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
 			emit_window_start, emit_window_end, emit_pool_command, emit_limits,
-			reward_attrs, category_id, questline_id, automated
+			category_id, questline_id, automated
 		FROM questtemplate WHERE id = ?`, id).Scan(
 		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
 		&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
 		&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits,
-		&t.RewardAttrs, &t.CategoryID, &t.QuestlineID, &automated,
+		&t.CategoryID, &t.QuestlineID, &automated,
 	)
 	if err == sql.ErrNoRows {
 		return templateRow{}, ErrTemplateNotFound
@@ -1004,10 +999,6 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 	}
 	if tmpl.Significance == "" {
 		q.Significance = domain.SigCommon
-	}
-	if tmpl.RewardAttrs.Valid {
-		s := tmpl.RewardAttrs.String
-		q.RewardAttrs = &s
 	}
 	if tmpl.CategoryID.Valid {
 		v := tmpl.CategoryID.Int64

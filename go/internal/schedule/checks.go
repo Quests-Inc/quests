@@ -92,7 +92,6 @@ func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 				log.Printf("checks: stale fail step %d: %v", st.ID, err)
 				continue
 			}
-			_ = r.Store.ApplyQuestStatusRewards(ctx, updated, domain.StatusFailed)
 			qid := updated.ID
 			r.Hub.Publish("quest_failed", events.PublishOpts{
 				QuestID: &qid, Title: updated.Title, Description: updated.Description,
@@ -308,9 +307,6 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		log.Printf("checks: poll save step %d: %v", st.ID, err)
 		return
 	}
-	if updated.Status == domain.StatusCompleted {
-		_ = r.Store.ApplyQuestStatusRewards(ctx, updated, domain.StatusCompleted)
-	}
 	qid := updated.ID
 	r.Hub.Publish(kind, events.PublishOpts{
 		QuestID: &qid, Title: updated.Title, Description: updated.Description,
@@ -341,9 +337,6 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q domain.Quest, st *domain.
 			log.Printf("checks: once ok step %d: %v", st.ID, err)
 			return
 		}
-		if updated.Status == domain.StatusCompleted {
-			_ = r.Store.ApplyQuestStatusRewards(ctx, updated, domain.StatusCompleted)
-		}
 		qid := updated.ID
 		r.Hub.Publish(kind, events.PublishOpts{
 			QuestID: &qid, Title: updated.Title, Description: updated.Description,
@@ -372,7 +365,6 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q domain.Quest, st *domain.
 		log.Printf("checks: once fail step %d: %v", st.ID, err)
 		return
 	}
-	_ = r.Store.ApplyQuestStatusRewards(ctx, updated, domain.StatusFailed)
 	qid := updated.ID
 	r.Hub.Publish("quest_failed", events.PublishOpts{
 		QuestID: &qid, Title: updated.Title, Description: updated.Description,

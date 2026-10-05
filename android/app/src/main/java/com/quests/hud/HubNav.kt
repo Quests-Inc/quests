@@ -8,8 +8,7 @@ package com.quests.hud
  */
 object HubNav {
     const val TAB_JOURNAL = "journal"
-    // hero/stats aren't in the header's own tab bar (unfinished) — not part
-    // of the swipe strip. Linear, no wrap: settings through calendar.
+    // Linear, no wrap: settings through calendar.
     val TAB_ORDER = listOf("journal", "toc", "notes", "attachments", "calendar")
 
     var pendingTab: String? = null

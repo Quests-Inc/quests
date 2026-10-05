@@ -105,8 +105,6 @@ class QuestBase(SQLModel):
     deadline_at: Optional[datetime] = None
     # Length of the countdown window ending at deadline_at (seconds).
     duration_seconds: Optional[int] = Field(default=None, ge=1)
-    # JSON object of attribute weights, e.g. {"str":1,"int":2}. Empty = XP+impulse only.
-    reward_attrs: Optional[str] = Field(default=None, max_length=500)
     category_id: Optional[int] = Field(
         default=None, foreign_key="questcategory.id", index=True
     )
@@ -260,7 +258,6 @@ class QuestUpdate(SQLModel):
     sort_order: Optional[int] = None
     deadline_at: Optional[datetime] = None
     duration_seconds: Optional[int] = Field(default=None, ge=1)
-    reward_attrs: Optional[str] = Field(default=None, max_length=500)
     category_id: Optional[int] = None
     questline_id: Optional[int] = None
     automated: Optional[bool] = None
@@ -334,8 +331,6 @@ class QuestTemplateBase(SQLModel):
     # How many items to draw from the pool per successful roll.
     # Optional JSON overrides of the emit-output limits (max_steps, max_title, …).
     emit_limits: Optional[str] = Field(default=None, max_length=1000)
-    # JSON attribute weights copied onto instances, e.g. {"str":1,"int":2}.
-    reward_attrs: Optional[str] = Field(default=None, max_length=500)
     category_id: Optional[int] = Field(
         default=None, foreign_key="questcategory.id", index=True
     )
@@ -422,7 +417,6 @@ class QuestTemplateUpdate(SQLModel):
     emit_window_end: Optional[str] = Field(default=None, max_length=8)
     emit_pool_command: Optional[str] = Field(default=None, max_length=20000)
     steps: Optional[List[QuestTemplateStepCreate]] = None
-    reward_attrs: Optional[str] = Field(default=None, max_length=500)
     category_id: Optional[int] = None
     questline_id: Optional[int] = None
 
@@ -523,104 +517,6 @@ class QuestChangeLogRead(SQLModel):
 
     @field_serializer("at", when_used="json")
     def _ser_at(self, value: Optional[datetime]) -> Optional[str]:
-        return to_utc_iso(value)
-
-
-# --- Hero sheet / metrics -------------------------------------------------
-
-
-class HeroAttributeId(str, Enum):
-    str = "str"  # сила
-    dex = "dex"  # ловкость
-    con = "con"  # выносливость
-    int = "int"  # интеллект
-    wis = "wis"  # мудрость
-    cha = "cha"  # харизма
-
-
-ATTR_LABEL_RU: dict[str, str] = {
-    HeroAttributeId.str.value: "Сила",
-    HeroAttributeId.dex.value: "Ловкость",
-    HeroAttributeId.con.value: "Выносливость",
-    HeroAttributeId.int.value: "Интеллект",
-    HeroAttributeId.wis.value: "Мудрость",
-    HeroAttributeId.cha.value: "Харизма",
-}
-
-
-class HeroSheet(SQLModel, table=True):
-    """Singleton player sheet (id=1)."""
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    xp: int = Field(default=0, ge=0)
-    momentum: int = Field(default=50, ge=0, le=100)
-    # Naive UTC; decay advances this by whole hours.
-    momentum_updated_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
-
-
-class HeroAttribute(SQLModel, table=True):
-    __table_args__ = (UniqueConstraint("attr_id", name="uq_hero_attribute_attr_id"),)
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    attr_id: str = Field(max_length=8, index=True)
-    rank: int = Field(default=0, ge=0)
-    progress: int = Field(default=0, ge=0)
-    updated_at: datetime = Field(default_factory=utcnow)
-
-
-class MetricLedger(SQLModel, table=True):
-    """Append-only metric changes (xp / momentum / attribute progress)."""
-
-    __table_args__ = (
-        UniqueConstraint("quest_id", "reason", name="uq_metric_ledger_quest_reason"),
-    )
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    at: datetime = Field(default_factory=utcnow, index=True)
-    kind: str = Field(max_length=16, index=True)  # xp | momentum | attr
-    attr_id: Optional[str] = Field(default=None, max_length=8)
-    delta: int = 0
-    balance_after: int = 0
-    quest_id: Optional[int] = Field(default=None, foreign_key="quest.id", index=True)
-    reason: str = Field(max_length=64, index=True)
-    flavor: Optional[str] = Field(default=None, max_length=300)
-
-
-class HeroAttributeRead(SQLModel):
-    attr_id: str
-    label: str
-    rank: int
-    progress: int
-    progress_to_next: int
-
-
-class MetricLedgerRead(SQLModel):
-    id: int
-    at: datetime
-    kind: str
-    attr_id: Optional[str] = None
-    delta: int
-    balance_after: int
-    quest_id: Optional[int] = None
-    reason: str
-    flavor: Optional[str] = None
-
-    @field_serializer("at", when_used="json")
-    def _ser_at(self, value: Optional[datetime]) -> Optional[str]:
-        return to_utc_iso(value)
-
-
-class HeroSheetRead(SQLModel):
-    xp: int
-    momentum: int
-    momentum_updated_at: datetime
-    updated_at: datetime
-    attributes: List[HeroAttributeRead] = Field(default_factory=list)
-    recent: List[MetricLedgerRead] = Field(default_factory=list)
-
-    @field_serializer("momentum_updated_at", "updated_at", when_used="json")
-    def _ser_utc(self, value: Optional[datetime]) -> Optional[str]:
         return to_utc_iso(value)
 
 

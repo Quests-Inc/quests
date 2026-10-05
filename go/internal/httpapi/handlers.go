@@ -301,7 +301,6 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 		SortOrder:       body.SortOrder,
 		DeadlineAt:      d,
 		DurationSeconds: dur,
-		RewardAttrs:     body.RewardAttrs,
 		CategoryID:      catID,
 		QuestlineID:     lineID,
 		CreatedAt:       now,
@@ -420,11 +419,6 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 	if v, ok := raw["sort_order"]; ok {
 		_ = json.Unmarshal(v, &q.SortOrder)
 	}
-	if v, ok := raw["reward_attrs"]; ok {
-		var s *string
-		_ = json.Unmarshal(v, &s)
-		q.RewardAttrs = s
-	}
 	if v, ok := raw["category_id"]; ok {
 		var cid *int64
 		_ = json.Unmarshal(v, &cid)
@@ -525,9 +519,6 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-	}
-	if updated.Status != beforeStatus {
-		_ = s.Store.ApplyQuestStatusRewards(r.Context(), updated, updated.Status)
 	}
 	quiet, source := s.publishOpts(r)
 	qid := updated.ID

@@ -66,7 +66,7 @@ type ListFilter struct {
 func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]domain.Quest, error) {
 	q := `
 		SELECT q.id, q.title, q.description, q.status, q.significance, q.pinned, q.sort_order,
-			q.deadline_at, q.duration_seconds, q.reward_attrs, q.category_id, q.questline_id,
+			q.deadline_at, q.duration_seconds, q.category_id, q.questline_id,
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
 			l.title, l.color, l.icon, l.custom_icon, l.updated_at
@@ -130,7 +130,7 @@ func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]domain.Quest, e
 func (s *Store) GetQuest(ctx context.Context, id int64) (domain.Quest, error) {
 	row := s.DB.QueryRowContext(ctx, `
 		SELECT q.id, q.title, q.description, q.status, q.significance, q.pinned, q.sort_order,
-			q.deadline_at, q.duration_seconds, q.reward_attrs, q.category_id, q.questline_id,
+			q.deadline_at, q.duration_seconds, q.category_id, q.questline_id,
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
 			l.title, l.color, l.icon, l.custom_icon, l.updated_at
@@ -165,7 +165,7 @@ func scanQuest(row rowScanner) (domain.Quest, error) {
 	var q domain.Quest
 	var deadline, completed, created, updated sql.NullString
 	var duration sql.NullInt64
-	var reward, period, source sql.NullString
+	var period, source sql.NullString
 	var catID, lineID, tmplID sql.NullInt64
 	var pinned, automated int
 	var cSlug, cLabel, cColor sql.NullString
@@ -173,7 +173,7 @@ func scanQuest(row rowScanner) (domain.Quest, error) {
 	var lUpdated sql.NullString
 	err := row.Scan(
 		&q.ID, &q.Title, &q.Description, &q.Status, &q.Significance, &pinned, &q.SortOrder,
-		&deadline, &duration, &reward, &catID, &lineID,
+		&deadline, &duration, &catID, &lineID,
 		&created, &updated, &completed, &tmplID, &period, &automated, &source,
 		&cSlug, &cLabel, &cColor,
 		&lTitle, &lColor, &lIcon, &lCustom, &lUpdated,
@@ -197,10 +197,6 @@ func scanQuest(row rowScanner) (domain.Quest, error) {
 	if duration.Valid {
 		v := int(duration.Int64)
 		q.DurationSeconds = &v
-	}
-	if reward.Valid {
-		s := reward.String
-		q.RewardAttrs = &s
 	}
 	if catID.Valid {
 		v := catID.Int64
@@ -359,11 +355,11 @@ func (s *Store) createQuest(ctx context.Context, q domain.Quest, changeKind, cha
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO quest (
 			title, description, status, significance, pinned, sort_order,
-			deadline_at, duration_seconds, reward_attrs, category_id, questline_id,
+			deadline_at, duration_seconds, category_id, questline_id,
 			created_at, updated_at, completed_at, template_id, period_key, automated, source
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), boolInt(q.Pinned), q.SortOrder,
-		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullStr(q.RewardAttrs), nullI64(q.CategoryID), nullI64(q.QuestlineID),
+		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.CreatedAt), timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), nullI64(q.TemplateID), nullStr(q.PeriodKey), boolInt(q.Automated), nullStr(q.Source),
 	)
 	if err != nil {
@@ -410,11 +406,11 @@ func (s *Store) UpdateQuest(ctx context.Context, q domain.Quest, changeKind, cha
 	_, err = tx.ExecContext(ctx, `
 		UPDATE quest SET
 			title=?, description=?, status=?, significance=?, pinned=?, sort_order=?,
-			deadline_at=?, duration_seconds=?, reward_attrs=?, category_id=?, questline_id=?,
+			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
 			updated_at=?, completed_at=?, automated=?
 		WHERE id=?`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), boolInt(q.Pinned), q.SortOrder,
-		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullStr(q.RewardAttrs), nullI64(q.CategoryID), nullI64(q.QuestlineID),
+		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated), q.ID,
 	)
 	if err != nil {
@@ -437,9 +433,6 @@ func (s *Store) DeleteQuest(ctx context.Context, id int64, title string) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM metricledger WHERE quest_id = ?`, id); err != nil {
-		return err
-	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM queststep WHERE quest_id = ?`, id); err != nil {
 		return err
 	}
@@ -724,11 +717,11 @@ func (s *Store) UpdateQuestComment(ctx context.Context, q domain.Quest, changeKi
 	_, err = tx.ExecContext(ctx, `
 		UPDATE quest SET
 			title=?, description=?, status=?, significance=?, pinned=?, sort_order=?,
-			deadline_at=?, duration_seconds=?, reward_attrs=?, category_id=?, questline_id=?,
+			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
 			updated_at=?, completed_at=?, automated=?
 		WHERE id=?`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), boolInt(q.Pinned), q.SortOrder,
-		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullStr(q.RewardAttrs), nullI64(q.CategoryID), nullI64(q.QuestlineID),
+		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated), q.ID,
 	)
 	if err != nil {

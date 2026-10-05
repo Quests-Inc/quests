@@ -132,7 +132,6 @@ type Quest struct {
 	SortOrder       int
 	DeadlineAt      *time.Time
 	DurationSeconds *int
-	RewardAttrs     *string
 	CategoryID      *int64
 	QuestlineID     *int64
 	CreatedAt       time.Time
@@ -189,7 +188,6 @@ type QuestCreate struct {
 	SortOrder       int          `json:"sort_order"`
 	DeadlineAt      *string      `json:"deadline_at"`
 	DurationSeconds *int         `json:"duration_seconds"`
-	RewardAttrs     *string      `json:"reward_attrs"`
 	CategoryID      *int64       `json:"category_id"`
 	QuestlineID     *int64       `json:"questline_id"`
 	Automated       bool         `json:"automated"`

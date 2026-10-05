@@ -56,7 +56,6 @@ CREATE TABLE quest (
 	sort_order INTEGER NOT NULL DEFAULT 0,
 	deadline_at DATETIME,
 	duration_seconds INTEGER,
-	reward_attrs TEXT,
 	category_id INTEGER,
 	questline_id INTEGER,
 	created_at DATETIME NOT NULL,
@@ -96,10 +95,6 @@ CREATE TABLE questchangelog (
 CREATE TABLE questtemplate (
 	id INTEGER PRIMARY KEY,
 	questline_id INTEGER
-);
-CREATE TABLE metricledger (
-	id INTEGER PRIMARY KEY,
-	quest_id INTEGER
 );
 CREATE TABLE attachment (
 	id INTEGER PRIMARY KEY,

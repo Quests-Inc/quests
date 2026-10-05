@@ -214,23 +214,16 @@
     border-bottom-color: var(--color-fg, #e8e8e8);
   }
 
-  .journal__hero,
-  .journal__calendar,
-  .journal__stats {
+  .journal__calendar {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
   }
 
-  .journal__calendar,
-  .journal__stats {
+  .journal__calendar {
     padding: var(--space-5, 1.5rem) var(--space-6, 2rem);
     display: flex;
     flex-direction: column;
-  }
-
-  .journal__stats {
-    padding: 0;
   }
 
   .journal__toc {

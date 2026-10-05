@@ -6,6 +6,7 @@
     emitTemplate,
     createTemplate,
     deleteTemplate,
+    getTemplateStreak,
     listCategories,
     listQuestlines,
     listTags,
@@ -265,6 +266,32 @@
     secSteps = true
   }
 
+  /** Per-template close streaks, loaded after the list so rows render at once. */
+  let streaks = $state(/** @type {Record<number, any>} */ ({}))
+
+  /** @param {any[]} tpls */
+  async function loadStreaks(tpls) {
+    const out = /** @type {Record<number, any>} */ ({})
+    await Promise.all(
+      tpls.map(async (t) => {
+        try {
+          out[t.id] = await getTemplateStreak(t.id)
+        } catch {
+          /* no streak for this template */
+        }
+      }),
+    )
+    streaks = out
+  }
+
+  /** @param {number} id */
+  function streakLabel(id) {
+    const st = streaks[id]
+    if (!st || !st.closed) return ''
+    const pct = Math.round((st.close_rate || 0) * 100)
+    return `серия ${st.current_streak} · лучшая ${st.longest_streak} · ${pct}%`
+  }
+
   async function refresh() {
     loading = true
     error = ''
@@ -276,6 +303,7 @@
         listTags(),
       ])
       templates = tpls
+      void loadStreaks(tpls)
       categories = Array.isArray(cats) ? cats : []
       questlines = Array.isArray(lines) ? lines : []
       tagCatalog = Array.isArray(tags) ? tags : []
@@ -536,6 +564,7 @@
       t.category_label,
       QUEST_SIGNIFICANCES.find((x) => x.id === t.significance)?.label || 'обычное',
       t.pinned && 'закреплён',
+      streakLabel(t.id),
       `${t.steps?.length ?? 0} ${plural(t.steps?.length ?? 0, ['шаг', 'шага', 'шагов'])}`,
     ]
       .filter(Boolean)
