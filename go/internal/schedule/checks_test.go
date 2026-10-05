@@ -78,7 +78,11 @@ CREATE TABLE questchangelog (
 	detail TEXT NOT NULL DEFAULT '',
 	significance TEXT,
 	revision INTEGER,
-	comment TEXT
+	comment TEXT,
+	entity_type TEXT NOT NULL DEFAULT 'quest',
+	entity_id INTEGER,
+	parent_type TEXT,
+	parent_id INTEGER
 );
 CREATE TABLE tag (
 	id INTEGER PRIMARY KEY,

@@ -658,6 +658,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "Step not found")
 		return
 	}
+	wasDone := st.Done
 	if body.Title != nil {
 		st.Title = *body.Title
 	}
@@ -699,6 +700,9 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 	detail := "изменено"
 	if st.Done {
 		kind = "step_completed"
+		detail = st.Title
+	} else if wasDone {
+		kind = "step_reopened"
 		detail = st.Title
 	}
 	updated, err := s.Store.UpdateStep(r.Context(), *st, q, kind, detail)

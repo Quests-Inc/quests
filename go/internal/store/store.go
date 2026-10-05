@@ -589,9 +589,9 @@ func stageChangeComment(tx *sql.Tx, ctx context.Context, kind string, questID *i
 		cmt = comment
 	}
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO questchangelog (at, kind, quest_id, title, detail, significance, revision, comment)
-		VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
-		timeutil.ToDBUTC(timeutil.NowUTC()), kind, nullI64(questID), title, detail, sig, cmt,
+		INSERT INTO questchangelog (at, kind, quest_id, title, detail, significance, revision, comment, entity_type, entity_id)
+		VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'quest', ?)`,
+		timeutil.ToDBUTC(timeutil.NowUTC()), kind, nullI64(questID), title, detail, sig, cmt, nullI64(questID),
 	)
 	return err
 }

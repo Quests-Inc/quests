@@ -503,6 +503,12 @@ class QuestChangeLog(SQLModel, table=True):
     significance: Optional[str] = Field(default=None, max_length=16)
     # Monotonic hub revision when published live; null if backfilled later.
     revision: Optional[int] = Field(default=None, index=True)
+    # What the entry is about: quest | note | attachment. quest_id stays for quests.
+    entity_type: str = Field(default="quest", max_length=16)
+    entity_id: Optional[int] = Field(default=None)
+    # Owner of an attachment (quest | questline | note), for history in its card.
+    parent_type: Optional[str] = Field(default=None, max_length=16)
+    parent_id: Optional[int] = Field(default=None)
 
 
 class QuestChangeLogRead(SQLModel):
@@ -514,6 +520,10 @@ class QuestChangeLogRead(SQLModel):
     detail: str
     significance: Optional[str] = None
     revision: Optional[int] = None
+    entity_type: str = "quest"
+    entity_id: Optional[int] = None
+    parent_type: Optional[str] = None
+    parent_id: Optional[int] = None
 
     @field_serializer("at", when_used="json")
     def _ser_at(self, value: Optional[datetime]) -> Optional[str]:

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/refs"
@@ -147,7 +149,7 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 			created = copied
 		}
 	}
-	s.publishNote("note_created", created)
+	s.logNote("note_created", created, "создана", 0)
 	writeJSON(w, 201, s.notePayloadFiltered(r, created))
 }
 
@@ -259,7 +261,7 @@ func (s *Server) patchNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishNote("note_updated", updated)
+	s.logNote("note_updated", updated, "изменена", 10*time.Minute)
 	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
 }
 
@@ -282,7 +284,7 @@ func (s *Server) deleteNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishNote("note_deleted", cur)
+	s.logNote("note_deleted", cur, "удалена", 0)
 	w.WriteHeader(204)
 }
 
@@ -371,7 +373,7 @@ func (s *Server) postNoteIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishNote("note_updated", updated)
+	s.logNote("note_updated", updated, "изменена", 10*time.Minute)
 	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
 }
 
@@ -386,7 +388,7 @@ func (s *Server) deleteNoteIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishNote("note_updated", updated)
+	s.logNote("note_updated", updated, "изменена", 10*time.Minute)
 	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
 }
 
@@ -504,6 +506,15 @@ func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []map[str
 	}
 	noteRefs := refs.FilterKind(refs.Parse(blob.String()), "note")
 	return s.resolveRefs(r, noteRefs)
+}
+
+// logNote records the note event in the change log (kind names follow the
+// hub's note_* events) and publishes it live.
+func (s *Server) logNote(kind string, n store.Note, detail string, coalesce time.Duration) {
+	_ = s.Store.LogEvent(context.WithoutCancel(context.Background()), store.ChangeEvent{
+		Kind: kind, EntityType: "note", EntityID: n.ID, Title: n.Title, Detail: detail, Coalesce: coalesce,
+	})
+	s.publishNote(kind, n)
 }
 
 func (s *Server) publishNote(kind string, n store.Note) {

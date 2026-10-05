@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
@@ -90,7 +91,11 @@ CREATE TABLE questchangelog (
 	detail TEXT NOT NULL DEFAULT '',
 	significance TEXT,
 	revision INTEGER,
-	comment TEXT
+	comment TEXT,
+	entity_type TEXT NOT NULL DEFAULT 'quest',
+	entity_id INTEGER,
+	parent_type TEXT,
+	parent_id INTEGER
 );
 CREATE TABLE questtemplate (
 	id INTEGER PRIMARY KEY,
@@ -831,5 +836,49 @@ func TestAttachmentHidden(t *testing.T) {
 	}
 	if c := image(); c != 200 {
 		t.Fatalf("unhidden image = %d, want 200", c)
+	}
+}
+
+func TestAttachmentEventsLandInChangeLog(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	clam := fakeClamd(t, "stream: OK")
+	s := newAttachmentServer(t, dav.URL, clam, 0)
+	qid := seedQuest(t, s)
+	h := s.Handler()
+	up := postFile(t, h, fmt.Sprintf("/api/quests/%d/attachments", qid), "log.md", "", []byte("# x"))
+	if up.Code != 201 {
+		t.Fatalf("upload = %d %s", up.Code, up.Body.String())
+	}
+	rows, err := s.Store.ListChangeLog(context.Background(), 10, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, r := range rows {
+		if r["kind"] == "attachment_added" {
+			found = true
+			if r["entity_type"] != "attachment" || r["parent_type"] != "quest" || r["parent_id"] != qid || r["title"] != "log.md" {
+				t.Fatalf("bad entry: %v", r)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("attachment_added missing: %v", rows)
+	}
+}
+
+func TestLogEventCoalesces(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	ctx := context.Background()
+	ev := store.ChangeEvent{Kind: "note_updated", EntityType: "note", EntityID: 7, Title: "n", Detail: "изменена", Coalesce: 10 * time.Minute}
+	for i := 0; i < 3; i++ {
+		if err := s.Store.LogEvent(ctx, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, _ := s.Store.ListChangeLog(ctx, 10, nil, nil)
+	if len(rows) != 1 {
+		t.Fatalf("want 1 coalesced entry, got %d: %v", len(rows), rows)
 	}
 }
