@@ -1,0 +1,157 @@
+// Overlays the map draft (a log of pending operations) on the graph the server
+// returned, so the page can show what saving would produce. The server stays
+// the judge of validity; this only mirrors it for display.
+
+import { parseRefs } from './refs.js'
+
+const tmpKey = (type, opId) => `${type}:t${opId}`
+
+/**
+ * @param {{ nodes: any[], edges: any[], roots?: string[], root?: string }} graph
+ * @param {{ id: number, kind: string, payload: any }[]} ops
+ * @returns {{ nodes: any[], edges: any[], ownerless: Set<string> }}
+ */
+export function applyDraft(graph, ops) {
+  const nodes = graph.nodes.map((n) => ({ ...n }))
+  const edges = graph.edges.map((e) => ({ ...e }))
+  const byKey = new Map(nodes.map((n) => [n.key, n]))
+  const has = (from, to, kind) => edges.some((e) => e.from === from && e.to === to && e.kind === kind)
+  const addEdge = (from, to, kind, draft, opId) => {
+    if (from === to || has(from, to, kind)) return
+    edges.push({ from, to, kind, draft, op: opId })
+  }
+  const ownerOf = new Map() // node key → owner key (new steps / files)
+
+  const stub = (type, opId, title, extra = {}) => {
+    const key = tmpKey(type, opId)
+    const n = {
+      key,
+      type,
+      id: `t${opId}`,
+      title: title || '(без названия)',
+      depth: -1,
+      links: 0,
+      draft: true,
+      op: opId,
+      ...extra,
+    }
+    nodes.push(n)
+    byKey.set(key, n)
+    return n
+  }
+  // Tokens typed into a new thing's own text are real links once saved.
+  const textRefs = (from, text) => {
+    for (const r of parseRefs(text || '')) {
+      if (r.kind === 'quest' || r.kind === 'note' || r.kind === 'step' || r.kind === 'attachment' || r.kind === 'questline') {
+        addEdge(from, `${r.kind}:${r.id}`, 'reference', 'add', null)
+      }
+    }
+  }
+
+  for (const op of ops) {
+    const p = op.payload || {}
+    switch (op.kind) {
+      case 'create_quest': {
+        const f = p.fields || {}
+        stub('quest', op.id, f.title, { desc: f.description || '', status: f.status || 'active', pos: p.pos })
+        textRefs(tmpKey('quest', op.id), f.description)
+        break
+      }
+      case 'create_note': {
+        const f = p.fields || {}
+        stub('note', op.id, f.title, { desc: f.description || '', pos: p.pos })
+        textRefs(tmpKey('note', op.id), f.description)
+        break
+      }
+      case 'create_step': {
+        const f = p.fields || {}
+        const n = stub('step', op.id, f.title, { desc: f.description || '', progress: '0/1', status: 'open', pos: p.pos })
+        textRefs(n.key, f.description)
+        if (p.quest) ownerOf.set(n.key, p.quest)
+        break
+      }
+      case 'upload_file': {
+        stub('attachment', op.id, p.filename, { mime: p.mime, pos: p.pos })
+        if (p.owner) ownerOf.set(tmpKey('attachment', op.id), p.owner)
+        break
+      }
+      case 'add_ref':
+        addEdge(p.from, p.to, 'reference', 'add', op.id)
+        break
+      case 'remove_ref': {
+        const e = edges.find((x) => x.from === p.from && x.to === p.to && x.kind === 'reference')
+        if (e) {
+          e.draft = 'remove'
+          e.op = op.id
+        }
+        break
+      }
+      case 'attach':
+        ownerOf.set(p.item, p.owner)
+        break
+    }
+  }
+
+  // Owners: a new thing's owner edge, or a re-parented file's new one.
+  for (const [item, owner] of ownerOf) {
+    const n = byKey.get(item)
+    if (!n) continue
+    if (!n.draft) {
+      // A saved attachment moves: its old owner edge goes, the new one is a draft.
+      for (let i = edges.length - 1; i >= 0; i--) {
+        if (edges[i].to === item && edges[i].kind === 'structure') edges.splice(i, 1)
+      }
+    }
+    if (byKey.has(owner)) edges.push({ from: owner, to: item, kind: 'structure', draft: 'add', op: null })
+  }
+
+  // A new step or file with no owner cannot exist on its own.
+  const ownerless = new Set()
+  for (const n of nodes) {
+    if (n.draft && (n.type === 'step' || n.type === 'attachment') && !ownerOf.has(n.key)) ownerless.add(n.key)
+  }
+
+  // Draft things hang where they are linked: depth one past their neighbour.
+  const adj = new Map()
+  for (const e of edges) {
+    if (!adj.has(e.from)) adj.set(e.from, [])
+    if (!adj.has(e.to)) adj.set(e.to, [])
+    adj.get(e.from).push(e.to)
+    adj.get(e.to).push(e.from)
+  }
+  const queue = nodes.filter((n) => n.depth >= 0).map((n) => n.key)
+  for (let i = 0; i < queue.length; i++) {
+    const cur = byKey.get(queue[i])
+    for (const k of adj.get(cur.key) ?? []) {
+      const nb = byKey.get(k)
+      if (nb && nb.depth < 0) {
+        nb.depth = cur.depth + 1
+        queue.push(k)
+      }
+    }
+  }
+  return { nodes, edges, ownerless }
+}
+
+/** One line for the draft log. @param {any} op @param {(key: string) => string} title */
+export function describeOp(op, title) {
+  const p = op.payload || {}
+  switch (op.kind) {
+    case 'create_quest':
+      return `Создать квест «${p.fields?.title ?? ''}»`
+    case 'create_note':
+      return `Создать заметку «${p.fields?.title ?? ''}»`
+    case 'create_step':
+      return `Создать шаг «${p.fields?.title ?? ''}»`
+    case 'upload_file':
+      return `Загрузить файл «${p.filename ?? ''}»`
+    case 'add_ref':
+      return `Ссылка: «${title(p.from)}» → «${title(p.to)}»`
+    case 'remove_ref':
+      return `Убрать ссылку: «${title(p.from)}» → «${title(p.to)}»`
+    case 'attach':
+      return `Прикрепить «${title(p.item)}» к «${title(p.owner)}»`
+    default:
+      return op.kind
+  }
+}

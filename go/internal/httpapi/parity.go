@@ -40,6 +40,7 @@ func (s *Server) registerParity(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/templates/{id}/streak", s.getTemplateStreak)
 	mux.HandleFunc("GET /api/quest-log", s.getQuestLog)
+	mux.HandleFunc("GET /api/graph", s.getGraph)
 	mux.HandleFunc("GET /api/context", s.getContext)
 }
 
@@ -370,6 +371,54 @@ func (s *Server) getTemplateStreak(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, row)
+}
+
+// getGraph maps the neighbourhood of one entity: ?quest=N | note=N | questline=N,
+// optional &depth=1..4 (default 2).
+func (s *Server) getGraph(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var rootType string
+	var rootID int64
+	for _, t := range []string{"quest", "note", "questline"} {
+		if v := q.Get(t); v != "" {
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || n <= 0 {
+				writeErr(w, 400, "bad "+t+" id")
+				return
+			}
+			rootType, rootID = t, n
+			break
+		}
+	}
+	if rootType == "" {
+		writeErr(w, 400, "pass quest=, note= or questline=")
+		return
+	}
+	depth := 2
+	if v := q.Get("depth"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			depth = n
+		}
+	}
+	roots := []store.GraphRoot{{Type: rootType, ID: rootID}}
+	// ?extra=quest:5,note:7 adds more centres to the same map.
+	for _, part := range strings.Split(q.Get("extra"), ",") {
+		t, idStr, ok := strings.Cut(strings.TrimSpace(part), ":")
+		n, err := strconv.ParseInt(idStr, 10, 64)
+		if ok && err == nil && n > 0 && (t == "quest" || t == "note" || t == "questline") {
+			roots = append(roots, store.GraphRoot{Type: t, ID: n})
+		}
+	}
+	g, err := s.Store.BuildGraphRoots(r.Context(), roots, depth)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "Not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, g)
 }
 
 func (s *Server) getQuestLog(w http.ResponseWriter, r *http.Request) {

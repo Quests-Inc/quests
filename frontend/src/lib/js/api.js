@@ -614,3 +614,79 @@ export function getQuestLog(params = {}) {
   const qs = q.toString()
   return request(`/api/quest-log${qs ? `?${qs}` : ''}`)
 }
+
+/**
+ * Relations map around one entity (plus optional extra roots).
+ * @param {string} type @param {number} id @param {number} [depth]
+ * @param {{ type: string, id: number }[]} [extra]
+ */
+export function getGraph(type, id, depth = 2, extra = []) {
+  const more = extra.map((r) => `${r.type}:${r.id}`).join(',')
+  return request(
+    `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}`,
+  )
+}
+
+// --- Map draft: edits made on the relations map, kept on the server until saved.
+
+export function getGraphDraft() {
+  return request('/api/graph-draft')
+}
+
+/** @param {string} kind @param {any} payload */
+export function addGraphDraftOp(kind, payload) {
+  return request('/api/graph-draft/ops', { method: 'POST', body: JSON.stringify({ kind, payload }) })
+}
+
+/** @param {number} id @param {boolean} [dry] dry = only report what would go with it */
+export function deleteGraphDraftOp(id, dry = false) {
+  return request(`/api/graph-draft/ops/${id}${dry ? '?dry=1' : ''}`, { method: 'DELETE' })
+}
+
+/** @param {{ type: string, id: number }[]} roots */
+export function putGraphDraftRoots(roots) {
+  return request('/api/graph-draft/roots', { method: 'PUT', body: JSON.stringify({ roots }) })
+}
+
+export function cancelGraphDraft() {
+  return request('/api/graph-draft', { method: 'DELETE' })
+}
+
+/** Throws on failure; a 422 carries `problems` in the thrown error's `problems`. */
+export async function commitGraphDraft() {
+  const res = await fetch(`${BASE}/api/graph-draft/commit`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Quests-Source': 'web' },
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const err = new Error(data?.error || data?.detail || `HTTP ${res.status}`)
+    // @ts-ignore
+    err.problems = data?.problems || []
+    // @ts-ignore
+    err.failedOp = data?.failed_op ?? null
+    throw err
+  }
+  return data
+}
+
+/** Stages a file in the draft. @param {File} file @param {string} [owner] "quest:5" etc. */
+export async function uploadGraphDraftFile(file, owner = '') {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (owner) fd.append('owner', owner)
+  const res = await fetch(`${BASE}/api/graph-draft/files`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-Quests-Source': 'web' },
+    body: fd,
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const msg = typeof data?.detail === 'string' ? data.detail : `HTTP ${res.status}`
+    toast(msg, { kind: 'error' })
+    throw new Error(msg)
+  }
+  return data
+}

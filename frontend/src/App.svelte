@@ -1,6 +1,7 @@
 <script>
   // Quests web UI — orchestrator (state, load, overlays)
   import HistoryPage from './lib/blocks/HistoryPage.svelte'
+  import GraphPage from './lib/blocks/GraphPage.svelte'
   import { onMount } from 'svelte'
   import { cubicOut } from 'svelte/easing'
   import {
@@ -83,7 +84,7 @@
     db: 'unknown',
   })
   let searchQuery = $state('')
-  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history'} */
+  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph'} */
   let view = $state('journal')
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
@@ -132,6 +133,10 @@
     if (isNarrowViewport()) setSidebarCollapsed(key, false)
   }
   /** @type {{ id: number, slug: string, label: string, sort_order: number, color?: string }[]} */
+  /** Centre of the relations map tab; null until picked or opened from a card. */
+  let graphRoot = $state(/** @type {{ type: string | null, id: number | null }} */ ({ type: null, id: null }))
+  /** Bump to refresh the map after live events. */
+  let graphNonce = $state(0)
   /** Bump to refresh the history feed after live events. */
   let historyNonce = $state(0)
   let categories = $state([])
@@ -469,6 +474,7 @@
         ? {
             questline_id: defaults.questline_id ?? null,
             category_id: defaults.category_id ?? null,
+            description: defaults.description ?? '',
           }
         : null
     modalOpen = true
@@ -976,6 +982,7 @@
     selectedId = quest.id
     load({ silent: true })
     if (meta.mode === 'create') toast('Квест создан', { kind: 'success' })
+    if (view === 'graph') graphNonce += 1
   }
 
   function onDeleted(id) {
@@ -1024,7 +1031,8 @@
         raw === 'notes' ||
         raw === 'attachments' ||
         raw === 'calendar' ||
-        raw === 'history'
+        raw === 'history' ||
+        raw === 'graph'
       ) {
         return raw
       }
@@ -1057,6 +1065,11 @@
     if (nextView === 'notes') {
       return selectedNoteId != null ? { note: selectedNoteId } : { tab: 'notes' }
     }
+    if (nextView === 'graph') {
+      return graphRoot.id != null
+        ? { tab: 'graph', gt: graphRoot.type, gid: graphRoot.id }
+        : { tab: 'graph' }
+    }
     if (nextView === 'attachments') {
       return selectedAttachmentId != null
         ? { attachment: selectedAttachmentId }
@@ -1068,7 +1081,7 @@
   // Header tab order; drives which way a tab switch slides.
   // 'toc' is hidden for now (trial without it, see quest 328); the page and its
   // view branch are kept so the tab can come back by re-adding it here and in the header.
-  const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history']
+  const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph']
   let navDir = $state(1)
 
   /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
@@ -1087,6 +1100,25 @@
     if (from !== -1 && to !== -1 && from !== to) navDir = to > from ? 1 : -1
     view = next
     replaceSearch(searchForView(next))
+  }
+
+  /** Opens the relations map centred on one entity. */
+  function openGraph(type, id) {
+    const from = TAB_ORDER.indexOf(view)
+    navDir = TAB_ORDER.indexOf('graph') > from ? 1 : -1
+    graphRoot = { type, id: Number(id) }
+    replaceSearch(searchForView('graph'))
+    view = 'graph'
+  }
+
+  function onGraphCenter(type, id) {
+    graphRoot = { type, id: Number(id) }
+    replaceSearch(searchForView('graph'))
+  }
+
+  /** Opens a map node's entity in its own tab. */
+  function onGraphOpen(kind, id) {
+    onJournalRef(kind, id)
   }
 
   /** Calendar → History for one day. The URL is set first: History reads its filters on mount. */
@@ -1231,6 +1263,18 @@
       view = 'notes'
     } else if (fromTab) {
       view = fromTab
+      if (fromTab === 'graph') {
+        try {
+          const sp = new URL(location.href).searchParams
+          const gid = Number(sp.get('gid'))
+          const gt = sp.get('gt')
+          if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline')) {
+            graphRoot = { type: gt, id: gid }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
     const fromUrl = questIdFromUrl()
     if (fromUrl != null && fromNote == null && fromAtt == null && fromTab == null) {
@@ -1256,6 +1300,7 @@
         if (msg?.type === 'quests_changed') {
           load({ silent: true })
           if (view === 'history') historyNonce += 1
+          if (view === 'graph') graphNonce += 1
         }
       },
       {
@@ -1266,6 +1311,7 @@
           void refreshTemplates()
           void refreshHealth()
           if (view === 'history') historyNonce += 1
+          if (view === 'graph') graphNonce += 1
         },
       },
     )
@@ -1396,8 +1442,8 @@
       {
         id: 'tabs',
         group: 'Вкладки',
-        label: 'Журнал, заметки, вложения, календарь, история',
-        keys: '1–5',
+        label: 'Журнал, заметки, вложения, календарь, история, карта',
+        keys: '1–6',
         codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
         run: (event) => {
           const i = Number(event.code.slice(-1)) - 1
@@ -1633,6 +1679,19 @@
         onRef={onJournalRef}
       />
     </div>
+  {:else if view === 'graph'}
+    <div class="journal__graph">
+      <GraphPage
+        active={view === 'graph'}
+        rootType={graphRoot.type}
+        rootId={graphRoot.id}
+        nonce={graphNonce}
+        {quests}
+        {notes}
+        onCenter={onGraphCenter}
+        onOpen={onGraphOpen}
+      />
+    </div>
   {:else if view === 'history'}
     <div class="journal__history">
       <HistoryPage
@@ -1689,6 +1748,7 @@
         onRef={onJournalRef}
       />
       <QuestDetail
+        onOpenGraph={openGraph}
         {selected}
         {kbStepId}
         {quests}

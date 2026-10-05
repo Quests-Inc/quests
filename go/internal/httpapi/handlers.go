@@ -58,6 +58,12 @@ type Server struct {
 }
 
 func (s *Server) Handler() http.Handler {
+	return s.cors(s.requireAuth(s.routes()))
+}
+
+// routes builds the API routes without the cors/auth wrappers; the draft
+// commit uses it to call handlers directly.
+func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.getHealth)
 	mux.HandleFunc("POST /api/health/heartbeat", s.postHeartbeat)
@@ -81,8 +87,9 @@ func (s *Server) Handler() http.Handler {
 	s.registerParity(mux)
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
+	s.registerGraphDraft(mux)
 	s.mountSPA(mux)
-	return s.cors(s.requireAuth(mux))
+	return mux
 }
 
 func (s *Server) cors(next http.Handler) http.Handler {

@@ -511,6 +511,23 @@ class QuestChangeLog(SQLModel, table=True):
     parent_id: Optional[int] = Field(default=None)
 
 
+class GraphDraftOp(SQLModel, table=True):
+    """One pending edit made on the relations map; applied on «Сохранить»."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    kind: str = Field(max_length=32)
+    payload: str  # JSON
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class GraphDraftState(SQLModel, table=True):
+    """Singleton (id=1): view state of the draft, e.g. extra roots on the map."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    roots: str = Field(default="[]")  # JSON [{type, id}]
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
 class QuestChangeLogRead(SQLModel):
     id: int
     at: datetime

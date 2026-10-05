@@ -3,12 +3,12 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
 
   /** @type {{
-   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history',
+   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph',
    *   liveStatus: string,
    *   health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
    *   sidebarCollapsed?: boolean,
    *   onToggleSidebar?: (() => void) | null,
-   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history') => void,
+   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph') => void,
    *   onOpenSettings: () => void,
    *   onOpenTemplates: () => void,
    *   onOpenSecrets: () => void,
@@ -480,6 +480,18 @@
     >
       <Icon name="scroll" size={15} />
       <span class="view-tab__label">История</span>
+    </button>
+    <button
+      type="button"
+      class="view-tab"
+      class:view-tab--on={view === 'graph'}
+      role="tab"
+      aria-selected={view === 'graph'}
+      title="Карта связей"
+      onclick={() => onViewChange('graph')}
+    >
+      <Icon name="map" size={15} />
+      <span class="view-tab__label">Карта</span>
     </button>
   </div>
   {#snippet fullActions()}

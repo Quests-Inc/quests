@@ -39,7 +39,7 @@
   import ModalFoot from './ModalFoot.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{ open: boolean, mode: 'create' | 'edit', quest?: any, defaults?: { questline_id?: number | null, category_id?: number | null }, quests?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (q: any) => void, onDeleted?: (id: number) => void }} */
+  /** @type {{ open: boolean, mode: 'create' | 'edit', quest?: any, defaults?: { questline_id?: number | null, category_id?: number | null, description?: string }, quests?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (q: any) => void, onDeleted?: (id: number) => void, onDraft?: (payload: any) => void }} */
   let {
     open = false,
     mode = 'create',
@@ -51,6 +51,7 @@
     onClose,
     onSaved,
     onDeleted,
+    onDraft = null,
   } = $props()
 
   let title = $state('')
@@ -164,7 +165,7 @@
 
   function resetFromQuest(q) {
     title = q?.title ?? ''
-    description = q?.description ?? ''
+    description = q?.description ?? defaults?.description ?? ''
     status = q?.status ?? 'active'
     significance = q?.significance ?? 'common'
     pinned = Boolean(q?.pinned)
@@ -284,6 +285,12 @@
         if (dur != null) payload.duration_seconds = dur
       }
       let saved
+      if (mode === 'create' && onDraft) {
+        // From the relations map: goes into the draft, nothing is created yet.
+        onDraft({ ...payload, steps: stepsPayload })
+        onClose()
+        return
+      }
       if (mode === 'create') {
         saved = await createQuest({ ...payload, steps: stepsPayload })
       } else {
@@ -468,7 +475,7 @@
 
     <ModalFoot
       onCancel={onClose}
-      submitLabel={mode === 'create' ? 'Создать' : 'Сохранить'}
+      submitLabel={mode === 'create' ? (onDraft ? 'В черновик' : 'Создать') : 'Сохранить'}
       submitIcon={mode === 'create' ? 'checkmark' : 'save'}
       busy={saving}
       disabled={deleting}

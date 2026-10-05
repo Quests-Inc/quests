@@ -97,8 +97,20 @@ CREATE TABLE questchangelog (
 	parent_type TEXT,
 	parent_id INTEGER
 );
+CREATE TABLE graphdraft_op (
+	id INTEGER PRIMARY KEY,
+	kind TEXT NOT NULL,
+	payload TEXT NOT NULL,
+	created_at DATETIME NOT NULL
+);
+CREATE TABLE graphdraft_state (
+	id INTEGER PRIMARY KEY,
+	roots TEXT NOT NULL DEFAULT '[]',
+	updated_at DATETIME NOT NULL
+);
 CREATE TABLE questtemplate (
 	id INTEGER PRIMARY KEY,
+	title TEXT NOT NULL DEFAULT '',
 	questline_id INTEGER
 );
 CREATE TABLE attachment (
@@ -927,5 +939,65 @@ func TestChangeLogFilters(t *testing.T) {
 	bat, _ := timeutil.ParseFlexible(first[0]["at"].(string))
 	if n := count(store.ChangeLogFilter{EntityTypes: all, BeforeID: &bid, BeforeAt: &bat}); n != 2 {
 		t.Fatalf("after cursor = %d", n)
+	}
+}
+
+func TestGraphEdgesAndOrphans(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	clam := fakeClamd(t, "stream: OK")
+	s := newAttachmentServer(t, dav.URL, clam, 0)
+	ctx := context.Background()
+	qid := seedQuest(t, s)
+	linked, err := s.Store.CreateNote(ctx, store.Note{Title: "linked"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphan, err := s.Store.CreateNote(ctx, store.Note{Title: "orphan"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A note pointing at the quest, and the quest text pointing back at "linked".
+	if _, err := s.Store.UpdateNote(ctx, linked.ID, map[string]any{"description": fmt.Sprintf("see quest=%d", qid)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Store.DB.Exec(`UPDATE quest SET description = ? WHERE id = ?`, fmt.Sprintf("uses note=%d", linked.ID), qid); err != nil {
+		t.Fatal(err)
+	}
+	if up := postFile(t, s.Handler(), fmt.Sprintf("/api/quests/%d/attachments", qid), "a.md", "", []byte("# x")); up.Code != 201 {
+		t.Fatalf("upload = %d", up.Code)
+	}
+
+	g, err := s.Store.BuildGraph(ctx, "quest", qid, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]int{}
+	for _, e := range g.Edges {
+		kinds[e.Kind]++
+	}
+	if kinds[store.EdgeStructure] < 2 || kinds[store.EdgeReference] != 2 {
+		t.Fatalf("edge kinds = %v edges=%v", kinds, g.Edges)
+	}
+	byKey := map[string]store.GraphNode{}
+	for _, n := range g.Nodes {
+		byKey[n.Key] = n
+	}
+	if n, ok := byKey[fmt.Sprintf("note:%d", linked.ID)]; !ok || n.Links != 2 {
+		t.Fatalf("linked note = %+v ok=%v", n, ok)
+	}
+	if _, ok := byKey[fmt.Sprintf("note:%d", orphan.ID)]; ok {
+		t.Fatal("unrelated note must not be in the neighbourhood")
+	}
+	// Rooted at the orphan: nothing else is reachable and it has no references.
+	og, err := s.Store.BuildGraph(ctx, "note", orphan.ID, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(og.Nodes) != 1 || og.Nodes[0].Links != 0 {
+		t.Fatalf("orphan graph = %+v", og)
+	}
+	if _, err := s.Store.BuildGraph(ctx, "quest", 99999, 1); err == nil {
+		t.Fatal("missing root must be an error")
 	}
 }

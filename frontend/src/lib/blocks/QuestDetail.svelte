@@ -48,6 +48,7 @@
    *   questlines?: any[],
    *   labels?: Record<string, string>,
    *   onRef?: (kind: string, id: number) => void,
+   *   onOpenGraph?: (type: string, id: number) => void,
    * }} */
   let {
     selected,
@@ -76,6 +77,7 @@
     notes = [],
     labels = {},
     onRef,
+    onOpenGraph,
   } = $props()
 
   const tzLabel = localTimeZone()
@@ -189,6 +191,7 @@
     })
   })
 
+
 </script>
 
 {#snippet questActions(q)}
@@ -215,6 +218,15 @@
       aria-label="Править"
     >
       <Icon name="edit" />
+    </button>
+    <button
+      type="button"
+      class="btn btn--icon"
+      onclick={() => onOpenGraph?.('quest', q.id)}
+      title="Связи"
+      aria-label="Показать связи квеста"
+    >
+      <Icon name="map" />
     </button>
     <button
       type="button"
