@@ -417,13 +417,40 @@
     ctx = { ...ctx, open: false }
   }
 
-  /** Takes the picked cards off the map; draft cards and the centre stay. */
+  /** Takes the picked cards off the map. */
   async function hidePicked() {
+    const keys = [...picked]
+    picked = new Set()
+    await hideKeys(keys)
+  }
+
+  /**
+   * Takes cards off the map. Only what stays linked to a remaining card is
+   * remembered as "hidden" (so it can be brought back); a card with no link
+   * left to anything that stays simply goes. If nothing is left, the map is
+   * cleared. Draft cards are not hidden (drop them from the log instead).
+   * @param {string[]} keys
+   */
+  async function hideKeys(keys) {
+    const gone = new Set(keys)
+    const shown = view?.nodes ?? []
+    const left = shown.filter((n) => !gone.has(n.key) && !n.draft)
+    // Everything real is being removed, the centre included: start over.
+    if (gone.has(data?.root) && !left.length) {
+      await clearMap()
+      return
+    }
+    const stays = new Set(shown.filter((n) => !gone.has(n.key)).map((n) => n.key))
+    const linked = new Set()
+    for (const e of view?.edges ?? []) {
+      if (gone.has(e.from) && stays.has(e.to)) linked.add(e.from)
+      if (gone.has(e.to) && stays.has(e.from)) linked.add(e.to)
+    }
     const hide = new Set(hidden)
     const roots = [...draft.roots]
     let rootsChanged = false
     let skipped = 0
-    for (const k of picked) {
+    for (const k of gone) {
       const n = nodeMap.get(k)
       if (!n || k === data?.root) continue
       if (n.draft) {
@@ -434,9 +461,8 @@
       if (at >= 0) {
         roots.splice(at, 1)
         rootsChanged = true
-      } else hide.add(k)
+      } else if (linked.has(k)) hide.add(k)
     }
-    picked = new Set()
     saveHidden(hide)
     if (rootsChanged) {
       try {
@@ -497,6 +523,25 @@
       nodes = nodes.filter((n) => !withThem.has(n.key))
     }
     filteredOut = offQuests.size
+    // What lost its link to every centre (hidden branches, filtered quests)
+    // goes too; draft things stay wherever they are.
+    {
+      const adj = new Map()
+      const link = (a, b) => {
+        if (!adj.has(a)) adj.set(a, [])
+        adj.get(a).push(b)
+      }
+      const present = new Set(nodes.map((n) => n.key))
+      for (const e of over.edges) {
+        if (present.has(e.from) && present.has(e.to)) {
+          link(e.from, e.to)
+          link(e.to, e.from)
+        }
+      }
+      const reach = new Set([...rootKeys].filter((k) => present.has(k)))
+      for (const k of reach) for (const nb of adj.get(k) ?? []) reach.add(nb)
+      if (reach.size) nodes = nodes.filter((n) => n.draft || reach.has(n.key))
+    }
     const keep = new Set(nodes.map((n) => n.key))
     const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
     void rebuild({ ...g, nodes, edges }, open_)
@@ -1098,6 +1143,7 @@
       if (openTarget(n)) items.push({ id: 'open', label: 'Открыть' })
       if (CENTERABLE.has(n.type) && n.key !== data?.root) items.push({ id: 'center', label: 'Сделать центром' })
       if (n.key !== data?.root) items.push({ id: isExtraRoot(n) ? 'unroot' : 'hide', label: 'Убрать с карты' })
+      else if ((view?.nodes ?? []).every((x) => x.key === n.key || x.draft)) items.push({ id: 'hide', label: 'Убрать с карты' })
     }
     // What can be changed, duplicated, or put into this card.
     const own = []
@@ -1181,7 +1227,7 @@
     else if (id === 'attach' && n) startLink('attach', n)
     else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
     else if (id === 'drop' && n?.op) await askDrop({ id: n.op })
-    else if (id === 'hide' && n) saveHidden(new Set([...hidden, n.key]))
+    else if (id === 'hide' && n) await hideKeys([n.key])
     else if (id === 'unroot' && n) {
       const roots = draft.roots.filter((r) => `${r.type}:${r.id}` !== n.key)
       await putGraphDraftRoots(roots)
