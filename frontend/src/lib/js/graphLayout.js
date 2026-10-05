@@ -127,8 +127,9 @@ export function layoutGraph(nodes, edges, { iterations = 320, sizeOf = () => ({ 
 
 const TYPE_ORDER = { step: 0, cluster: 1, attachment: 1, note: 2, quest: 3, template: 4, questline: 5 }
 const EDGE_RANK = { structure: 0, dependency: 1, reference: 2 }
-/** Leaf siblings of these types, from this count up, are packed into a ball. */
-const BALL_TYPES = new Set(['step', 'attachment'])
+/** Leaf siblings of these types, from this count up, are packed into a block.
+ * Steps are not: a quest rarely has more than ten and they read better in a column. */
+const BALL_TYPES = new Set(['attachment'])
 const BALL_MIN = 6
 
 /**

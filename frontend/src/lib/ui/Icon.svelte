@@ -33,6 +33,10 @@
   import save from '../../assets/icons/save.svg?raw'
   import scroll from '../../assets/icons/scroll.svg?raw'
   import settings from '../../assets/icons/settings.svg?raw'
+  import arrange from '../../assets/icons/arrange.svg?raw'
+  import clearIcon from '../../assets/icons/clear.svg?raw'
+  import fit from '../../assets/icons/fit.svg?raw'
+  import select from '../../assets/icons/select.svg?raw'
   import sidebar from '../../assets/icons/sidebar.svg?raw'
   import subtract from '../../assets/icons/subtract.svg?raw'
   import target from '../../assets/icons/target.svg?raw'
@@ -42,6 +46,7 @@
   const ICONS = {
     add,
     alert,
+    arrange,
     'arrow-up': arrowUp,
     attachment,
     calendar,
@@ -49,6 +54,7 @@
     checkmark,
     'chevron-down': chevronDown,
     'chevron-right': chevronRight,
+    clear: clearIcon,
     close,
     copy,
     delete: deleteIcon,
@@ -58,6 +64,7 @@
     eye,
     'eye-off': eyeOff,
     'file-download': fileDownload,
+    fit,
     filter,
     flag,
     folder,
@@ -73,6 +80,7 @@
     repeat,
     save,
     scroll,
+    select,
     settings,
     sidebar,
     subtract,

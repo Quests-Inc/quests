@@ -1112,7 +1112,8 @@
   }
 
   function onGraphCenter(type, id) {
-    graphRoot = { type, id: Number(id) }
+    // (null, null) = the map was cleared.
+    graphRoot = id == null ? { type: null, id: null } : { type, id: Number(id) }
     replaceSearch(searchForView('graph'))
   }
 

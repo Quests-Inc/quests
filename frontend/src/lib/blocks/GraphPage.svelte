@@ -18,6 +18,8 @@
     getGraph,
     getGraphDraft,
     getNote,
+    QUEST_STATUSES,
+    QUEST_STATUS_LABELS,
     getQuestFull,
     putGraphDraftOp,
     putGraphDraftRoots,
@@ -38,7 +40,7 @@
    *   quests?: any[],
    *   notes?: any[],
    *   questlines?: any[],
-   *   onCenter?: (type: string, id: number) => void,
+   *   onCenter?: (type: string | null, id: number | null) => void,
    *   onOpen?: (kind: string, id: number) => void,
    * }} */
   let {
@@ -366,6 +368,87 @@
     }
   }
 
+  // Which quests the map shows (and offers in "add to the map"). Default: active only.
+  const STATUS_KEY = 'quests.graph.statuses'
+  const loadStatuses = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STATUS_KEY) || 'null')
+      if (Array.isArray(raw)) {
+        const ok = raw.filter((x) => QUEST_STATUSES.includes(x))
+        if (ok.length) return new Set(ok)
+      }
+    } catch {
+      /* fall through to the default */
+    }
+    return new Set(['active'])
+  }
+  let questStatuses = $state(loadStatuses())
+  const toggleStatus = (st) => {
+    const next = new Set(questStatuses)
+    if (next.has(st)) next.delete(st)
+    else next.add(st)
+    if (!next.size) return // at least one status stays on
+    questStatuses = next
+    try {
+      localStorage.setItem(STATUS_KEY, JSON.stringify([...next]))
+    } catch {
+      /* the filter still works until reload */
+    }
+  }
+  let statusLabel = $derived(
+    questStatuses.size === QUEST_STATUSES.length
+      ? 'все'
+      : questStatuses.size === 1
+        ? QUEST_STATUS_LABELS[[...questStatuses][0]]
+        : `${questStatuses.size} статуса`,
+  )
+  /** Quests the status filter keeps off the map right now (for the counter). */
+  let filteredOut = $state(0)
+
+  // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
+  let selectMode = $state(false)
+  let picked = $state(/** @type {Set<string>} */ (new Set()))
+  let marquee = $state(/** @type {{ x0: number, y0: number, x1: number, y1: number } | null} */ (null))
+
+  function toggleSelectMode() {
+    selectMode = !selectMode
+    if (!selectMode) picked = new Set()
+    marquee = null
+    ctx = { ...ctx, open: false }
+  }
+
+  /** Takes the picked cards off the map; draft cards and the centre stay. */
+  async function hidePicked() {
+    const hide = new Set(hidden)
+    const roots = [...draft.roots]
+    let rootsChanged = false
+    let skipped = 0
+    for (const k of picked) {
+      const n = nodeMap.get(k)
+      if (!n || k === data?.root) continue
+      if (n.draft) {
+        skipped += 1
+        continue
+      }
+      const at = roots.findIndex((r) => `${r.type}:${r.id}` === k)
+      if (at >= 0) {
+        roots.splice(at, 1)
+        rootsChanged = true
+      } else hide.add(k)
+    }
+    picked = new Set()
+    saveHidden(hide)
+    if (rootsChanged) {
+      try {
+        await putGraphDraftRoots(roots)
+        await loadDraft()
+      } catch {
+        /* toast already shown */
+      }
+    }
+    if (skipped) toast('Карточки черновика не скрываются: уберите их из журнала', { kind: 'info' })
+  }
+
   /** New steps / files with no owner: drawn red, they block saving. */
   let ownerless = $state(/** @type {Set<string>} */ (new Set()))
   /** Saved things that the draft writes into: node key → ops, oldest first. */
@@ -398,7 +481,22 @@
     ownerless = over.ownerless
     touched = over.touched
     // Hidden cards leave the map together with their edges (never the centre).
-    const nodes = over.nodes.filter((n) => !gone.has(n.key) || n.key === g.root)
+    const statuses = questStatuses
+    const rootKeys = new Set([g.root, ...draft.roots.map((r) => `${r.type}:${r.id}`)])
+    let nodes = over.nodes.filter((n) => !gone.has(n.key) || n.key === g.root)
+    // Quests outside the chosen statuses leave the map, with the steps and
+    // files that hang only off them. Centres and draft things always stay.
+    const offQuests = new Set(
+      nodes.filter((n) => n.type === 'quest' && !n.draft && !rootKeys.has(n.key) && !statuses.has(n.status)).map((n) => n.key),
+    )
+    if (offQuests.size) {
+      const withThem = new Set(offQuests)
+      for (const e of over.edges) {
+        if (e.kind === 'structure' && offQuests.has(e.from) && /^(step|attachment):/.test(e.to)) withThem.add(e.to)
+      }
+      nodes = nodes.filter((n) => !withThem.has(n.key))
+    }
+    filteredOut = offQuests.size
     const keep = new Set(nodes.map((n) => n.key))
     const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
     void rebuild({ ...g, nodes, edges }, open_)
@@ -630,7 +728,25 @@
   // scrollable text and links, so reading and scrolling are not hijacked.
   let drag = null
   function onBgDown(e) {
-    if (e.button !== 0 || e.target.closest('[data-gkey]')) return
+    if (e.target.closest('[data-gkey]')) return
+    // Middle button always pans, also in selection mode.
+    if (e.button === 1) {
+      e.preventDefault()
+      drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
+      stageEl?.setPointerCapture(e.pointerId)
+      return
+    }
+    if (e.button !== 0) return
+    if (selectMode) {
+      const r = stageEl?.getBoundingClientRect()
+      if (!r) return
+      const x = e.clientX - r.left
+      const y = e.clientY - r.top
+      drag = { kind: 'marquee', additive: e.shiftKey || e.ctrlKey || e.metaKey }
+      marquee = { x0: x, y0: y, x1: x, y1: y }
+      stageEl?.setPointerCapture(e.pointerId)
+      return
+    }
     drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
     stageEl?.setPointerCapture(e.pointerId)
   }
@@ -640,6 +756,23 @@
         e.stopPropagation()
         void finishLink(n)
       }
+      return
+    }
+    if (selectMode) {
+      if (e.button !== 0 || e.target.closest('textarea, input, .gcard__editbar, .gcard__changed')) return
+      e.stopPropagation()
+      const group = picked.has(n.key)
+        ? [...picked].map((k) => nodeMap.get(k)).filter(Boolean)
+        : [n]
+      drag = {
+        kind: 'multi',
+        key: n.key,
+        x: e.clientX,
+        y: e.clientY,
+        moved: false,
+        items: group.map((m) => ({ m, x: m.x, y: m.y })),
+      }
+      stageEl?.setPointerCapture(e.pointerId)
       return
     }
     if (e.button !== 0) return
@@ -653,7 +786,7 @@
   }
   /** Dragging an expanded block by its frame moves all its cards together. */
   function onGroupDown(e, g) {
-    if (e.button !== 0 || linking) return
+    if (e.button !== 0 || linking || selectMode) return
     e.stopPropagation()
     const members = (view?.nodes ?? []).filter((n) => n.group === g.key)
     drag = {
@@ -668,8 +801,23 @@
   function onMove(e) {
     if (linking) linkCursor = worldAt(e)
     if (!drag) return
+    if (drag.kind === 'marquee') {
+      const r = stageEl?.getBoundingClientRect()
+      if (r && marquee) marquee = { ...marquee, x1: e.clientX - r.left, y1: e.clientY - r.top }
+      return
+    }
     const dx = e.clientX - drag.x
     const dy = e.clientY - drag.y
+    if (drag.kind === 'multi') {
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
+      if (!drag.moved) return
+      for (const s of drag.items) {
+        s.m.x = s.x + dx / cam.k
+        s.m.y = s.y + dy / cam.k
+      }
+      view = view && { ...view }
+      return
+    }
     if (drag.kind === 'pan') {
       cam = { ...cam, x: drag.cx + dx, y: drag.cy + dy }
     } else if (drag.kind === 'group') {
@@ -689,6 +837,35 @@
     }
   }
   function onUp() {
+    if (drag?.kind === 'marquee' && marquee) {
+      const m = marquee
+      marquee = null
+      const w = Math.abs(m.x1 - m.x0)
+      const h = Math.abs(m.y1 - m.y0)
+      if (w < 4 && h < 4) {
+        if (!drag.additive) picked = new Set()
+      } else {
+        const x0 = (Math.min(m.x0, m.x1) - cam.x) / cam.k
+        const x1 = (Math.max(m.x0, m.x1) - cam.x) / cam.k
+        const y0 = (Math.min(m.y0, m.y1) - cam.y) / cam.k
+        const y1 = (Math.max(m.y0, m.y1) - cam.y) / cam.k
+        const next = drag.additive ? new Set(picked) : new Set()
+        for (const n of view?.nodes ?? []) {
+          if (n.x + n.w / 2 >= x0 && n.x - n.w / 2 <= x1 && n.y + n.h / 2 >= y0 && n.y - n.h / 2 <= y1) next.add(n.key)
+        }
+        picked = next
+      }
+    }
+    if (drag?.kind === 'multi') {
+      if (drag.moved) {
+        for (const s of drag.items) saved.set(s.m.key, { x: s.m.x, y: s.m.y })
+      } else {
+        const next = new Set(picked)
+        if (next.has(drag.key)) next.delete(drag.key)
+        else next.add(drag.key)
+        picked = next
+      }
+    }
     if (drag?.kind === 'group' && drag.moved) {
       for (const s of drag.members) saved.set(s.m.key, { x: s.m.x, y: s.m.y })
     }
@@ -868,7 +1045,7 @@
   }
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
-  let ctx = $state({ open: false, x: 0, y: 0, node: /** @type {any | null} */ (null), at: { x: 0, y: 0 } })
+  let ctx = $state({ open: false, x: 0, y: 0, node: /** @type {any | null} */ (null), at: { x: 0, y: 0 }, group: false })
 
   /** Screen point → world coordinates (where a new thing should land). */
   function worldAt(e) {
@@ -884,15 +1061,21 @@
       cancelLink()
       return
     }
+    // With a group picked, the menu is just what a group can do.
+    if (selectMode && picked.size && (!n || picked.has(n.key))) {
+      ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: true }
+      return
+    }
     const real = n && n.type !== 'cluster' ? n : null
     if (real) selectedKey = real.key
-    ctx = { open: true, x: e.clientX, y: e.clientY, node: real, at: worldAt(e) }
+    ctx = { open: true, x: e.clientX, y: e.clientY, node: real, at: worldAt(e), group: false }
   }
 
   const isExtraRoot = (n) => n && !n.draft && draft.roots.some((r) => `${r.type}:${r.id}` === n.key)
 
   let ctxItems = $derived.by(() => {
     const n = ctx.node
+    if (ctx.group) return [{ id: 'hide-picked', label: `Убрать с карты (${picked.size})` }]
     if (!n) {
       return [
         {
@@ -906,6 +1089,8 @@
         },
         { id: 'upload', label: 'Загрузить файл…' },
         { id: 'find', label: 'Добавить на карту…' },
+        { id: 'sep-sel', sep: true },
+        { id: 'select-mode', label: selectMode ? 'Выйти из режима выделения' : 'Режим выделения' },
       ]
     }
     const items = []
@@ -975,7 +1160,9 @@
     const n = ctx.node
     const at = ctx.at
     const plain = { owner: '', linkFrom: '', edit: null }
-    if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
+    if (id === 'hide-picked') await hidePicked()
+    else if (id === 'select-mode') toggleSelectMode()
+    else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
     else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
     else if (id === 'add-quest-line' && n) questModal = { open: true, desc: '', at, questlineId: n.id }
     else if (id === 'new-note') entityModal = { open: true, kind: 'note', at, ...plain }
@@ -1178,6 +1365,28 @@
     node.focus()
   }
 
+  /** Empty map: no centre, no extra centres, nothing hidden, layout forgotten.
+   * Pending draft changes stay in the log (they have their own "Отменить всё"). */
+  async function clearMap() {
+    center = { type: null, id: null }
+    selectedKey = null
+    expanded = new Set()
+    linking = null
+    editing = null
+    resetPositions()
+    saveHidden(new Set())
+    try {
+      await putGraphDraftRoots([])
+      await loadDraft()
+    } catch {
+      /* toast already shown */
+    }
+    onCenter?.(null, null)
+  }
+
+  /** There is something to clear: a centre, extra centres, or hidden cards. */
+  let canClear = $derived(Boolean(center.id) || draft.roots.length > 0 || hidden.size > 0)
+
   async function addToMap(type, id) {
     // First thing on an empty map becomes its centre.
     if (!center.id) {
@@ -1215,7 +1424,13 @@
   {/if}
 {/snippet}
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && linking && cancelLink()} />
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key !== 'Escape') return
+    if (linking) cancelLink()
+    else if (selectMode) toggleSelectMode()
+  }}
+/>
 
 <div class="graph">
   <div class="graph__tools">
@@ -1249,6 +1464,19 @@
         <option value="free">Свободно</option>
       </select>
     </label>
+    <details class="graph__filter">
+      <summary title="Какие квесты показывать на карте и предлагать в «Добавить на карту»">
+        Квесты: {statusLabel}{#if filteredOut} · скрыто {filteredOut}{/if}
+      </summary>
+      <div class="graph__filter-pop">
+        {#each QUEST_STATUSES as st (st)}
+          <label>
+            <input type="checkbox" checked={questStatuses.has(st)} onchange={() => toggleStatus(st)} />
+            {QUEST_STATUS_LABELS[st]}
+          </label>
+        {/each}
+      </div>
+    </details>
     <label class="graph__ctl">
       Глубина
       <select bind:value={depth} aria-label="Глубина">
@@ -1274,8 +1502,7 @@
         Показать убранные ({hidden.size})
       </button>
     {/if}
-    <button type="button" class="graph__btn" onclick={relayout}>Распутать</button>
-    <button type="button" class="graph__btn" onclick={fit}>Вписать</button>
+
   </div>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1394,6 +1621,7 @@
           class:gcard--anchor={linking?.anchor === n.key}
           class:gcard--ownerless={ownerless.has(n.key)}
           class:gcard--editing={editing?.key === n.key}
+          class:gcard--picked={picked.has(n.key)}
           class:gcard--pill={!big && !square && !withText}
           style:--c={ownerless.has(n.key) ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
           style:left="{n.x - n.w / 2}px"
@@ -1479,6 +1707,65 @@
           {/if}
         </div>
       {/each}
+    </div>
+
+    {#if marquee}
+      <div
+        class="gmarquee"
+        style:left="{Math.min(marquee.x0, marquee.x1)}px"
+        style:top="{Math.min(marquee.y0, marquee.y1)}px"
+        style:width="{Math.abs(marquee.x1 - marquee.x0)}px"
+        style:height="{Math.abs(marquee.y1 - marquee.y0)}px"
+      ></div>
+    {/if}
+
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="gtools"
+      onpointerdown={(e) => e.stopPropagation()}
+      onwheel={(e) => e.stopPropagation()}
+      oncontextmenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+    >
+      {#if selectMode && picked.size}
+        <span class="gtools__count">Выделено: {picked.size}</span>
+        <button type="button" class="gtool" title="Убрать выделенное с карты" aria-label="Убрать выделенное с карты" onclick={hidePicked}>
+          <Icon name="eye-off" size={16} />
+        </button>
+        <button type="button" class="gtool" title="Снять выделение" aria-label="Снять выделение" onclick={() => (picked = new Set())}>
+          <Icon name="close" size={16} />
+        </button>
+        <span class="gtools__sep" aria-hidden="true"></span>
+      {/if}
+      <button
+        type="button"
+        class="gtool"
+        class:gtool--on={selectMode}
+        aria-pressed={selectMode}
+        title="Режим выделения: рамкой по полю или кликами по карточкам. Выделенные двигаются вместе. Esc — выйти"
+        aria-label="Режим выделения"
+        onclick={toggleSelectMode}
+      >
+        <Icon name="select" size={16} />
+      </button>
+      <button type="button" class="gtool" title="Вписать карту в окно" aria-label="Вписать карту в окно" onclick={fit}>
+        <Icon name="fit" size={16} />
+      </button>
+      <button type="button" class="gtool" title="Распутать: пересчитать раскладку" aria-label="Распутать" onclick={relayout}>
+        <Icon name="arrange" size={16} />
+      </button>
+      <button
+        type="button"
+        class="gtool"
+        disabled={!canClear}
+        title="Очистить карту: центр, добавленные центры и скрытое. Журнал изменений остаётся"
+        aria-label="Очистить карту"
+        onclick={clearMap}
+      >
+        <Icon name="clear" size={16} />
+      </button>
     </div>
 
     {#if draft.ops.length}
@@ -1620,11 +1907,11 @@
   onDraft={draftEditStep}
 />
 
-<!-- Only live quests can be put on the map this way; notes and questlines as they are. -->
+<!-- Quests follow the status filter; notes and questlines are offered as they are. -->
 <FindEntityModal
   open={findModal}
   types={['quest', 'note', 'questline']}
-  quests={quests.filter((q) => q.status === 'active')}
+  quests={quests.filter((q) => questStatuses.has(q.status))}
   {notes}
   {questlines}
   onClose={() => (findModal = false)}
@@ -1992,6 +2279,125 @@
     border-style: dashed;
   }
 
+  .gcard--picked {
+    outline: 3px solid #5aa9ff;
+    outline-offset: 2px;
+  }
+
+  .gmarquee {
+    position: absolute;
+    z-index: 7;
+    border: 1px solid #5aa9ff;
+    background: color-mix(in srgb, #5aa9ff 14%, transparent);
+    pointer-events: none;
+  }
+
+  /* Map tools: flat square icon buttons in the bottom-right corner. */
+  .gtools {
+    position: absolute;
+    z-index: 6;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: default;
+  }
+
+  .gtool {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 8px;
+    background: var(--color-bg-raised, #1a1a1a);
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+
+  .gtool:hover:not(:disabled) {
+    color: var(--color-fg, #e8e8e8);
+    border-color: var(--color-fg-subtle, #6e6e6e);
+  }
+
+  .gtool:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .gtool--on {
+    color: #5aa9ff;
+    border-color: #5aa9ff;
+  }
+
+  .gtools__count {
+    margin-right: 0.15rem;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .gtools__sep {
+    width: 1px;
+    height: 1.2rem;
+    margin: 0 0.1rem;
+    background: var(--color-border, #333);
+  }
+
+  /* The folded log is a capsule; its buttons are capsules too. */
+  .gdraft--strip .graph__btn {
+    border-radius: 999px;
+    padding-inline: 0.8rem;
+  }
+
+  .graph__btn--on {
+    border-color: #5aa9ff;
+    color: #5aa9ff;
+  }
+
+  .graph__filter {
+    position: relative;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .graph__filter summary {
+    cursor: pointer;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 4px;
+    color: var(--color-fg, #e8e8e8);
+    list-style: none;
+  }
+
+  .graph__filter summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .graph__filter-pop {
+    position: absolute;
+    z-index: 8;
+    top: calc(100% + 0.3rem);
+    left: 0;
+    display: grid;
+    gap: 0.25rem;
+    min-width: 11rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 8px;
+    background: var(--color-bg-raised, #1a1a1a);
+    box-shadow: var(--pill-shadow, none);
+  }
+
+  .graph__filter-pop label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--color-fg, #e8e8e8);
+    font-size: var(--text-sm, 0.875rem);
+  }
+
   /* Link mode: what can be picked glows, the rest recedes. */
   .gcard--dim {
     opacity: 0.35;
@@ -2123,7 +2529,7 @@
 
   .gdraft__list li {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.6rem;
     padding: 0.2rem 0.3rem;
   }
@@ -2145,6 +2551,11 @@
 
   .gdraft__x {
     flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    padding: 0;
     border: 0;
     background: transparent;
     color: var(--color-fg-muted, #9a9a9a);
