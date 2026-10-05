@@ -84,7 +84,7 @@
 
   // --- Draft: edits made here stay in a server-side log until saved. ---
   let draft = $state({ ops: /** @type {any[]} */ ([]), roots: /** @type {{ type: string, id: number }[]} */ ([]) })
-  let draftOpen = $state(false)
+  let draftOpen = $state(true)
   let committing = $state(false)
   /** op id → message, from a refused or failed save */
   let opProblems = $state(/** @type {Record<number, string>} */ ({}))
@@ -566,6 +566,13 @@
     stageEl?.setPointerCapture(e.pointerId)
   }
   function onCardDown(e, n) {
+    if (linking) {
+      if (e.button === 0) {
+        e.stopPropagation()
+        void finishLink(n)
+      }
+      return
+    }
     if (e.button !== 0) return
     if (e.target.closest('.gcard__body a, .gcard__body button, .gcard__body pre')) return
     const body = e.target.closest('.gcard__body')
@@ -577,7 +584,7 @@
   }
   /** Dragging an expanded block by its frame moves all its cards together. */
   function onGroupDown(e, g) {
-    if (e.button !== 0) return
+    if (e.button !== 0 || linking) return
     e.stopPropagation()
     const members = (view?.nodes ?? []).filter((n) => n.group === g.key)
     drag = {
@@ -590,6 +597,7 @@
     stageEl?.setPointerCapture(e.pointerId)
   }
   function onMove(e) {
+    if (linking) linkCursor = worldAt(e)
     if (!drag) return
     const dx = e.clientX - drag.x
     const dy = e.clientY - drag.y
@@ -706,6 +714,82 @@
     onCenter?.(m.type, m.id)
   }
 
+  // --- Link mode: a line follows the cursor from a card; click a target to
+  // make the link, right-click or Esc to cancel. Also used for "attach to". ---
+  /** @type {{ mode: 'to' | 'from' | 'attach', anchor: string } | null} */
+  let linking = $state(null)
+  let linkCursor = $state({ x: 0, y: 0 })
+
+  const REF_FROM = new Set(['quest', 'note', 'step'])
+  const REF_TO = new Set(['quest', 'note', 'step', 'attachment', 'questline'])
+
+  /** Whether the card can be picked as the other end in the current link mode. */
+  function canPick(n) {
+    if (!linking || !n || n.key === linking.anchor || n.type === 'cluster') return false
+    const a = nodeMap.get(linking.anchor)
+    if (!a) return false
+    if (linking.mode === 'to') return REF_TO.has(n.type)
+    if (linking.mode === 'from') return REF_FROM.has(n.type)
+    // attach: a file goes to a quest / note / questline, a step to a quest
+    return a.type === 'step' ? n.type === 'quest' : n.type === 'quest' || n.type === 'note' || n.type === 'questline'
+  }
+
+  function startLink(mode, n) {
+    const a = nodeMap.get(n.key)
+    linking = { mode, anchor: n.key }
+    linkCursor = a ? { x: a.x, y: a.y } : { x: 0, y: 0 }
+    ctx = { ...ctx, open: false }
+  }
+
+  function cancelLink() {
+    linking = null
+  }
+
+  /** A reference from a to b that would survive saving already exists. */
+  const hasRef = (from, to) =>
+    (view?.edges ?? []).some((e) => e.kind === 'reference' && e.from === from && e.to === to && e.draft !== 'remove')
+
+  async function finishLink(target) {
+    const l = linking
+    if (!l || !canPick(target)) return
+    linking = null
+    if (l.mode === 'attach') {
+      const owned = (view?.edges ?? []).some((e) => e.kind === 'structure' && e.from === target.key && e.to === l.anchor)
+      if (owned) {
+        toast('Уже прикреплено сюда', { kind: 'info' })
+        return
+      }
+      await addOp('attach', { item: l.anchor, owner: target.key })
+      return
+    }
+    const from = l.mode === 'to' ? l.anchor : target.key
+    const to = l.mode === 'to' ? target.key : l.anchor
+    if (hasRef(from, to)) {
+      toast('Такая ссылка уже есть', { kind: 'info' })
+      return
+    }
+    await addOp('add_ref', { from, to })
+  }
+
+  /** Links written in this card's own text, as targets still visible on the map. */
+  function outgoingRefs(n) {
+    return (view?.edges ?? [])
+      .filter((e) => e.kind === 'reference' && e.from === n.key && e.draft !== 'remove' && nodeMap.has(e.to))
+      .map((e) => e.to)
+  }
+
+  async function unlinkRef(n, targetKey) {
+    const e = (view?.edges ?? []).find(
+      (x) => x.kind === 'reference' && x.from === n.key && x.to === targetKey && x.draft !== 'remove',
+    )
+    // A link made earlier in this draft is undone by dropping that step of the log.
+    if (e?.draft === 'add' && e.op) {
+      await askDrop({ id: e.op })
+      return
+    }
+    await addOp('remove_ref', { from: n.key, to: targetKey })
+  }
+
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
   let ctx = $state({ open: false, x: 0, y: 0, node: /** @type {any | null} */ (null), at: { x: 0, y: 0 } })
 
@@ -719,6 +803,10 @@
   function onCtx(e, n = null) {
     e.preventDefault()
     e.stopPropagation()
+    if (linking) {
+      cancelLink()
+      return
+    }
     const real = n && n.type !== 'cluster' ? n : null
     if (real) selectedKey = real.key
     ctx = { open: true, x: e.clientX, y: e.clientY, node: real, at: worldAt(e) }
@@ -744,14 +832,31 @@
       ]
     }
     const items = []
-    if (n.draft) {
-      items.push({ id: 'drop', label: 'Убрать из черновика', danger: true })
-      return items
+    if (!n.draft) {
+      if (openTarget(n)) items.push({ id: 'open', label: 'Открыть' })
+      if (n.type !== 'step' && n.key !== data?.root) items.push({ id: 'center', label: 'Сделать центром' })
+      if (isExtraRoot(n)) items.push({ id: 'unroot', label: 'Убрать с карты' })
+      if (n.type === 'quest' || n.type === 'note') items.push({ id: 'new-quest-ref', label: 'Создать квест со ссылкой сюда' })
     }
-    if (openTarget(n)) items.push({ id: 'open', label: 'Открыть' })
-    if (n.type !== 'step' && n.key !== data?.root) items.push({ id: 'center', label: 'Сделать центром' })
-    if (isExtraRoot(n)) items.push({ id: 'unroot', label: 'Убрать с карты' })
-    if (n.type === 'quest' || n.type === 'note') items.push({ id: 'new-quest-ref', label: 'Создать квест со ссылкой сюда' })
+    if (REF_FROM.has(n.type)) {
+      if (items.length) items.push({ id: 'sep-link', sep: true })
+      items.push({ id: 'link-to', label: 'Добавить ссылку на…' })
+      items.push({ id: 'link-from', label: 'Отметить как ссылку для…' })
+      const out = outgoingRefs(n)
+      if (out.length) {
+        items.push({
+          id: 'unlink',
+          label: 'Убрать ссылку…',
+          children: out.map((k) => ({ id: `unlink:${k}`, label: `→ ${titleOf(k)}` })),
+        })
+      }
+    }
+    if (n.type === 'step') items.push({ id: 'attach', label: 'Прикрепить к квесту…' })
+    if (n.type === 'attachment') items.push({ id: 'attach', label: 'Прикрепить к…' })
+    if (n.draft) {
+      items.push({ id: 'sep-drop', sep: true })
+      items.push({ id: 'drop', label: 'Убрать из черновика', danger: true })
+    }
     return items
   })
 
@@ -773,6 +878,10 @@
       fileAt = at
       fileInput?.click()
     } else if (id === 'find') findModal = true
+    else if (id === 'link-to' && n) startLink('to', n)
+    else if (id === 'link-from' && n) startLink('from', n)
+    else if (id === 'attach' && n) startLink('attach', n)
+    else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
     else if (id === 'drop' && n?.op) await askDrop({ id: n.op })
     else if (id === 'unroot' && n) {
       const roots = draft.roots.filter((r) => `${r.type}:${r.id}` !== n.key)
@@ -817,6 +926,8 @@
   const isOrphan = (n) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
   const rasterOf = (n) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
 </script>
+
+<svelte:window onkeydown={(e) => e.key === 'Escape' && linking && cancelLink()} />
 
 <div class="graph">
   <div class="graph__tools">
@@ -877,12 +988,12 @@
   {#if draft.ops.length}
     <div class="gdraft">
       <button type="button" class="gdraft__toggle" aria-expanded={draftOpen} onclick={() => (draftOpen = !draftOpen)}>
-        Черновик · {draft.ops.length}
+        Журнал изменений · {draft.ops.length}
         <Icon name={draftOpen ? 'chevron-down' : 'chevron-right'} size={12} />
       </button>
       <span class="gdraft__hint">
         {#if ownerless.size}
-          Нужно прикрепить к владельцу: {ownerless.size} (красная рамка). Пока не прикреплено, сохранить нельзя.
+          Нужно исправить: {ownerless.size} (красная рамка): шаг или файл без владельца, квест без шагов. Пока не исправлено, сохранить нельзя.
         {:else}
           В базе пока ничего нет — сохраните или отмените.
         {/if}
@@ -891,7 +1002,7 @@
         type="button"
         class="graph__btn graph__btn--primary"
         disabled={committing || ownerless.size > 0}
-        title={ownerless.size ? 'Есть шаги или файлы без владельца' : 'Применить все изменения'}
+        title={ownerless.size ? 'Есть невалидные элементы (красная рамка)' : 'Применить все изменения'}
         onclick={saveDraft}
       >
         {committing ? 'Сохраняю…' : 'Сохранить'}
@@ -924,6 +1035,18 @@
     onwheel={onWheel}
     oncontextmenu={(e) => onCtx(e)}
   >
+    {#if linking}
+      <p class="glink-hint">
+        {#if linking.mode === 'to'}
+          Выберите, на что ссылаться
+        {:else if linking.mode === 'from'}
+          Выберите, где должна появиться ссылка на «{titleOf(linking.anchor)}»
+        {:else}
+          Выберите, к чему прикрепить «{titleOf(linking.anchor)}»
+        {/if}
+        · ПКМ или Esc — отмена
+      </p>
+    {/if}
     {#if !center.id}
       <p class="graph__msg">Выберите квест или заметку в поиске выше — или откройте карту из карточки квеста.</p>
     {:else if error}
@@ -955,6 +1078,20 @@
             <circle cx={e.sx} cy={e.sy} r="3.4" fill={e.draft === 'remove' ? '#d23c3c' : EDGES[e.kind].color} />
           {/if}
         {/each}
+        {#if linking && nodeMap.get(linking.anchor)}
+          {@const a = nodeMap.get(linking.anchor)}
+          <line
+            x1={a.x}
+            y1={a.y}
+            x2={linkCursor.x}
+            y2={linkCursor.y}
+            stroke={linking.mode === 'attach' ? EDGES.structure.color : EDGES.reference.color}
+            stroke-width="2.4"
+            stroke-dasharray="6 4"
+            class="glink-line"
+          />
+          <circle cx={linkCursor.x} cy={linkCursor.y} r="4.5" fill={EDGES.reference.color} />
+        {/if}
       </svg>
 
       {#each groups as g (g.key)}
@@ -998,6 +1135,9 @@
           class:gcard--done={isDone(n)}
           class:gcard--orphan={isOrphan(n)}
           class:gcard--draft={n.draft}
+          class:gcard--dim={linking && n.key !== linking.anchor && !canPick(n)}
+          class:gcard--pickable={linking && canPick(n)}
+          class:gcard--anchor={linking?.anchor === n.key}
           class:gcard--ownerless={ownerless.has(n.key)}
           class:gcard--pill={!big && !square && !withText}
           style:--c={ownerless.has(n.key) ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
@@ -1416,6 +1556,43 @@
 
   .gcard--orphan {
     border-style: dashed;
+  }
+
+  /* Link mode: what can be picked glows, the rest recedes. */
+  .gcard--dim {
+    opacity: 0.35;
+  }
+
+  .gcard--pickable {
+    cursor: crosshair;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, #c9a227) 35%, transparent);
+  }
+
+  .gcard--pickable:hover {
+    box-shadow: 0 0 0 4px var(--c, #c9a227);
+  }
+
+  .gcard--anchor {
+    box-shadow: 0 0 0 4px var(--c, #c9a227);
+  }
+
+  .glink-hint {
+    position: absolute;
+    z-index: 4;
+    top: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--color-accent, #c9a227);
+    border-radius: 999px;
+    background: var(--color-bg-raised, #1a1a1a);
+    font-size: var(--text-sm, 0.875rem);
+    pointer-events: none;
+  }
+
+  .glink-line {
+    pointer-events: none;
   }
 
   /* New, not yet saved: dotted frame; without an owner the frame turns red. */

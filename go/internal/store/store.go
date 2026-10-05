@@ -548,6 +548,42 @@ func (s *Store) DeleteStep(ctx context.Context, questID, stepID int64, q domain.
 	return s.GetQuest(ctx, questID)
 }
 
+// MoveStep re-parents a step to another quest, at the end of its steps. The
+// caller passes both quests already updated (step removed / added, status
+// synced); the step's dependency on "the previous step" is cleared because
+// its predecessor changes.
+func (s *Store) MoveStep(ctx context.Context, stepID int64, from, to domain.Quest, newOrder int) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx,
+		`UPDATE queststep SET quest_id=?, sort_order=?, wait_previous=0 WHERE id=? AND quest_id=?`,
+		to.ID, newOrder, stepID, from.ID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	if err := persistQuestRow(tx, ctx, from); err != nil {
+		return err
+	}
+	if err := persistQuestRow(tx, ctx, to); err != nil {
+		return err
+	}
+	if err := stageChange(tx, ctx, "quest_updated", &from.ID, from.Title,
+		fmt.Sprintf("−шаги: 1 (в quest=%d)", to.ID), string(from.Significance)); err != nil {
+		return err
+	}
+	if err := stageChange(tx, ctx, "quest_updated", &to.ID, to.Title,
+		fmt.Sprintf("+шаги: 1 (из quest=%d)", from.ID), string(to.Significance)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func persistQuestRow(tx *sql.Tx, ctx context.Context, q domain.Quest) error {
 	_, err := tx.ExecContext(ctx, `
 		UPDATE quest SET status=?, updated_at=?, completed_at=? WHERE id=?`,

@@ -19,8 +19,11 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/store"
+	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 // The relations map is edited through a draft: an ordered log of operations
@@ -94,6 +97,7 @@ func (s *Server) registerGraphDraft(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/graph-draft", s.cancelGraphDraft)
 	mux.HandleFunc("POST /api/graph-draft/commit", s.commitGraphDraft)
 	mux.HandleFunc("POST /api/attachments/{id}/owner", s.postAttachmentOwner)
+	mux.HandleFunc("POST /api/quests/{id}/steps/{step_id}/move", s.postStepMove)
 }
 
 func (s *Server) getGraphDraft(w http.ResponseWriter, r *http.Request) {
@@ -240,9 +244,6 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 		item, ok := parseDraftRef(p.Item)
 		if !ok || (item.Type != "attachment" && item.Type != "step") {
 			return "item: only attachments and new steps can be attached"
-		}
-		if item.Type == "step" && !item.isTmp() {
-			return "item: moving an existing step is not supported yet"
 		}
 		if m := needRef(p.Item, "item"); m != "" {
 			return m
@@ -562,6 +563,99 @@ func (s *Server) postAttachmentOwner(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, store.AttachmentToRead(a))
 }
 
+// postStepMove moves a step to another quest (end of its steps). A quest keeps
+// at least one step, like deleting does.
+func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
+	fromID, err1 := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	stepID, err2 := strconv.ParseInt(r.PathValue("step_id"), 10, 64)
+	if err1 != nil || err2 != nil {
+		writeErr(w, 400, "bad id")
+		return
+	}
+	var in struct {
+		QuestID int64 `json:"quest_id"`
+		// AllowEmpty lets a quest end up with no steps for now; the draft
+		// commit sets it after checking the final state of every quest.
+		AllowEmpty bool `json:"allow_empty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.QuestID <= 0 {
+		writeErr(w, 400, "quest_id required")
+		return
+	}
+	if in.QuestID == fromID {
+		writeErr(w, 422, "шаг уже в этом квесте")
+		return
+	}
+	from, err := s.Store.GetQuest(r.Context(), fromID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "Quest not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	to, err := s.Store.GetQuest(r.Context(), in.QuestID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "Target quest not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if len(from.Steps) <= 1 && !in.AllowEmpty {
+		writeErr(w, 422, "нельзя унести последний шаг квеста")
+		return
+	}
+	var moved domain.Step
+	var rest []domain.Step
+	for _, st := range from.Steps {
+		if st.ID == stepID {
+			moved = st
+			continue
+		}
+		rest = append(rest, st)
+	}
+	if moved.ID == 0 {
+		writeErr(w, 404, "Step not found")
+		return
+	}
+	order := 0
+	for _, st := range to.Steps {
+		if st.SortOrder >= order {
+			order = st.SortOrder + 1
+		}
+	}
+	moved.QuestID, moved.SortOrder, moved.WaitPrevious = to.ID, order, false
+	now := timeutil.NowUTC()
+	from.Steps = rest
+	to.Steps = append(to.Steps, moved)
+	domain.SyncStatusFromSteps(&from, now)
+	domain.SyncStatusFromSteps(&to, now)
+	from.UpdatedAt, to.UpdatedAt = now, now
+	if err := s.Store.MoveStep(r.Context(), stepID, from, to, order); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, 404, "Step not found")
+			return
+		}
+		writeErr(w, 500, err.Error())
+		return
+	}
+	for _, q := range []domain.Quest{from, to} {
+		id := q.ID
+		s.Hub.Publish("quest_updated", events.PublishOpts{
+			QuestID: &id, Title: q.Title, Detail: "перенос шага", Source: "web", Significance: string(q.Significance),
+		})
+	}
+	nf, _ := s.Store.GetQuest(r.Context(), fromID)
+	nt, _ := s.Store.GetQuest(r.Context(), in.QuestID)
+	writeJSON(w, 200, map[string]any{
+		"from": domain.ToQuestRead(nf, timeutil.NowUTC()),
+		"to":   domain.ToQuestRead(nt, timeutil.NowUTC()),
+	})
+}
+
 // ---- commit ----------------------------------------------------------------
 
 type draftProblem struct {
@@ -735,6 +829,20 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			aid, _ := strconv.ParseInt(item.ID, 10, 64)
+			if item.Type == "step" {
+				fromQ, qerr := s.Store.QuestIDForStep(ctx, aid)
+				if qerr != nil {
+					fail(op, qerr)
+					return
+				}
+				body, _ := json.Marshal(map[string]any{"quest_id": oid, "allow_empty": true})
+				code, out := dispatch(ctx, mux, "POST", fmt.Sprintf("/api/quests/%d/steps/%d/move", fromQ, aid), "application/json", body)
+				if code >= 300 {
+					fail(op, errors.New(errText(code, out)))
+					return
+				}
+				break
+			}
 			body, _ := json.Marshal(map[string]any{"owner_type": ot, "owner_id": oid})
 			code, out := dispatch(ctx, mux, "POST", fmt.Sprintf("/api/attachments/%d/owner", aid), "application/json", body)
 			if code >= 300 {
@@ -787,6 +895,55 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		_ = json.Unmarshal(op.Payload, &p)
 		if item, ok := parseDraftRef(p.Item); ok && item.isTmp() {
 			owners[item.String()] = p.Owner
+		}
+	}
+	// Final state of every real quest touched by step moves: each keeps a step.
+	// Taking a quest's last step is allowed in the draft as long as another
+	// step comes in before saving.
+	finalOwner := map[int64]int64{} // real step → real quest it ends up in
+	lastMoveOp := map[int64]int64{} // origin quest → an op that takes a step from it
+	for _, op := range ops {
+		if op.Kind != "attach" {
+			continue
+		}
+		var p attachPayload
+		_ = json.Unmarshal(op.Payload, &p)
+		item, ok := parseDraftRef(p.Item)
+		owner, ok2 := parseDraftRef(p.Owner)
+		if !ok || !ok2 || item.Type != "step" || item.isTmp() || owner.isTmp() {
+			continue
+		}
+		sid, _ := strconv.ParseInt(item.ID, 10, 64)
+		oid, _ := strconv.ParseInt(owner.ID, 10, 64)
+		finalOwner[sid] = oid
+		if origin, err := s.Store.QuestIDForStep(ctx, sid); err == nil {
+			lastMoveOp[origin] = op.ID
+		}
+	}
+	delta := map[int64]int{}
+	for sid, dest := range finalOwner {
+		origin, err := s.Store.QuestIDForStep(ctx, sid)
+		if err != nil || origin == dest {
+			continue
+		}
+		delta[origin]--
+		delta[dest]++
+	}
+	for key, owner := range owners { // new steps landing in real quests
+		if strings.HasPrefix(key, "step:t") {
+			if ref, ok := parseDraftRef(owner); ok && !ref.isTmp() {
+				id, _ := strconv.ParseInt(ref.ID, 10, 64)
+				delta[id]++
+			}
+		}
+	}
+	for qid, d := range delta {
+		if d >= 0 {
+			continue
+		}
+		q, err := s.Store.GetQuest(ctx, qid)
+		if err == nil && len(q.Steps)+d < 1 {
+			problems = append(problems, draftProblem{lastMoveOp[qid], "квест «" + q.Title + "» останется без шагов"})
 		}
 	}
 	for _, op := range ops {

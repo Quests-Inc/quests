@@ -30,6 +30,8 @@ type GraphNode struct {
 	// Progress is "cur/total" of a step; Sort its position within the quest.
 	Progress string `json:"progress,omitempty"`
 	Sort     int    `json:"sort"`
+	// StepCount is how many steps a quest has (all of them, not just visible).
+	StepCount int `json:"step_count"`
 	// Mime is the detected content type of an attachment, to pick its icon.
 	Mime  string `json:"mime,omitempty"`
 	Depth int    `json:"depth"` // hops from the root
@@ -229,6 +231,11 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 		return nil
 	}); err != nil {
 		return Graph{}, err
+	}
+	for _, st := range steps {
+		if qn := nodes[nodeKey("quest", st.quest)]; qn != nil {
+			qn.StepCount++
+		}
 	}
 	for i, st := range steps {
 		if st.wait && i > 0 && steps[i-1].quest == st.quest {

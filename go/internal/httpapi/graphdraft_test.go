@@ -200,3 +200,78 @@ func TestGraphDraftRefusesDuplicateLinks(t *testing.T) {
 		t.Fatalf("re-add after remove = %d", c)
 	}
 }
+
+func TestMoveExistingStep(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	h := s.Handler()
+	mk := func(title string, steps ...string) int64 {
+		var st []map[string]any
+		for _, x := range steps {
+			st = append(st, map[string]any{"title": x})
+		}
+		code, out := draftReq(t, h, "POST", "/api/quests", map[string]any{"title": title, "steps": st})
+		if code != 201 {
+			t.Fatalf("create quest = %d %v", code, out)
+		}
+		return int64(out["id"].(float64))
+	}
+	a := mk("A", "a1", "a2")
+	b := mk("B", "b1")
+	qa, _ := s.Store.GetQuest(t.Context(), a)
+	moveID := qa.Steps[0].ID
+
+	// Through the endpoint.
+	code, out := draftReq(t, h, "POST", fmt.Sprintf("/api/quests/%d/steps/%d/move", a, moveID), map[string]any{"quest_id": b})
+	if code != 200 {
+		t.Fatalf("move = %d %v", code, out)
+	}
+	qa, _ = s.Store.GetQuest(t.Context(), a)
+	qb, _ := s.Store.GetQuest(t.Context(), b)
+	if len(qa.Steps) != 1 || len(qb.Steps) != 2 || qb.Steps[1].ID != moveID {
+		t.Fatalf("after move: A=%d steps, B=%d steps (%+v)", len(qa.Steps), len(qb.Steps), qb.Steps)
+	}
+	// The last step of a quest cannot leave; moving into the same quest is refused.
+	if code, _ := draftReq(t, h, "POST", fmt.Sprintf("/api/quests/%d/steps/%d/move", a, qa.Steps[0].ID), map[string]any{"quest_id": b}); code != 422 {
+		t.Fatalf("moving the last step = %d, want 422", code)
+	}
+	if code, _ := draftReq(t, h, "POST", fmt.Sprintf("/api/quests/%d/steps/%d/move", b, moveID), map[string]any{"quest_id": b}); code != 422 {
+		t.Fatalf("moving into the same quest = %d, want 422", code)
+	}
+
+	// Through the draft: move it back, and see the guard on commit.
+	op := addOp(t, h, "attach", map[string]any{"item": fmt.Sprintf("step:%d", moveID), "owner": fmt.Sprintf("quest:%d", a)})
+	if code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil); code != 200 {
+		t.Fatalf("commit = %d %v", code, out)
+	}
+	qa, _ = s.Store.GetQuest(t.Context(), a)
+	if len(qa.Steps) != 2 {
+		t.Fatalf("step did not come back: %d", len(qa.Steps))
+	}
+	_ = op
+	// Taking a quest's last step is fine in the draft, but saving is refused
+	// while the quest would be left with none ...
+	qb, _ = s.Store.GetQuest(t.Context(), b)
+	b1 := qb.Steps[0].ID
+	take := addOp(t, h, "attach", map[string]any{"item": fmt.Sprintf("step:%d", b1), "owner": fmt.Sprintf("quest:%d", a)})
+	code, out = draftReq(t, h, "POST", "/api/graph-draft/commit", nil)
+	if code != 422 || out["problems"] == nil {
+		t.Fatalf("draining a quest must be refused: %d %v", code, out)
+	}
+	// ... and allowed once another step is brought in.
+	fresh := addOp(t, h, "create_step", map[string]any{"fields": map[string]any{"title": "замена"}, "quest": fmt.Sprintf("quest:%d", b)})
+	_ = fresh
+	if code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil); code != 200 {
+		t.Fatalf("commit with a replacement step = %d %v", code, out)
+	}
+	_ = take
+	qb, _ = s.Store.GetQuest(t.Context(), b)
+	if len(qb.Steps) != 1 || qb.Steps[0].Title != "замена" {
+		t.Fatalf("B should hold only the replacement: %+v", qb.Steps)
+	}
+	qa, _ = s.Store.GetQuest(t.Context(), a)
+	if len(qa.Steps) != 3 {
+		t.Fatalf("A should have gained b1: %d steps", len(qa.Steps))
+	}
+}

@@ -92,23 +92,38 @@ export function applyDraft(graph, ops) {
     }
   }
 
-  // Owners: a new thing's owner edge, or a re-parented file's new one.
+  // Owners: a new thing's owner edge, or a re-parented file's / step's new one.
+  /** quest key → change in its number of steps */
+  const stepDelta = new Map()
+  const bump = (k, d) => stepDelta.set(k, (stepDelta.get(k) ?? 0) + d)
   for (const [item, owner] of ownerOf) {
     const n = byKey.get(item)
     if (!n) continue
     if (!n.draft) {
-      // A saved attachment moves: its old owner edge goes, the new one is a draft.
+      // A saved attachment / step moves: its old owner edge goes, the new one is a draft.
       for (let i = edges.length - 1; i >= 0; i--) {
-        if (edges[i].to === item && edges[i].kind === 'structure') edges.splice(i, 1)
+        if (edges[i].to === item && edges[i].kind === 'structure') {
+          if (n.type === 'step' && edges[i].from.startsWith('quest:') && edges[i].from !== owner) {
+            bump(edges[i].from, -1)
+            bump(owner, +1)
+          }
+          edges.splice(i, 1)
+        }
       }
+    } else if (n.type === 'step') {
+      bump(owner, +1)
     }
     if (byKey.has(owner)) edges.push({ from: owner, to: item, kind: 'structure', draft: 'add', op: null })
   }
 
-  // A new step or file with no owner cannot exist on its own.
+  // Invalid until fixed: a new step or file with no owner cannot exist on its
+  // own, and a quest must keep at least one step.
   const ownerless = new Set()
   for (const n of nodes) {
     if (n.draft && (n.type === 'step' || n.type === 'attachment') && !ownerOf.has(n.key)) ownerless.add(n.key)
+    if (n.type === 'quest' && !n.draft && n.step_count != null && n.step_count + (stepDelta.get(n.key) ?? 0) < 1) {
+      ownerless.add(n.key)
+    }
   }
 
   // Draft things hang where they are linked: depth one past their neighbour.
