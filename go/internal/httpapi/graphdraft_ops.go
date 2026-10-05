@@ -18,7 +18,7 @@ import (
 // passOf orders the creating ops: containers first, then what lives in them.
 func passOf(op store.DraftOp) int {
 	switch op.Kind {
-	case "create_quest", "create_note":
+	case "create_quest", "create_note", "create_questline":
 		return 1
 	case "create_step":
 		return 2
@@ -232,7 +232,7 @@ func (s *Server) putGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 		if o.ID != id {
 			continue
 		}
-		if o.Kind != "create_quest" && o.Kind != "create_note" && o.Kind != "create_step" {
+		if o.Kind != "create_quest" && o.Kind != "create_note" && o.Kind != "create_step" && o.Kind != "create_questline" {
 			writeErr(w, 422, "only created things can be edited in place")
 			return
 		}

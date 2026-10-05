@@ -369,6 +369,7 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 		}
 	}
 	in := map[string]bool{}
+	g.Edges = []GraphEdge{} // JSON [] rather than null for a lone card
 	for _, k := range order {
 		n := *nodes[k]
 		n.Links = links[k]

@@ -9,7 +9,7 @@
    * draft, nothing is saved yet.
    * @type {{
    *   open: boolean,
-   *   kind: 'note' | 'step',
+   *   kind: 'note' | 'step' | 'questline',
    *   initial?: { title: string, description: string } | null,
    *   heading?: string,
    *   quests?: any[],
@@ -35,7 +35,7 @@
   function submit(event) {
     event.preventDefault()
     if (!title.trim()) {
-      error = kind === 'note' ? 'Нужен заголовок' : 'Нужно название шага'
+      error = kind === 'step' ? 'Нужно название шага' : 'Нужен заголовок'
       return
     }
     onSubmit({ title: title.trim(), description: description.trim() })
@@ -46,7 +46,7 @@
 <ModalShell {open} {onClose} labelledby="draft-entity-title" zIndex={46} maxWidth="32rem">
   <ModalHead
     id="draft-entity-title"
-    title={heading || (kind === 'note' ? 'Новая заметка' : 'Новый шаг')}
+    title={heading || (kind === 'note' ? 'Новая заметка' : kind === 'questline' ? 'Новый квестлайн' : 'Новый шаг')}
     icon="add"
     {onClose}
   />
@@ -55,7 +55,7 @@
   {/if}
   <form class="modal__form" onsubmit={submit}>
     <label class="field">
-      <span class="label">{kind === 'note' ? 'Заголовок' : 'Название'}</span>
+      <span class="label">{kind === 'step' ? 'Название' : 'Заголовок'}</span>
       <input type="text" bind:value={title} />
     </label>
     <div class="field">

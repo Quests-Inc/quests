@@ -49,10 +49,10 @@
         }
       }
     }
+    scan('questline', questlines)
     scan('quest', quests)
     scan('note', notes)
-    scan('questline', questlines)
-    return out.slice(0, 12)
+    return out.slice(0, 50)
   })
 
   function pick(m) {
@@ -67,7 +67,7 @@
     <input
       class="search"
       type="search"
-      placeholder="Название или quest=N / note=N"
+      placeholder="Название квеста, заметки или квестлайна, либо quest=N / note=N"
       bind:value={query}
       bind:this={input}
       onkeydown={(e) => {

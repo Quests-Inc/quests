@@ -129,7 +129,7 @@
       const r = await commitGraphDraft()
       toast(`Сохранено: ${r.applied} ${r.applied === 1 ? 'изменение' : 'изменений'}`, { kind: 'success' })
       // An empty map has nothing to show the saved things on: centre on the first one.
-      const made = !center.id ? Object.entries(r.created ?? {}).find(([k]) => k.startsWith('quest:') || k.startsWith('note:')) : null
+      const made = !center.id ? Object.entries(r.created ?? {}).find(([k]) => k.startsWith('quest:') || k.startsWith('note:') || k.startsWith('questline:')) : null
       resetPositions()
       if (made) {
         center = { type: made[0].split(':')[0], id: Number(made[1]) }
@@ -998,9 +998,10 @@
     const q = rootQuery.trim().toLowerCase()
     if (!q) return []
     const out = []
+    for (const x of questlines) if ((x.title || '').toLowerCase().includes(q)) out.push({ type: 'questline', id: x.id, title: x.title })
     for (const x of quests) if ((x.title || '').toLowerCase().includes(q)) out.push({ type: 'quest', id: x.id, title: x.title })
     for (const x of notes) if ((x.title || '').toLowerCase().includes(q)) out.push({ type: 'note', id: x.id, title: x.title })
-    return out.slice(0, 10)
+    return out.slice(0, 12)
   })
   function chooseRoot(m) {
     rootQuery = ''
@@ -1029,9 +1030,30 @@
     if (!a) return false
     if (linking.mode === 'to') return REF_TO.has(n.type)
     if (linking.mode === 'from') return REF_FROM.has(n.type)
+    // a note goes under another note, but never under its own descendant
+    if (a.type === 'note') return n.type === 'note' && !noteDescendants(a.key).has(n.key)
     // attach: a file goes to a quest / note / questline, a step to a quest
     return a.type === 'step' ? n.type === 'quest' : n.type === 'quest' || n.type === 'note' || n.type === 'questline'
   }
+
+  /** Keys of the notes below this one, over the structure edges on the map (draft included). */
+  function noteDescendants(key) {
+    const seen = new Set()
+    const walk = (k) => {
+      for (const e of view?.edges ?? []) {
+        if (e.kind === 'structure' && e.from === k && e.draft !== 'remove' && e.to.startsWith('note:') && !seen.has(e.to)) {
+          seen.add(e.to)
+          walk(e.to)
+        }
+      }
+    }
+    walk(key)
+    return seen
+  }
+
+  /** The note this one hangs under, on the map. */
+  const parentNote = (n) =>
+    (view?.edges ?? []).find((e) => e.kind === 'structure' && e.to === n.key && e.from.startsWith('note:') && e.draft !== 'remove')?.from ?? null
 
   function startLink(mode, n) {
     const a = nodeMap.get(n.key)
@@ -1056,6 +1078,10 @@
       const owned = (view?.edges ?? []).some((e) => e.kind === 'structure' && e.from === target.key && e.to === l.anchor)
       if (owned) {
         toast('Уже прикреплено сюда', { kind: 'info' })
+        return
+      }
+      if (nodeMap.get(l.anchor)?.type === 'note') {
+        await addOp('set_parent', { id: l.anchor, parent: target.key, was: parentNote(nodeMap.get(l.anchor)) ?? '' })
         return
       }
       await addOp('attach', { item: l.anchor, owner: target.key })
@@ -1130,6 +1156,7 @@
             { id: 'new-quest', label: 'Квест' },
             { id: 'new-note', label: 'Заметку' },
             { id: 'new-step', label: 'Шаг' },
+            { id: 'new-questline', label: 'Квестлайн' },
           ],
         },
         { id: 'upload', label: 'Загрузить файл…' },
@@ -1147,7 +1174,7 @@
     }
     // What can be changed, duplicated, or put into this card.
     const own = []
-    if (n.type === 'quest' || n.type === 'step' || n.type === 'note') own.push({ id: 'edit', label: 'Изменить…' })
+    if (n.type === 'quest' || n.type === 'step' || n.type === 'note' || (n.type === 'questline' && n.draft)) own.push({ id: 'edit', label: 'Изменить…' })
     if (!n.draft && ['quest', 'note', 'step', 'attachment', 'questline'].includes(n.type)) own.push({ id: 'copy', label: 'Копировать' })
     const add = []
     if (n.type === 'quest') add.push({ id: 'add-step', label: 'Шаг' })
@@ -1175,6 +1202,11 @@
     }
     if (n.type === 'step') items.push({ id: 'attach', label: 'Прикрепить к квесту…' })
     if (n.type === 'attachment') items.push({ id: 'attach', label: 'Прикрепить к…' })
+    if (n.type === 'note') {
+      items.push({ id: 'attach', label: 'Прикрепить к заметке…' })
+      const up = parentNote(n)
+      if (up) items.push({ id: 'detach-note', label: `Открепить от «${titleOf(up)}»` })
+    }
     if (n.draft) {
       items.push({ id: 'sep-drop', sep: true })
       items.push({ id: 'drop', label: 'Убрать из черновика', danger: true })
@@ -1186,7 +1218,7 @@
   let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: /** @type {number | null} */ (null) })
   let entityModal = $state({
     open: false,
-    kind: /** @type {'note' | 'step'} */ ('note'),
+    kind: /** @type {'note' | 'step' | 'questline'} */ ('note'),
     at: { x: 0, y: 0 },
     /** quest key a new step is made for */
     owner: '',
@@ -1212,6 +1244,7 @@
     else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
     else if (id === 'add-quest-line' && n) questModal = { open: true, desc: '', at, questlineId: n.id }
     else if (id === 'new-note') entityModal = { open: true, kind: 'note', at, ...plain }
+    else if (id === 'new-questline') entityModal = { open: true, kind: 'questline', at, ...plain }
     else if (id === 'new-step') entityModal = { open: true, kind: 'step', at, ...plain }
     else if (id === 'add-step' && n) entityModal = { open: true, kind: 'step', at, ...plain, owner: n.key }
     else if (id === 'add-note' && n) entityModal = { open: true, kind: 'note', at, ...plain, linkFrom: n.key }
@@ -1225,6 +1258,7 @@
     else if (id === 'link-to' && n) startLink('to', n)
     else if (id === 'link-from' && n) startLink('from', n)
     else if (id === 'attach' && n) startLink('attach', n)
+    else if (id === 'detach-note' && n) await addOp('set_parent', { id: n.key, parent: '', was: parentNote(n) ?? '' })
     else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
     else if (id === 'drop' && n?.op) await askDrop({ id: n.op })
     else if (id === 'hide' && n) await hideKeys([n.key])
@@ -1286,7 +1320,7 @@
           payload: op.payload,
           title: f.title ?? n.title,
           description: f.description ?? '',
-          heading: n.type === 'quest' ? 'Изменить квест' : 'Изменить шаг',
+          heading: n.type === 'quest' ? 'Изменить квест' : n.type === 'questline' ? 'Изменить квестлайн' : 'Изменить шаг',
         },
       }
       return
@@ -1346,6 +1380,10 @@
     }
     if (m.kind === 'step') {
       await addOp('create_step', { fields, ...(m.owner ? { quest: m.owner } : {}), pos: m.at })
+      return
+    }
+    if (m.kind === 'questline') {
+      await addOp('create_questline', { fields, pos: m.at })
       return
     }
     const op = await addOp('create_note', { fields, pos: m.at })
@@ -1599,7 +1637,7 @@
             stroke-width={(e.kind === 'structure' ? 1.2 : 1.8) + (e.draft === 'add' ? 1 : 0)}
             stroke-dasharray={e.draft === 'remove' ? '2 5' : EDGES[e.kind].dash}
             opacity={e.draft === 'remove' ? 0.9 : e.kind === 'structure' ? 0.6 : 0.95}
-            marker-end={e.kind === 'structure' ? undefined : `url(#arrow-${e.kind})`}
+            marker-end={`url(#arrow-${e.kind})`}
           />
           {#if e.kind !== 'structure'}
             <circle cx={e.sx} cy={e.sy} r="3.4" fill={e.draft === 'remove' ? '#d23c3c' : EDGES[e.kind].color} />

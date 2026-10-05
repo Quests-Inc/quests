@@ -29,17 +29,19 @@ import (
 // single operation can be dropped without losing the rest.
 
 var draftKinds = map[string]bool{
-	"create_quest": true,
-	"create_note":  true,
-	"create_step":  true,
-	"upload_file":  true,
-	"add_ref":      true,
-	"remove_ref":   true,
-	"attach":       true,
-	"edit_quest":   true,
-	"edit_step":    true,
-	"edit_note":    true,
-	"copy":         true,
+	"create_quest":     true,
+	"create_note":      true,
+	"create_questline": true,
+	"create_step":      true,
+	"upload_file":      true,
+	"add_ref":          true,
+	"remove_ref":       true,
+	"attach":           true,
+	"edit_quest":       true,
+	"edit_step":        true,
+	"edit_note":        true,
+	"set_parent":       true,
+	"copy":             true,
 }
 
 // draftRef is "type:id" where id is a number (real entity) or "t<op>" (made
@@ -83,6 +85,13 @@ type filePayload struct {
 type editPayload struct {
 	ID     string         `json:"id"`
 	Fields map[string]any `json:"fields"`
+}
+
+// parentPayload moves a note under another note (Parent empty = to the top).
+type parentPayload struct {
+	ID     string `json:"id"`
+	Parent string `json:"parent"`
+	Was    string `json:"was"`
 }
 
 type copyPayload struct {
@@ -138,6 +147,8 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 				return ref.Type == "note"
 			case "create_step":
 				return ref.Type == "step"
+			case "create_questline":
+				return ref.Type == "questline"
 			case "upload_file":
 				return ref.Type == "attachment"
 			case "copy":
@@ -223,7 +234,7 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 		return ""
 	}
 	switch kind {
-	case "create_quest", "create_note", "create_step":
+	case "create_quest", "create_note", "create_step", "create_questline":
 		var p createPayload
 		if err := json.Unmarshal(raw, &p); err != nil {
 			return "invalid payload"
@@ -245,6 +256,21 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 			return "id: only saved " + want + "s can be edited this way"
 		}
 		return needRef(p.ID, "id", want)
+	case "set_parent":
+		var p parentPayload
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return "invalid payload"
+		}
+		if m := needRef(p.ID, "id", "note"); m != "" {
+			return m
+		}
+		if p.Parent == "" {
+			return ""
+		}
+		if p.Parent == p.ID {
+			return "a note cannot be its own parent"
+		}
+		return needRef(p.Parent, "parent", "note")
 	case "copy":
 		var p copyPayload
 		if err := json.Unmarshal(raw, &p); err != nil {
@@ -347,7 +373,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 	}
 	for _, o := range ops {
 		switch o.Kind {
-		case "create_quest", "create_note", "create_step":
+		case "create_quest", "create_note", "create_step", "create_questline":
 			if f.isTmp() && f.ID == store.TmpID(o.ID) {
 				var p createPayload
 				_ = json.Unmarshal(o.Payload, &p)
@@ -376,12 +402,13 @@ func opRefs(o store.DraftOp) []string {
 		Quest  string `json:"quest"`
 		ID     string `json:"id"`
 		Source string `json:"source"`
+		Parent string `json:"parent"`
 	}
 	if json.Unmarshal(o.Payload, &p) != nil {
 		return nil
 	}
 	var out []string
-	for _, v := range []string{p.From, p.To, p.Item, p.Owner, p.Quest, p.ID, p.Source} {
+	for _, v := range []string{p.From, p.To, p.Item, p.Owner, p.Quest, p.ID, p.Source, p.Parent} {
 		if v != "" {
 			out = append(out, v)
 		}
@@ -398,6 +425,8 @@ func createdRef(o store.DraftOp) string {
 		return "note:" + store.TmpID(o.ID)
 	case "create_step":
 		return "step:" + store.TmpID(o.ID)
+	case "create_questline":
+		return "questline:" + store.TmpID(o.ID)
 	case "upload_file":
 		return "attachment:" + store.TmpID(o.ID)
 	case "copy":
@@ -865,12 +894,15 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			key := createdRef(op)
 			switch op.Kind {
-			case "create_quest", "create_note":
+			case "create_quest", "create_note", "create_questline":
 				var p createPayload
 				_ = json.Unmarshal(op.Payload, &p)
 				path := "/api/quests"
-				if op.Kind == "create_note" {
+				switch op.Kind {
+				case "create_note":
 					path = "/api/notes"
+				case "create_questline":
+					path = "/api/questlines"
 				}
 				body, _ := json.Marshal(p.Fields)
 				code, out := dispatch(ctx, mux, "POST", path, "application/json", body)
@@ -977,6 +1009,28 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			body, _ := json.Marshal(p.Fields)
 			if code, out := dispatch(ctx, mux, "PATCH", path, "application/json", body); code >= 300 {
+				fail(op, errors.New(errText(code, out)))
+				return
+			}
+		case "set_parent":
+			var p parentPayload
+			_ = json.Unmarshal(op.Payload, &p)
+			_, id, ok := real(p.ID)
+			if !ok {
+				fail(op, errors.New("note missing"))
+				return
+			}
+			var parent any
+			if p.Parent != "" {
+				_, pid, pok := real(p.Parent)
+				if !pok {
+					fail(op, errors.New("parent note missing"))
+					return
+				}
+				parent = pid
+			}
+			body, _ := json.Marshal(map[string]any{"parent_id": parent})
+			if code, out := dispatch(ctx, mux, "PATCH", fmt.Sprintf("/api/notes/%d", id), "application/json", body); code >= 300 {
 				fail(op, errors.New(errText(code, out)))
 				return
 			}

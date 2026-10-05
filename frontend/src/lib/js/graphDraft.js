@@ -73,6 +73,12 @@ export function applyDraft(graph, ops) {
         textRefs(tmpKey('note', op.id), f.description)
         break
       }
+      case 'create_questline': {
+        const f = p.fields || {}
+        stub('questline', op.id, f.title, { desc: f.description || '', pos: p.pos })
+        textRefs(tmpKey('questline', op.id), f.description)
+        break
+      }
       case 'create_step': {
         const f = p.fields || {}
         const n = stub('step', op.id, f.title, { desc: f.description || '', progress: '0/1', status: 'open', pos: p.pos })
@@ -121,6 +127,21 @@ export function applyDraft(graph, ops) {
           if (f.description != null) n.desc = f.description
           touch(p.id, op.id)
         }
+        break
+      }
+      case 'set_parent': {
+        // Replaces whatever parent the note had; a removed link stays drawn (struck out).
+        for (let i = edges.length - 1; i >= 0; i--) {
+          const e = edges[i]
+          if (e.kind !== 'structure' || e.to !== p.id || !e.from.startsWith('note:') || e.draft === 'remove') continue
+          if (e.draft === 'add') edges.splice(i, 1)
+          else {
+            e.draft = 'remove'
+            e.op = op.id
+          }
+        }
+        if (p.parent) edges.push({ from: p.parent, to: p.id, kind: 'structure', draft: 'add', op: op.id })
+        touch(p.id, op.id)
         break
       }
       case 'edit_step': {
@@ -231,6 +252,8 @@ export function describeOp(op, title) {
       return `Создать квест «${p.fields?.title ?? ''}»`
     case 'create_note':
       return `Создать заметку «${p.fields?.title ?? ''}»`
+    case 'create_questline':
+      return `Создать квестлайн «${p.fields?.title ?? ''}»`
     case 'create_step':
       return `Создать шаг «${p.fields?.title ?? ''}»`
     case 'upload_file':
@@ -247,6 +270,8 @@ export function describeOp(op, title) {
       return `Изменить заметку «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'edit_step':
       return `Изменить шаг «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
+    case 'set_parent':
+      return p.parent ? `Заметка «${title(p.id)}» → под «${title(p.parent)}»` : `Заметка «${title(p.id)}» — открепить${p.was ? ` от «${title(p.was)}»` : ''}`
     case 'copy':
       return `Копия «${title(p.source)}»`
     default:

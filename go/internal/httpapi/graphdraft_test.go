@@ -408,3 +408,66 @@ func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
 		t.Fatalf("empty title via put = %d, want 422", code)
 	}
 }
+
+func TestGraphDraftCreateQuestline(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	h := s.Handler()
+	oldQ := seedQuest(t, s)
+
+	ql := addOp(t, h, "create_questline", map[string]any{"fields": map[string]any{"title": "Новая линия", "description": "про линию"}})
+	tql := fmt.Sprintf("questline:t%d", ql)
+	addOp(t, h, "add_ref", map[string]any{"from": tql, "to": fmt.Sprintf("quest:%d", oldQ)})
+
+	code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil)
+	if code != 200 {
+		t.Fatalf("commit = %d %v", code, out)
+	}
+	id := int64(out["created"].(map[string]any)[tql].(float64))
+	row, err := s.Store.GetQuestline(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row["title"] != "Новая линия" {
+		t.Fatalf("questline = %v", row)
+	}
+	if d, _ := row["description"].(string); !strings.Contains(d, fmt.Sprintf("quest=%d", oldQ)) {
+		t.Fatalf("ref not appended to questline: %q", d)
+	}
+}
+
+func TestGraphDraftSetParent(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	h := s.Handler()
+
+	a := addOp(t, h, "create_note", map[string]any{"fields": map[string]any{"title": "Родитель"}})
+	b := addOp(t, h, "create_note", map[string]any{"fields": map[string]any{"title": "Ребёнок"}})
+	ta, tb := fmt.Sprintf("note:t%d", a), fmt.Sprintf("note:t%d", b)
+	if c, _ := draftReq(t, h, "POST", "/api/graph-draft/ops", map[string]any{"kind": "set_parent", "payload": map[string]any{"id": ta, "parent": ta}}); c != 422 {
+		t.Fatalf("own parent = %d, want 422", c)
+	}
+	addOp(t, h, "set_parent", map[string]any{"id": tb, "parent": ta})
+	code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil)
+	if code != 200 {
+		t.Fatalf("commit = %d %v", code, out)
+	}
+	created := out["created"].(map[string]any)
+	aid, bid := int64(created[ta].(float64)), int64(created[tb].(float64))
+	var parent *int64
+	if err := s.Store.DB.QueryRow(`SELECT parent_id FROM note WHERE id = ?`, bid).Scan(&parent); err != nil || parent == nil || *parent != aid {
+		t.Fatalf("parent = %v err=%v, want %d", parent, err, aid)
+	}
+	// Detach.
+	addOp(t, h, "set_parent", map[string]any{"id": fmt.Sprintf("note:%d", bid), "parent": "", "was": fmt.Sprintf("note:%d", aid)})
+	if code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil); code != 200 {
+		t.Fatalf("detach commit = %d %v", code, out)
+	}
+	parent = nil
+	_ = s.Store.DB.QueryRow(`SELECT parent_id FROM note WHERE id = ?`, bid).Scan(&parent)
+	if parent != nil {
+		t.Fatalf("still attached to %d", *parent)
+	}
+}
