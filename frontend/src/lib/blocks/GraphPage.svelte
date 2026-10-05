@@ -629,6 +629,54 @@
     void tick().then(fit)
   }
 
+  // --- Minimap: every card as a small rectangle, the visible part as a frame;
+  // click or drag on it to move the view. ---
+  const MINI_W = 170
+  const MINI_H = 120
+  let stageSize = $state({ w: 0, h: 0 })
+  $effect(() => {
+    const el = stageEl
+    if (!el) return
+    const ro = new ResizeObserver(() => (stageSize = { w: el.clientWidth, h: el.clientHeight }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  })
+  let mini = $derived.by(() => {
+    const nodes = (view?.nodes ?? []).filter((n) => ready && Number.isFinite(n.x) && n.w)
+    if (!nodes.length || !stageSize.w) return null
+    const vx = -cam.x / cam.k
+    const vy = -cam.y / cam.k
+    const vw = stageSize.w / cam.k
+    const vh = stageSize.h / cam.k
+    let x0 = vx,
+      y0 = vy,
+      x1 = vx + vw,
+      y1 = vy + vh
+    for (const n of nodes) {
+      x0 = Math.min(x0, n.x - n.w / 2)
+      x1 = Math.max(x1, n.x + n.w / 2)
+      y0 = Math.min(y0, n.y - n.h / 2)
+      y1 = Math.max(y1, n.y + n.h / 2)
+    }
+    const pad = Math.max(x1 - x0, y1 - y0) * 0.04
+    x0 -= pad
+    y0 -= pad
+    x1 += pad
+    y1 += pad
+    const sc = Math.min(MINI_W / (x1 - x0), MINI_H / (y1 - y0))
+    return { x0, y0, sc, w: (x1 - x0) * sc, h: (y1 - y0) * sc, nodes, view: { x: vx, y: vy, w: vw, h: vh } }
+  })
+  let miniDrag = false
+  /** Centres the view on the world point under the pointer on the minimap. */
+  function miniGo(e) {
+    const m = mini
+    if (!m) return
+    const r = /** @type {HTMLElement} */ (e.currentTarget).getBoundingClientRect()
+    const wx = (e.clientX - r.left) / m.sc + m.x0
+    const wy = (e.clientY - r.top) / m.sc + m.y0
+    cam = { ...cam, x: stageSize.w / 2 - wx * cam.k, y: stageSize.h / 2 - wy * cam.k }
+  }
+
   function fit() {
     if (!view || !stageEl) return
     const r = stageEl.getBoundingClientRect()
@@ -1803,6 +1851,51 @@
       ></div>
     {/if}
 
+    {#if mini}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="gmini"
+        style:width="{mini.w}px"
+        style:height="{mini.h}px"
+        title="Миникарта: клик или перетаскивание — переместить вид"
+        onpointerdown={(e) => {
+          e.stopPropagation()
+          miniDrag = true
+          e.currentTarget.setPointerCapture(e.pointerId)
+          miniGo(e)
+        }}
+        onpointermove={(e) => miniDrag && miniGo(e)}
+        onpointerup={() => (miniDrag = false)}
+        onpointercancel={() => (miniDrag = false)}
+        onwheel={(e) => e.stopPropagation()}
+        oncontextmenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+      >
+        <svg width={mini.w} height={mini.h} aria-hidden="true">
+          {#each mini.nodes as n (n.key)}
+            <rect
+              x={(n.x - n.w / 2 - mini.x0) * mini.sc}
+              y={(n.y - n.h / 2 - mini.y0) * mini.sc}
+              width={Math.max(2, n.w * mini.sc)}
+              height={Math.max(2, n.h * mini.sc)}
+              rx="1"
+              fill={TYPES[n.type]?.color ?? '#888'}
+              opacity={n.draft ? 1 : 0.7}
+            />
+          {/each}
+          <rect
+            class="gmini__view"
+            x={(mini.view.x - mini.x0) * mini.sc}
+            y={(mini.view.y - mini.y0) * mini.sc}
+            width={mini.view.w * mini.sc}
+            height={mini.view.h * mini.sc}
+          />
+        </svg>
+      </div>
+    {/if}
+
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="gtools"
@@ -2377,6 +2470,28 @@
   }
 
   /* Map tools: flat square icon buttons in the bottom-right corner. */
+  .gmini {
+    position: absolute;
+    z-index: 6;
+    left: 0.6rem;
+    top: 0.6rem;
+    box-shadow: 0 0 0 1px var(--color-border, #333);
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--pill-bg, #0f0f0f) 85%, transparent);
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .gmini svg {
+    display: block;
+  }
+
+  .gmini__view {
+    fill: rgba(201, 162, 39, 0.05);
+    stroke: var(--color-accent, #c9a227);
+    stroke-width: 1.2;
+  }
+
   .gtools {
     position: absolute;
     z-index: 6;
