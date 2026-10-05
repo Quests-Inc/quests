@@ -619,11 +619,13 @@ export function getQuestLog(params = {}) {
  * Relations map around one entity (plus optional extra roots).
  * @param {string} type @param {number} id @param {number} [depth]
  * @param {{ type: string, id: number }[]} [extra]
+ * @param {{ type: string, id: number }[]} [expand] cards whose direct neighbours are added whatever the depth
  */
-export function getGraph(type, id, depth = 2, extra = []) {
+export function getGraph(type, id, depth = 2, extra = [], expand = []) {
   const more = extra.map((r) => `${r.type}:${r.id}`).join(',')
+  const open = expand.map((r) => `${r.type}:${r.id}`).join(',')
   return request(
-    `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}`,
+    `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}${open ? `&expand=${encodeURIComponent(open)}` : ''}`,
   )
 }
 

@@ -409,7 +409,16 @@ func (s *Server) getGraph(w http.ResponseWriter, r *http.Request) {
 			roots = append(roots, store.GraphRoot{Type: t, ID: n})
 		}
 	}
-	g, err := s.Store.BuildGraphRoots(r.Context(), roots, depth)
+	// ?expand=step:3,quest:9 adds the direct neighbours of those cards, however deep they are.
+	var expand []store.GraphRoot
+	for _, part := range strings.Split(q.Get("expand"), ",") {
+		t, idStr, ok := strings.Cut(strings.TrimSpace(part), ":")
+		n, err := strconv.ParseInt(idStr, 10, 64)
+		if ok && err == nil && n > 0 {
+			expand = append(expand, store.GraphRoot{Type: t, ID: n})
+		}
+	}
+	g, err := s.Store.BuildGraphExpanded(r.Context(), roots, depth, expand)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Not found")
 		return

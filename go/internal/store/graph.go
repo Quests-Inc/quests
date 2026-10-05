@@ -103,6 +103,14 @@ type GraphRoot struct {
 // BuildGraphRoots is BuildGraph around several entities at once. The first
 // root must exist; extra roots that are gone are skipped.
 func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth int) (Graph, error) {
+	return s.BuildGraphExpanded(ctx, roots, depth, nil)
+}
+
+// BuildGraphExpanded is BuildGraphRoots plus entities whose direct neighbours
+// are added regardless of the depth limit (exploring one direction). An
+// expanded entity must already be on the map to take effect; the list is
+// applied in order, so one expansion can build on the previous one.
+func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth int, expand []GraphRoot) (Graph, error) {
 	if len(roots) == 0 {
 		return Graph{}, ErrNotFound
 	}
@@ -354,6 +362,26 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 			cur.Hub = true
 			continue
 		}
+		next := append([]string(nil), adj[cur.Key]...)
+		sort.Strings(next)
+		for _, k := range next {
+			if nodes[k].Depth >= 0 {
+				continue
+			}
+			if len(order) >= graphMaxNodes {
+				g.Truncated = true
+				break
+			}
+			nodes[k].Depth = cur.Depth + 1
+			order = append(order, k)
+		}
+	}
+	for _, x := range expand {
+		cur, ok := nodes[nodeKey(x.Type, x.ID)]
+		if !ok || cur.Depth < 0 {
+			continue
+		}
+		cur.Hub = false
 		next := append([]string(nil), adj[cur.Key]...)
 		sort.Strings(next)
 		for _, k := range next {

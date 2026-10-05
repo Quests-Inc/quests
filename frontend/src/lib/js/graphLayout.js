@@ -312,3 +312,128 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true } 
   }
   return groups.map(({ pack, depth, ...g }) => g)
 }
+
+/**
+ * The same tree, top to bottom: the layout runs on transposed boxes (no
+ * balls), then the axes are swapped back.
+ * @param {any[]} nodes @param {any[]} edges
+ */
+export function layoutTreeDown(nodes, edges) {
+  for (const n of nodes) [n.w, n.h] = [n.h, n.w]
+  layoutTree(nodes, edges, { hgap: 50, vgap: 22, balls: false })
+  for (const n of nodes) {
+    ;[n.w, n.h] = [n.h, n.w]
+    ;[n.x, n.y] = [n.y, n.x]
+  }
+  return []
+}
+
+/**
+ * Columns by kind of thing (questlines, quests, steps, notes, files, templates),
+ * each stacked top to bottom: shows what the map is made of, not how it hangs.
+ * @param {any[]} nodes
+ */
+export function layoutLayers(nodes, { hgap = 90, vgap = 14 } = {}) {
+  const ORDER = ['questline', 'quest', 'step', 'note', 'attachment', 'template']
+  const cols = new Map(ORDER.map((t) => [t, []]))
+  for (const n of nodes) (cols.get(n.type) ?? cols.get('template')).push(n)
+  let x = 0
+  for (const t of ORDER) {
+    const list = cols.get(t)
+    if (!list.length) continue
+    list.sort((a, b) => a.depth - b.depth || String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru'))
+    const w = Math.max(...list.map((n) => n.w))
+    let y = 0
+    for (const n of list) {
+      n.x = x + w / 2
+      n.y = y + n.h / 2
+      y += n.h + vgap
+    }
+    // Centre the column on the middle of the tallest one afterwards.
+    cols.set(t, { list, h: y - vgap })
+    x += w + hgap
+  }
+  const tallest = Math.max(...[...cols.values()].map((c) => c.h ?? 0))
+  for (const c of cols.values()) if (c.list) for (const n of c.list) n.y += (tallest - c.h) / 2
+  return []
+}
+
+/**
+ * Rings around the centre by depth; each branch gets an angular sector as wide
+ * as its number of leaves. Several centres sit side by side.
+ * @param {any[]} nodes @param {any[]} edges
+ */
+export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
+  const byKey = new Map(nodes.map((n) => [n.key, n]))
+  const roots = nodes.filter((n) => n.depth === 0)
+  if (!roots.length) return []
+  const isRoot = new Set(roots)
+  const parentOf = new Map()
+  for (const e of edges) {
+    for (const [c, p] of [
+      [e.to, e.from],
+      [e.from, e.to],
+    ]) {
+      const cn = byKey.get(c)
+      const pn = byKey.get(p)
+      if (!cn || !pn || cn.depth !== pn.depth + 1) continue
+      const rank = EDGE_RANK[e.kind] ?? 3
+      const cur = parentOf.get(c)
+      if (!cur || rank < cur.rank) parentOf.set(c, { p, rank })
+    }
+  }
+  const kids = new Map(nodes.map((n) => [n.key, []]))
+  for (const n of nodes) {
+    if (isRoot.has(n)) continue
+    kids.get(parentOf.get(n.key)?.p ?? roots[0].key)?.push(n)
+  }
+  for (const list of kids.values()) {
+    list.sort((a, b) => (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) || String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru'))
+  }
+  const weight = new Map()
+  const wOf = (n) => {
+    const list = kids.get(n.key) ?? []
+    const w = list.length ? list.reduce((s, c) => s + wOf(c), 0) : 1
+    weight.set(n.key, w)
+    return w
+  }
+  let offsetX = 0
+  for (const root of roots) {
+    wOf(root)
+    // Radius per ring: far enough for the widest card, and for the ring's circumference to hold its cards.
+    const rings = []
+    const collect = (n) => {
+      ;(rings[n.depth] ??= []).push(n)
+      for (const c of kids.get(n.key) ?? []) collect(c)
+    }
+    collect(root)
+    const radius = [0]
+    for (let d = 1; d < rings.length; d++) {
+      const list = rings[d] ?? []
+      const diag = Math.max(...list.map((n) => Math.hypot(n.w, n.h) / 2), 0)
+      const prev = Math.max(...(rings[d - 1] ?? []).map((n) => Math.hypot(n.w, n.h) / 2), 0)
+      const around = list.reduce((s, n) => s + Math.max(n.w, n.h) + gap * 0.4, 0) / (2 * Math.PI)
+      radius[d] = Math.max(radius[d - 1] + prev + diag + gap, around)
+    }
+    const place = (n, a0, a1) => {
+      const a = (a0 + a1) / 2
+      n.x = offsetX + Math.cos(a) * radius[n.depth]
+      n.y = Math.sin(a) * radius[n.depth]
+      const list = kids.get(n.key) ?? []
+      const total = weight.get(n.key)
+      let at = a0
+      for (const c of list) {
+        const span = ((a1 - a0) * weight.get(c.key)) / total
+        place(c, at, at + span)
+        at += span
+      }
+    }
+    // Start at the left so a lone branch fans out to the right.
+    place(root, -Math.PI, Math.PI)
+    root.x = offsetX
+    root.y = 0
+    const reach = Math.max(...nodes.filter((n) => n.depth >= 0).map((n) => Math.abs(n.x - offsetX) + n.w / 2), 0)
+    offsetX += reach * 2 + gap * 3
+  }
+  return []
+}

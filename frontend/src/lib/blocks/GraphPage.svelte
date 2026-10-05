@@ -27,7 +27,7 @@
   } from '../js/api.js'
   import { toast } from '../js/toasts.svelte.js'
   import { applyDraft, describeOp } from '../js/graphDraft.js'
-  import { layoutGraph, layoutTree } from '../js/graphLayout.js'
+  import { layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown } from '../js/graphLayout.js'
 
   /** Relations map tab: what a quest/note is connected to, drawn from existing
    * ownership, step order and reference tokens. Nodes are HTML cards (so
@@ -81,7 +81,26 @@
   const RASTER = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
 
   let depth = $state(2)
-  let layoutMode = $state(/** @type {'tree' | 'free'} */ ('tree'))
+  const LAYOUTS = {
+    tree: 'Дерево',
+    down: 'Дерево сверху вниз',
+    radial: 'Радиальная',
+    layers: 'Слоями по типам',
+    free: 'Свободно',
+  }
+  const LAYOUT_KEY = 'quests.graph.layout'
+  let layoutMode = $state(
+    /** @type {keyof typeof LAYOUTS} */ (
+      (() => {
+        try {
+          const v = localStorage.getItem(LAYOUT_KEY)
+          return v && v in LAYOUTS ? v : 'tree'
+        } catch {
+          return 'tree'
+        }
+      })()
+    ),
+  )
   let center = $state({ type: rootType, id: rootId })
   let data = $state(/** @type {any | null} */ (null))
   let loading = $state(false)
@@ -199,6 +218,7 @@
     center = { type: rootType, id: rootId }
     selectedKey = null
     expanded = new Set()
+    setExpand([])
     resetPositions()
   })
 
@@ -216,12 +236,13 @@
     const c = center
     const d = depth
     const extra = draft.roots.filter((r) => !(r.type === c.type && r.id === c.id))
+    const open = expandKeys.map((k) => ({ type: k.split(':')[0], id: Number(k.split(':')[1]) }))
     void nonce
     void reloadTick
     const mine = ++seq
     loading = true
     error = ''
-    getGraph(c.type, c.id, d, extra)
+    getGraph(c.type, c.id, d, extra, open)
       .then((g) => {
         if (mine !== seq) return
         data = g
@@ -320,9 +341,12 @@
     const keys = new Set(attached.map((n) => n.key))
     const edges = view.edges.filter((e) => keys.has(e.from) && keys.has(e.to))
     let groups = []
+    if (layoutMode !== 'tree') for (const n of view.nodes) delete n.group
     if (layoutMode === 'tree') groups = layoutTree(attached, edges)
+    else if (layoutMode === 'down') groups = layoutTreeDown(attached, edges)
+    else if (layoutMode === 'radial') groups = layoutRadial(attached, edges)
+    else if (layoutMode === 'layers') groups = layoutLayers(attached)
     else {
-      for (const n of view.nodes) delete n.group
       layoutGraph(attached, edges, { sizeOf: (n) => ({ w: n.w, h: n.h }) })
     }
     // Unlinked new things: where they were created, else a column left of the map.
@@ -404,6 +428,57 @@
   )
   /** Quests the status filter keeps off the map right now (for the counter). */
   let filteredOut = $state(0)
+
+  // Which kinds of things the map shows (the centre and draft things always stay).
+  const ENTITY_TYPES = ['questline', 'quest', 'step', 'note', 'attachment']
+  const ENTITY_LABELS = { questline: 'Квестлайны', quest: 'Квесты', step: 'Шаги', note: 'Заметки', attachment: 'Вложения' }
+  const TYPES_KEY = 'quests.graph.types'
+  const loadTypes = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(TYPES_KEY) || 'null')
+      if (Array.isArray(raw)) {
+        const ok = raw.filter((x) => ENTITY_TYPES.includes(x))
+        if (ok.length) return new Set(ok)
+      }
+    } catch {
+      /* fall through to everything */
+    }
+    return new Set(ENTITY_TYPES)
+  }
+  let shownTypes = $state(loadTypes())
+  const toggleType = (t) => {
+    const next = new Set(shownTypes)
+    if (next.has(t)) next.delete(t)
+    else next.add(t)
+    if (!next.size) return
+    shownTypes = next
+    try {
+      localStorage.setItem(TYPES_KEY, JSON.stringify([...next]))
+    } catch {
+      /* the filter still works until reload */
+    }
+  }
+  let typesLabel = $derived(shownTypes.size === ENTITY_TYPES.length ? 'все' : `${shownTypes.size} из ${ENTITY_TYPES.length}`)
+
+  // Cards whose direct links were asked for ("Показать связи"): kept in this browser.
+  const EXPAND_KEY = 'quests.graph.expand'
+  const loadExpand = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(EXPAND_KEY) || '[]')
+      return Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : []
+    } catch {
+      return []
+    }
+  }
+  let expandKeys = $state(/** @type {string[]} */ (loadExpand()))
+  const setExpand = (next) => {
+    expandKeys = next
+    try {
+      localStorage.setItem(EXPAND_KEY, JSON.stringify(next))
+    } catch {
+      /* works until reload */
+    }
+  }
 
   // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
   let selectMode = $state(false)
@@ -541,6 +616,11 @@
       const reach = new Set([...rootKeys].filter((k) => present.has(k)))
       for (const k of reach) for (const nb of adj.get(k) ?? []) reach.add(nb)
       if (reach.size) nodes = nodes.filter((n) => n.draft || reach.has(n.key))
+    }
+    // Kinds switched off in the filter go last, so what is reached only through them stays.
+    const kinds = shownTypes
+    if (kinds.size < ENTITY_TYPES.length) {
+      nodes = nodes.filter((n) => n.draft || n.key === g.root || kinds.has(n.type) || !ENTITY_TYPES.includes(n.type))
     }
     const keep = new Set(nodes.map((n) => n.key))
     const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
@@ -1034,6 +1114,7 @@
   function recenter(n) {
     if (!CENTERABLE.has(n.type) || n.draft) return
     resetPositions()
+    setExpand([])
     center = { type: n.type, id: n.id }
     selectedKey = null
     onCenter?.(n.type, n.id)
@@ -1055,6 +1136,7 @@
     rootQuery = ''
     pickOpen = false
     resetPositions()
+    setExpand([])
     center = { type: m.type, id: m.id }
     selectedKey = null
     onCenter?.(m.type, m.id)
@@ -1098,6 +1180,12 @@
     walk(key)
     return seen
   }
+
+  /** Cards of one kind that belong to this card (steps of a quest, quests of a questline), as shown. */
+  const childKeys = (n, type) =>
+    (view?.edges ?? [])
+      .filter((e) => e.kind === 'structure' && e.from === n.key && e.to.startsWith(`${type}:`) && !e.to.includes(':t') && nodeMap.has(e.to))
+      .map((e) => e.to)
 
   /** The note this one hangs under, on the map. */
   const parentNote = (n) =>
@@ -1248,6 +1336,16 @@
         })
       }
     }
+    // Exploring: bring in what this card is linked to, or take its steps / quests off.
+    if (!n.draft) {
+      const explore = []
+      if (expandKeys.includes(n.key)) explore.push({ id: 'collapse', label: 'Свернуть связи' })
+      else explore.push({ id: 'expand', label: 'Показать связи' })
+      if (n.type === 'quest' && childKeys(n, 'step').length) explore.push({ id: 'drop-steps', label: 'Убрать шаги' })
+      if (n.type === 'questline' && childKeys(n, 'quest').length) explore.push({ id: 'drop-quests', label: 'Убрать квесты' })
+      if (items.length) items.push({ id: 'sep-explore', sep: true })
+      items.push(...explore)
+    }
     if (n.type === 'step') items.push({ id: 'attach', label: 'Прикрепить к квесту…' })
     if (n.type === 'attachment') items.push({ id: 'attach', label: 'Прикрепить к…' })
     if (n.type === 'note') {
@@ -1306,6 +1404,10 @@
     else if (id === 'link-to' && n) startLink('to', n)
     else if (id === 'link-from' && n) startLink('from', n)
     else if (id === 'attach' && n) startLink('attach', n)
+    else if (id === 'expand' && n) setExpand([...expandKeys, n.key])
+    else if (id === 'collapse' && n) setExpand(expandKeys.filter((k) => k !== n.key))
+    else if (id === 'drop-steps' && n) await hideKeys(childKeys(n, 'step'))
+    else if (id === 'drop-quests' && n) await hideKeys(childKeys(n, 'quest'))
     else if (id === 'detach-note' && n) await addOp('set_parent', { id: n.key, parent: '', was: parentNote(n) ?? '' })
     else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
     else if (id === 'drop' && n?.op) await askDrop({ id: n.op })
@@ -1506,6 +1608,7 @@
     linking = null
     editing = null
     resetPositions()
+    setExpand([])
     saveHidden(new Set())
     try {
       await putGraphDraftRoots([])
@@ -1591,9 +1694,21 @@
     </div>
     <label class="graph__ctl">
       Раскладка
-      <select bind:value={layoutMode} onchange={relayout} aria-label="Раскладка">
-        <option value="tree">Дерево</option>
-        <option value="free">Свободно</option>
+      <select
+        bind:value={layoutMode}
+        onchange={() => {
+          try {
+            localStorage.setItem(LAYOUT_KEY, layoutMode)
+          } catch {
+            /* the choice just is not remembered */
+          }
+          relayout()
+        }}
+        aria-label="Раскладка"
+      >
+        {#each Object.entries(LAYOUTS) as [k, label] (k)}
+          <option value={k}>{label}</option>
+        {/each}
       </select>
     </label>
     <details class="graph__filter">
@@ -1605,6 +1720,17 @@
           <label>
             <input type="checkbox" checked={questStatuses.has(st)} onchange={() => toggleStatus(st)} />
             {QUEST_STATUS_LABELS[st]}
+          </label>
+        {/each}
+      </div>
+    </details>
+    <details class="graph__filter">
+      <summary title="Какие сущности показывать на карте">Сущности: {typesLabel}</summary>
+      <div class="graph__filter-pop">
+        {#each ENTITY_TYPES as t (t)}
+          <label>
+            <input type="checkbox" checked={shownTypes.has(t)} onchange={() => toggleType(t)} />
+            {ENTITY_LABELS[t]}
           </label>
         {/each}
       </div>

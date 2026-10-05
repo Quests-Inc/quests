@@ -471,3 +471,34 @@ func TestGraphDraftSetParent(t *testing.T) {
 		t.Fatalf("still attached to %d", *parent)
 	}
 }
+
+func TestGraphExpandAddsNeighboursBeyondDepth(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	a, b, c := seedQuest(t, s), seedQuest(t, s), seedQuest(t, s)
+	set := func(id int64, d string) {
+		if _, err := s.Store.DB.Exec(`UPDATE quest SET description = ? WHERE id = ?`, d, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	set(a, fmt.Sprintf("quest=%d", b))
+	set(b, fmt.Sprintf("quest=%d", c))
+	root := []store.GraphRoot{{Type: "quest", ID: a}}
+	has := func(g store.Graph, id int64) bool {
+		for _, n := range g.Nodes {
+			if n.Key == fmt.Sprintf("quest:%d", id) {
+				return true
+			}
+		}
+		return false
+	}
+	g, err := s.Store.BuildGraphExpanded(t.Context(), root, 1, nil)
+	if err != nil || !has(g, b) || has(g, c) {
+		t.Fatalf("depth 1 must reach b only: err=%v", err)
+	}
+	g, err = s.Store.BuildGraphExpanded(t.Context(), root, 1, []store.GraphRoot{{Type: "quest", ID: b}})
+	if err != nil || !has(g, c) {
+		t.Fatalf("expanding b must add c: err=%v", err)
+	}
+}
