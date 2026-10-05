@@ -432,18 +432,7 @@
       <Icon name="scroll" size={15} />
       <span class="view-tab__label">Журнал</span>
     </button>
-    <button
-      type="button"
-      class="view-tab"
-      class:view-tab--on={view === 'toc'}
-      role="tab"
-      aria-selected={view === 'toc'}
-      title="Оглавление"
-      onclick={() => onViewChange('toc')}
-    >
-      <Icon name="list" size={15} />
-      <span class="view-tab__label">Оглавление</span>
-    </button>
+    <!-- «Оглавление» (view 'toc') temporarily hidden: trial without it. -->
     <button
       type="button"
       class="view-tab"

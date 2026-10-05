@@ -209,12 +209,22 @@
   function setScopeQuestline(id) {
     scopeQuestlineId = id
   }
-  /** Questlines under the current scope category, limited to ones with an
+  /** Questlines to narrow to under the current scope category: those whose own
+   * category matches, plus any that hold quests of that category (a questline
+   * can lack a category while its quests have one). Limited to ones with an
    * open quest unless "показывать завершённые" is on — a questline with
    * nothing active left isn't a live "session" worth offering to narrow to. */
   let scopeQuestlineOptions = $derived.by(() => {
     if (scopeCategoryId == null) return []
-    const inCategory = questlines.filter((l) => (l.category_id ?? null) === scopeCategoryId)
+    const ids = new Set(
+      questlines.filter((l) => (l.category_id ?? null) === scopeCategoryId).map((l) => l.id),
+    )
+    for (const q of quests) {
+      if (q.questline_id != null && (q.category_id ?? null) === scopeCategoryId) {
+        ids.add(q.questline_id)
+      }
+    }
+    const inCategory = questlines.filter((l) => ids.has(l.id))
     if (showAllQuests) return inCategory
     const liveLineIds = new Set(
       quests
@@ -1011,7 +1021,6 @@
     try {
       const raw = new URL(location.href).searchParams.get('tab')
       if (
-        raw === 'toc' ||
         raw === 'notes' ||
         raw === 'attachments' ||
         raw === 'calendar' ||
@@ -1057,7 +1066,9 @@
   }
 
   // Header tab order; drives which way a tab switch slides.
-  const TAB_ORDER = ['journal', 'toc', 'notes', 'attachments', 'calendar', 'history']
+  // 'toc' is hidden for now (trial without it, see quest 328); the page and its
+  // view branch are kept so the tab can come back by re-adding it here and in the header.
+  const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history']
   let navDir = $state(1)
 
   /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
@@ -1385,8 +1396,8 @@
       {
         id: 'tabs',
         group: 'Вкладки',
-        label: 'Журнал, оглавление, заметки, вложения, календарь, история',
-        keys: '1–6',
+        label: 'Журнал, заметки, вложения, календарь, история',
+        keys: '1–5',
         codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
         run: (event) => {
           const i = Number(event.code.slice(-1)) - 1
