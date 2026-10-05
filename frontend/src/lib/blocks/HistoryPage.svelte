@@ -1,0 +1,609 @@
+<script>
+  import Icon from '../ui/Icon.svelte'
+  import { getQuestLog, listTags } from '../js/api.js'
+  import { parseApiDate } from '../js/time.js'
+
+  /** @type {{
+   *   active?: boolean,
+   *   nonce?: number,
+   *   categories?: any[],
+   *   questlines?: any[],
+   *   onOpen?: (kind: string, id: number) => void,
+   * }} */
+  let { active = true, nonce = 0, categories = [], questlines = [], onOpen } = $props()
+
+  const PAGE = 100
+
+  const ENTITIES = [
+    { id: '', label: 'Всё' },
+    { id: 'quest', label: 'Квесты' },
+    { id: 'note', label: 'Заметки' },
+    { id: 'attachment', label: 'Вложения' },
+  ]
+  const KIND_GROUPS = [
+    { id: '', label: 'Любые события', kinds: [] },
+    { id: 'done', label: 'Выполнено', kinds: ['step_completed', 'quest_completed'] },
+    {
+      id: 'new',
+      label: 'Создано',
+      kinds: ['quest_created', 'quest_appeared', 'note_created', 'attachment_added'],
+    },
+    {
+      id: 'edit',
+      label: 'Правки',
+      kinds: [
+        'quest_updated',
+        'status_changed',
+        'pin_changed',
+        'step_reopened',
+        'note_updated',
+        'attachment_version',
+        'attachment_hidden',
+      ],
+    },
+    { id: 'miss', label: 'Провалы и отсрочки', kinds: ['quest_failed', 'quest_expired', 'quest_delayed'] },
+    {
+      id: 'del',
+      label: 'Удаления',
+      kinds: ['quest_deleted', 'note_deleted', 'attachment_deleted'],
+    },
+  ]
+  const PERIODS = [
+    { id: '', label: 'За всё время' },
+    { id: 'today', label: 'Сегодня' },
+    { id: '7', label: '7 дней' },
+    { id: '30', label: '30 дней' },
+  ]
+
+  /** kind → [label, icon, tone] */
+  const KINDS = {
+    quest_created: ['создан квест', 'add', 'new'],
+    quest_appeared: ['появился квест', 'add', 'new'],
+    quest_completed: ['квест выполнен', 'checkmark', 'ok'],
+    quest_failed: ['квест провален', 'alert', 'bad'],
+    quest_expired: ['квест просрочен', 'alert', 'bad'],
+    quest_delayed: ['квест отложен', 'renew', 'warn'],
+    quest_deleted: ['квест удалён', 'delete', 'bad'],
+    quest_updated: ['квест изменён', 'edit', ''],
+    status_changed: ['смена статуса', 'flag', ''],
+    pin_changed: ['закрепление', 'pin', ''],
+    step_completed: ['шаг выполнен', 'check', 'ok'],
+    step_reopened: ['шаг открыт снова', 'undo', 'warn'],
+    note_created: ['создана заметка', 'document', 'new'],
+    note_updated: ['заметка изменена', 'edit', ''],
+    note_deleted: ['заметка удалена', 'delete', 'bad'],
+    attachment_added: ['добавлено вложение', 'attachment', 'new'],
+    attachment_version: ['версия вложения', 'layers', ''],
+    attachment_hidden: ['вложение скрыто/возвращено', 'eye-off', ''],
+    attachment_deleted: ['вложение удалено', 'delete', 'bad'],
+  }
+
+  /** Details that only repeat what the kind label already says. */
+  const GENERIC = new Set([
+    'создано задание', 'изменено', 'удалено', 'удалена', 'изменена', 'создана',
+    'загружено', 'просрочено', 'провалено', 'завершено', 'создано',
+  ])
+
+  /** @param {any} r */
+  function detailOf(r) {
+    const d = (r.detail || '').trim()
+    if (!d || d === r.title || GENERIC.has(d.toLowerCase())) return ''
+    return d
+  }
+
+  /** @param {string} key @param {string} fallback */
+  function param(key, fallback = '') {
+    try {
+      return new URL(location.href).searchParams.get(key) ?? fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  let search = $state(param('q'))
+  let entity = $state(param('et'))
+  let kindGroup = $state(param('kg'))
+  let questlineId = $state(param('ql'))
+  let categoryId = $state(param('cat'))
+  let tagId = $state(param('tag'))
+  let period = $state(param('per'))
+  let day = $state(param('day'))
+
+  let tags = $state(/** @type {any[]} */ ([]))
+  let rows = $state(/** @type {any[]} */ ([]))
+  let loading = $state(false)
+  let more = $state(false)
+  let error = $state('')
+  let seq = 0
+
+  let filtersOn = $derived(
+    !!(search || entity || kindGroup || questlineId || categoryId || tagId || period || day),
+  )
+
+  /** Keep the filters in the address bar (tab=history stays) so a view can be linked. */
+  function syncUrl() {
+    try {
+      const qs = new URLSearchParams({ tab: 'history' })
+      const set = (k, v) => v && qs.set(k, v)
+      set('q', search.trim())
+      set('et', entity)
+      set('kg', kindGroup)
+      set('ql', questlineId)
+      set('cat', categoryId)
+      set('tag', tagId)
+      set('per', period)
+      set('day', day)
+      const next = `${location.pathname}?${qs}`
+      if (next !== `${location.pathname}${location.search}`) history.replaceState(null, '', next)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function dayStart(s) {
+    const [y, m, d] = s.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+
+  function range() {
+    if (day) {
+      const from = dayStart(day)
+      return { from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1) }
+    }
+    if (period) {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const back = period === 'today' ? 0 : Number(period) - 1
+      return { from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - back), to: null }
+    }
+    return { from: null, to: null }
+  }
+
+  /** @param {boolean} append */
+  async function load(append = false) {
+    const mine = ++seq
+    loading = true
+    error = ''
+    try {
+      const { from, to } = range()
+      const last = append ? rows[rows.length - 1] : null
+      const kinds = KIND_GROUPS.find((g) => g.id === kindGroup)?.kinds ?? []
+      const data = await getQuestLog({
+        limit: PAGE,
+        entity_type: entity || 'all',
+        kind: kinds.join(','),
+        questline_id: questlineId,
+        category_id: categoryId,
+        tag_id: tagId,
+        from: from?.toISOString(),
+        to: to?.toISOString(),
+        q: search.trim(),
+        before_id: last?.id,
+        before_at: last?.at,
+      })
+      if (mine !== seq) return
+      const list = Array.isArray(data) ? data : []
+      rows = append ? [...rows, ...list] : list
+      more = list.length === PAGE
+    } catch (e) {
+      if (mine === seq) error = e?.message || String(e)
+    } finally {
+      if (mine === seq) loading = false
+    }
+  }
+
+  $effect(() => {
+    if (!active) return
+    void [search, entity, kindGroup, questlineId, categoryId, tagId, period, day, nonce]
+    syncUrl()
+    // Typing in the search box shouldn't fire a request per keystroke.
+    const t = setTimeout(() => load(false), search ? 250 : 0)
+    return () => clearTimeout(t)
+  })
+
+  $effect(() => {
+    if (!active || tags.length) return
+    listTags()
+      .then((t) => (tags = Array.isArray(t) ? t : (t?.items ?? [])))
+      .catch(() => {})
+  })
+
+  function reset() {
+    search = ''
+    entity = ''
+    kindGroup = ''
+    questlineId = ''
+    categoryId = ''
+    tagId = ''
+    period = ''
+    day = ''
+  }
+
+  /** @param {string} iso */
+  function localDay(iso) {
+    const d = parseApiDate(iso)
+    if (!d) return ''
+    const p = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  }
+
+  /** @param {string} key */
+  function dayLabel(key) {
+    const d = dayStart(key)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const diff = Math.round((today.getTime() - d.getTime()) / 86400000)
+    const base = d.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+      weekday: 'short',
+    })
+    if (diff === 0) return `Сегодня · ${base}`
+    if (diff === 1) return `Вчера · ${base}`
+    return base
+  }
+
+  /** @param {string} iso */
+  function timeLabel(iso) {
+    const d = parseApiDate(iso)
+    return d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''
+  }
+
+  let groups = $derived.by(() => {
+    /** @type {{ key: string, items: any[] }[]} */
+    const out = []
+    for (const r of rows) {
+      const key = localDay(r.at)
+      const g = out[out.length - 1]
+      if (g && g.key === key) g.items.push(r)
+      else out.push({ key, items: [r] })
+    }
+    return out
+  })
+
+  /** Entity the row points at, or null when it's gone / not openable. */
+  function target(r) {
+    if (r.kind.endsWith('_deleted')) return null
+    if (r.entity_type === 'quest' && (r.entity_id ?? r.quest_id) != null) {
+      return ['quest', r.entity_id ?? r.quest_id]
+    }
+    if (r.entity_type === 'note' && r.entity_id != null) return ['note', r.entity_id]
+    if (r.entity_type === 'attachment' && r.entity_id != null) return ['attachment', r.entity_id]
+    return null
+  }
+
+  /** @param {any} r */
+  function open(r) {
+    const t = target(r)
+    if (t) onOpen?.(t[0], t[1])
+  }
+
+  /** Owner shown under attachment rows. */
+  function parentLabel(r) {
+    if (!r.parent_type || r.parent_id == null) return ''
+    const name = { quest: 'квест', questline: 'квестлайн', note: 'заметка' }[r.parent_type] ?? r.parent_type
+    return `${name} ${r.parent_id}`
+  }
+</script>
+
+<div class="hist">
+  <div class="hist__tools">
+    <div class="hist__row">
+      <input
+        class="search hist__search"
+        type="search"
+        placeholder="Поиск по названию и описанию события…"
+        bind:value={search}
+        aria-label="Поиск по истории"
+      />
+      <select class="hist__select" bind:value={period} aria-label="Период">
+        {#each PERIODS as p (p.id)}
+          <option value={p.id}>{p.label}</option>
+        {/each}
+      </select>
+      <input
+        class="hist__select"
+        type="date"
+        bind:value={day}
+        aria-label="Конкретный день"
+        title="Конкретный день"
+      />
+      {#if filtersOn}
+        <button type="button" class="hist__reset" onclick={reset}>
+          <Icon name="close" size={12} /> Сбросить
+        </button>
+      {/if}
+    </div>
+    <div class="hist__row">
+      <div class="hist__seg" role="group" aria-label="Что менялось">
+        {#each ENTITIES as e (e.id)}
+          <button
+            type="button"
+            class="hist__pill"
+            class:hist__pill--on={entity === e.id}
+            onclick={() => (entity = e.id)}>{e.label}</button
+          >
+        {/each}
+      </div>
+      <select class="hist__select" bind:value={kindGroup} aria-label="Вид события">
+        {#each KIND_GROUPS as g (g.id)}
+          <option value={g.id}>{g.label}</option>
+        {/each}
+      </select>
+      <select class="hist__select" bind:value={questlineId} aria-label="Квестлайн">
+        <option value="">Все квестлайны</option>
+        {#each questlines as l (l.id)}
+          <option value={String(l.id)}>{l.title}</option>
+        {/each}
+      </select>
+      <select class="hist__select" bind:value={categoryId} aria-label="Категория">
+        <option value="">Все категории</option>
+        {#each categories as c (c.id)}
+          <option value={String(c.id)}>{c.label}</option>
+        {/each}
+      </select>
+      {#if tags.length}
+        <select class="hist__select" bind:value={tagId} aria-label="Тег">
+          <option value="">Все теги</option>
+          {#each tags as t (t.id)}
+            <option value={String(t.id)}>{t.label || t.slug}</option>
+          {/each}
+        </select>
+      {/if}
+    </div>
+  </div>
+
+  <div class="hist__feed">
+    {#if error}
+      <p class="empty">{error}</p>
+    {:else if rows.length === 0 && !loading}
+      <p class="empty">{filtersOn ? 'Ничего не найдено' : 'История пока пуста'}</p>
+    {:else}
+      {#each groups as g (g.key)}
+        <section class="hist__day">
+          <h3 class="hist__dayhead">{dayLabel(g.key)} <span class="hist__n">{g.items.length}</span></h3>
+          {#each g.items as r (r.id)}
+            {@const info = KINDS[r.kind] ?? [r.kind.replaceAll('_', ' '), 'scroll', '']}
+            {@const t = target(r)}
+            <button
+              type="button"
+              class="hist__item hist__item--{info[2] || 'plain'}"
+              disabled={!t}
+              onclick={() => open(r)}
+            >
+              <span class="hist__time">{timeLabel(r.at)}</span>
+              <span class="hist__icon"><Icon name={info[1]} size={14} /></span>
+              <span class="hist__body">
+                <span class="hist__title">{r.title || '—'}</span>
+                <span class="hist__what">
+                  {info[0]}{#if detailOf(r)} · {detailOf(r)}{/if}
+                  {#if parentLabel(r)}<span class="hist__parent"> · {parentLabel(r)}</span>{/if}
+                </span>
+              </span>
+            </button>
+          {/each}
+        </section>
+      {/each}
+      {#if more}
+        <button type="button" class="hist__more" disabled={loading} onclick={() => load(true)}>
+          {loading ? 'Загрузка…' : 'Показать ещё'}
+        </button>
+      {/if}
+    {/if}
+  </div>
+</div>
+
+<style>
+  .hist {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .hist__tools {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-border, #333);
+  }
+
+  .hist__row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .hist__search {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  .hist__select {
+    flex: 0 0 auto;
+    max-width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-sm, 0.875rem);
+  }
+
+  .hist__select option {
+    background: var(--color-bg-raised, #1a1a1a);
+  }
+
+  .hist__seg {
+    display: inline-flex;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    overflow: hidden;
+  }
+
+  .hist__pill {
+    padding: 0.28rem 0.65rem;
+    border: 0;
+    border-right: 1px solid var(--color-border, #333);
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+
+  .hist__pill:last-child {
+    border-right: 0;
+  }
+
+  .hist__pill:hover {
+    color: var(--color-fg, #e8e8e8);
+  }
+
+  .hist__pill--on {
+    color: var(--color-fg, #e8e8e8);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, transparent);
+  }
+
+  .hist__reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+
+  .hist__feed {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.25rem 1rem 1.5rem;
+  }
+
+  .hist__dayhead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 0.7rem 0 0.3rem;
+    background: var(--color-bg, #121212);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle, #6e6e6e);
+  }
+
+  .hist__n {
+    margin-left: 0.3rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hist__item {
+    display: grid;
+    grid-template-columns: 3rem 1.4rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.4rem 0.3rem;
+    border: 0;
+    border-radius: var(--radius-md, 4px);
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .hist__item:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  .hist__item:not(:disabled):hover {
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, transparent);
+  }
+
+  .hist__time {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-subtle, #6e6e6e);
+    padding-top: 0.15rem;
+  }
+
+  .hist__icon {
+    display: inline-flex;
+    padding-top: 0.15rem;
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .hist__item--ok .hist__icon {
+    color: var(--color-success, #4fa56b);
+  }
+  .hist__item--bad .hist__icon {
+    color: var(--color-danger, #b54a3a);
+  }
+  .hist__item--warn .hist__icon {
+    color: var(--color-warning, #c8a03c);
+  }
+  .hist__item--new .hist__icon {
+    color: var(--color-accent, #c9a227);
+  }
+
+  .hist__body {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  .hist__title {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hist__what {
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .hist__parent {
+    font-family: var(--font-mono, monospace);
+  }
+
+  .hist__more {
+    display: block;
+    margin: 1rem auto 0;
+    padding: 0.4rem 1.2rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: transparent;
+    font: inherit;
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+
+  @media (max-width: 40rem) {
+    .hist__tools {
+      padding: 0.6rem 0.75rem;
+    }
+    .hist__feed {
+      padding: 0.25rem 0.75rem 1.5rem;
+    }
+    .hist__item {
+      grid-template-columns: 2.6rem 1.2rem minmax(0, 1fr);
+    }
+  }
+</style>

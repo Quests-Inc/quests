@@ -1,5 +1,6 @@
 <script>
   // Quests web UI — orchestrator (state, load, overlays)
+  import HistoryPage from './lib/blocks/HistoryPage.svelte'
   import { onMount } from 'svelte'
   import { cubicOut } from 'svelte/easing'
   import {
@@ -82,7 +83,7 @@
     db: 'unknown',
   })
   let searchQuery = $state('')
-  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar'} */
+  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history'} */
   let view = $state('journal')
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
@@ -131,6 +132,8 @@
     if (isNarrowViewport()) setSidebarCollapsed(key, false)
   }
   /** @type {{ id: number, slug: string, label: string, sort_order: number, color?: string }[]} */
+  /** Bump to refresh the history feed after live events. */
+  let historyNonce = $state(0)
   let categories = $state([])
   /** @type {{ id: number, title: string, category_id?: number | null, color?: string, icon?: string }[]} */
   let questlines = $state([])
@@ -1011,7 +1014,8 @@
         raw === 'toc' ||
         raw === 'notes' ||
         raw === 'attachments' ||
-        raw === 'calendar'
+        raw === 'calendar' ||
+        raw === 'history'
       ) {
         return raw
       }
@@ -1053,7 +1057,7 @@
   }
 
   // Header tab order; drives which way a tab switch slides.
-  const TAB_ORDER = ['journal', 'toc', 'notes', 'attachments', 'calendar']
+  const TAB_ORDER = ['journal', 'toc', 'notes', 'attachments', 'calendar', 'history']
   let navDir = $state(1)
 
   /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
@@ -1232,6 +1236,7 @@
         }
         if (msg?.type === 'quests_changed') {
           load({ silent: true })
+          if (view === 'history') historyNonce += 1
         }
       },
       {
@@ -1241,6 +1246,7 @@
           void load({ silent: true })
           void refreshTemplates()
           void refreshHealth()
+          if (view === 'history') historyNonce += 1
         },
       },
     )
@@ -1371,8 +1377,8 @@
       {
         id: 'tabs',
         group: 'Вкладки',
-        label: 'Журнал, оглавление, заметки, вложения, календарь',
-        keys: '1–5',
+        label: 'Журнал, оглавление, заметки, вложения, календарь, история',
+        keys: '1–6',
         codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
         run: (event) => {
           const i = Number(event.code.slice(-1)) - 1
@@ -1605,6 +1611,16 @@
         onSelect={(id) => selectNoteFromUi(id)}
         onChanged={() => load({ silent: true })}
         onRef={onJournalRef}
+      />
+    </div>
+  {:else if view === 'history'}
+    <div class="journal__history">
+      <HistoryPage
+        active={view === 'history'}
+        nonce={historyNonce}
+        {categories}
+        {questlines}
+        onOpen={onJournalRef}
       />
     </div>
   {:else if view === 'attachments'}

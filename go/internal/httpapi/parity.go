@@ -373,24 +373,53 @@ func (s *Server) getTemplateStreak(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getQuestLog(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	i64 := func(key string) *int64 {
+		if v := q.Get(key); v != "" {
+			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+				return &n
+			}
+		}
+		return nil
+	}
+	list := func(key string) []string {
+		var out []string
+		for _, p := range strings.Split(q.Get(key), ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	when := func(key string) *time.Time {
+		if v := q.Get(key); v != "" {
+			if t, err := timeutil.ParseFlexible(v); err == nil {
+				return &t
+			}
+		}
+		return nil
+	}
 	limit := 100
-	if v := r.URL.Query().Get("limit"); v != "" {
+	if v := q.Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			limit = n
 		}
 	}
-	var qid, before *int64
-	if v := r.URL.Query().Get("quest_id"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			qid = &n
-		}
-	}
-	if v := r.URL.Query().Get("before_id"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			before = &n
-		}
-	}
-	rows, err := s.Store.ListChangeLog(r.Context(), limit, qid, before)
+	rows, err := s.Store.ListChangeLog(r.Context(), store.ChangeLogFilter{
+		Limit:       limit,
+		QuestID:     i64("quest_id"),
+		EntityTypes: list("entity_type"),
+		EntityID:    i64("entity_id"),
+		Kinds:       list("kind"),
+		QuestlineID: i64("questline_id"),
+		CategoryID:  i64("category_id"),
+		TagID:       i64("tag_id"),
+		From:        when("from"),
+		To:          when("to"),
+		Query:       q.Get("q"),
+		BeforeID:    i64("before_id"),
+		BeforeAt:    when("before_at"),
+	})
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return

@@ -599,3 +599,18 @@ export function deleteAttachmentRevision(ownerType, ownerId, attachmentId, revis
     { method: 'DELETE' },
   )
 }
+
+/**
+ * Change-log feed. `params`: limit, entity_type (csv: quest|note|attachment|all),
+ * entity_id, quest_id, kind (csv), questline_id, category_id, tag_id,
+ * from/to (ISO), q, before_id + before_at (keyset cursor).
+ * @param {Record<string, string | number | null | undefined>} [params]
+ */
+export function getQuestLog(params = {}) {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null && v !== '') q.set(k, String(v))
+  }
+  const qs = q.toString()
+  return request(`/api/quest-log${qs ? `?${qs}` : ''}`)
+}

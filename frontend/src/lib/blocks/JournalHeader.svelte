@@ -3,12 +3,12 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
 
   /** @type {{
-   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar',
+   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history',
    *   liveStatus: string,
    *   health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
    *   sidebarCollapsed?: boolean,
    *   onToggleSidebar?: (() => void) | null,
-   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar') => void,
+   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history') => void,
    *   onOpenSettings: () => void,
    *   onOpenTemplates: () => void,
    *   onOpenSecrets: () => void,
@@ -479,6 +479,18 @@
     >
       <Icon name="calendar" size={15} />
       <span class="view-tab__label">Календарь</span>
+    </button>
+    <button
+      type="button"
+      class="view-tab"
+      class:view-tab--on={view === 'history'}
+      role="tab"
+      aria-selected={view === 'history'}
+      title="История"
+      onclick={() => onViewChange('history')}
+    >
+      <Icon name="scroll" size={15} />
+      <span class="view-tab__label">История</span>
     </button>
   </div>
   {#snippet fullActions()}

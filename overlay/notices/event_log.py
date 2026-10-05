@@ -72,6 +72,8 @@ def format_log_message(kind: str, detail: str = "") -> str:
     if kind == "step_completed":
         step = detail.split(" (", 1)[0].strip() if detail else ""
         return f"выполнен шаг: {step}" if step else "выполнен шаг"
+    if kind == "step_reopened":
+        return f"шаг открыт снова: {detail}" if detail else "шаг открыт снова"
     if kind == "step_progress":
         return f"прогресс: {detail}" if detail else "прогресс"
     if kind == "status_changed":

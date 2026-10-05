@@ -242,6 +242,7 @@
     flex-direction: column;
   }
 
+  .journal__history,
   .journal__attachments {
     flex: 1 1 auto;
     min-height: 0;
