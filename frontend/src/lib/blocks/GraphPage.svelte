@@ -4,6 +4,7 @@
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'
+  import QuestlineIcon from '../ui/QuestlineIcon.svelte'
   import ConfirmModal from '../modals/ConfirmModal.svelte'
   import QuestModal from '../modals/QuestModal.svelte'
   import DraftEntityModal from '../modals/DraftEntityModal.svelte'
@@ -119,7 +120,7 @@
     try {
       const r = await commitGraphDraft()
       toast(`Сохранено: ${r.applied} ${r.applied === 1 ? 'изменение' : 'изменений'}`, { kind: 'success' })
-      saved.clear()
+      resetPositions()
       await loadDraft()
       reloadTick += 1
     } catch (e) {
@@ -143,7 +144,7 @@
     try {
       await cancelGraphDraft()
       opProblems = {}
-      saved.clear()
+      resetPositions()
       await loadDraft()
     } catch {
       /* toast already shown */
@@ -184,7 +185,7 @@
     center = { type: rootType, id: rootId }
     selectedKey = null
     expanded = new Set()
-    saved.clear()
+    resetPositions()
   })
 
   $effect(() => {
@@ -257,6 +258,13 @@
    * group sat, so an expanded block lands there and folds back to the same spot. */
   const saved = new Map()
 
+  /** Where an attachment group stood folded before it was opened; it goes back there. */
+  const origins = new Map()
+  function resetPositions() {
+    saved.clear()
+    origins.clear()
+  }
+
   let buildSeq = 0
   /** Render the cards hidden, measure them, lay out, reveal. */
   async function rebuild(g, open_) {
@@ -323,6 +331,24 @@
 
   /** New steps / files with no owner: drawn red, they block saving. */
   let ownerless = $state(/** @type {Set<string>} */ (new Set()))
+  /** Saved things that the draft writes into: node key → ops, oldest first. */
+  let touched = $state(/** @type {Map<string, number[]>} */ (new Map()))
+  /** The log row shown briefly after clicking a card's change marker. */
+  let flashOp = $state(/** @type {number | null} */ (null))
+  let flashTimer = 0
+
+  /** Opens the log on the last change that wrote into this card. */
+  function showChanges(key) {
+    const ops = touched.get(key)
+    if (!ops?.length) return
+    draftOpen = true
+    flashOp = ops[ops.length - 1]
+    clearTimeout(flashTimer)
+    flashTimer = window.setTimeout(() => (flashOp = null), 2800)
+    void tick().then(() => {
+      document.querySelector(`.gdraft__list [data-op="${flashOp}"]`)?.scrollIntoView({ block: 'nearest' })
+    })
+  }
 
   // Rebuild when the data, the draft, or the set of expanded groups changes.
   $effect(() => {
@@ -332,6 +358,7 @@
     if (!g) return
     const over = applyDraft(g, ops)
     ownerless = over.ownerless
+    touched = over.touched
     void rebuild({ ...g, nodes: over.nodes, edges: over.edges }, open_)
   })
 
@@ -412,7 +439,7 @@
   }
 
   function relayout() {
-    saved.clear()
+    resetPositions()
     applyLayout()
     void tick().then(fit)
   }
@@ -651,23 +678,29 @@
     }
   }
 
-  function collapse(key) {
+  /** Folding puts the group back where it stood before it was opened (the open
+   * block may have been nudged aside to keep clear of other cards). */
+  function foldSpot(key) {
     const g = groups.find((x) => x.type === 'attachment' && `cluster:${x.owner}` === key)
-    if (g) saved.set(key, membersCenter(g))
+    const spot = origins.get(key) ?? (g ? membersCenter(g) : null)
+    if (spot) saved.set(key, spot)
+    origins.delete(key)
+  }
+
+  function collapse(key) {
+    foldSpot(key)
     expanded = new Set([...expanded].filter((k) => k !== key))
   }
 
   function collapseAll() {
-    for (const k of expanded) {
-      const g = groups.find((x) => x.type === 'attachment' && `cluster:${x.owner}` === k)
-      if (g) saved.set(k, membersCenter(g))
-    }
+    for (const k of expanded) foldSpot(k)
     expanded = new Set()
   }
 
   function select(n) {
     if (n.type === 'cluster') {
       saved.set(n.key, { x: n.x, y: n.y })
+      origins.set(n.key, { x: n.x, y: n.y })
       expanded = new Set([...expanded, n.key])
       return
     }
@@ -688,7 +721,7 @@
 
   function recenter(n) {
     if (n.type === 'step' || n.type === 'cluster' || n.draft) return
-    saved.clear()
+    resetPositions()
     center = { type: n.type, id: n.id }
     selectedKey = null
     onCenter?.(n.type, n.id)
@@ -708,7 +741,7 @@
   function chooseRoot(m) {
     rootQuery = ''
     pickOpen = false
-    saved.clear()
+    resetPositions()
     center = { type: m.type, id: m.id }
     selectedKey = null
     onCenter?.(m.type, m.id)
@@ -927,6 +960,16 @@
   const rasterOf = (n) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
 </script>
 
+{#snippet glyph(n, t)}
+  {#if (n.type === 'quest' || n.type === 'note' || n.type === 'questline') && (n.icon || n.icon_url)}
+    <span class="gcard__icon" style:--line-color={n.color || t.color}>
+      <QuestlineIcon icon={n.icon || 'document'} iconUrl={n.icon_url || null} size="sm" />
+    </span>
+  {:else}
+    <span class="gcard__glyph">{n.type === 'step' && isDone(n) ? '✓' : t.glyph}</span>
+  {/if}
+{/snippet}
+
 <svelte:window onkeydown={(e) => e.key === 'Escape' && linking && cancelLink()} />
 
 <div class="graph">
@@ -1124,7 +1167,7 @@
             </div>
           {:else if big || withText}
             <div class="gcard__head">
-              <span class="gcard__glyph">{t.glyph}</span>
+              {@render glyph(n, t)}
               <span class="gcard__title">{n.title}</span>
               {#if n.type === 'quest' && n.status && n.status !== 'active'}
                 <span class="gcard__status">{n.status}</span>
@@ -1138,11 +1181,21 @@
               </div>
             {/if}
           {:else}
-            <span class="gcard__glyph">{n.type === 'step' && isDone(n) ? '✓' : t.glyph}</span>
+            {@render glyph(n, t)}
             <span class="gcard__title gcard__title--line">{n.title}</span>
             {#if n.type === 'step' && n.progress}
               <span class="gcard__prog">{n.progress}</span>
             {/if}
+          {/if}
+          {#if touched.has(n.key) && !n.draft}
+            <button
+              type="button"
+              class="gcard__changed"
+              title="Есть несохранённые изменения — показать в журнале"
+              aria-label="Есть несохранённые изменения"
+              onpointerdown={(e) => e.stopPropagation()}
+              onclick={() => showChanges(n.key)}>!</button
+            >
           {/if}
         </div>
       {/each}
@@ -1194,7 +1247,7 @@
           </p>
           <ol class="gdraft__list">
             {#each draft.ops as op (op.id)}
-              <li class:gdraft__row--bad={opProblems[op.id]}>
+              <li class:gdraft__row--bad={opProblems[op.id]} class:gdraft__row--flash={flashOp === op.id} data-op={op.id}>
                 <span class="gdraft__text">{describeOp(op, titleOf)}</span>
                 {#if opProblems[op.id]}<span class="gdraft__msg">{opProblems[op.id]}</span>{/if}
                 <button type="button" class="gdraft__x" title="Убрать из черновика" aria-label="Убрать из черновика" onclick={() => askDrop(op)}>
@@ -1746,6 +1799,46 @@
     align-items: baseline;
     gap: 0.4rem;
     min-width: 0;
+  }
+
+  .gcard__icon {
+    flex: none;
+    display: inline-flex;
+    align-self: center;
+    color: var(--line-color, var(--c, #888));
+  }
+
+  /* Unsaved change: a yellow "!" in a circle on the card's top-right corner. */
+  .gcard__changed {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    z-index: 2;
+    width: 19px;
+    height: 19px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--color-bg, #121212);
+    border-radius: 50%;
+    background: #f2c230;
+    color: #1b1500;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 4px color-mix(in srgb, #000 50%, transparent);
+  }
+
+  .gcard__changed:hover {
+    transform: scale(1.15);
+  }
+
+  .gdraft__row--flash {
+    background: color-mix(in srgb, #f2c230 28%, transparent);
+    border-radius: 6px;
+    outline: 1px solid #f2c230;
   }
 
   .gcard__glyph {

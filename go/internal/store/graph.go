@@ -32,6 +32,11 @@ type GraphNode struct {
 	Sort     int    `json:"sort"`
 	// StepCount is how many steps a quest has (all of them, not just visible).
 	StepCount int `json:"step_count"`
+	// Icon / IconURL / Color: the entity's own for a note or questline, the
+	// questline's for a quest (so a card can wear the questline icon).
+	Icon    string `json:"icon,omitempty"`
+	IconURL string `json:"icon_url,omitempty"`
+	Color   string `json:"color,omitempty"`
 	// Mime is the detected content type of an attachment, to pick its icon.
 	Mime  string `json:"mime,omitempty"`
 	Depth int    `json:"depth"` // hops from the root
@@ -145,6 +150,9 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 	}
 
 	// Entities.
+	questLine := map[int64]int64{}
+	type iconSet struct{ icon, url, color string }
+	lineIcon := map[int64]iconSet{}
 	if err := scan(`SELECT id, title, status, questline_id, COALESCE(source,''), description FROM quest`, func(r interface{ Scan(...any) error }) error {
 		var id int64
 		var title, status, source, desc string
@@ -154,6 +162,7 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 		}
 		addNode("quest", id, title, status).Desc = clip(desc, descQuest)
 		if line != nil {
+			questLine[id] = *line
 			addEdge(nodeKey("questline", *line), nodeKey("quest", id), EdgeStructure)
 		}
 		var tid int64
@@ -164,13 +173,20 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 	}); err != nil {
 		return Graph{}, err
 	}
-	if err := scan(`SELECT id, title FROM questline`, func(r interface{ Scan(...any) error }) error {
+	if err := scan(`SELECT id, title, icon, color, custom_icon FROM questline`, func(r interface{ Scan(...any) error }) error {
 		var id int64
-		var title string
-		if err := r.Scan(&id, &title); err != nil {
+		var title, icon, color string
+		var custom *string
+		if err := r.Scan(&id, &title, &icon, &color, &custom); err != nil {
 			return err
 		}
-		addNode("questline", id, title, "")
+		is := iconSet{icon: icon, color: color}
+		if custom != nil && *custom != "" {
+			is.url = fmt.Sprintf("/api/questlines/%d/icon", id)
+		}
+		lineIcon[id] = is
+		n := addNode("questline", id, title, "")
+		n.Icon, n.IconURL, n.Color = is.icon, is.url, is.color
 		return nil
 	}); err != nil {
 		return Graph{}, err
@@ -186,14 +202,25 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 	}); err != nil {
 		return Graph{}, err
 	}
-	if err := scan(`SELECT id, title, parent_id, description FROM note`, func(r interface{ Scan(...any) error }) error {
+	if err := scan(`SELECT id, title, parent_id, description, icon, color, custom_icon FROM note`, func(r interface{ Scan(...any) error }) error {
 		var id int64
 		var title, desc string
 		var parent *int64
-		if err := r.Scan(&id, &title, &parent, &desc); err != nil {
+		var icon, color, custom *string
+		if err := r.Scan(&id, &title, &parent, &desc, &icon, &color, &custom); err != nil {
 			return err
 		}
-		addNode("note", id, title, "").Desc = clip(desc, descNote)
+		nn := addNode("note", id, title, "")
+		nn.Desc = clip(desc, descNote)
+		if icon != nil {
+			nn.Icon = *icon
+		}
+		if color != nil {
+			nn.Color = *color
+		}
+		if custom != nil && *custom != "" {
+			nn.IconURL = fmt.Sprintf("/api/notes/%d/icon", id)
+		}
 		if parent != nil {
 			addEdge(nodeKey("note", *parent), nodeKey("note", id), EdgeStructure)
 		}
@@ -259,6 +286,12 @@ func (s *Store) BuildGraphRoots(ctx context.Context, roots []GraphRoot, depth in
 		return nil
 	}); err != nil {
 		return Graph{}, err
+	}
+
+	for qid, lid := range questLine {
+		if qn, ok := nodes[nodeKey("quest", qid)]; ok {
+			qn.Icon, qn.IconURL, qn.Color = lineIcon[lid].icon, lineIcon[lid].url, lineIcon[lid].color
+		}
 	}
 
 	// References from text.

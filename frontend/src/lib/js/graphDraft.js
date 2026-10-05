@@ -9,7 +9,7 @@ const tmpKey = (type, opId) => `${type}:t${opId}`
 /**
  * @param {{ nodes: any[], edges: any[], roots?: string[], root?: string }} graph
  * @param {{ id: number, kind: string, payload: any }[]} ops
- * @returns {{ nodes: any[], edges: any[], ownerless: Set<string> }}
+ * @returns {{ nodes: any[], edges: any[], ownerless: Set<string>, touched: Map<string, number[]> }}
  */
 export function applyDraft(graph, ops) {
   const nodes = graph.nodes.map((n) => ({ ...n }))
@@ -21,6 +21,12 @@ export function applyDraft(graph, ops) {
     edges.push({ from, to, kind, draft, op: opId })
   }
   const ownerOf = new Map() // node key → owner key (new steps / files)
+  /** node key → ops that write into it (the source of a link, the moved item) */
+  const touched = new Map()
+  const touch = (key, opId) => {
+    if (!touched.has(key)) touched.set(key, [])
+    touched.get(key).push(opId)
+  }
 
   const stub = (type, opId, title, extra = {}) => {
     const key = tmpKey(type, opId)
@@ -77,6 +83,7 @@ export function applyDraft(graph, ops) {
       }
       case 'add_ref':
         addEdge(p.from, p.to, 'reference', 'add', op.id)
+        touch(p.from, op.id)
         break
       case 'remove_ref': {
         const e = edges.find((x) => x.from === p.from && x.to === p.to && x.kind === 'reference')
@@ -84,10 +91,12 @@ export function applyDraft(graph, ops) {
           e.draft = 'remove'
           e.op = op.id
         }
+        touch(p.from, op.id)
         break
       }
       case 'attach':
         ownerOf.set(p.item, p.owner)
+        touch(p.item, op.id)
         break
     }
   }
@@ -145,7 +154,7 @@ export function applyDraft(graph, ops) {
       }
     }
   }
-  return { nodes, edges, ownerless }
+  return { nodes, edges, ownerless, touched }
 }
 
 /** One line for the draft log. @param {any} op @param {(key: string) => string} title */
