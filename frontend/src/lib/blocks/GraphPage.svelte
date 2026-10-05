@@ -2736,6 +2736,10 @@
     margin: 0 0 0.4em;
   }
 
+  .gcard__body :global(> :last-child) {
+    margin-bottom: 0;
+  }
+
   .gcard__body :global(h1),
   .gcard__body :global(h2),
   .gcard__body :global(h3) {
