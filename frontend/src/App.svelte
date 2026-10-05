@@ -1688,6 +1688,7 @@
         nonce={graphNonce}
         {quests}
         {notes}
+        {questlines}
         onCenter={onGraphCenter}
         onOpen={onGraphOpen}
       />

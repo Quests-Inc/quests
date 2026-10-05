@@ -285,6 +285,13 @@
         if (dur != null) payload.duration_seconds = dur
       }
       let saved
+      if (mode === 'edit' && onDraft) {
+        // From the relations map: the change goes into the draft, steps are
+        // edited separately there.
+        onDraft(payload)
+        onClose()
+        return
+      }
       if (mode === 'create' && onDraft) {
         // From the relations map: goes into the draft, nothing is created yet.
         onDraft({ ...payload, steps: stepsPayload })
@@ -469,19 +476,21 @@
       {/if}
     </FormSection>
 
-    <FormSection title="Шаги" summary={stepsSummary} bind:open={secSteps}>
-      <StepsEditor bind:steps variant="quest" {quests} {questlines} {notes} {attachments} />
-    </FormSection>
+    {#if !(onDraft && mode === 'edit')}
+      <FormSection title="Шаги" summary={stepsSummary} bind:open={secSteps}>
+        <StepsEditor bind:steps variant="quest" {quests} {questlines} {notes} {attachments} />
+      </FormSection>
+    {/if}
 
     <ModalFoot
       onCancel={onClose}
-      submitLabel={mode === 'create' ? (onDraft ? 'В черновик' : 'Создать') : 'Сохранить'}
+      submitLabel={onDraft ? 'В черновик' : mode === 'create' ? 'Создать' : 'Сохранить'}
       submitIcon={mode === 'create' ? 'checkmark' : 'save'}
       busy={saving}
       disabled={deleting}
     >
       {#snippet left()}
-        {#if mode === 'edit'}
+        {#if mode === 'edit' && !onDraft}
           <button
             type="button"
             class="btn btn--danger"

@@ -327,3 +327,84 @@ func TestDraftCascadeRules(t *testing.T) {
 		t.Fatalf("an unrelated link stays alone: %s", got)
 	}
 }
+
+func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	h := s.Handler()
+
+	code, out := draftReq(t, h, "POST", "/api/quests", map[string]any{"title": "Исходный", "description": "описание", "steps": []map[string]any{{"title": "первый"}, {"title": "второй"}}})
+	if code != 201 {
+		t.Fatalf("create = %d %v", code, out)
+	}
+	qid := int64(out["id"].(float64))
+	up := postFile(t, h, fmt.Sprintf("/api/quests/%d/attachments", qid), "doc.md", "", []byte("# doc"))
+	var att map[string]any
+	_ = json.Unmarshal(up.Body.Bytes(), &att)
+	attID := int64(att["id"].(float64))
+	qs, _ := s.Store.GetQuest(t.Context(), qid)
+	stepID := qs.Steps[0].ID
+
+	// Edit a quest and a step; copy the quest, the step and the file.
+	addOp(t, h, "edit_quest", map[string]any{"id": fmt.Sprintf("quest:%d", qid), "fields": map[string]any{"title": "Переименован"}})
+	addOp(t, h, "edit_step", map[string]any{"id": fmt.Sprintf("step:%d", stepID), "fields": map[string]any{"title": "первый (правка)"}})
+	cq := addOp(t, h, "copy", map[string]any{"source": fmt.Sprintf("quest:%d", qid)})
+	addOp(t, h, "copy", map[string]any{"source": fmt.Sprintf("step:%d", stepID)})
+	addOp(t, h, "copy", map[string]any{"source": fmt.Sprintf("attachment:%d", attID)})
+	// A note attached to the copy by a link.
+	nn := addOp(t, h, "create_note", map[string]any{"fields": map[string]any{"title": "Заметка к копии"}})
+	addOp(t, h, "add_ref", map[string]any{"from": fmt.Sprintf("quest:t%d", cq), "to": fmt.Sprintf("note:t%d", nn)})
+
+	code, out = draftReq(t, h, "POST", "/api/graph-draft/commit", nil)
+	if code != 200 {
+		t.Fatalf("commit = %d %v", code, out)
+	}
+	orig, _ := s.Store.GetQuest(t.Context(), qid)
+	if orig.Title != "Переименован" || orig.Steps[0].Title != "первый (правка)" {
+		t.Fatalf("edits not applied: %q / %q", orig.Title, orig.Steps[0].Title)
+	}
+	if len(orig.Steps) != 3 || orig.Steps[2].Title != "первый"+copySuffix {
+		t.Fatalf("step copy missing: %+v", orig.Steps)
+	}
+	if atts, _ := s.Store.ListAttachments(t.Context(), "quest", qid); len(atts) != 2 {
+		t.Fatalf("file copy missing: %d attachments", len(atts))
+	}
+	created := out["created"].(map[string]any)
+	copyID := int64(created[fmt.Sprintf("quest:t%d", cq)].(float64))
+	cp, _ := s.Store.GetQuest(t.Context(), copyID)
+	if cp.Title != "Переименован"+copySuffix && cp.Title != "Исходный"+copySuffix {
+		t.Fatalf("quest copy title = %q", cp.Title)
+	}
+	if len(cp.Steps) != 2 || !strings.Contains(cp.Description, "note=") {
+		t.Fatalf("quest copy wrong: steps=%d desc=%q", len(cp.Steps), cp.Description)
+	}
+
+	// A note edited on the map: title and the full markdown text.
+	noteBody := "# Заголовок\n\n" + strings.Repeat("длинный текст ", 400)
+	code, nout := draftReq(t, h, "POST", "/api/notes", map[string]any{"title": "Заметка", "description": "старое"})
+	if code != 201 {
+		t.Fatalf("create note = %d", code)
+	}
+	nid := int64(nout["id"].(float64))
+	addOp(t, h, "edit_note", map[string]any{"id": fmt.Sprintf("note:%d", nid), "fields": map[string]any{"description": noteBody}})
+	if code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil); code != 200 {
+		t.Fatalf("commit note edit = %d %v", code, out)
+	}
+	if n, _ := s.Store.GetNote(t.Context(), nid); n.Description != noteBody || n.Title != "Заметка" {
+		t.Fatalf("note edit not applied (len %d)", len(n.Description))
+	}
+
+	// Editing a draft-only thing replaces its create op in place.
+	n2 := addOp(t, h, "create_note", map[string]any{"fields": map[string]any{"title": "черновик"}})
+	if code, _ := draftReq(t, h, "PUT", fmt.Sprintf("/api/graph-draft/ops/%d", n2), map[string]any{"payload": map[string]any{"fields": map[string]any{"title": "правленный"}}}); code != 200 {
+		t.Fatalf("put op = %d", code)
+	}
+	ops, _ := s.Store.ListDraftOps(t.Context())
+	if len(ops) != 1 || !strings.Contains(string(ops[0].Payload), "правленный") {
+		t.Fatalf("put did not replace: %v", ops)
+	}
+	if code, _ := draftReq(t, h, "PUT", fmt.Sprintf("/api/graph-draft/ops/%d", n2), map[string]any{"payload": map[string]any{"fields": map[string]any{"title": ""}}}); code != 422 {
+		t.Fatalf("empty title via put = %d, want 422", code)
+	}
+}

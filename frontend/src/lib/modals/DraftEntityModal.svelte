@@ -10,12 +10,14 @@
    * @type {{
    *   open: boolean,
    *   kind: 'note' | 'step',
+   *   initial?: { title: string, description: string } | null,
+   *   heading?: string,
    *   quests?: any[],
    *   notes?: any[],
    *   onClose: () => void,
    *   onSubmit: (fields: { title: string, description: string }) => void,
    * }} */
-  let { open = false, kind = 'note', quests = [], notes = [], onClose, onSubmit } = $props()
+  let { open = false, kind = 'note', initial = null, heading = '', quests = [], notes = [], onClose, onSubmit } = $props()
 
   let title = $state('')
   let description = $state('')
@@ -24,8 +26,8 @@
   $effect(() => {
     if (!open) return
     untrack(() => {
-      title = ''
-      description = ''
+      title = initial?.title ?? ''
+      description = initial?.description ?? ''
       error = ''
     })
   })
@@ -44,7 +46,7 @@
 <ModalShell {open} {onClose} labelledby="draft-entity-title" zIndex={46} maxWidth="32rem">
   <ModalHead
     id="draft-entity-title"
-    title={kind === 'note' ? 'Новая заметка' : 'Новый шаг'}
+    title={heading || (kind === 'note' ? 'Новая заметка' : 'Новый шаг')}
     icon="add"
     {onClose}
   />

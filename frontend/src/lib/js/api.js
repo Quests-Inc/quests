@@ -690,3 +690,13 @@ export async function uploadGraphDraftFile(file, owner = '') {
   }
   return data
 }
+
+/** One quest with its steps and tags. @param {number} id */
+export function getQuestFull(id) {
+  return request(`/api/quests/${id}`)
+}
+
+/** Replaces the payload of a created thing in the draft. @param {number} id @param {any} payload */
+export function putGraphDraftOp(id, payload) {
+  return request(`/api/graph-draft/ops/${id}`, { method: 'PUT', body: JSON.stringify({ payload }) })
+}

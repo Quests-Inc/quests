@@ -61,6 +61,10 @@ export function applyDraft(graph, ops) {
         const f = p.fields || {}
         stub('quest', op.id, f.title, { desc: f.description || '', status: f.status || 'active', pos: p.pos })
         textRefs(tmpKey('quest', op.id), f.description)
+        // A quest made inside a questline hangs off it.
+        if (f.questline_id != null && byKey.has(`questline:${f.questline_id}`)) {
+          edges.push({ from: `questline:${f.questline_id}`, to: tmpKey('quest', op.id), kind: 'structure', draft: 'add', op: op.id })
+        }
         break
       }
       case 'create_note': {
@@ -98,6 +102,68 @@ export function applyDraft(graph, ops) {
         ownerOf.set(p.item, p.owner)
         touch(p.item, op.id)
         break
+      case 'edit_quest': {
+        const n = byKey.get(p.id)
+        const f = p.fields || {}
+        if (n) {
+          if (f.title != null) n.title = f.title
+          if (f.description != null) n.desc = f.description
+          if (f.status != null) n.status = f.status
+          touch(p.id, op.id)
+        }
+        break
+      }
+      case 'edit_note': {
+        const n = byKey.get(p.id)
+        const f = p.fields || {}
+        if (n) {
+          if (f.title != null) n.title = f.title
+          if (f.description != null) n.desc = f.description
+          touch(p.id, op.id)
+        }
+        break
+      }
+      case 'edit_step': {
+        const n = byKey.get(p.id)
+        const f = p.fields || {}
+        if (n) {
+          if (f.title != null) n.title = f.title
+          if (f.description != null) n.desc = f.description
+          if (f.progress_current != null || f.progress_total != null) {
+            const [c0, t0] = String(n.progress || '0/1').split('/').map(Number)
+            const c = f.progress_current ?? c0
+            const t = f.progress_total ?? t0
+            n.progress = `${c}/${t}`
+            n.status = c >= t ? 'done' : 'open'
+          }
+          touch(p.id, op.id)
+        }
+        break
+      }
+      case 'copy': {
+        const src = byKey.get(p.source)
+        if (!src) break
+        const key = `${src.type}:t${op.id}`
+        const n = stub(src.type, op.id, `${src.title} (копия)`, {
+          desc: src.desc,
+          icon: src.icon,
+          icon_url: src.icon_url,
+          color: src.color,
+          mime: src.mime,
+          progress: src.type === 'step' ? `0/${String(src.progress || '0/1').split('/')[1] || 1}` : undefined,
+          status: src.type === 'step' ? 'open' : src.status,
+          pos: p.pos,
+        })
+        // Copies of steps and files stay with the original's owner; a copied
+        // quest stays in its questline.
+        const own = edges.find((e) => e.kind === 'structure' && e.to === p.source)
+        if (own && (src.type === 'step' || src.type === 'attachment')) ownerOf.set(key, own.from)
+        if (own && src.type === 'quest' && own.from.startsWith('questline:')) {
+          edges.push({ from: own.from, to: key, kind: 'structure', draft: 'add', op: op.id })
+        }
+        void n
+        break
+      }
     }
   }
 
@@ -175,6 +241,14 @@ export function describeOp(op, title) {
       return `Убрать ссылку: «${title(p.from)}» → «${title(p.to)}»`
     case 'attach':
       return `Прикрепить «${title(p.item)}» к «${title(p.owner)}»`
+    case 'edit_quest':
+      return `Изменить квест «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
+    case 'edit_note':
+      return `Изменить заметку «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
+    case 'edit_step':
+      return `Изменить шаг «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
+    case 'copy':
+      return `Копия «${title(p.source)}»`
     default:
       return op.kind
   }

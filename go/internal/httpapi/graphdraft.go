@@ -7,10 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"net/textproto"
 	"regexp"
 	"sort"
 	"strconv"
@@ -38,6 +36,10 @@ var draftKinds = map[string]bool{
 	"add_ref":      true,
 	"remove_ref":   true,
 	"attach":       true,
+	"edit_quest":   true,
+	"edit_step":    true,
+	"edit_note":    true,
+	"copy":         true,
 }
 
 // draftRef is "type:id" where id is a number (real entity) or "t<op>" (made
@@ -78,6 +80,15 @@ type filePayload struct {
 	Owner    string `json:"owner,omitempty"`
 }
 
+type editPayload struct {
+	ID     string         `json:"id"`
+	Fields map[string]any `json:"fields"`
+}
+
+type copyPayload struct {
+	Source string `json:"source"`
+}
+
 type linkPayload struct {
 	From string `json:"from"`
 	To   string `json:"to"`
@@ -91,6 +102,7 @@ type attachPayload struct {
 func (s *Server) registerGraphDraft(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/graph-draft", s.getGraphDraft)
 	mux.HandleFunc("POST /api/graph-draft/ops", s.postGraphDraftOp)
+	mux.HandleFunc("PUT /api/graph-draft/ops/{id}", s.putGraphDraftOp)
 	mux.HandleFunc("DELETE /api/graph-draft/ops/{id}", s.deleteGraphDraftOp)
 	mux.HandleFunc("PUT /api/graph-draft/roots", s.putGraphDraftRoots)
 	mux.HandleFunc("POST /api/graph-draft/files", s.postGraphDraftFile)
@@ -128,6 +140,13 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 				return ref.Type == "step"
 			case "upload_file":
 				return ref.Type == "attachment"
+			case "copy":
+				var cp copyPayload
+				if json.Unmarshal(o.Payload, &cp) == nil {
+					if src, ok := parseDraftRef(cp.Source); ok {
+						return ref.Type == src.Type
+					}
+				}
 			}
 		}
 		return false
@@ -215,12 +234,33 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 		if kind == "create_step" && p.Quest != "" {
 			return needRef(p.Quest, "quest", "quest")
 		}
+	case "edit_quest", "edit_step", "edit_note":
+		var p editPayload
+		if err := json.Unmarshal(raw, &p); err != nil || len(p.Fields) == 0 {
+			return "invalid payload"
+		}
+		want := map[string]string{"edit_quest": "quest", "edit_step": "step", "edit_note": "note"}[kind]
+		ref, ok := parseDraftRef(p.ID)
+		if !ok || ref.Type != want || ref.isTmp() {
+			return "id: only saved " + want + "s can be edited this way"
+		}
+		return needRef(p.ID, "id", want)
+	case "copy":
+		var p copyPayload
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return "invalid payload"
+		}
+		ref, ok := parseDraftRef(p.Source)
+		if !ok || ref.isTmp() {
+			return "source: only saved things can be copied"
+		}
+		return needRef(p.Source, "source")
 	case "add_ref", "remove_ref":
 		var p linkPayload
 		if err := json.Unmarshal(raw, &p); err != nil {
 			return "invalid payload"
 		}
-		if m := needRef(p.From, "from", "quest", "note", "step"); m != "" {
+		if m := needRef(p.From, "from", "quest", "note", "step", "questline"); m != "" {
 			return m
 		}
 		if m := needRef(p.To, "to"); m != "" {
@@ -298,6 +338,11 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 					}
 				}
 			}
+		case "questline":
+			if ql, err := s.Store.GetQuestline(ctx, id); err == nil {
+				d, _ := ql["description"].(string)
+				has = textHas(d)
+			}
 		}
 	}
 	for _, o := range ops {
@@ -324,17 +369,19 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 // mistaken for a reference.
 func opRefs(o store.DraftOp) []string {
 	var p struct {
-		From  string `json:"from"`
-		To    string `json:"to"`
-		Item  string `json:"item"`
-		Owner string `json:"owner"`
-		Quest string `json:"quest"`
+		From   string `json:"from"`
+		To     string `json:"to"`
+		Item   string `json:"item"`
+		Owner  string `json:"owner"`
+		Quest  string `json:"quest"`
+		ID     string `json:"id"`
+		Source string `json:"source"`
 	}
 	if json.Unmarshal(o.Payload, &p) != nil {
 		return nil
 	}
 	var out []string
-	for _, v := range []string{p.From, p.To, p.Item, p.Owner, p.Quest} {
+	for _, v := range []string{p.From, p.To, p.Item, p.Owner, p.Quest, p.ID, p.Source} {
 		if v != "" {
 			out = append(out, v)
 		}
@@ -353,6 +400,13 @@ func createdRef(o store.DraftOp) string {
 		return "step:" + store.TmpID(o.ID)
 	case "upload_file":
 		return "attachment:" + store.TmpID(o.ID)
+	case "copy":
+		var p copyPayload
+		if json.Unmarshal(o.Payload, &p) == nil {
+			if src, ok := parseDraftRef(p.Source); ok {
+				return src.Type + ":" + store.TmpID(o.ID)
+			}
+		}
 	}
 	return ""
 }
@@ -803,19 +857,19 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 	}
 	collection := map[string]string{"quest": "quests", "note": "notes", "questline": "questlines"}
 
-	// Pass 1: things that come into being, parents before children.
-	for _, pass := range []string{"create_quest", "create_note", "create_step", "upload_file"} {
+	// Pass 1: things that come into being, containers before their contents.
+	for pass := 1; pass <= 3; pass++ {
 		for _, op := range ops {
-			if op.Kind != pass {
+			if passOf(op) != pass {
 				continue
 			}
-			key := map[string]string{"create_quest": "quest", "create_note": "note", "create_step": "step", "upload_file": "attachment"}[pass] + ":" + store.TmpID(op.ID)
-			switch pass {
+			key := createdRef(op)
+			switch op.Kind {
 			case "create_quest", "create_note":
 				var p createPayload
 				_ = json.Unmarshal(op.Payload, &p)
 				path := "/api/quests"
-				if pass == "create_note" {
+				if op.Kind == "create_note" {
 					path = "/api/notes"
 				}
 				body, _ := json.Marshal(p.Fields)
@@ -862,26 +916,24 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 				}
 				data, _ := io.ReadAll(rc)
 				_ = rc.Close()
-				var buf bytes.Buffer
-				mw := multipart.NewWriter(&buf)
-				h := textproto.MIMEHeader{}
-				h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, strings.ReplaceAll(fp.Filename, `"`, "")))
-				if fp.Declared != "" {
-					h.Set("Content-Type", fp.Declared)
-				} else {
-					h.Set("Content-Type", fp.Mime)
+				ctype := fp.Declared
+				if ctype == "" {
+					ctype = fp.Mime
 				}
-				part, _ := mw.CreatePart(h)
-				_, _ = part.Write(data)
-				_ = mw.Close()
-				code, out := dispatch(ctx, mux, "POST", fmt.Sprintf("/api/%s/%d/attachments", collection[otype], oid), mw.FormDataContentType(), buf.Bytes())
-				id, derr := idFrom(code, out)
-				if derr != nil {
-					fail(op, derr)
+				id, uerr := postAttachment(ctx, mux, collection[otype], oid, fp.Filename, ctype, "", data)
+				if uerr != nil {
+					fail(op, uerr)
 					return
 				}
 				created[key] = id
 				_ = s.WebDAV.Delete(context.WithoutCancel(ctx), fp.Path)
+			case "copy":
+				id, cerr := s.copyEntity(ctx, mux, op, owners[key], real, collection)
+				if cerr != nil {
+					fail(op, cerr)
+					return
+				}
+				created[key] = id
 			}
 			applied = append(applied, op.ID)
 		}
@@ -901,6 +953,31 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := s.editRef(ctx, mux, op.Kind == "add_ref", ft, fid, fmt.Sprintf("%s=%d", tt, tid)); err != nil {
 				fail(op, err)
+				return
+			}
+		case "edit_quest", "edit_step", "edit_note":
+			var p editPayload
+			_ = json.Unmarshal(op.Payload, &p)
+			_, id, ok := real(p.ID)
+			if !ok {
+				fail(op, errors.New("edit target missing"))
+				return
+			}
+			path := fmt.Sprintf("/api/quests/%d", id)
+			if op.Kind == "edit_note" {
+				path = fmt.Sprintf("/api/notes/%d", id)
+			}
+			if op.Kind == "edit_step" {
+				qid, qerr := s.Store.QuestIDForStep(ctx, id)
+				if qerr != nil {
+					fail(op, qerr)
+					return
+				}
+				path = fmt.Sprintf("/api/quests/%d/steps/%d", qid, id)
+			}
+			body, _ := json.Marshal(p.Fields)
+			if code, out := dispatch(ctx, mux, "PATCH", path, "application/json", body); code >= 300 {
+				fail(op, errors.New(errText(code, out)))
 				return
 			}
 		case "attach":
@@ -971,6 +1048,29 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 			_ = json.Unmarshal(op.Payload, &p)
 			if p.Owner != "" {
 				owners["attachment:"+store.TmpID(op.ID)] = p.Owner
+			}
+		}
+	}
+	// A copy of a step or file stays with the original's owner until attached elsewhere.
+	for _, op := range ops {
+		if op.Kind != "copy" {
+			continue
+		}
+		var p copyPayload
+		_ = json.Unmarshal(op.Payload, &p)
+		src, ok := parseDraftRef(p.Source)
+		if !ok || src.isTmp() {
+			continue
+		}
+		sid, _ := strconv.ParseInt(src.ID, 10, 64)
+		switch src.Type {
+		case "step":
+			if qid, err := s.Store.QuestIDForStep(ctx, sid); err == nil {
+				owners["step:"+store.TmpID(op.ID)] = fmt.Sprintf("quest:%d", qid)
+			}
+		case "attachment":
+			if a, err := s.Store.GetAttachment(ctx, sid); err == nil {
+				owners["attachment:"+store.TmpID(op.ID)] = fmt.Sprintf("%s:%d", a.OwnerType, a.OwnerID)
 			}
 		}
 	}
@@ -1064,6 +1164,13 @@ func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ st
 			return err
 		}
 		desc, path = n.Description, fmt.Sprintf("/api/notes/%d", id)
+	case "questline":
+		ql, err := s.Store.GetQuestline(ctx, id)
+		if err != nil {
+			return err
+		}
+		desc, _ = ql["description"].(string)
+		path = fmt.Sprintf("/api/questlines/%d", id)
 	case "step":
 		qid, err := s.Store.QuestIDForStep(ctx, id)
 		if err != nil {

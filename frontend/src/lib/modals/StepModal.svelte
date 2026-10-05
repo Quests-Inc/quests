@@ -18,6 +18,7 @@
    *   attachments?: any[],
    *   onClose: () => void,
    *   onSaved: (q: any) => void,
+   *   onDraft?: ((payload: any) => void) | null,
    * }} */
   let {
     open = false,
@@ -29,6 +30,7 @@
     attachments = [],
     onClose,
     onSaved,
+    onDraft = null,
   } = $props()
 
   let draft = $state(questStepDraft())
@@ -55,13 +57,19 @@
     saving = true
     formError = ''
     try {
-      const saved = await updateQuestStep(questId, step.id, {
+      const payload = {
         title: trimmed,
         description: draft.description.trim(),
         progress_current: Math.max(0, Number(draft.progress_current) || 0),
         progress_total: Math.max(1, Number(draft.progress_total) || 1),
         ...checkPayload(draft),
-      })
+      }
+      if (onDraft) {
+        onDraft(payload)
+        onClose()
+        return
+      }
+      const saved = await updateQuestStep(questId, step.id, payload)
       onSaved(saved)
       onClose()
     } catch (e) {
@@ -118,6 +126,6 @@
       />
     </div>
 
-    <ModalFoot onCancel={onClose} submitLabel="Сохранить" submitIcon="save" busy={saving} />
+    <ModalFoot onCancel={onClose} submitLabel={onDraft ? "В черновик" : "Сохранить"} submitIcon="save" busy={saving} />
   </form>
 </ModalShell>

@@ -7,6 +7,7 @@
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
   import ConfirmModal from '../modals/ConfirmModal.svelte'
   import QuestModal from '../modals/QuestModal.svelte'
+  import StepModal from '../modals/StepModal.svelte'
   import DraftEntityModal from '../modals/DraftEntityModal.svelte'
   import FindEntityModal from '../modals/FindEntityModal.svelte'
   import {
@@ -16,6 +17,9 @@
     deleteGraphDraftOp,
     getGraph,
     getGraphDraft,
+    getNote,
+    getQuestFull,
+    putGraphDraftOp,
     putGraphDraftRoots,
     uploadGraphDraftFile,
   } from '../js/api.js'
@@ -33,6 +37,7 @@
    *   nonce?: number,
    *   quests?: any[],
    *   notes?: any[],
+   *   questlines?: any[],
    *   onCenter?: (type: string, id: number) => void,
    *   onOpen?: (kind: string, id: number) => void,
    * }} */
@@ -43,6 +48,7 @@
     nonce = 0,
     quests = [],
     notes = [],
+    questlines = [],
     onCenter,
     onOpen,
   } = $props()
@@ -120,7 +126,13 @@
     try {
       const r = await commitGraphDraft()
       toast(`Сохранено: ${r.applied} ${r.applied === 1 ? 'изменение' : 'изменений'}`, { kind: 'success' })
+      // An empty map has nothing to show the saved things on: centre on the first one.
+      const made = !center.id ? Object.entries(r.created ?? {}).find(([k]) => k.startsWith('quest:') || k.startsWith('note:')) : null
       resetPositions()
+      if (made) {
+        center = { type: made[0].split(':')[0], id: Number(made[1]) }
+        onCenter?.(center.type, center.id)
+      }
       await loadDraft()
       reloadTick += 1
     } catch (e) {
@@ -193,7 +205,12 @@
   })
 
   $effect(() => {
-    if (!active || !center.type || !center.id) return
+    if (!active) return
+    // No centre yet: an empty base map, so things made in the draft still show.
+    if (!center.type || !center.id) {
+      data = { root: '', roots: [], nodes: [], edges: [], truncated: false, depth }
+      return
+    }
     const c = center
     const d = depth
     const extra = draft.roots.filter((r) => !(r.type === c.type && r.id === c.id))
@@ -329,6 +346,26 @@
     view = { ...view, groups }
   }
 
+  /** Cards the user took off the map (kept in this browser; nothing is deleted). */
+  const HIDDEN_KEY = 'quests.graph.hidden'
+  const loadHidden = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')
+      return new Set(Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : [])
+    } catch {
+      return new Set()
+    }
+  }
+  let hidden = $state(loadHidden())
+  const saveHidden = (next) => {
+    hidden = next
+    try {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]))
+    } catch {
+      /* storage may be unavailable; hiding still works until reload */
+    }
+  }
+
   /** New steps / files with no owner: drawn red, they block saving. */
   let ownerless = $state(/** @type {Set<string>} */ (new Set()))
   /** Saved things that the draft writes into: node key → ops, oldest first. */
@@ -356,10 +393,15 @@
     const open_ = expanded
     const ops = draft.ops
     if (!g) return
+    const gone = hidden
     const over = applyDraft(g, ops)
     ownerless = over.ownerless
     touched = over.touched
-    void rebuild({ ...g, nodes: over.nodes, edges: over.edges }, open_)
+    // Hidden cards leave the map together with their edges (never the centre).
+    const nodes = over.nodes.filter((n) => !gone.has(n.key) || n.key === g.root)
+    const keep = new Set(nodes.map((n) => n.key))
+    const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
+    void rebuild({ ...g, nodes, edges }, open_)
   })
 
   /** Puts hand-placed cards back, and an expanded block where its cluster was. */
@@ -601,7 +643,7 @@
       return
     }
     if (e.button !== 0) return
-    if (e.target.closest('.gcard__body a, .gcard__body button, .gcard__body pre')) return
+    if (e.target.closest('textarea, input, .gcard__editbar, .gcard__body a, .gcard__body button, .gcard__body pre')) return
     const body = e.target.closest('.gcard__body')
     // Inside the text area: let selection/scrolling happen; only the frame drags.
     if (body && body.scrollHeight > body.clientHeight + 1 && e.offsetX > body.clientWidth - 14) return
@@ -656,7 +698,7 @@
   }
   function onWheel(e) {
     // Over a card's scrollable text the wheel scrolls the text, not the map.
-    const body = e.target instanceof Element ? e.target.closest('.gcard__body') : null
+    const body = e.target instanceof Element ? e.target.closest('.gcard__body, textarea') : null
     if (body && body.scrollHeight > body.clientHeight + 1) return
     e.preventDefault()
     const r = stageEl?.getBoundingClientRect()
@@ -720,7 +762,7 @@
   }
 
   function recenter(n) {
-    if (n.type === 'step' || n.type === 'cluster' || n.draft) return
+    if (!CENTERABLE.has(n.type) || n.draft) return
     resetPositions()
     center = { type: n.type, id: n.id }
     selectedKey = null
@@ -753,7 +795,9 @@
   let linking = $state(null)
   let linkCursor = $state({ x: 0, y: 0 })
 
-  const REF_FROM = new Set(['quest', 'note', 'step'])
+  const REF_FROM = new Set(['quest', 'note', 'step', 'questline'])
+  /** Things the map can be centred on. */
+  const CENTERABLE = new Set(['quest', 'note', 'questline'])
   const REF_TO = new Set(['quest', 'note', 'step', 'attachment', 'questline'])
 
   /** Whether the card can be picked as the other end in the current link mode. */
@@ -867,9 +911,23 @@
     const items = []
     if (!n.draft) {
       if (openTarget(n)) items.push({ id: 'open', label: 'Открыть' })
-      if (n.type !== 'step' && n.key !== data?.root) items.push({ id: 'center', label: 'Сделать центром' })
-      if (isExtraRoot(n)) items.push({ id: 'unroot', label: 'Убрать с карты' })
-      if (n.type === 'quest' || n.type === 'note') items.push({ id: 'new-quest-ref', label: 'Создать квест со ссылкой сюда' })
+      if (CENTERABLE.has(n.type) && n.key !== data?.root) items.push({ id: 'center', label: 'Сделать центром' })
+      if (n.key !== data?.root) items.push({ id: isExtraRoot(n) ? 'unroot' : 'hide', label: 'Убрать с карты' })
+    }
+    // What can be changed, duplicated, or put into this card.
+    const own = []
+    if (n.type === 'quest' || n.type === 'step' || n.type === 'note') own.push({ id: 'edit', label: 'Изменить…' })
+    if (!n.draft && ['quest', 'note', 'step', 'attachment', 'questline'].includes(n.type)) own.push({ id: 'copy', label: 'Копировать' })
+    const add = []
+    if (n.type === 'quest') add.push({ id: 'add-step', label: 'Шаг' })
+    if (n.type === 'quest' || n.type === 'note') add.push({ id: 'add-file', label: 'Вложение…' })
+    if (n.type === 'quest' || n.type === 'step' || n.type === 'questline') add.push({ id: 'add-note', label: 'Заметку' })
+    if (n.type === 'questline') add.push({ id: 'add-quest-line', label: 'Квест' })
+    if (!n.draft && (n.type === 'quest' || n.type === 'note')) add.push({ id: 'new-quest-ref', label: 'Квест со ссылкой сюда' })
+    if (add.length) own.push({ id: 'add', label: 'Добавить', children: add })
+    if (own.length) {
+      if (items.length) items.push({ id: 'sep-own', sep: true })
+      items.push(...own)
     }
     if (REF_FROM.has(n.type)) {
       if (items.length) items.push({ id: 'sep-link', sep: true })
@@ -894,8 +952,21 @@
   })
 
   // Modals started from the menus.
-  let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 } })
-  let entityModal = $state({ open: false, kind: /** @type {'note' | 'step'} */ ('note'), at: { x: 0, y: 0 } })
+  let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: /** @type {number | null} */ (null) })
+  let entityModal = $state({
+    open: false,
+    kind: /** @type {'note' | 'step'} */ ('note'),
+    at: { x: 0, y: 0 },
+    /** quest key a new step is made for */
+    owner: '',
+    /** key of a card that should link to the new note */
+    linkFrom: '',
+    /** a thing that exists only in the draft, edited in place */
+    edit: /** @type {{ opId: number, payload: any, title: string, description: string, heading: string } | null} */ (null),
+  })
+  let editQuest = $state({ open: false, quest: /** @type {any | null} */ (null) })
+  let editStep = $state({ open: false, questId: /** @type {number | null} */ (null), step: /** @type {any | null} */ (null) })
+  let fileOwner = ''
   let findModal = $state(false)
   let fileInput = $state(/** @type {HTMLInputElement | null} */ (null))
   let fileAt = { x: 0, y: 0 }
@@ -903,12 +974,19 @@
   async function onCtxSelect(id) {
     const n = ctx.node
     const at = ctx.at
-    if (id === 'new-quest') questModal = { open: true, desc: '', at }
-    else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at }
-    else if (id === 'new-note') entityModal = { open: true, kind: 'note', at }
-    else if (id === 'new-step') entityModal = { open: true, kind: 'step', at }
-    else if (id === 'upload') {
+    const plain = { owner: '', linkFrom: '', edit: null }
+    if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
+    else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
+    else if (id === 'add-quest-line' && n) questModal = { open: true, desc: '', at, questlineId: n.id }
+    else if (id === 'new-note') entityModal = { open: true, kind: 'note', at, ...plain }
+    else if (id === 'new-step') entityModal = { open: true, kind: 'step', at, ...plain }
+    else if (id === 'add-step' && n) entityModal = { open: true, kind: 'step', at, ...plain, owner: n.key }
+    else if (id === 'add-note' && n) entityModal = { open: true, kind: 'note', at, ...plain, linkFrom: n.key }
+    else if (id === 'edit' && n) await startEdit(n)
+    else if (id === 'copy' && n) await addOp('copy', { source: n.key, pos: at })
+    else if (id === 'upload' || id === 'add-file') {
       fileAt = at
+      fileOwner = id === 'add-file' && n ? n.key : ''
       fileInput?.click()
     } else if (id === 'find') findModal = true
     else if (id === 'link-to' && n) startLink('to', n)
@@ -916,6 +994,7 @@
     else if (id === 'attach' && n) startLink('attach', n)
     else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
     else if (id === 'drop' && n?.op) await askDrop({ id: n.op })
+    else if (id === 'hide' && n) saveHidden(new Set([...hidden, n.key]))
     else if (id === 'unroot' && n) {
       const roots = draft.roots.filter((r) => `${r.type}:${r.id}` !== n.key)
       await putGraphDraftRoots(roots)
@@ -931,7 +1010,7 @@
     e.currentTarget.value = ''
     for (const [i, file] of files.entries()) {
       try {
-        const op = await uploadGraphDraftFile(file)
+        const op = await uploadGraphDraftFile(file, fileOwner)
         saved.set(`attachment:t${op.id}`, { x: fileAt.x + i * 110, y: fileAt.y })
       } catch {
         /* toast already shown */
@@ -940,7 +1019,173 @@
     await loadDraft()
   }
 
+  // --- Editing. A saved quest / step opens its usual form (the change goes to
+  // the draft); a thing that exists only in the draft is edited in place; a
+  // note is edited right on its card, in markdown. ---
+  const sameVal = (a, b, key) => {
+    if ((a == null || a === '') && (b == null || b === '')) return true
+    if (key === 'description') return String(a ?? '').trim() === String(b ?? '').trim()
+    if (key.endsWith('_at')) return new Date(a).getTime() === new Date(b).getTime()
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  const diffFields = (orig, payload, keys) => {
+    const out = {}
+    for (const k of keys) if (k in payload && !sameVal(orig[k], payload[k], k)) out[k] = payload[k]
+    return out
+  }
+  const QUEST_KEYS = ['title', 'description', 'status', 'significance', 'pinned', 'automated', 'sort_order', 'category_id', 'questline_id', 'deadline_at', 'duration_seconds']
+  const STEP_KEYS = ['title', 'description', 'progress_current', 'progress_total', 'check_command', 'check_interval_seconds', 'wait_previous', 'run_mode']
+
+  async function startEdit(n) {
+    if (n.type === 'note') return startEditNote(n)
+    if (n.draft) {
+      const op = draft.ops.find((o) => o.id === n.op)
+      if (!op) return
+      const f = op.payload?.fields ?? {}
+      entityModal = {
+        open: true,
+        kind: 'step',
+        at: ctx.at,
+        owner: '',
+        linkFrom: '',
+        edit: {
+          opId: op.id,
+          payload: op.payload,
+          title: f.title ?? n.title,
+          description: f.description ?? '',
+          heading: n.type === 'quest' ? 'Изменить квест' : 'Изменить шаг',
+        },
+      }
+      return
+    }
+    try {
+      if (n.type === 'quest') {
+        editQuest = { open: true, quest: await getQuestFull(n.id) }
+      } else if (n.type === 'step') {
+        const owner = (view?.edges ?? []).find((e) => e.kind === 'structure' && e.to === n.key && e.from.startsWith('quest:'))
+        if (!owner) return
+        const qid = Number(owner.from.slice('quest:'.length))
+        const full = await getQuestFull(qid)
+        const step = (full.steps ?? []).find((x) => x.id === n.id)
+        if (step) editStep = { open: true, questId: qid, step }
+      }
+    } catch {
+      /* toast already shown */
+    }
+  }
+
+  async function draftEditQuest(payload) {
+    const orig = editQuest.quest
+    if (!orig) return
+    const fields = diffFields(orig, payload, QUEST_KEYS)
+    const was = (orig.tags ?? []).map((t) => t.id).sort((a, b) => a - b)
+    const now = [...(payload.tag_ids ?? [])].sort((a, b) => a - b)
+    if (JSON.stringify(was) !== JSON.stringify(now)) fields.tag_ids = payload.tag_ids
+    if (!Object.keys(fields).length) {
+      toast('Ничего не изменилось', { kind: 'info' })
+      return
+    }
+    await addOp('edit_quest', { id: `quest:${orig.id}`, fields })
+  }
+
+  async function draftEditStep(payload) {
+    const orig = editStep.step
+    if (!orig) return
+    const fields = diffFields(orig, payload, STEP_KEYS)
+    if (!Object.keys(fields).length) {
+      toast('Ничего не изменилось', { kind: 'info' })
+      return
+    }
+    await addOp('edit_step', { id: `step:${orig.id}`, fields })
+  }
+
+  /** Submit of the small title + description form (new note / step, or an in-place edit). */
+  async function onEntitySubmit(fields) {
+    const m = entityModal
+    if (m.edit) {
+      try {
+        await putGraphDraftOp(m.edit.opId, { ...m.edit.payload, fields: { ...(m.edit.payload.fields ?? {}), ...fields } })
+        await loadDraft()
+      } catch {
+        /* toast already shown */
+      }
+      return
+    }
+    if (m.kind === 'step') {
+      await addOp('create_step', { fields, ...(m.owner ? { quest: m.owner } : {}), pos: m.at })
+      return
+    }
+    const op = await addOp('create_note', { fields, pos: m.at })
+    if (op && m.linkFrom) await addOp('add_ref', { from: m.linkFrom, to: `note:t${op.id}` })
+  }
+
+  /** Note edited on its card: the full text is fetched first (the map shows only the start of long notes). */
+  let editing = $state(
+    /** @type {{ key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any } | null} */ (null),
+  )
+
+  async function startEditNote(n) {
+    if (editing?.key === n.key) return
+    try {
+      if (n.draft) {
+        const op = draft.ops.find((o) => o.id === n.op)
+        if (!op) return
+        const f = op.payload?.fields ?? {}
+        editing = {
+          key: n.key,
+          title: f.title ?? n.title,
+          text: f.description ?? '',
+          orig: { title: f.title ?? '', description: f.description ?? '' },
+          opId: op.id,
+          payload: op.payload,
+        }
+      } else {
+        const full = await getNote(n.id)
+        editing = {
+          key: n.key,
+          title: full.title ?? n.title,
+          text: full.description ?? '',
+          orig: { title: full.title ?? '', description: full.description ?? '' },
+          opId: null,
+        }
+      }
+    } catch {
+      /* toast already shown */
+    }
+  }
+
+  async function finishEdit(saveIt) {
+    const e = editing
+    editing = null
+    if (!saveIt || !e) return
+    const changed = {}
+    if (e.title.trim() && e.title.trim() !== e.orig.title) changed.title = e.title.trim()
+    if (e.text !== e.orig.description) changed.description = e.text
+    if (!Object.keys(changed).length) return
+    if (e.opId != null) {
+      try {
+        await putGraphDraftOp(e.opId, { ...e.payload, fields: { ...(e.payload.fields ?? {}), ...changed } })
+        await loadDraft()
+      } catch {
+        /* toast already shown */
+      }
+      return
+    }
+    await addOp('edit_note', { id: e.key, fields: changed })
+  }
+
+  const autofocus = (node) => {
+    node.focus()
+  }
+
   async function addToMap(type, id) {
+    // First thing on an empty map becomes its centre.
+    if (!center.id) {
+      resetPositions()
+      center = { type, id }
+      onCenter?.(type, id)
+      return
+    }
     if (center.type === type && center.id === id) {
       toast('Это уже центр карты', { kind: 'info' })
       return
@@ -1024,6 +1269,11 @@
     {#if expanded.size}
       <button type="button" class="graph__btn" onclick={collapseAll}>Свернуть вложения</button>
     {/if}
+    {#if hidden.size}
+      <button type="button" class="graph__btn" title="Вернуть убранные с карты карточки" onclick={() => saveHidden(new Set())}>
+        Показать убранные ({hidden.size})
+      </button>
+    {/if}
     <button type="button" class="graph__btn" onclick={relayout}>Распутать</button>
     <button type="button" class="graph__btn" onclick={fit}>Вписать</button>
   </div>
@@ -1051,8 +1301,8 @@
         · ПКМ или Esc — отмена
       </p>
     {/if}
-    {#if !center.id}
-      <p class="graph__msg">Выберите квест или заметку в поиске выше — или откройте карту из карточки квеста.</p>
+    {#if !center.id && !view?.nodes?.length}
+      <p class="graph__msg">Выберите квест или заметку в поиске выше — или откройте карту из карточки квеста. ПКМ по полю создаёт новые.</p>
     {:else if error}
       <p class="graph__msg">{error}</p>
     {:else if loading && !view}
@@ -1143,16 +1393,20 @@
           class:gcard--pickable={linking && canPick(n)}
           class:gcard--anchor={linking?.anchor === n.key}
           class:gcard--ownerless={ownerless.has(n.key)}
+          class:gcard--editing={editing?.key === n.key}
           class:gcard--pill={!big && !square && !withText}
           style:--c={ownerless.has(n.key) ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
           style:left="{n.x - n.w / 2}px"
           style:top="{n.y - n.h / 2}px"
           style:width={big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
-          style:height={ready && n.h ? `${n.h}px` : undefined}
+          style:height={ready && n.h ? `${editing?.key === n.key ? Math.max(n.h, 340) : n.h}px` : undefined}
           data-gkey={n.key}
           title="{t.label}: {n.title}{isOrphan(n) ? ' — на неё нет ссылок' : ''}"
           onpointerdown={(e) => onCardDown(e, n)}
           oncontextmenu={(e) => onCtx(e, n)}
+          ondblclick={(e) => {
+            if (n.type === 'note' && !(e.target instanceof Element && e.target.closest('a, button, textarea, input'))) void startEditNote(n)
+          }}
         >
           {#if square}
             <div class="gcard__sq">
@@ -1164,6 +1418,32 @@
                 <FileKindIcon att={{ filename: n.title, content_type_detected: n.mime }} size={30} />
               {/if}
               <span class="gcard__name">{n.type === 'cluster' ? 'вложений' : n.title}</span>
+            </div>
+          {:else if editing && editing.key === n.key}
+            <div class="gcard__head">
+              {@render glyph(n, t)}
+              <input class="gcard__titleedit" bind:value={editing.title} aria-label="Заголовок" />
+            </div>
+            <textarea
+              class="gcard__editor"
+              bind:value={editing.text}
+              use:autofocus
+              placeholder="Markdown"
+              spellcheck="false"
+              onkeydown={(e) => {
+                if (e.key === 'Escape') {
+                  e.stopPropagation()
+                  void finishEdit(false)
+                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault()
+                  void finishEdit(true)
+                }
+              }}
+            ></textarea>
+            <div class="gcard__editbar">
+              <button type="button" class="graph__btn graph__btn--primary" onclick={() => finishEdit(true)}>Готово</button>
+              <button type="button" class="graph__btn" onclick={() => finishEdit(false)}>Отмена</button>
+              <span class="gcard__edithint">Ctrl+Enter — готово · Esc — отмена</span>
             </div>
           {:else if big || withText}
             <div class="gcard__head">
@@ -1276,7 +1556,7 @@
       {#if tgt}
         <button type="button" class="graph__btn" onclick={() => onOpen?.(tgt[0], tgt[1])}>Открыть</button>
       {/if}
-      {#if selected.key !== data?.root && selected.type !== 'step'}
+      {#if selected.key !== data?.root && CENTERABLE.has(selected.type) && !selected.draft}
         <button type="button" class="graph__btn" onclick={() => recenter(selected)}>Сделать центром</button>
       {/if}
     {:else}
@@ -1295,7 +1575,7 @@
 <QuestModal
   open={questModal.open}
   mode="create"
-  defaults={{ description: questModal.desc }}
+  defaults={{ description: questModal.desc, questline_id: questModal.questlineId }}
   {quests}
   {notes}
   attachments={[]}
@@ -1307,13 +1587,49 @@
 <DraftEntityModal
   open={entityModal.open}
   kind={entityModal.kind}
+  initial={entityModal.edit ? { title: entityModal.edit.title, description: entityModal.edit.description } : null}
+  heading={entityModal.edit?.heading ?? ''}
   {quests}
   {notes}
   onClose={() => (entityModal = { ...entityModal, open: false })}
-  onSubmit={(fields) => addOp(entityModal.kind === 'note' ? 'create_note' : 'create_step', { fields, pos: entityModal.at })}
+  onSubmit={onEntitySubmit}
 />
 
-<FindEntityModal open={findModal} {quests} {notes} onClose={() => (findModal = false)} onPick={addToMap} />
+<QuestModal
+  open={editQuest.open}
+  mode="edit"
+  quest={editQuest.quest}
+  {quests}
+  {notes}
+  attachments={[]}
+  onClose={() => (editQuest = { ...editQuest, open: false })}
+  onSaved={() => {}}
+  onDraft={draftEditQuest}
+/>
+
+<StepModal
+  open={editStep.open}
+  questId={editStep.questId}
+  step={editStep.step}
+  {quests}
+  {notes}
+  questlines={[]}
+  attachments={[]}
+  onClose={() => (editStep = { ...editStep, open: false })}
+  onSaved={() => {}}
+  onDraft={draftEditStep}
+/>
+
+<!-- Only live quests can be put on the map this way; notes and questlines as they are. -->
+<FindEntityModal
+  open={findModal}
+  types={['quest', 'note', 'questline']}
+  quests={quests.filter((q) => q.status === 'active')}
+  {notes}
+  {questlines}
+  onClose={() => (findModal = false)}
+  onPick={addToMap}
+/>
 
 <ConfirmModal
   open={cancelAsk}
@@ -1608,6 +1924,51 @@
 
   .gcard--root {
     border-width: 3px;
+  }
+
+  .gcard--editing {
+    z-index: 5;
+    cursor: default;
+    box-shadow: 0 6px 24px color-mix(in srgb, #000 55%, transparent);
+  }
+
+  .gcard__titleedit {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 6px;
+    background: var(--color-bg, #121212);
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+  }
+
+  .gcard__editor {
+    flex: 1 1 auto;
+    min-height: 0;
+    resize: none;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 6px;
+    background: var(--color-bg, #121212);
+    color: var(--color-fg, #e8e8e8);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    user-select: text;
+  }
+
+  .gcard__editbar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .gcard__edithint {
+    margin-left: auto;
+    font-size: 0.65rem;
+    color: var(--color-fg-muted, #9a9a9a);
   }
 
   .gcard--sel {
