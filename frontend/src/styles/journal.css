@@ -2276,6 +2276,32 @@
     margin-bottom: var(--space-6, 2rem);
   }
 
+  /* Quest description: a pill that hugs short text and grows to full width
+     for long text. The questline description stays flat. */
+  .block--prose:not(.detail__line-desc) {
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0.7rem 1rem;
+    border-radius: var(--pill-radius, 12px);
+    background: var(--pill-bg, #0f0f0f);
+    box-shadow: var(--pill-shadow, none);
+  }
+
+  .block--prose:not(.detail__line-desc) .md > :first-child {
+    margin-top: 0;
+  }
+
+  .block--prose:not(.detail__line-desc) .md > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* Code and tables inside a pill sit one step lighter than the pill. */
+  .block--prose:not(.detail__line-desc) .md pre,
+  .block--prose:not(.detail__line-desc) .md :not(pre) > code {
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 7%, transparent);
+  }
+
   .block--prose .block__body,
   .block--prose .md {
     font-family: var(--font-body, Georgia, serif);
@@ -2594,6 +2620,13 @@
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto auto auto;
     gap: var(--space-2, 0.5rem);
     align-items: center;
+    /* One pill per file: name, comment and actions read as a single unit
+       instead of floating apart on wide screens. Darker than the surface in
+       any theme (mixed from --color-bg, not a fixed black). */
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--pill-radius, 12px);
+    background: var(--pill-bg, #0f0f0f);
+    box-shadow: var(--pill-shadow, none);
   }
 
   .attach__row--off {
@@ -2970,7 +3003,14 @@
 
   .step__desc {
     grid-column: 2 / -1;
+    justify-self: start;
+    max-width: 100%;
+    box-sizing: border-box;
     margin: 0;
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--pill-radius, 12px);
+    background: var(--pill-bg, #0f0f0f);
+    box-shadow: var(--pill-shadow, none);
     font-size: var(--text-sm, 0.875rem);
     color: var(--color-fg-muted, #9a9a9a);
   }

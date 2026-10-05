@@ -11,6 +11,12 @@
   --color-bg-muted: #242424;
   --color-bg-hover: #2a2a2a;
 
+  /* Pills: content set slightly into the surface (descriptions, attachment rows).
+     Derived from --color-bg so every theme gets a darker-than-surface tone. */
+  --pill-bg: color-mix(in srgb, var(--color-bg) 90%, #000);
+  --pill-shadow: 0 1px 3px color-mix(in srgb, #000 35%, transparent);
+  --pill-radius: 12px;
+
   /* Ink */
   --color-fg: #e8e8e8;
   --color-fg-muted: #9a9a9a;
