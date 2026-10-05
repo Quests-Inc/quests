@@ -22,6 +22,7 @@
   import RefText from '../ui/RefText.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import AttachmentsBlock from './AttachmentsBlock.svelte'
+  import EntityHistory from './EntityHistory.svelte'
   import ConfirmModal from '../modals/ConfirmModal.svelte'
   import NoteIconModal from '../modals/NoteIconModal.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
@@ -1530,6 +1531,9 @@
       {#if selectedId}
         <div class="block notes__attach">
           <AttachmentsBlock ownerType="note" ownerId={selectedId} onOpenOwner={onRef} />
+        </div>
+        <div class="block notes__attach">
+          <EntityHistory entityType="note" entityId={selectedId} version={detail?.updated_at} />
         </div>
       {/if}
     {/if}

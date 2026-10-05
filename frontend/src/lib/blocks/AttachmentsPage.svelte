@@ -3,6 +3,7 @@
   import FileKindIcon from '../ui/FileKindIcon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import ConfirmModal from '../modals/ConfirmModal.svelte'
+  import EntityHistory from './EntityHistory.svelte'
   import {
     attachmentDownloadUrl,
     deleteAttachment,
@@ -564,6 +565,13 @@
             {/each}
           </ul>
         {/if}
+
+        <EntityHistory
+          entityType="attachment"
+          entityId={a.id}
+          version={`${a.revision}-${a.hidden}-${a.uploaded_at}`}
+          labelClass="attpage__lbl"
+        />
 
         <button type="button" class="attpage__link attpage__copy" onclick={() => copyRef(a)}>
           <Icon name="copy" size={12} /> Копировать attachment={a.id}

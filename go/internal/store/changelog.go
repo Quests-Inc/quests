@@ -28,6 +28,8 @@ type ChangeLogFilter struct {
 	QuestID     *int64   // the quest itself, or an attachment owned by it
 	EntityTypes []string // quest | note | attachment; empty = quest only, "all" = any
 	EntityID    *int64   // with exactly one EntityType: one entity's history
+	OwnerType   string   // with OwnerID: the entity itself plus everything attached to it
+	OwnerID     *int64
 	Kinds       []string
 	QuestlineID *int64 // quests of the line, their attachments, and its own attachments
 	CategoryID  *int64
@@ -79,6 +81,9 @@ func (s *Store) ListChangeLog(ctx context.Context, f ChangeLogFilter) ([]map[str
 	}
 	if f.EntityID != nil {
 		add("entity_id=?", *f.EntityID)
+	}
+	if f.OwnerType != "" && f.OwnerID != nil {
+		add("((entity_type=? AND entity_id=?) OR (parent_type=? AND parent_id=?))", f.OwnerType, *f.OwnerID, f.OwnerType, *f.OwnerID)
 	}
 	if f.QuestID != nil {
 		add("(quest_id=? OR (parent_type='quest' AND parent_id=?))", *f.QuestID, *f.QuestID)

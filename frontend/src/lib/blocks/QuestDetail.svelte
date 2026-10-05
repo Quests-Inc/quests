@@ -4,6 +4,8 @@
   import MarkdownBody from '../ui/MarkdownBody.svelte'
   import RefText from '../ui/RefText.svelte'
   import AttachmentsBlock from './AttachmentsBlock.svelte'
+  import EntityHistory from './EntityHistory.svelte'
+  import TemplateStreak from './TemplateStreak.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { formatLocal, localTimeZone } from '../js/time.js'
   import { parseRefs } from '../js/refs.js'
@@ -186,6 +188,7 @@
       document.querySelector('.detail')?.scrollTo({ top: 0 })
     })
   })
+
 </script>
 
 {#snippet questActions(q)}
@@ -400,6 +403,10 @@
     <AttachmentsBlock ownerType="quest" ownerId={q.id} onOpenOwner={onRef} />
   </div>
 
+  <div class="block">
+    <EntityHistory entityType="quest" entityId={q.id} version={q.updated_at} />
+  </div>
+
   {#if linkedNotes.length}
     <div class="block">
       <button
@@ -452,6 +459,9 @@
           {/if}
         </dd>
       </div>
+    {/if}
+    {#if q.source?.startsWith('template:')}
+      <TemplateStreak templateId={Number(q.source.slice('template:'.length))} status={q.status} />
     {/if}
   </dl>
 

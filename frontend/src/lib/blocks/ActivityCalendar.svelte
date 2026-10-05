@@ -12,8 +12,9 @@
    *   onRef?: (kind: string, id: number) => void,
    *   onSelectQuest?: (id: number) => void,
    *   onQuestContextMenu?: (event: MouseEvent, id: number) => void,
+   *   onOpenHistory?: (dayKey: string) => void,
    * }} */
-  let { quests = [], labels = {}, onRef, onSelectQuest, onQuestContextMenu } = $props()
+  let { quests = [], labels = {}, onRef, onSelectQuest, onQuestContextMenu, onOpenHistory } = $props()
 
   /** @param {MouseEvent} event @param {number} id */
   function openQuestMenu(event, id) {
@@ -551,7 +552,15 @@
                 <div class="activity-cal__cell-head">
                   <span class="activity-cal__daynum">{cell.day}</span>
                   {#if cell.items.length > 0}
-                    <span class="activity-cal__count">{cell.items.length}</span>
+                    {@const doneN = cell.items.filter((i) => i.done).length}
+                    <span class="activity-cal__count">
+                      {#if doneN > 0}
+                        <span class="activity-cal__done" title="Выполнено: {doneN}">
+                          <Icon name="check" size={10} />{doneN}
+                        </span>
+                      {/if}
+                      {cell.items.length}
+                    </span>
                   {/if}
                 </div>
                 <div class="activity-cal__cards">
@@ -609,6 +618,17 @@
           </button>
         </div>
         <div class="day-load__actions">
+          {#if selectedKey && onOpenHistory}
+            <button
+              type="button"
+              class="btn day-load__icon-btn"
+              onclick={() => onOpenHistory?.(selectedKey ?? '')}
+              title="События дня в истории"
+              aria-label="События дня в истории"
+            >
+              <Icon name="scroll" size={16} />
+            </button>
+          {/if}
           <button
             type="button"
             class="btn day-load__icon-btn"

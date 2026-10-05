@@ -2,6 +2,7 @@
   import Icon from '../ui/Icon.svelte'
   import { getQuestLog, listTags } from '../js/api.js'
   import { parseApiDate } from '../js/time.js'
+  import { KINDS, detailOf } from '../js/historyKinds.js'
 
   /** @type {{
    *   active?: boolean,
@@ -54,42 +55,6 @@
     { id: '7', label: '7 дней' },
     { id: '30', label: '30 дней' },
   ]
-
-  /** kind → [label, icon, tone] */
-  const KINDS = {
-    quest_created: ['создан квест', 'add', 'new'],
-    quest_appeared: ['появился квест', 'add', 'new'],
-    quest_completed: ['квест выполнен', 'checkmark', 'ok'],
-    quest_failed: ['квест провален', 'alert', 'bad'],
-    quest_expired: ['квест просрочен', 'alert', 'bad'],
-    quest_delayed: ['квест отложен', 'renew', 'warn'],
-    quest_deleted: ['квест удалён', 'delete', 'bad'],
-    quest_updated: ['квест изменён', 'edit', ''],
-    status_changed: ['смена статуса', 'flag', ''],
-    pin_changed: ['закрепление', 'pin', ''],
-    step_completed: ['шаг выполнен', 'check', 'ok'],
-    step_reopened: ['шаг открыт снова', 'undo', 'warn'],
-    note_created: ['создана заметка', 'document', 'new'],
-    note_updated: ['заметка изменена', 'edit', ''],
-    note_deleted: ['заметка удалена', 'delete', 'bad'],
-    attachment_added: ['добавлено вложение', 'attachment', 'new'],
-    attachment_version: ['версия вложения', 'layers', ''],
-    attachment_hidden: ['вложение скрыто/возвращено', 'eye-off', ''],
-    attachment_deleted: ['вложение удалено', 'delete', 'bad'],
-  }
-
-  /** Details that only repeat what the kind label already says. */
-  const GENERIC = new Set([
-    'создано задание', 'изменено', 'удалено', 'удалена', 'изменена', 'создана',
-    'загружено', 'просрочено', 'провалено', 'завершено', 'создано',
-  ])
-
-  /** @param {any} r */
-  function detailOf(r) {
-    const d = (r.detail || '').trim()
-    if (!d || d === r.title || GENERIC.has(d.toLowerCase())) return ''
-    return d
-  }
 
   /** @param {string} key @param {string} fallback */
   function param(key, fallback = '') {
@@ -403,6 +368,7 @@
   }
 
   .hist__tools {
+    --hist-h: 2.4rem;
     display: grid;
     gap: 0.55rem;
     padding: 0.75rem 1rem;
@@ -417,6 +383,8 @@
   }
 
   .hist__search {
+    box-sizing: border-box;
+    height: var(--hist-h);
     flex: 1 1 14rem;
     min-width: 0;
   }
@@ -424,7 +392,9 @@
   .hist__select {
     flex: 0 0 auto;
     max-width: 100%;
-    padding: 0.35rem 0.5rem;
+    box-sizing: border-box;
+    height: var(--hist-h);
+    padding: 0 0.6rem;
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
     background: transparent;
@@ -439,18 +409,20 @@
 
   .hist__seg {
     display: inline-flex;
+    box-sizing: border-box;
+    height: var(--hist-h);
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
     overflow: hidden;
   }
 
   .hist__pill {
-    padding: 0.28rem 0.65rem;
+    padding: 0 0.9rem;
     border: 0;
     border-right: 1px solid var(--color-border, #333);
     background: transparent;
     font: inherit;
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-sm, 0.875rem);
     color: var(--color-fg-muted, #9a9a9a);
     cursor: pointer;
   }
@@ -469,15 +441,17 @@
   }
 
   .hist__reset {
+    box-sizing: border-box;
+    height: var(--hist-h);
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.3rem 0.6rem;
+    padding: 0 0.8rem;
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
     background: transparent;
     font: inherit;
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-sm, 0.875rem);
     color: var(--color-fg-muted, #9a9a9a);
     cursor: pointer;
   }

@@ -1078,6 +1078,14 @@
     replaceSearch(searchForView(next))
   }
 
+  /** Calendar → History for one day. The URL is set first: History reads its filters on mount. */
+  function openHistoryDay(dayKey) {
+    const from = TAB_ORDER.indexOf(view)
+    navDir = TAB_ORDER.indexOf('history') > from ? 1 : -1
+    replaceSearch({ tab: 'history', day: dayKey })
+    view = 'history'
+  }
+
   function selectQuestFromUi(id, { pushUrl = true } = {}) {
     const n = Number(id)
     if (!Number.isFinite(n) || n <= 0) return
@@ -1577,6 +1585,7 @@
         labels={refLabels}
         onRef={onJournalRef}
         onSelectQuest={selectQuestFromUi}
+        onOpenHistory={openHistoryDay}
         onQuestContextMenu={(event, id) => {
           const quest = quests.find((q) => q.id === id)
           if (quest) openQuestContextMenu(event, quest)

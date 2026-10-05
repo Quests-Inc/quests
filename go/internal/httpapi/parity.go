@@ -410,6 +410,8 @@ func (s *Server) getQuestLog(w http.ResponseWriter, r *http.Request) {
 		QuestID:     i64("quest_id"),
 		EntityTypes: list("entity_type"),
 		EntityID:    i64("entity_id"),
+		OwnerType:   q.Get("owner_type"),
+		OwnerID:     i64("owner_id"),
 		Kinds:       list("kind"),
 		QuestlineID: i64("questline_id"),
 		CategoryID:  i64("category_id"),

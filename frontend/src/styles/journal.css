@@ -1148,6 +1148,14 @@
     color: var(--color-info, #5a8a7a);
   }
 
+  .activity-cal__done {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin-right: 0.3rem;
+    color: var(--color-success, #4fa56b);
+  }
+
   .activity-cal__count {
     font-family: var(--font-ui, sans-serif);
     font-size: 0.6rem;
