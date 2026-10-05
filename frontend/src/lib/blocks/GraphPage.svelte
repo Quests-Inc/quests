@@ -620,7 +620,15 @@
     // Kinds switched off in the filter go last, so what is reached only through them stays.
     const kinds = shownTypes
     if (kinds.size < ENTITY_TYPES.length) {
-      nodes = nodes.filter((n) => n.draft || n.key === g.root || kinds.has(n.type) || !ENTITY_TYPES.includes(n.type))
+      const off = new Set(
+        nodes.filter((n) => !(n.draft || n.key === g.root || kinds.has(n.type) || !ENTITY_TYPES.includes(n.type))).map((n) => n.key),
+      )
+      // Steps and files go with the quest / note they belong to.
+      const withThem = new Set(off)
+      for (const e of over.edges) {
+        if (e.kind === 'structure' && off.has(e.from) && /^(step|attachment):/.test(e.to)) withThem.add(e.to)
+      }
+      nodes = nodes.filter((n) => n.draft || n.key === g.root || !withThem.has(n.key))
     }
     const keep = new Set(nodes.map((n) => n.key))
     const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
