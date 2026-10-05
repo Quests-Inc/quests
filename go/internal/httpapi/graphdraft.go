@@ -319,25 +319,112 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 	return has
 }
 
-// dependents returns the ids of ops that need op id (directly or through
-// other ops), in addition to id itself.
+// opRefs lists the draft references an op points at (the fields that name
+// other things), parsed rather than searched for, so free text can never be
+// mistaken for a reference.
+func opRefs(o store.DraftOp) []string {
+	var p struct {
+		From  string `json:"from"`
+		To    string `json:"to"`
+		Item  string `json:"item"`
+		Owner string `json:"owner"`
+		Quest string `json:"quest"`
+	}
+	if json.Unmarshal(o.Payload, &p) != nil {
+		return nil
+	}
+	var out []string
+	for _, v := range []string{p.From, p.To, p.Item, p.Owner, p.Quest} {
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// createdRef is the placeholder an op's created entity answers to, or "".
+func createdRef(o store.DraftOp) string {
+	switch o.Kind {
+	case "create_quest":
+		return "quest:" + store.TmpID(o.ID)
+	case "create_note":
+		return "note:" + store.TmpID(o.ID)
+	case "create_step":
+		return "step:" + store.TmpID(o.ID)
+	case "upload_file":
+		return "attachment:" + store.TmpID(o.ID)
+	}
+	return ""
+}
+
+// dependents returns the ids of ops that cannot stand once op id is gone, in
+// addition to id itself: ops that use what it created (transitively), and the
+// op right after it that only undoes or repeats the same link.
 func dependents(ops []store.DraftOp, id int64) []int64 {
+	byID := map[int64]store.DraftOp{}
+	for _, o := range ops {
+		byID[o.ID] = o
+	}
 	out := []int64{id}
 	gone := map[int64]bool{id: true}
+	// Ops dropped only because they paired with a dropped one do not pair
+	// onward: what follows them still stands on its own.
+	paired := map[int64]bool{}
+	drop := func(o store.DraftOp) {
+		gone[o.ID] = true
+		out = append(out, o.ID)
+	}
+	linkOf := func(o store.DraftOp) (linkPayload, bool) {
+		var p linkPayload
+		if (o.Kind != "add_ref" && o.Kind != "remove_ref") || json.Unmarshal(o.Payload, &p) != nil {
+			return p, false
+		}
+		return p, true
+	}
 	for changed := true; changed; {
 		changed = false
 		for _, o := range ops {
 			if gone[o.ID] {
 				continue
 			}
-			text := string(o.Payload)
-			for g := range gone {
-				if strings.Contains(text, ":t"+strconv.FormatInt(g, 10)+`"`) {
-					gone[o.ID] = true
-					out = append(out, o.ID)
-					changed = true
-					break
+			uses := false
+			for _, r := range opRefs(o) {
+				for g := range gone {
+					if c := createdRef(byID[g]); c != "" && c == r {
+						uses = true
+					}
 				}
+			}
+			if uses {
+				drop(o)
+				changed = true
+			}
+		}
+		// Without an add, the next remove of that link has nothing to remove
+		// (and without a remove, the next add has nothing to add back). Only
+		// the next one: what follows still makes sense on its own.
+		for g := range gone {
+			if paired[g] {
+				continue
+			}
+			gp, ok := linkOf(byID[g])
+			if !ok {
+				continue
+			}
+			for _, o := range ops {
+				if o.ID <= g || gone[o.ID] {
+					continue
+				}
+				p, ok := linkOf(o)
+				if !ok || p.From != gp.From || p.To != gp.To {
+					continue
+				}
+				if o.Kind != byID[g].Kind {
+					drop(o)
+					paired[o.ID] = true
+					changed = true
+				}
+				break
 			}
 		}
 	}
