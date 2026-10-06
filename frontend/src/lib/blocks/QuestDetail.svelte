@@ -20,6 +20,7 @@
   import { downloadQuestPdfSimple } from '../js/questPdf.js'
   import { downloadQuestPdf as downloadQuestPdfRich } from '../js/questExport.js'
   import { toastDone, toastProgress } from '../js/toasts.svelte.js'
+  import { animateText } from '../js/typewriter.js'
 
   /** @type {{
    *   selected: any | null,
@@ -181,14 +182,72 @@
   /** Only jump to top when switching quests — not on every silent refresh / step bump. */
   let lastDetailQuestId = /** @type {number | null} */ (null)
 
+  /** What's actually rendered — equals selected.title/description except mid-animation. */
+  let displayTitle = $state('')
+  let displayDescription = $state('')
+  let prevAutomatedTitle = /** @type {string | null} */ (null)
+  let prevAutomatedDescription = /** @type {string | null} */ (null)
+  /** @type {AbortController | null} */
+  let titleAnim = null
+  /** @type {AbortController | null} */
+  let descAnim = null
+
+  /** Erase the old text (if any) then type the new one — only for a quest
+   * open in this pane whose automated=true source (agent/script) just
+   * changed its own title/description; never for the user's own edits. */
+  async function retype(oldText, newText, granularity, setDisplay, getCtrl, setCtrl) {
+    getCtrl()?.abort()
+    const ac = new AbortController()
+    setCtrl(ac)
+    if (oldText) {
+      await animateText(oldText, { mode: 'erase', granularity, onUpdate: setDisplay, signal: ac.signal })
+    }
+    await animateText(newText, { mode: 'reveal', granularity, onUpdate: setDisplay, signal: ac.signal })
+    if (getCtrl() === ac) setCtrl(null)
+  }
+
   $effect(() => {
-    const id = selected?.id ?? null
-    if (id === lastDetailQuestId) return
-    lastDetailQuestId = id
-    if (id == null) return
-    queueMicrotask(() => {
-      document.querySelector('.detail')?.scrollTo({ top: 0 })
-    })
+    const q = selected
+    const id = q?.id ?? null
+    const title = q?.title || ''
+    const description = q?.description || ''
+
+    if (id !== lastDetailQuestId) {
+      lastDetailQuestId = id
+      titleAnim?.abort()
+      descAnim?.abort()
+      displayTitle = title
+      displayDescription = description
+      prevAutomatedTitle = title
+      prevAutomatedDescription = description
+      if (id != null) {
+        queueMicrotask(() => {
+          document.querySelector('.detail')?.scrollTo({ top: 0 })
+        })
+      }
+      return
+    }
+    if (!q) return
+
+    if (q.automated) {
+      if (prevAutomatedTitle != null && title !== prevAutomatedTitle) {
+        void retype(prevAutomatedTitle, title, 'char', (t) => (displayTitle = t),
+          () => titleAnim, (c) => (titleAnim = c))
+      } else if (!titleAnim) {
+        displayTitle = title
+      }
+      if (prevAutomatedDescription != null && description !== prevAutomatedDescription) {
+        void retype(prevAutomatedDescription, description, 'word', (t) => (displayDescription = t),
+          () => descAnim, (c) => (descAnim = c))
+      } else if (!descAnim) {
+        displayDescription = description
+      }
+    } else if (!titleAnim && !descAnim) {
+      displayTitle = title
+      displayDescription = description
+    }
+    prevAutomatedTitle = title
+    prevAutomatedDescription = description
   })
 
 
@@ -403,9 +462,9 @@
 
 {#snippet questBody(q)}
   {@const timer = questTimer(q, nowMs)}
-  {#if q.description}
+  {#if q.description || displayDescription}
     <div class="block block--prose">
-      <MarkdownBody class="block__body" source={q.description} {labels} {onRef} />
+      <MarkdownBody class="block__body" source={displayDescription} {labels} {onRef} />
     </div>
   {/if}
 
@@ -569,7 +628,7 @@
               class="detail__title"
               oncontextmenu={(e) => onQuestTitleContextMenu?.(e, selected)}
             >
-              <RefText source={selected.title} {labels} {onRef} />
+              <RefText source={displayTitle} {labels} {onRef} />
             </h2>
             {@render questActions(selected)}
           </div>
@@ -616,7 +675,7 @@
             class="detail__title"
             oncontextmenu={(e) => onQuestTitleContextMenu?.(e, selected)}
           >
-            <RefText source={selected.title} {labels} {onRef} />
+            <RefText source={displayTitle} {labels} {onRef} />
           </h2>
           {@render questActions(selected)}
         </div>
