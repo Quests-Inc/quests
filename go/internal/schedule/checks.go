@@ -588,6 +588,10 @@ func (r *CheckRunner) failOnce(ctx context.Context, j store.RunnerJob, why strin
 
 // ExpireRunnerJobs settles jobs whose lease or deadline passed and tells their steps.
 func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
+	// Jobs of deleted quests / steps do not hang around waiting for a device.
+	if _, err := r.Store.CancelOrphanJobs(ctx); err != nil {
+		log.Printf("checks: cancel orphan runner jobs: %v", err)
+	}
 	changed, err := r.Store.ExpireJobs(ctx)
 	if err != nil {
 		log.Printf("checks: expire runner jobs: %v", err)

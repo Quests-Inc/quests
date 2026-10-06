@@ -704,6 +704,69 @@ def get_graph(entity: str, entity_id: int, depth: int = 2) -> dict[str, Any]:
     }
 
 
+@server.tool(
+    description=(
+        "Runners: devices that execute step checks / template commands (run_on / "
+        "emit_run_on = the runner's label). Returns label, online (seen within ~70s), "
+        "last_seen_at, hostname, version, registered/revoked and queued/running job "
+        "counts. Registering a runner (one-time token) is done by the user: "
+        "`quests-server runner add <label>` or the Runners tab."
+    )
+)
+def list_runners() -> list[dict[str, Any]]:
+    return _api_get("/api/runners") or []
+
+
+def _trim(text: str | None, limit: int = 1500) -> str:
+    text = text or ""
+    return text if len(text) <= limit else "…" + text[-limit:]
+
+
+@server.tool(
+    description=(
+        "Runner jobs, newest first: state (queued/assigned/running/success/fail/timeout/"
+        "lost/skipped/abandoned/canceled), kind (poll/once/emit_pool), runner_label, "
+        "quest_id/step_id/template_id, attempt_no, timings, exit_code, progress, reason "
+        "and trimmed stdout/stderr/log_tail. `skipped` = the device never came online in "
+        "time, `abandoned` = it vanished mid-run (outcome unknown), `lost` = lease "
+        "lapsed, a late result may still arrive. Filter by label and/or state "
+        "(comma-separated); limit ≤ 100."
+    )
+)
+def list_runner_jobs(
+    label: str | None = None, state: str | None = None, limit: int = 30
+) -> list[dict[str, Any]]:
+    rows = _api_get(
+        "/api/runner-jobs",
+        {"label": label, "state": state, "limit": max(1, min(100, limit))},
+    ) or []
+    keep = (
+        "id", "state", "kind", "runner_label", "quest_id", "step_id", "template_id", "title",
+        "attempt_no", "created_at", "assigned_at", "started_at", "finished_at", "valid_until",
+        "exit_code", "timed_out", "progress_current", "progress_total", "reason",
+    )
+    out = []
+    for j in rows:
+        item = {k: j.get(k) for k in keep if j.get(k) not in (None, "")}
+        for k in ("stdout", "stderr", "log_tail"):
+            if j.get(k):
+                item[k] = _trim(j[k])
+        out.append(item)
+    return out
+
+
+@server.tool(
+    description=(
+        "Cancel a runner job: a queued one is dropped at once, a running one is told to "
+        "stop on its next heartbeat. A cancelled one-shot check parks its step (it is "
+        "not queued again by itself)."
+    )
+)
+def cancel_runner_job(job_id: int) -> dict[str, Any]:
+    _api("POST", f"/api/runner-jobs/{int(job_id)}/cancel")
+    return {"cancelled": int(job_id)}
+
+
 @server.tool(description="List all questlines (id, title, category, color, …).")
 def list_questlines() -> list[dict[str, Any]]:
     return _api_get("/api/questlines") or []

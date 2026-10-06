@@ -170,3 +170,43 @@ func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 		t.Fatalf("a job on a device outlives the server restart, status=%s", got.Status)
 	}
 }
+
+// Deleting the quest (or step) takes its jobs out of the queue; a running one is told to stop.
+func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
+	st := openRunnerChecksDB(t)
+	ctx := context.Background()
+	idle := domain.RunIdle
+	a := remoteStep("waits", "true", "ghost", domain.RunModeOnce)
+	a.RunStatus = &idle
+	b := remoteStep("runs", "true", "home", domain.RunModeOnce)
+	b.RunStatus = &idle
+	q := seedQuest(t, st, []domain.Step{a, b})
+	r := NewCheckRunner(st, events.New())
+	r.Tick(ctx)
+	r.Wait()
+	if job, _ := st.ClaimJob(ctx, "home", time.Minute); job == nil {
+		t.Fatal("no running job")
+	}
+
+	if err := st.DeleteQuest(ctx, q.ID, q.Title); err != nil {
+		t.Fatal(err)
+	}
+	r.ExpireRunnerJobs(ctx)
+
+	jobs, _ := st.ListRunnerJobs(ctx, store.JobFilter{})
+	if len(jobs) != 2 {
+		t.Fatalf("jobs: %+v", jobs)
+	}
+	for _, j := range jobs {
+		switch j.RunnerLabel {
+		case "ghost":
+			if j.State != store.JobCanceled {
+				t.Fatalf("waiting job of a deleted quest: %s", j.State)
+			}
+		case "home":
+			if !j.Cancel {
+				t.Fatalf("running job was not asked to stop: %+v", j)
+			}
+		}
+	}
+}

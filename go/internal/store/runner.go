@@ -608,6 +608,26 @@ func (s *Store) CancelRunnerJob(ctx context.Context, id int64) error {
 	return nil
 }
 
+// CancelOrphanJobs drops the jobs of steps that no longer exist (the quest or
+// step was deleted, however that happened): a waiting job is cancelled at
+// once, one already running is asked to stop. Returns how many it touched.
+func (s *Store) CancelOrphanJobs(ctx context.Context) (int64, error) {
+	now := timeutil.ToDBUTC(timeutil.NowUTC())
+	const gone = `step_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM queststep WHERE queststep.id = runner_job.step_id)`
+	res, err := s.DB.ExecContext(ctx, `UPDATE runner_job SET state = 'canceled', finished_at = ?, reason = 'квест или шаг удалён'
+		WHERE state = 'queued' AND `+gone, now)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	res, err = s.DB.ExecContext(ctx, `UPDATE runner_job SET cancel = 1 WHERE state IN ('assigned','running') AND cancel = 0 AND `+gone)
+	if err != nil {
+		return n, err
+	}
+	m, _ := res.RowsAffected()
+	return n + m, nil
+}
+
 // PurgeRunnerJobs forgets finished jobs older than the cutoff.
 func (s *Store) PurgeRunnerJobs(ctx context.Context, before time.Time) (int64, error) {
 	res, err := s.DB.ExecContext(ctx, `DELETE FROM runner_job WHERE state NOT IN ('queued','assigned','running') AND finished_at < ?`, timeutil.ToDBUTC(before))

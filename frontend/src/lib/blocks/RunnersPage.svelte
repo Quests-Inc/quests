@@ -332,12 +332,18 @@
     overflow: auto;
     padding: 1rem 1.25rem 2rem;
     display: grid;
+    /* minmax(0, …): a long title must shrink (ellipsis), not widen the whole page */
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.4rem;
     align-content: start;
     max-width: 62rem;
     width: 100%;
     box-sizing: border-box;
     margin: 0 auto;
+  }
+
+  .runners__block {
+    min-width: 0;
   }
 
   .runners__block h2 {
@@ -424,6 +430,7 @@
     margin: 0;
     padding: 0;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.4rem;
   }
 
@@ -480,6 +487,7 @@
   }
 
   .job {
+    min-width: 0;
     padding: 0.45rem 0.75rem;
     border: 1px solid var(--color-border, #333);
     border-radius: var(--pill-radius, 10px);
@@ -492,8 +500,9 @@
 
   .job__row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.2rem 0.6rem;
     min-width: 0;
   }
 
@@ -509,18 +518,18 @@
   }
 
   .job__title {
-    flex: 1 1 auto;
+    flex: 1 1 14rem;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* quest · step: the step name is the tail, so wrap instead of cutting it off */
+    overflow-wrap: anywhere;
   }
 
   .job__meta {
     flex: 0 1 auto;
+    min-width: 0;
     color: var(--color-fg-muted, #9a9a9a);
     font-size: 0.72rem;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .link {
@@ -595,12 +604,7 @@
   }
 
   @media (max-width: 720px) {
-    .job__row {
-      flex-wrap: wrap;
-    }
-
     .job__meta {
-      white-space: normal;
       flex-basis: 100%;
     }
   }
