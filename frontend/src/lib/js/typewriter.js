@@ -83,6 +83,10 @@ export function animateText(text, opts) {
     }
 
     signal?.addEventListener('abort', onAbort, { once: true })
-    tick()
+    // Defer the first frame too (never call onUpdate synchronously): a
+    // caller may invoke animateText from inside a Svelte $effect, and a
+    // synchronous state write there re-enters the same effect mid-run
+    // (effect_update_depth_exceeded) — see quest=231.
+    timer = window.setTimeout(tick, stepMs)
   })
 }
