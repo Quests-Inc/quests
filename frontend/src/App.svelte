@@ -189,6 +189,14 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let stepDeleteBusy = $state(false)
   /** @type {{ questId: number, stepId: number, title: string } | null} */
   let stepDelete = $state(null)
+  /** True while QuestDetail is playing its erase-before-delete animation. */
+  let deleteAnimActive = $state(false)
+  /** @type {(() => void) | null} */
+  let deleteAnimResolve = null
+  function onDeleteAnimDone() {
+    deleteAnimResolve?.()
+    deleteAnimResolve = null
+  }
   let statusBusy = $state(false)
   let questPdfBusy = false
   let pinBusyId = $state(/** @type {number | null} */ (null))
@@ -848,6 +856,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     error = ''
     try {
       const id = selected.id
+      deleteAnimActive = true
+      await new Promise((resolve) => {
+        deleteAnimResolve = resolve
+      })
+      deleteAnimActive = false
       await deleteQuest(id)
       deleteConfirmOpen = false
       onDeleted(id)
@@ -856,6 +869,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
       toast(error, { kind: 'error' })
     } finally {
       deleting = false
+      deleteAnimActive = false
     }
   }
 
@@ -1783,6 +1797,8 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
         {nowMs}
         {statusBusy}
         {deleting}
+        {deleteAnimActive}
+        onDeleteAnimDone={onDeleteAnimDone}
         {stepBusyId}
         {stepEditId}
         {stepEditValue}

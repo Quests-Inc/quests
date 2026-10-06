@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte'
   import Icon from '../ui/Icon.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
@@ -29,6 +30,8 @@
    *   nowMs: number,
    *   statusBusy: boolean,
    *   deleting: boolean,
+   *   deleteAnimActive?: boolean,
+   *   onDeleteAnimDone?: () => void,
    *   stepBusyId: number | null,
    *   stepEditId: number | null,
    *   stepEditValue: string,
@@ -59,6 +62,8 @@
     nowMs,
     statusBusy,
     deleting,
+    deleteAnimActive = false,
+    onDeleteAnimDone,
     stepBusyId,
     stepEditId,
     stepEditValue,
@@ -251,6 +256,41 @@
   })
 
 
+  /** Erase-before-delete: App.svelte flips deleteAnimActive after the
+   * confirm dialog is accepted and awaits onDeleteAnimDone before actually
+   * calling the delete API — so the title/description visibly erase first
+   * instead of the quest just vanishing from the list. */
+  $effect(() => {
+    if (!deleteAnimActive) return
+    // untrack: onUpdate below writes displayTitle/displayDescription — a
+    // tracked read here would re-run this same effect on every animation
+    // frame (abort+restart from the new, shorter text each time), finishing
+    // in a handful of ms instead of erasing at the intended pace.
+    const { titleText, descText } = untrack(() => ({
+      titleText: displayTitle,
+      descText: displayDescription,
+    }))
+    titleAnim?.abort()
+    descAnim?.abort()
+    const tAc = new AbortController()
+    const dAc = new AbortController()
+    titleAnim = tAc
+    descAnim = dAc
+    Promise.all([
+      animateText(titleText, {
+        mode: 'erase', granularity: 'char',
+        onUpdate: (t) => (displayTitle = t), signal: tAc.signal,
+      }),
+      animateText(descText, {
+        mode: 'erase', granularity: 'word',
+        onUpdate: (t) => (displayDescription = t), signal: dAc.signal,
+      }),
+    ]).then(() => {
+      if (titleAnim === tAc) titleAnim = null
+      if (descAnim === dAc) descAnim = null
+      onDeleteAnimDone?.()
+    })
+  })
 </script>
 
 {#snippet questActions(q)}
