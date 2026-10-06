@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte'
   import Icon from '../ui/Icon.svelte'
   import RefText from '../ui/RefText.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
@@ -81,6 +82,41 @@
     onScopeQuestline(v === '' ? null : Number(v))
   }
 
+  /** @type {HTMLElement | null} */
+  let rootEl = $state(null)
+
+  /** The nearest ancestor that actually scrolls. */
+  function scrollParent(el) {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const oy = getComputedStyle(p).overflowY
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p
+    }
+    return null
+  }
+
+  // A quest picked from elsewhere (a link, a hotkey, the map) may sit far down
+  // a long list: bring its row into view, centred, unless it is already visible.
+  let scrolledFor = /** @type {number | null} */ (null)
+  $effect(() => {
+    const id = selectedId
+    // The list may not be there yet when the quest is chosen: re-check as it fills.
+    void byCategory
+    void listedQuests
+    void lineOpen
+    void categoryOpen
+    if (id == null || !rootEl || scrolledFor === id) return
+    void tick().then(() => {
+      const row = rootEl?.querySelector('.quest-row--active')
+      if (!row) return
+      scrolledFor = id
+      const box = scrollParent(/** @type {HTMLElement} */ (row))
+      if (!box) return
+      const a = row.getBoundingClientRect()
+      const b = box.getBoundingClientRect()
+      if (a.top < b.top || a.bottom > b.bottom) row.scrollIntoView({ block: 'center' })
+    })
+  })
+
   function isCategoryOpen(key) {
     return categoryOpen[key] !== false
   }
@@ -90,7 +126,7 @@
   }
 </script>
 
-<aside class="sidebar" data-nav-root>
+<aside class="sidebar" data-nav-root bind:this={rootEl}>
   <div class="sidebar__tools">
     <input
       class="search"
