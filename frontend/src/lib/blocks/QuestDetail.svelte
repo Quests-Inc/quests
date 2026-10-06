@@ -31,6 +31,7 @@
    *   statusBusy: boolean,
    *   deleting: boolean,
    *   deleteAnimActive?: boolean,
+   *   consumeRemoteEdit?: (questId: number | null) => boolean,
    *   onDeleteAnimDone?: () => void,
    *   stepBusyId: number | null,
    *   stepEditId: number | null,
@@ -63,6 +64,7 @@
     statusBusy,
     deleting,
     deleteAnimActive = false,
+    consumeRemoteEdit = undefined,
     onDeleteAnimDone,
     stepBusyId,
     stepEditId,
@@ -202,19 +204,27 @@
   let stepDisplayDesc = $state(new Map())
   let prevStepAutomatedDesc = new Map()
   let stepDescAnims = new Map()
+  /** Which texts are being typed in right now — drives the fading tail. */
+  let typingTitle = $state(false)
+  let typingDesc = $state(false)
+  let typingSteps = $state(new Set())
 
-  /** Erase the old text (if any) then type the new one — only for a quest
-   * open in this pane whose automated=true source (agent/script) just
-   * changed its own title/description; never for the user's own edits. */
-  async function retype(oldText, newText, granularity, setDisplay, getCtrl, setCtrl) {
+  /** Erase the old text (if any) then type the new one — only for a change
+   * that arrived from outside the web UI (consumeRemoteEdit); never for the
+   * user's own edits. */
+  async function retype(oldText, newText, granularity, setDisplay, getCtrl, setCtrl, setTyping) {
     getCtrl()?.abort()
     const ac = new AbortController()
     setCtrl(ac)
     if (oldText) {
       await animateText(oldText, { mode: 'erase', granularity, onUpdate: setDisplay, signal: ac.signal })
     }
+    setTyping(true)
     await animateText(newText, { mode: 'reveal', granularity, onUpdate: setDisplay, signal: ac.signal })
-    if (getCtrl() === ac) setCtrl(null)
+    if (getCtrl() === ac) {
+      setCtrl(null)
+      setTyping(false)
+    }
   }
 
   $effect(() => {
@@ -231,6 +241,9 @@
       descAnim?.abort()
       for (const ac of stepDescAnims.values()) ac.abort()
       stepDescAnims = new Map()
+      typingTitle = false
+      typingDesc = false
+      typingSteps = new Set()
       displayTitle = title
       displayDescription = description
       prevAutomatedTitle = title
@@ -252,16 +265,27 @@
     }
     if (!q) return
 
-    if (q.automated) {
+    const stepsChanged = steps.some(
+      (s) => prevStepAutomatedDesc.has(s.id) && (s.description || '') !== prevStepAutomatedDesc.get(s.id),
+    )
+    // Animate by who made the change, not by the quest: only an update that
+    // came in from outside the web UI (mcp, cli, scheduler…) is typed in.
+    const textChanged =
+      (prevAutomatedTitle != null && title !== prevAutomatedTitle) ||
+      (prevAutomatedDescription != null && description !== prevAutomatedDescription) ||
+      stepsChanged
+    const remote = textChanged && !!consumeRemoteEdit?.(id)
+
+    if (remote) {
       if (prevAutomatedTitle != null && title !== prevAutomatedTitle) {
         void retype(prevAutomatedTitle, title, 'char', (t) => (displayTitle = t),
-          () => titleAnim, (c) => (titleAnim = c))
+          () => titleAnim, (c) => (titleAnim = c), (v) => (typingTitle = v))
       } else if (!titleAnim) {
         displayTitle = title
       }
       if (prevAutomatedDescription != null && description !== prevAutomatedDescription) {
         void retype(prevAutomatedDescription, description, 'word', (t) => (displayDescription = t),
-          () => descAnim, (c) => (descAnim = c))
+          () => descAnim, (c) => (descAnim = c), (v) => (typingDesc = v))
       } else if (!descAnim) {
         displayDescription = description
       }
@@ -275,6 +299,12 @@
             (c) => {
               if (c) stepDescAnims.set(s.id, c)
               else stepDescAnims.delete(s.id)
+            },
+            (v) => {
+              const next = new Set(typingSteps)
+              if (v) next.add(s.id)
+              else next.delete(s.id)
+              typingSteps = next
             })
         } else if (!stepDescAnims.has(s.id) && stepDisplayDesc.get(s.id) !== sDesc) {
           // Only write when the value actually changes — reassigning this
@@ -286,7 +316,7 @@
         }
         prevStepAutomatedDesc.set(s.id, sDesc)
       }
-    } else if (!titleAnim && !descAnim) {
+    } else if (!titleAnim && !descAnim && stepDescAnims.size === 0) {
       displayTitle = title
       displayDescription = description
       const freshDesc = new Map()
@@ -534,7 +564,7 @@
             {/if}
           </div>
           {#if step.description || stepDesc}
-            <MarkdownBody class="step__desc" source={stepDesc} {labels} {onRef} />
+            <MarkdownBody class="step__desc" source={stepDesc} {labels} {onRef} typing={typingSteps.has(step.id)} />
           {/if}
         </li>
       {/each}
@@ -548,7 +578,7 @@
   {@const timer = questTimer(q, nowMs)}
   {#if q.description || displayDescription}
     <div class="block block--prose">
-      <MarkdownBody class="block__body" source={displayDescription} {labels} {onRef} />
+      <MarkdownBody class="block__body" source={displayDescription} {labels} {onRef} typing={typingDesc} />
     </div>
   {/if}
 
@@ -712,7 +742,7 @@
               class="detail__title"
               oncontextmenu={(e) => onQuestTitleContextMenu?.(e, selected)}
             >
-              {#key selected.id}<span class="strike" class:strike--done={selected.status === 'completed'}><RefText source={displayTitle} {labels} {onRef} /></span>{/key}
+              {#key selected.id}<span class="strike" class:strike--done={selected.status === 'completed'}><RefText source={displayTitle} {labels} {onRef} typing={typingTitle} /></span>{/key}
             </h2>
             {@render questActions(selected)}
           </div>
@@ -759,7 +789,7 @@
             class="detail__title"
             oncontextmenu={(e) => onQuestTitleContextMenu?.(e, selected)}
           >
-            {#key selected.id}<span class="strike" class:strike--done={selected.status === 'completed'}><RefText source={displayTitle} {labels} {onRef} /></span>{/key}
+            {#key selected.id}<span class="strike" class:strike--done={selected.status === 'completed'}><RefText source={displayTitle} {labels} {onRef} typing={typingTitle} /></span>{/key}
           </h2>
           {@render questActions(selected)}
         </div>

@@ -193,6 +193,17 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let deleteAnimActive = $state(false)
   /** @type {(() => void) | null} */
   let deleteAnimResolve = null
+  /** quest id → when a live event from outside the web UI touched it. The
+   * event lands before the refetched data, so QuestDetail picks the mark up
+   * when the text actually changes and decides to type it in. */
+  const remoteEdits = new Map()
+  const REMOTE_EDIT_TTL_MS = 8000
+  function consumeRemoteEdit(questId) {
+    const at = remoteEdits.get(questId)
+    if (at == null) return false
+    remoteEdits.delete(questId)
+    return Date.now() - at < REMOTE_EDIT_TTL_MS
+  }
   function onDeleteAnimDone() {
     deleteAnimResolve?.()
     deleteAnimResolve = null
@@ -1346,6 +1357,9 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
           return
         }
         if (msg?.type === 'quests_changed') {
+          if (msg.quest_id != null && msg.source && msg.source !== 'web') {
+            remoteEdits.set(msg.quest_id, Date.now())
+          }
           load({ silent: true })
           if (view === 'history') historyNonce += 1
           if (view === 'graph') graphNonce += 1
@@ -1798,6 +1812,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
         {statusBusy}
         {deleting}
         {deleteAnimActive}
+        {consumeRemoteEdit}
         onDeleteAnimDone={onDeleteAnimDone}
         {stepBusyId}
         {stepEditId}

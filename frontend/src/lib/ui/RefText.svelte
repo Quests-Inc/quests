@@ -1,5 +1,6 @@
 <script>
   import DOMPurify from 'dompurify'
+  import { tailFade } from '../js/typewriter.js'
   import { renderRefTextHtml, parseRefHref } from '../js/refs.js'
 
   /** @type {{
@@ -7,12 +8,14 @@
    *   class?: string,
    *   labels?: Record<string, string>,
    *   onRef?: (kind: string, id: number) => void,
+   *   typing?: boolean,
    * }} */
   let {
     source = '',
     class: className = '',
     labels = {},
     onRef,
+    typing = false,
   } = $props()
 
   const PURIFY = {
@@ -41,5 +44,5 @@
 
 {#if source}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <span class={className} onclick={onClick}>{@html html}</span>
+  <span class={className} onclick={onClick} use:tailFade={typing}>{@html html}</span>
 {/if}

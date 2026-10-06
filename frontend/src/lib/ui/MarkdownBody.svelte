@@ -3,6 +3,7 @@
   import { renderMarkdown } from '../js/markdown.js'
   import { parseRefHref } from '../js/refs.js'
   import { copyText } from '../js/clipboard.js'
+  import { tailFade } from '../js/typewriter.js'
   import copySvg from '../../assets/icons/copy.svg?raw'
   import checkSvg from '../../assets/icons/checkmark.svg?raw'
 
@@ -11,12 +12,14 @@
    *   class?: string,
    *   labels?: Record<string, string>,
    *   onRef?: (kind: string, id: number) => void,
+   *   typing?: boolean,
    * }} */
   let {
     source = '',
     class: className = '',
     labels = {},
     onRef,
+    typing = false,
   } = $props()
 
   let html = $derived(renderMarkdown(source, { labels }))
@@ -112,5 +115,6 @@
     bind:this={root}
     onclick={onClick}
     use:captureImgErrors
+    use:tailFade={typing}
   >{@html html}</div>
 {/if}
