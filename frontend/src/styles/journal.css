@@ -2846,7 +2846,38 @@
 
   .step--done .step__title {
     color: var(--color-fg-muted, #9a9a9a);
-    text-decoration: line-through;
+  }
+
+  /* Animated strike bar — replaces instant text-decoration: line-through so
+     completion reads as an action, not a static label. Mounts already-struck
+     with no animation (nothing to transition from); only a live toggle
+     while mounted animates. */
+  .strike {
+    position: relative;
+    display: inline-block;
+  }
+
+  .strike::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 2px;
+    background: currentColor;
+    transform: translateY(-50%) scaleX(0);
+    transform-origin: left;
+    transition: transform 320ms ease;
+  }
+
+  .strike--done::after {
+    transform: translateY(-50%) scaleX(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .strike::after {
+      transition: none;
+    }
   }
 
   .step-list--pipe {

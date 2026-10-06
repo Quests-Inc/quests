@@ -366,7 +366,7 @@
         >
           <span class="step__mark">{step.done ? '✓' : step.run_status === 'running' ? '▶' : '○'}</span>
           <span class="step__main">
-            <RefText class="step__title" source={step.title} {labels} {onRef} />
+            <span class="step__title"><span class="strike" class:strike--done={step.done}><RefText source={step.title} {labels} {onRef} /></span></span>
             {#if step.check_command}
               <span
                 class="step__auto"
@@ -628,7 +628,7 @@
               class="detail__title"
               oncontextmenu={(e) => onQuestTitleContextMenu?.(e, selected)}
             >
-              <RefText source={displayTitle} {labels} {onRef} />
+              {#key selected.id}<span class="strike" class:strike--done={selected.status === 'completed'}><RefText source={displayTitle} {labels} {onRef} /></span>{/key}
             </h2>
             {@render questActions(selected)}
           </div>
@@ -675,7 +675,7 @@
             class="detail__title"
             oncontextmenu={(e) => onQuestTitleContextMenu?.(e, selected)}
           >
-            <RefText source={displayTitle} {labels} {onRef} />
+            {#key selected.id}<span class="strike" class:strike--done={selected.status === 'completed'}><RefText source={displayTitle} {labels} {onRef} /></span>{/key}
           </h2>
           {@render questActions(selected)}
         </div>
