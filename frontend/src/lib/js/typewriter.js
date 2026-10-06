@@ -35,7 +35,7 @@ export function animateText(text, opts) {
   const {
     mode = 'reveal',
     granularity = 'char',
-    stepMs = granularity === 'char' ? 22 : 55,
+    stepMs = granularity === 'char' ? 22 : 28,
     onUpdate,
     signal,
   } = opts

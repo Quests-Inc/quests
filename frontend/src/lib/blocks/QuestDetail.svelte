@@ -276,7 +276,12 @@
               if (c) stepDescAnims.set(s.id, c)
               else stepDescAnims.delete(s.id)
             })
-        } else if (!stepDescAnims.has(s.id)) {
+        } else if (!stepDescAnims.has(s.id) && stepDisplayDesc.get(s.id) !== sDesc) {
+          // Only write when the value actually changes — reassigning this
+          // $state Map on every effect run (e.g. a step-done event that
+          // doesn't touch the description) re-triggers reactivity each time
+          // and, under back-to-back live events, blows past Svelte's
+          // effect-depth guard (effect_update_depth_exceeded, quest=231).
           stepDisplayDesc = new Map(stepDisplayDesc).set(s.id, sDesc)
         }
         prevStepAutomatedDesc.set(s.id, sDesc)
