@@ -197,6 +197,12 @@
   /** @type {AbortController | null} */
   let descAnim = null
 
+  /** Same idea as displayTitle/displayDescription, per step.id — step
+   * descriptions (comments) get typed in too, not just the quest's own. */
+  let stepDisplayDesc = $state(new Map())
+  let prevStepAutomatedDesc = new Map()
+  let stepDescAnims = new Map()
+
   /** Erase the old text (if any) then type the new one — only for a quest
    * open in this pane whose automated=true source (agent/script) just
    * changed its own title/description; never for the user's own edits. */
@@ -217,14 +223,26 @@
     const title = q?.title || ''
     const description = q?.description || ''
 
+    const steps = q?.steps || []
+
     if (id !== lastDetailQuestId) {
       lastDetailQuestId = id
       titleAnim?.abort()
       descAnim?.abort()
+      for (const ac of stepDescAnims.values()) ac.abort()
+      stepDescAnims = new Map()
       displayTitle = title
       displayDescription = description
       prevAutomatedTitle = title
       prevAutomatedDescription = description
+      const freshDesc = new Map()
+      const freshPrev = new Map()
+      for (const s of steps) {
+        freshDesc.set(s.id, s.description || '')
+        freshPrev.set(s.id, s.description || '')
+      }
+      stepDisplayDesc = freshDesc
+      prevStepAutomatedDesc = freshPrev
       if (id != null) {
         queueMicrotask(() => {
           document.querySelector('.detail')?.scrollTo({ top: 0 })
@@ -247,9 +265,29 @@
       } else if (!descAnim) {
         displayDescription = description
       }
+      for (const s of steps) {
+        const sDesc = s.description || ''
+        const prev = prevStepAutomatedDesc.has(s.id) ? prevStepAutomatedDesc.get(s.id) : null
+        if (prev != null && sDesc !== prev) {
+          void retype(prev, sDesc, 'word',
+            (t) => (stepDisplayDesc = new Map(stepDisplayDesc).set(s.id, t)),
+            () => stepDescAnims.get(s.id) ?? null,
+            (c) => {
+              if (c) stepDescAnims.set(s.id, c)
+              else stepDescAnims.delete(s.id)
+            })
+        } else if (!stepDescAnims.has(s.id)) {
+          stepDisplayDesc = new Map(stepDisplayDesc).set(s.id, sDesc)
+        }
+        prevStepAutomatedDesc.set(s.id, sDesc)
+      }
     } else if (!titleAnim && !descAnim) {
       displayTitle = title
       displayDescription = description
+      const freshDesc = new Map()
+      for (const s of steps) freshDesc.set(s.id, s.description || '')
+      stepDisplayDesc = freshDesc
+      for (const s of steps) prevStepAutomatedDesc.set(s.id, s.description || '')
     }
     prevAutomatedTitle = title
     prevAutomatedDescription = description
@@ -396,6 +434,7 @@
       {#each q.steps as step, i (step.id)}
         {@const waiting =
           Boolean(step.wait_previous) && i > 0 && !q.steps[i - 1].done && !step.done}
+        {@const stepDesc = stepDisplayDesc.get(step.id) ?? step.description}
         <li
           class="step"
           class:step--done={step.done}
@@ -489,8 +528,8 @@
               <span class="step__btn-slot" aria-hidden="true"></span>
             {/if}
           </div>
-          {#if step.description}
-            <MarkdownBody class="step__desc" source={step.description} {labels} {onRef} />
+          {#if step.description || stepDesc}
+            <MarkdownBody class="step__desc" source={stepDesc} {labels} {onRef} />
           {/if}
         </li>
       {/each}
