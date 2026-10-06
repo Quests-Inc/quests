@@ -108,6 +108,8 @@
   let selectedKey = $state(/** @type {string | null} */ (null))
   let showEdge = $state({ structure: true, reference: true, dependency: true })
   let expanded = $state(/** @type {Set<string>} */ (new Set()))
+  /** Owners whose files are laid out one by one: never a folded group or a block. */
+  let loose = $state(/** @type {Set<string>} */ (new Set()))
   let seq = 0
 
   // --- Draft: edits made here stay in a server-side log until saved. ---
@@ -218,6 +220,7 @@
     center = { type: rootType, id: rootId }
     selectedKey = null
     expanded = new Set()
+    loose = new Set()
     setExpand([])
     resetPositions()
   })
@@ -255,6 +258,41 @@
       })
   })
 
+  /** Keys that never reach the map: typing in a field, or a dialog on top. */
+  const typing = (e) =>
+    e.target instanceof Element && (e.target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('.backdrop [role="dialog"]'))
+
+  /** Map shortcuts (by physical key, so they work in any keyboard layout):
+   * Ctrl+S save, Ctrl+Z undo the last change, V select, F fit, R untangle, Shift+Del clear. */
+  function onKey(e) {
+    if (e.key === 'Escape') {
+      if (linking) cancelLink()
+      else if (selectMode) toggleSelectMode()
+      return
+    }
+    if (!active || e.altKey) return
+    const mod = e.ctrlKey || e.metaKey
+    if (mod && e.code === 'KeyS') {
+      e.preventDefault()
+      if (!ownerless.size && !document.querySelector('.backdrop [role="dialog"]')) void saveDraft()
+      return
+    }
+    if (typing(e)) return
+    if (mod && e.code === 'KeyZ' && !e.shiftKey) {
+      e.preventDefault()
+      const last = draft.ops[draft.ops.length - 1]
+      if (last) void askDrop(last)
+      return
+    }
+    if (mod) return
+    if (e.code === 'KeyV' && !e.shiftKey) toggleSelectMode()
+    else if (e.code === 'KeyF' && !e.shiftKey) fit()
+    else if (e.code === 'KeyR' && !e.shiftKey) relayout()
+    else if (e.code === 'Delete' && e.shiftKey && canClear) void clearMap()
+    else return
+    e.preventDefault()
+  }
+
   /** Collapses bulky attachment lists into one cluster node. */
   function prepare(g, open_) {
     const nodes = g.nodes.map((n) => ({ ...n, x: 0, y: 0, w: 0, h: 0 }))
@@ -271,7 +309,7 @@
     const drop = new Set()
     for (const [owner, keys] of owners) {
       const ck = `cluster:${owner}`
-      if (keys.length < CLUSTER_MIN || open_.has(ck)) continue
+      if (keys.length < CLUSTER_MIN || open_.has(ck) || loose.has(owner)) continue
       for (const k of keys) drop.add(k)
       nodes.push({
         key: ck,
@@ -342,7 +380,7 @@
     const edges = view.edges.filter((e) => keys.has(e.from) && keys.has(e.to))
     let groups = []
     if (layoutMode !== 'tree') for (const n of view.nodes) delete n.group
-    if (layoutMode === 'tree') groups = layoutTree(attached, edges)
+    if (layoutMode === 'tree') groups = layoutTree(attached, edges, { loose })
     else if (layoutMode === 'down') groups = layoutTreeDown(attached, edges)
     else if (layoutMode === 'radial') groups = layoutRadial(attached, edges)
     else if (layoutMode === 'layers') groups = layoutLayers(attached)
@@ -575,6 +613,7 @@
   $effect(() => {
     const g = data
     const open_ = expanded
+    void loose
     const ops = draft.ops
     if (!g) return
     const gone = hidden
@@ -1095,6 +1134,15 @@
   function collapseAll() {
     for (const k of expanded) foldSpot(k)
     expanded = new Set()
+    loose = new Set()
+  }
+
+  /** Lays a file group out as separate cards. */
+  function disband(owner) {
+    const key = `cluster:${owner}`
+    if (expanded.has(key)) foldSpot(key)
+    expanded = new Set([...expanded].filter((k) => k !== key))
+    loose = new Set([...loose, owner])
   }
 
   function select(n) {
@@ -1278,12 +1326,51 @@
     }
     // With a group picked, the menu is just what a group can do.
     if (selectMode && picked.size && (!n || picked.has(n.key))) {
-      ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: true }
+      ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: true, cluster: null, edge: null }
+      return
+    }
+    if (n?.type === 'cluster') {
+      const owner = n.key.slice('cluster:'.length)
+      ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: false, cluster: { owner, key: n.key, folded: true, node: n }, edge: null }
       return
     }
     const real = n && n.type !== 'cluster' ? n : null
     if (real) selectedKey = real.key
-    ctx = { open: true, x: e.clientX, y: e.clientY, node: real, at: worldAt(e), group: false }
+    ctx = { open: true, x: e.clientX, y: e.clientY, node: real, at: worldAt(e), group: false, cluster: null, edge: null }
+  }
+
+  /** Right-click on the frame of an opened file block. */
+  function onGroupCtx(e, g) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (linking || g.type !== 'attachment') return
+    ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: false, cluster: { owner: g.owner, key: collapseKey(g), folded: false, node: null }, edge: null }
+  }
+
+  /** What can be done to a line itself (nothing for plain ownership of steps and files). */
+  function edgeActions(e) {
+    if (e.draft === 'remove' || !e.from || !e.to) return []
+    if (e.kind === 'reference') return [{ id: 'edge-unref', label: 'Разорвать ссылку' }]
+    if (e.kind === 'dependency' && e.from.startsWith('step:') && e.to.startsWith('step:')) {
+      return [{ id: 'edge-nowait', label: 'Не ждать предыдущий шаг' }]
+    }
+    if (e.kind === 'structure' && e.from.startsWith('questline:') && e.to.startsWith('quest:') && !e.to.includes(':t')) {
+      return [{ id: 'edge-unline', label: 'Вывести квест из квестлайна' }]
+    }
+    if (e.kind === 'structure' && e.from.startsWith('note:') && e.to.startsWith('note:')) {
+      return [{ id: 'edge-unparent', label: 'Открепить заметку' }]
+    }
+    return []
+  }
+
+  function onEdgeCtx(ev, e) {
+    ev.preventDefault()
+    ev.stopPropagation()
+    if (linking) {
+      cancelLink()
+      return
+    }
+    ctx = { open: true, x: ev.clientX, y: ev.clientY, node: null, at: worldAt(ev), group: false, cluster: null, edge: e }
   }
 
   const isExtraRoot = (n) => n && !n.draft && draft.roots.some((r) => `${r.type}:${r.id}` === n.key)
@@ -1291,6 +1378,13 @@
   let ctxItems = $derived.by(() => {
     const n = ctx.node
     if (ctx.group) return [{ id: 'hide-picked', label: `Убрать с карты (${picked.size})` }]
+    if (ctx.edge) return edgeActions(ctx.edge)
+    if (ctx.cluster) {
+      return [
+        ctx.cluster.folded ? { id: 'cl-open', label: 'Развернуть' } : ctx.cluster.key ? { id: 'cl-fold', label: 'Свернуть' } : null,
+        { id: 'cl-disband', label: 'Расформировать' },
+      ].filter((x) => x !== null)
+    }
     if (!n) {
       return [
         {
@@ -1412,6 +1506,13 @@
     else if (id === 'link-to' && n) startLink('to', n)
     else if (id === 'link-from' && n) startLink('from', n)
     else if (id === 'attach' && n) startLink('attach', n)
+    else if (id === 'cl-open' && ctx.cluster?.node) select(ctx.cluster.node)
+    else if (id === 'cl-fold' && ctx.cluster?.key) collapse(ctx.cluster.key)
+    else if (id === 'cl-disband' && ctx.cluster) disband(ctx.cluster.owner)
+    else if (id === 'edge-unref' && ctx.edge) await unlinkRef({ key: ctx.edge.from }, ctx.edge.to)
+    else if (id === 'edge-nowait' && ctx.edge) await addOp('edit_step', { id: ctx.edge.to, fields: { wait_previous: false } })
+    else if (id === 'edge-unline' && ctx.edge) await addOp('edit_quest', { id: ctx.edge.to, fields: { questline_id: null } })
+    else if (id === 'edge-unparent' && ctx.edge) await addOp('set_parent', { id: ctx.edge.to, parent: '', was: ctx.edge.from })
     else if (id === 'expand' && n) setExpand([...expandKeys, n.key])
     else if (id === 'collapse' && n) setExpand(expandKeys.filter((k) => k !== n.key))
     else if (id === 'drop-steps' && n) await hideKeys(childKeys(n, 'step'))
@@ -1613,6 +1714,7 @@
     center = { type: null, id: null }
     selectedKey = null
     expanded = new Set()
+    loose = new Set()
     linking = null
     editing = null
     resetPositions()
@@ -1668,11 +1770,7 @@
 {/snippet}
 
 <svelte:window
-  onkeydown={(e) => {
-    if (e.key !== 'Escape') return
-    if (linking) cancelLink()
-    else if (selectMode) toggleSelectMode()
-  }}
+  onkeydown={onKey}
 />
 
 <div class="graph">
@@ -1760,7 +1858,7 @@
         {e.label}
       </label>
     {/each}
-    {#if expanded.size}
+    {#if expanded.size || loose.size}
       <button type="button" class="graph__btn" onclick={collapseAll}>Свернуть вложения</button>
     {/if}
     {#if hidden.size}
@@ -1821,6 +1919,9 @@
             opacity={e.draft === 'remove' ? 0.9 : e.kind === 'structure' ? 0.6 : 0.95}
             marker-end={`url(#arrow-${e.kind})`}
           />
+          {#if edgeActions(e).length}
+            <path d={e.d} fill="none" stroke="transparent" stroke-width="14" class="gedge-hit" oncontextmenu={(ev) => onEdgeCtx(ev, e)} />
+          {/if}
           {#if e.kind !== 'structure'}
             <circle cx={e.sx} cy={e.sy} r="3.4" fill={e.draft === 'remove' ? '#d23c3c' : EDGES[e.kind].color} />
           {/if}
@@ -1851,6 +1952,7 @@
           style:height="{g.h}px"
           style:--c={TYPES[g.type].color}
           onpointerdown={(e) => onGroupDown(e, g)}
+          oncontextmenu={(e) => onGroupCtx(e, g)}
         >
           {#if collapseKey(g)}
             <button
@@ -2055,23 +2157,23 @@
         class="gtool"
         class:gtool--on={selectMode}
         aria-pressed={selectMode}
-        title="Режим выделения: рамкой по полю или кликами по карточкам. Выделенные двигаются вместе. Esc — выйти"
+        title="Режим выделения (V): рамкой по полю или кликами по карточкам. Выделенные двигаются вместе. Esc — выйти"
         aria-label="Режим выделения"
         onclick={toggleSelectMode}
       >
         <Icon name="select" size={16} />
       </button>
-      <button type="button" class="gtool" title="Вписать карту в окно" aria-label="Вписать карту в окно" onclick={fit}>
+      <button type="button" class="gtool" title="Вписать карту в окно (F)" aria-label="Вписать карту в окно" onclick={fit}>
         <Icon name="fit" size={16} />
       </button>
-      <button type="button" class="gtool" title="Распутать: пересчитать раскладку" aria-label="Распутать" onclick={relayout}>
+      <button type="button" class="gtool" title="Распутать: пересчитать раскладку (R)" aria-label="Распутать" onclick={relayout}>
         <Icon name="arrange" size={16} />
       </button>
       <button
         type="button"
         class="gtool"
         disabled={!canClear}
-        title="Очистить карту: центр, добавленные центры и скрытое. Журнал изменений остаётся"
+        title="Очистить карту (Shift+Delete): центр, добавленные центры и скрытое. Журнал изменений остаётся"
         aria-label="Очистить карту"
         onclick={clearMap}
       >
@@ -2107,7 +2209,7 @@
               type="button"
               class="graph__btn graph__btn--primary"
               disabled={committing || ownerless.size > 0}
-              title={ownerless.size ? 'Есть невалидные элементы (красная рамка)' : 'Применить все изменения'}
+              title={ownerless.size ? 'Есть невалидные элементы (красная рамка)' : 'Применить все изменения (Ctrl+S)'}
               onclick={saveDraft}
             >
               {committing ? 'Сохраняю…' : 'Сохранить'}
@@ -2422,6 +2524,10 @@
 
   .gworld--hidden {
     visibility: hidden;
+  }
+
+  .gedge-hit {
+    pointer-events: stroke;
   }
 
   .gedges {

@@ -180,10 +180,10 @@ export function packBall(items, gap = 12, pad = 14, head = 30) {
  * Sets x/y as the node centre (nodes carry w/h); returns the balls.
  * @param {{ key: string, depth: number, type: string, title?: string, w: number, h: number, x?: number, y?: number, group?: string }[]} nodes
  * @param {{ from: string, to: string, kind: string }[]} edges
- * @param {{ hgap?: number, vgap?: number, balls?: boolean }} [opts]
+ * @param {{ hgap?: number, vgap?: number, balls?: boolean, loose?: Set<string> | null }} [opts] `loose`: owners whose files are never packed
  * @returns {{ key: string, owner: string, type: string, title: string, x: number, y: number, w: number, h: number, count: number }[]}
  */
-export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true } = {}) {
+export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, loose = null } = {}) {
   const byKey = new Map(nodes.map((n) => [n.key, n]))
   // Several roots (extra centres on the map) become separate trees, stacked.
   const roots = nodes.filter((n) => n.depth === 0)
@@ -227,6 +227,7 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true } 
   const all = [...nodes]
   if (balls) {
     for (const owner of nodes) {
+      if (loose?.has(owner.key)) continue
       const list = kids.get(owner.key) ?? []
       for (const type of BALL_TYPES) {
         const leaves = list.filter((c) => c.type === type && !(kids.get(c.key)?.length))

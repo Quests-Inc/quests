@@ -111,6 +111,15 @@ export function applyDraft(graph, ops) {
       case 'edit_quest': {
         const n = byKey.get(p.id)
         const f = p.fields || {}
+        // Taken out of its questline: the ownership line is struck out.
+        if ('questline_id' in f) {
+          for (const e of edges) {
+            if (e.kind === 'structure' && e.to === p.id && e.from.startsWith('questline:') && e.draft !== 'add' && e.draft !== 'remove') {
+              e.draft = 'remove'
+              e.op = op.id
+            }
+          }
+        }
         if (n) {
           if (f.title != null) n.title = f.title
           if (f.description != null) n.desc = f.description
@@ -147,6 +156,15 @@ export function applyDraft(graph, ops) {
       case 'edit_step': {
         const n = byKey.get(p.id)
         const f = p.fields || {}
+        // No longer waits for the previous step: the dependency line is struck out.
+        if (f.wait_previous === false) {
+          for (const e of edges) {
+            if (e.kind === 'dependency' && e.to === p.id && e.from.startsWith('step:') && e.draft !== 'remove') {
+              e.draft = 'remove'
+              e.op = op.id
+            }
+          }
+        }
         if (n) {
           if (f.title != null) n.title = f.title
           if (f.description != null) n.desc = f.description
@@ -265,10 +283,14 @@ export function describeOp(op, title) {
     case 'attach':
       return `Прикрепить «${title(p.item)}» к «${title(p.owner)}»`
     case 'edit_quest':
+      if (p.fields && Object.keys(p.fields).length === 1 && 'questline_id' in p.fields && p.fields.questline_id == null) {
+        return `Вывести квест «${title(p.id)}» из квестлайна`
+      }
       return `Изменить квест «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'edit_note':
       return `Изменить заметку «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'edit_step':
+      if (p.fields?.wait_previous === false && Object.keys(p.fields).length === 1) return `Шаг «${title(p.id)}» больше не ждёт предыдущий`
       return `Изменить шаг «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'set_parent':
       return p.parent ? `Заметка «${title(p.id)}» → под «${title(p.parent)}»` : `Заметка «${title(p.id)}» — открепить${p.was ? ` от «${title(p.was)}»` : ''}`

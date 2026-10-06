@@ -667,6 +667,41 @@ def get_inactive_context(questline: str | int | None = None) -> dict[str, Any]:
     )
 
 
+@server.tool(
+    description=(
+        "Relations map around one quest / note / questline, as a skeleton: "
+        "nodes (key like quest:5, type, id, title, status, depth) and edges "
+        "(from, to, kind: structure = belongs to, reference = cited in text, "
+        "dependency = order/progress/template). No bodies, so it stays small: "
+        "use the ids with get_base_context / get_note_context for details. "
+        "Titles of PRIVATE notes are shown (contents never are). depth 1-4, "
+        "default 2; `truncated` means the map hit its size cap."
+    )
+)
+def get_graph(entity: str, entity_id: int, depth: int = 2) -> dict[str, Any]:
+    if entity not in ("quest", "note", "questline"):
+        raise ValueError("entity must be quest, note or questline")
+    g = _api_get("/api/graph", {entity: entity_id, "depth": max(1, min(4, depth))}) or {}
+    nodes = [
+        {
+            k: n[k]
+            for k in ("key", "type", "id", "title", "status", "depth")
+            if n.get(k) not in (None, "")
+        }
+        for n in g.get("nodes") or []
+    ]
+    edges = [
+        {"from": e["from"], "to": e["to"], "kind": e["kind"]} for e in g.get("edges") or []
+    ]
+    return {
+        "root": g.get("root"),
+        "depth": g.get("depth"),
+        "truncated": bool(g.get("truncated")),
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
 @server.tool(description="List all questlines (id, title, category, color, …).")
 def list_questlines() -> list[dict[str, Any]]:
     return _api_get("/api/questlines") or []
