@@ -1,5 +1,5 @@
 <script>
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
@@ -66,7 +66,7 @@
   }
   const EDGES = {
     structure: { label: 'Принадлежность', color: '#6e6e6e', dash: '' },
-    reference: { label: 'Ссылка в тексте', color: '#c9a227', dash: '6 4' },
+    reference: { label: 'Ссылка', color: '#c9a227', dash: '6 4' },
     dependency: { label: 'Зависимость', color: '#d0699b', dash: '' },
   }
   /** Attachments of one owner collapse into a cluster beyond this many. */
@@ -125,7 +125,9 @@
   async function loadDraft() {
     try {
       const d = await getGraphDraft()
-      draft = { ops: d.ops ?? [], roots: Array.isArray(d.roots) ? d.roots : [] }
+      const next = { ops: d.ops ?? [], roots: Array.isArray(d.roots) ? d.roots : [] }
+      // Unchanged: keep the object, so nothing is rebuilt.
+      if (JSON.stringify(next) !== JSON.stringify(draft)) draft = next
     } catch {
       /* the page still works read-only */
     }
@@ -215,8 +217,14 @@
   /** False while cards are being measured (they are rendered hidden). */
   let ready = $state(false)
 
+  let lastRootKey = ''
+  let lastDataJson = ''
   $effect(() => {
     if (!active || !rootType || !rootId) return
+    // Coming back to the (kept) page with the same centre changes nothing.
+    const rk = `${rootType}:${rootId}:${nonce}`
+    if (rk === lastRootKey) return
+    lastRootKey = rk
     center = { type: rootType, id: rootId }
     selectedKey = null
     expanded = new Set()
@@ -233,6 +241,7 @@
     if (!active) return
     // No centre yet: an empty base map, so things made in the draft still show.
     if (!center.type || !center.id) {
+      lastDataJson = ''
       data = { root: '', roots: [], nodes: [], edges: [], truncated: false, depth }
       return
     }
@@ -248,7 +257,10 @@
     getGraph(c.type, c.id, d, extra, open)
       .then((g) => {
         if (mine !== seq) return
-        data = g
+        if (JSON.stringify(g) !== lastDataJson) {
+          lastDataJson = JSON.stringify(g)
+          data = g
+        }
       })
       .catch((e) => {
         if (mine === seq) error = e?.message || String(e)
@@ -609,6 +621,15 @@
     })
   }
 
+  let buildTick = $state(0)
+  let buildLater = false
+  $effect(() => {
+    if (active && buildLater) {
+      buildLater = false
+      buildTick += 1
+    }
+  })
+
   // Rebuild when the data, the draft, or the set of expanded groups changes.
   $effect(() => {
     const g = data
@@ -671,6 +692,12 @@
     }
     const keep = new Set(nodes.map((n) => n.key))
     const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
+    // Hidden page: cards cannot be measured; build when it is shown again.
+    void buildTick
+    if (!untrack(() => active)) {
+      buildLater = true
+      return
+    }
     void rebuild({ ...g, nodes, edges }, open_)
   })
 
@@ -2395,7 +2422,7 @@
 
   .graph__pick {
     position: relative;
-    flex: 0 1 18rem;
+    flex: 1 1 18rem;
     min-width: 11rem;
   }
 
@@ -3143,5 +3170,66 @@
     overflow-wrap: anywhere;
     font-size: 0.68rem;
     line-height: 1.2;
+  }
+
+  /* Narrow (portrait) screens: the controls form an even grid and the page
+     scrolls, so the map field can be tall instead of squeezed under them. */
+  @media (max-width: 720px) {
+    .graph {
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .graph__tools {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.5rem 0.6rem;
+      align-items: stretch;
+      flex: 0 0 auto;
+    }
+
+    .graph__pick {
+      grid-column: 1 / -1;
+    }
+
+    .graph__tools > .graph__ctl,
+    .graph__tools > .graph__filter {
+      grid-column: span 3;
+      min-width: 0;
+    }
+
+    .graph__tools > .graph__edge {
+      grid-column: span 2;
+      justify-content: center;
+      gap: 0.25rem;
+      white-space: nowrap;
+    }
+
+    .graph__edge svg {
+      width: 14px;
+    }
+
+    .graph__tools > .graph__btn {
+      grid-column: span 3;
+    }
+
+    .graph__tools > .graph__ctl {
+      justify-content: space-between;
+    }
+
+    .graph__tools > .graph__ctl select {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .graph__tools > .graph__filter summary {
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .graph__stage {
+      flex: 0 0 auto;
+      height: max(26rem, 68vh);
+    }
   }
 </style>

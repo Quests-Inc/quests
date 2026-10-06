@@ -2,7 +2,7 @@
   // Quests web UI — orchestrator (state, load, overlays)
   import HistoryPage from './lib/blocks/HistoryPage.svelte'
   import GraphPage from './lib/blocks/GraphPage.svelte'
-  import { onMount } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import { cubicOut } from 'svelte/easing'
   import {
     deleteQuest,
@@ -1084,6 +1084,37 @@
   const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph']
   let navDir = $state(1)
 
+  // The map stays mounted once opened; it is only shown / hidden, with the same
+  // slide the other tabs get (they are re-created per tab, the map is not).
+  let graphSeen = $state(false)
+  let graphOn = $state(view === 'graph')
+  let graphEl = $state(/** @type {HTMLDivElement | null} */ (null))
+  let prevView = view
+  const SLIDE_MS = 220
+  const SLIDE_EASE = 'cubic-bezier(0.215, 0.61, 0.355, 1)'
+  $effect(() => {
+    const v = view
+    if (v === 'graph') graphSeen = true
+    const was = prevView
+    prevView = v
+    if (v === was) return
+    const dir = untrack(() => navDir)
+    if (v === 'graph') {
+      graphOn = true
+      void tick().then(() => {
+        graphEl?.animate([{ transform: `translateX(${dir * 100}%)` }, { transform: 'none' }], { duration: SLIDE_MS, easing: SLIDE_EASE })
+      })
+    } else if (was === 'graph' && graphEl) {
+      const anim = graphEl.animate([{ transform: 'none' }, { transform: `translateX(${-dir * 100}%)` }], {
+        duration: SLIDE_MS,
+        easing: SLIDE_EASE,
+      })
+      anim.onfinish = () => {
+        if (view !== 'graph') graphOn = false
+      }
+    }
+  })
+
   /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
   function slideTab(node, { dir, out = false }) {
     const sign = out ? -dir : dir
@@ -1681,19 +1712,7 @@
       />
     </div>
   {:else if view === 'graph'}
-    <div class="journal__graph">
-      <GraphPage
-        active={view === 'graph'}
-        rootType={graphRoot.type}
-        rootId={graphRoot.id}
-        nonce={graphNonce}
-        {quests}
-        {notes}
-        {questlines}
-        onCenter={onGraphCenter}
-        onOpen={onGraphOpen}
-      />
-    </div>
+    <!-- drawn below, outside the keyed viewport -->
   {:else if view === 'history'}
     <div class="journal__history">
       <HistoryPage
@@ -1785,6 +1804,25 @@
   {/if}
   </div>
   {/key}
+  <!-- The map stays mounted once opened (just hidden), so coming back is instant and keeps its view. -->
+  {#if graphSeen}
+    <div class="journal__viewport journal__viewport--keep" bind:this={graphEl} style:display={graphOn ? undefined : 'none'}>
+    <div class="journal__graph">
+      <GraphPage
+        active={view === 'graph'}
+        rootType={graphRoot.type}
+        rootId={graphRoot.id}
+        nonce={graphNonce}
+        {quests}
+        {notes}
+        {questlines}
+        onCenter={onGraphCenter}
+        onOpen={onGraphOpen}
+      />
+    </div>
+    </div>
+  {/if}
+
   </div>
 </div>
 
