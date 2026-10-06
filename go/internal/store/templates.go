@@ -18,7 +18,7 @@ func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRea
 	q := `
 		SELECT t.id, t.title, t.description, t.pinned, t.sort_order, t.duration_seconds, t.freq, t.weekdays,
 			t.enabled, t.timezone, t.deadline_time, t.significance, t.emit_mode, t.emit_chance,
-			t.emit_window_start, t.emit_window_end, t.emit_pool_command, t.emit_limits,
+			t.emit_window_start, t.emit_window_end, t.emit_pool_command, t.emit_limits, t.emit_run_on,
 			t.category_id, t.questline_id,
 			t.created_at, t.updated_at, t.automated,
 			c.slug, c.label, c.color, l.title, l.color, l.icon, l.custom_icon, l.updated_at, l.id
@@ -111,7 +111,7 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 	row := s.DB.QueryRowContext(ctx, `
 		SELECT t.id, t.title, t.description, t.pinned, t.sort_order, t.duration_seconds, t.freq, t.weekdays,
 			t.enabled, t.timezone, t.deadline_time, t.significance, t.emit_mode, t.emit_chance,
-			t.emit_window_start, t.emit_window_end, t.emit_pool_command, t.emit_limits,
+			t.emit_window_start, t.emit_window_end, t.emit_pool_command, t.emit_limits, t.emit_run_on,
 			t.category_id, t.questline_id,
 			t.created_at, t.updated_at, t.automated,
 			c.slug, c.label, c.color, l.title, l.color, l.icon, l.custom_icon, l.updated_at, l.id
@@ -178,18 +178,22 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 	}
 	colorCat := nullI64(asI64Ptr(body["category_id"]))
 	lineID := nullI64(asI64Ptr(body["questline_id"]))
+	emitRunOn := NormalizeRunOn(asStringPtr(body["emit_run_on"]))
+	if !ValidRunOn(emitRunOn) {
+		return nil, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+	}
 
 	res, err := s.DB.ExecContext(ctx, `
 		INSERT INTO questtemplate (
 			title, description, pinned, sort_order, duration_seconds, freq, weekdays, enabled, timezone,
 			deadline_time, significance, emit_mode, emit_chance, emit_window_start, emit_window_end,
-			emit_pool_command, emit_limits,
+			emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, created_at, updated_at, automated
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		title, desc, boolInt(pinned), sortOrder, nullInt(asIntPtr(body["duration_seconds"])), freq, weekdays, boolInt(enabled), tz,
 		nullStr(asStringPtr(body["deadline_time"])), sig, emitMode, emitChance,
 		nullStr(asStringPtr(body["emit_window_start"])), nullStr(asStringPtr(body["emit_window_end"])),
-		nullStr(asStringPtr(body["emit_pool_command"])), emitLimits,
+		nullStr(asStringPtr(body["emit_pool_command"])), emitLimits, nullStr(emitRunOn),
 		colorCat, lineID,
 		timeutil.ToDBUTC(now), timeutil.ToDBUTC(now), boolInt(asBool(body["automated"], false)),
 	)
@@ -228,11 +232,15 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	if lerr != nil {
 		return nil, errBad(lerr.Error())
 	}
+	emitRunOn := NormalizeRunOn(asStringPtr(merged["emit_run_on"]))
+	if !ValidRunOn(emitRunOn) {
+		return nil, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+	}
 	_, err = s.DB.ExecContext(ctx, `
 		UPDATE questtemplate SET
 			title=?, description=?, pinned=?, sort_order=?, duration_seconds=?, freq=?, weekdays=?,
 			enabled=?, timezone=?, deadline_time=?, significance=?, emit_mode=?, emit_chance=?,
-			emit_window_start=?, emit_window_end=?, emit_pool_command=?, emit_limits=?,
+			emit_window_start=?, emit_window_end=?, emit_pool_command=?, emit_limits=?, emit_run_on=?,
 			category_id=?, questline_id=?,
 			updated_at=?, automated=?
 		WHERE id=?`,
@@ -243,7 +251,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 		asStringDef(merged["timezone"], "Europe/Moscow"), nullStr(asStringPtr(merged["deadline_time"])),
 		asStringDef(merged["significance"], "common"), asStringDef(merged["emit_mode"], "fixed"),
 		asFloat(merged["emit_chance"], 1.0), nullStr(asStringPtr(merged["emit_window_start"])),
-		nullStr(asStringPtr(merged["emit_window_end"])), nullStr(asStringPtr(merged["emit_pool_command"])), emitLimits,
+		nullStr(asStringPtr(merged["emit_window_end"])), nullStr(asStringPtr(merged["emit_pool_command"])), emitLimits, nullStr(emitRunOn),
 		nullI64(asI64Ptr(merged["category_id"])), nullI64(asI64Ptr(merged["questline_id"])),
 		timeutil.ToDBUTC(now), boolInt(asBool(merged["automated"], false)), id,
 	)
@@ -413,11 +421,12 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 		_, err := s.DB.ExecContext(ctx, `
 			INSERT INTO questtemplatestep (
 				template_id, title, description, sort_order, progress_min, progress_max,
-				check_command, check_interval_seconds, wait_previous, run_mode
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				check_command, check_interval_seconds, wait_previous, run_mode, run_on
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tid, title, asStringDef(m["description"], ""), ord, pmin, pmax,
 			nullStr(asStringPtr(m["check_command"])), nullInt(asIntPtr(m["check_interval_seconds"])),
 			boolInt(asBool(m["wait_previous"], false)), nullRunMode(asStringDef(m["run_mode"], domain.RunModePoll)),
+			nullStr(NormalizeRunOn(asStringPtr(m["run_on"]))),
 		)
 		if err != nil {
 			return err
@@ -429,7 +438,7 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]map[string]any, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, template_id, title, description, sort_order, progress_min, progress_max,
-			check_command, check_interval_seconds, wait_previous, run_mode
+			check_command, check_interval_seconds, wait_previous, run_mode, run_on
 		FROM questtemplatestep WHERE template_id=? ORDER BY sort_order, id`, tid)
 	if err != nil {
 		return nil, err
@@ -443,15 +452,18 @@ func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]map[str
 		var cmd sql.NullString
 		var iv sql.NullInt64
 		var waitPrev int
-		var runMode sql.NullString
-		if err := rows.Scan(&id, &tmplID, &title, &desc, &sortOrder, &pmin, &pmax, &cmd, &iv, &waitPrev, &runMode); err != nil {
+		var runMode, runOn sql.NullString
+		if err := rows.Scan(&id, &tmplID, &title, &desc, &sortOrder, &pmin, &pmax, &cmd, &iv, &waitPrev, &runMode, &runOn); err != nil {
 			return nil, err
 		}
 		m := map[string]any{
 			"id": id, "template_id": tmplID, "title": title, "description": desc,
 			"sort_order": sortOrder, "progress_min": pmin, "progress_max": pmax,
 			"check_command": nil, "check_interval_seconds": nil,
-			"wait_previous": waitPrev != 0, "run_mode": domain.RunModePoll,
+			"wait_previous": waitPrev != 0, "run_mode": domain.RunModePoll, "run_on": nil,
+		}
+		if runOn.Valid && strings.TrimSpace(runOn.String) != "" {
+			m["run_on"] = strings.TrimSpace(runOn.String)
 		}
 		if cmd.Valid {
 			m["check_command"] = cmd.String
@@ -472,7 +484,7 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 	var title, desc, freq, weekdays, tz, sig, emitMode string
 	var pinned, enabled, sortOrder, automated int
 	var dur sql.NullInt64
-	var deadline, ewStart, ewEnd, emitPoolCommand, emitLimits sql.NullString
+	var deadline, ewStart, ewEnd, emitPoolCommand, emitLimits, emitRunOn sql.NullString
 	var emitChance float64
 	var catID, lineID sql.NullInt64
 	var created, updated sql.NullString
@@ -482,7 +494,7 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 	err := row.Scan(
 		&id, &title, &desc, &pinned, &sortOrder, &dur, &freq, &weekdays,
 		&enabled, &tz, &deadline, &sig, &emitMode, &emitChance,
-		&ewStart, &ewEnd, &emitPoolCommand, &emitLimits,
+		&ewStart, &ewEnd, &emitPoolCommand, &emitLimits, &emitRunOn,
 		&catID, &lineID,
 		&created, &updated, &automated,
 		&cSlug, &cLabel, &cColor, &lTitle, &lColor, &lIcon, &lCustom, &lUpdated, &lID,
@@ -496,8 +508,8 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 		"significance": sig, "emit_mode": emitMode, "emit_chance": emitChance,
 		"emit_limits":      nil,
 		"duration_seconds": nil, "deadline_time": nil, "emit_window_start": nil, "emit_window_end": nil,
-		"emit_pool_command": nil,
-		"category_id":       nil, "questline_id": nil,
+		"emit_pool_command": nil, "emit_run_on": nil,
+		"category_id": nil, "questline_id": nil,
 		"category_slug": nil, "category_label": nil, "category_color": nil,
 		"questline_title": nil, "questline_color": nil, "questline_icon": nil, "questline_icon_url": nil,
 		"automated":              automated != 0,
@@ -523,6 +535,9 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 	}
 	if emitPoolCommand.Valid {
 		tr["emit_pool_command"] = emitPoolCommand.String
+	}
+	if emitRunOn.Valid && strings.TrimSpace(emitRunOn.String) != "" {
+		tr["emit_run_on"] = strings.TrimSpace(emitRunOn.String)
 	}
 	if catID.Valid {
 		tr["category_id"] = catID.Int64

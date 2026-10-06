@@ -702,3 +702,35 @@ export function getQuestFull(id) {
 export function putGraphDraftOp(id, payload) {
   return request(`/api/graph-draft/ops/${id}`, { method: 'PUT', body: JSON.stringify({ payload }) })
 }
+
+
+// --- Runners: devices that execute checks (quests-runner), and their job queue.
+
+export function getRunners() {
+  return request('/api/runners')
+}
+
+/** @param {string} label @returns {Promise<{ label: string, registration_token: string, valid_hours: number }>} */
+export function createRunner(label) {
+  return request('/api/runners', { method: 'POST', body: JSON.stringify({ label }) })
+}
+
+/** @param {string} label */
+export function deleteRunner(label) {
+  return request(`/api/runners/${encodeURIComponent(label)}`, { method: 'DELETE' })
+}
+
+/** @param {{ label?: string, state?: string, limit?: number }} [f] */
+export function getRunnerJobs(f = {}) {
+  const qs = new URLSearchParams()
+  if (f.label) qs.set('label', f.label)
+  if (f.state) qs.set('state', f.state)
+  if (f.limit) qs.set('limit', String(f.limit))
+  const q = qs.toString()
+  return request(`/api/runner-jobs${q ? `?${q}` : ''}`)
+}
+
+/** @param {number} id */
+export function cancelRunnerJob(id) {
+  return request(`/api/runner-jobs/${id}/cancel`, { method: 'POST' })
+}

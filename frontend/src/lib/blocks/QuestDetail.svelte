@@ -328,6 +328,9 @@
                 {:else}
                   auto {step.check_interval_seconds || '?'}s
                 {/if}
+                {#if step.run_on}
+                  · {step.run_on}
+                {/if}
               </span>
             {/if}
           </span>

@@ -123,6 +123,7 @@
         bind:interval={draft.check_interval_seconds}
         bind:waitPrevious={draft.wait_previous}
         bind:runMode={draft.run_mode}
+        bind:runOn={draft.run_on}
       />
     </div>
 

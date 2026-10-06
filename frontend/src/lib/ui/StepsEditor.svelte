@@ -138,6 +138,7 @@
             bind:interval={s.check_interval_seconds}
             bind:waitPrevious={s.wait_previous}
             bind:runMode={s.run_mode}
+            bind:runOn={s.run_on}
           />
         </div>
       {/if}

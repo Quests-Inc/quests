@@ -60,6 +60,7 @@ type StepRead struct {
 	WaitPrevious         bool    `json:"wait_previous"`
 	RunMode              string  `json:"run_mode"`
 	RunStatus            *string `json:"run_status"`
+	RunOn                *string `json:"run_on"`
 	Done                 bool    `json:"done"`
 }
 
@@ -147,6 +148,7 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 			WaitPrevious:         s.WaitPrevious,
 			RunMode:              mode,
 			RunStatus:            s.RunStatus,
+			RunOn:                s.RunOn,
 			Done:                 s.Done,
 		})
 	}

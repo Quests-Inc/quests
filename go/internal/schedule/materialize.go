@@ -57,6 +57,7 @@ type templateRow struct {
 	EmitWindowStart sql.NullString
 	EmitWindowEnd   sql.NullString
 	EmitPoolCommand sql.NullString
+	EmitRunOn       sql.NullString
 	EmitLimits      sql.NullString
 	CategoryID      sql.NullInt64
 	QuestlineID     sql.NullInt64
@@ -73,6 +74,7 @@ type templateStepRow struct {
 	CheckIntervalSeconds sql.NullInt64
 	WaitPrevious         bool
 	RunMode              string
+	RunOn                sql.NullString
 }
 
 // MaterializeDue creates quest instances for due templates (fixed + surprise).
@@ -92,7 +94,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 	rows, err := st.DB.QueryContext(ctx, `
 		SELECT id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
 			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
-			emit_window_start, emit_window_end, emit_pool_command, emit_limits,
+			emit_window_start, emit_window_end, emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, automated
 		FROM questtemplate WHERE enabled = 1 ORDER BY sort_order, id`)
 	if err != nil {
@@ -106,7 +108,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		if err := rows.Scan(
 			&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
 			&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
-			&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits,
+			&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits, &t.EmitRunOn,
 			&t.CategoryID, &t.QuestlineID, &automated,
 		); err != nil {
 			return nil, err
@@ -513,7 +515,7 @@ func pickScheduledAt(localDay time.Time, windowStart, windowEnd string, rng *ran
 func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, rng *rand.Rand) ([]domain.Step, error) {
 	rows, err := st.DB.QueryContext(ctx, `
 		SELECT title, description, sort_order, progress_min, progress_max, check_command, check_interval_seconds,
-			wait_previous, run_mode
+			wait_previous, run_mode, run_on
 		FROM questtemplatestep WHERE template_id = ? ORDER BY sort_order, id`, tmpl.ID)
 	if err != nil {
 		return nil, err
@@ -524,7 +526,7 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 		var s templateStepRow
 		var waitPrev int
 		var runMode sql.NullString
-		if err := rows.Scan(&s.Title, &s.Description, &s.SortOrder, &s.ProgressMin, &s.ProgressMax, &s.CheckCommand, &s.CheckIntervalSeconds, &waitPrev, &runMode); err != nil {
+		if err := rows.Scan(&s.Title, &s.Description, &s.SortOrder, &s.ProgressMin, &s.ProgressMax, &s.CheckCommand, &s.CheckIntervalSeconds, &waitPrev, &runMode, &s.RunOn); err != nil {
 			return nil, err
 		}
 		s.WaitPrevious = waitPrev != 0
@@ -565,6 +567,9 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 			st.CheckCommand = &c
 			st.WaitPrevious = s.WaitPrevious
 			st.RunMode = s.RunMode
+			if s.RunOn.Valid {
+				st.RunOn = store.NormalizeRunOn(&s.RunOn.String)
+			}
 			if st.RunMode == domain.RunModePoll || st.RunMode == domain.RunModeWatch {
 				iv := 15
 				if s.CheckIntervalSeconds.Valid {
@@ -644,7 +649,14 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 	var out emitOutput
 	var info execInfo
 	var execErr error
-	if opts.runner != nil {
+	if tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "" {
+		// The command runs on a runner device: queue it, collect the result on a later tick.
+		var ready bool
+		out, info, execErr, ready = execEmitRemote(ctx, st, tmpl, periodKey)
+		if !ready {
+			return emitResult{RollID: id}, nil
+		}
+	} else if opts.runner != nil {
 		var ready bool
 		out, info, execErr, ready = opts.runner.exec(ctx, st, tmpl.ID, periodKey, tmpl.EmitPoolCommand.String)
 		if !ready {
@@ -902,12 +914,12 @@ func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRo
 	err := st.DB.QueryRowContext(ctx, `
 		SELECT id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
 			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
-			emit_window_start, emit_window_end, emit_pool_command, emit_limits,
+			emit_window_start, emit_window_end, emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, automated
 		FROM questtemplate WHERE id = ?`, id).Scan(
 		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
 		&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
-		&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits,
+		&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits, &t.EmitRunOn,
 		&t.CategoryID, &t.QuestlineID, &automated,
 	)
 	if err == sql.ErrNoRows {

@@ -411,6 +411,8 @@ def _step_body(s: dict[str, Any]) -> dict[str, Any]:
         body["wait_previous"] = bool(s["wait_previous"])
     if s.get("run_mode") is not None:
         body["run_mode"] = str(s["run_mode"])
+    if s.get("run_on") is not None:
+        body["run_on"] = str(s["run_on"])
     return body
 
 
@@ -849,7 +851,9 @@ def get_template(template_id: int) -> dict[str, Any]:
         "quest's own due time, they do NOT delay creation) or surprise (a cached "
         "per-day chance roll landing at a random moment inside "
         "emit_window_start..emit_window_end). "
-        "emit_pool_command is independent of emit_mode and optional: a shell "
+        "emit_run_on=<runner label> runs emit_pool_command on another device (a "
+        "quests-runner registered under that label) instead of the server; empty = the "
+        "server. emit_pool_command is independent of emit_mode and optional: a shell "
         "one-liner, OR — if it starts with a shebang line (#!/usr/bin/env python3 "
         "etc.) — a full inline script. quests writes that text to a temp file and "
         "executes it directly (its own shebang picks the interpreter), so the "
@@ -859,7 +863,7 @@ def get_template(template_id: int) -> dict[str, Any]:
         "significance?, pinned?, automated?, deadline_at? (absolute) + "
         "duration_seconds?, questline?/questline_id?, category?/category_id?, "
         "tags? (slugs or ids), steps? [{title, description?, progress_total?, "
-        "check_command?, check_interval_seconds?, run_mode?, wait_previous?}]. What "
+        "check_command?, check_interval_seconds?, run_mode?, wait_previous?, run_on?}]. What "
         "it sets overrides the template's own fields, the rest comes from the "
         "template (and the template's steps are the fallback when it prints none). "
         "Fields outside this list are ignored and named in the attempt log. null, {} "
@@ -897,6 +901,7 @@ def create_template(
     emit_window_start: str | None = None,
     emit_window_end: str | None = None,
     emit_pool_command: str | None = None,
+    emit_run_on: str | None = None,
     emit_limits: dict[str, int] | None = None,
     deadline_time: str | None = None,
     duration_seconds: int | None = None,
@@ -923,6 +928,8 @@ def create_template(
         body["emit_window_end"] = emit_window_end
     if emit_pool_command is not None:
         body["emit_pool_command"] = emit_pool_command
+    if emit_run_on is not None:
+        body["emit_run_on"] = emit_run_on
     if emit_limits is not None:
         body["emit_limits"] = emit_limits
     if deadline_time is not None:
@@ -970,6 +977,7 @@ def update_template(
     emit_window_start: str | None = None,
     emit_window_end: str | None = None,
     emit_pool_command: str | None = None,
+    emit_run_on: str | None = None,
     emit_limits: dict[str, int] | None = None,
     deadline_time: str | None = None,
     duration_seconds: int | None = None,
@@ -1002,6 +1010,8 @@ def update_template(
         body["emit_window_end"] = emit_window_end
     if emit_pool_command is not None:
         body["emit_pool_command"] = emit_pool_command
+    if emit_run_on is not None:
+        body["emit_run_on"] = emit_run_on
     if emit_limits is not None:
         body["emit_limits"] = emit_limits
     if deadline_time is not None:
@@ -1630,13 +1640,15 @@ def delete_note(note_id: int) -> dict[str, Any]:
         "Create a new quest (POST /api/quests). Steps can be passed inline via "
         "`steps`: a list of {title, description?, progress_total?, progress_current?, "
         "sort_order?, check_command?, check_interval_seconds?, wait_previous?, "
-        "run_mode?} — if omitted, a single default step named after the quest is "
+        "run_mode?, run_on?} — if omitted, a single default step named after the quest is "
         "created. run_mode is poll (stdout: a number, or JSON {progress?, total?, "
         "description?} — total re-sizes the step) or once (exit 0). A step can mirror "
         "another quest: put quest=N in its title/description, run_mode=watch (poll that "
         "also keeps going after the step is closed, active quests only) and check_command "
         "`quests progress N` (prints that quest's closed/total steps). wait_previous "
-        "gates the auto-step on the previous step. automated=true demotes "
+        "gates the auto-step on the previous step. run_on=<runner label> makes the "
+        "check run on another device (a quests-runner registered under that label) "
+        "instead of the server; empty = the server. automated=true demotes "
         "created/appeared/started overlay toasts. deadline_at is the moment the quest is due (ISO datetime, UTC — "
         "e.g. '2026-08-20T10:20:00Z'); duration_seconds sizes the urgent/reminder "
         "window that opens that many seconds before deadline_at and triggers the "
@@ -1814,6 +1826,7 @@ def add_step(
     check_interval_seconds: int | None = None,
     wait_previous: bool | None = None,
     run_mode: str | None = None,
+    run_on: str | None = None,
     quiet: bool = True,
 ) -> dict[str, Any]:
     body: dict[str, Any] = {
@@ -1833,6 +1846,8 @@ def add_step(
         body["wait_previous"] = bool(wait_previous)
     if run_mode is not None:
         body["run_mode"] = str(run_mode)
+    if run_on is not None:
+        body["run_on"] = str(run_on)
     q = _api(
         "POST",
         f"/api/quests/{quest_id}/steps",
@@ -1932,6 +1947,7 @@ def update_step(
     check_interval_seconds: int | None = None,
     wait_previous: bool | None = None,
     run_mode: str | None = None,
+    run_on: str | None = None,
     quiet: bool = True,
 ) -> dict[str, Any]:
     body: dict[str, Any] = {}
@@ -1953,6 +1969,8 @@ def update_step(
         body["wait_previous"] = bool(wait_previous)
     if run_mode is not None:
         body["run_mode"] = str(run_mode)
+    if run_on is not None:
+        body["run_on"] = str(run_on)
     if not body:
         raise ValueError("provide at least one field to update")
     q = _api(

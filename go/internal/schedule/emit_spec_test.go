@@ -75,6 +75,7 @@ CREATE TABLE questtemplate (
 	emit_window_start TEXT,
 	emit_window_end TEXT,
 	emit_pool_command TEXT,
+	emit_run_on TEXT,
 	emit_limits TEXT,
 	category_id INTEGER,
 	questline_id INTEGER,
@@ -91,7 +92,8 @@ CREATE TABLE questtemplatestep (
 	check_command TEXT,
 	check_interval_seconds INTEGER,
 	wait_previous INTEGER NOT NULL DEFAULT 0,
-	run_mode TEXT NOT NULL DEFAULT 'poll'
+	run_mode TEXT NOT NULL DEFAULT 'poll',
+	run_on TEXT
 );
 INSERT INTO questcategory (id, slug, label, created_at) VALUES (1, 'work', 'Работа', datetime('now')), (2, 'home', 'Дом', datetime('now'));
 INSERT INTO questline (id, title, category_id, created_at, updated_at) VALUES

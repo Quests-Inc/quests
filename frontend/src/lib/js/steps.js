@@ -27,6 +27,7 @@ function checkDraft(s) {
     check_interval_seconds: s?.check_interval_seconds != null ? String(s.check_interval_seconds) : '',
     wait_previous: Boolean(s?.wait_previous),
     run_mode: normalizeRunMode(s?.run_mode),
+    run_on: s?.run_on ?? '',
   }
 }
 
@@ -70,6 +71,8 @@ export function checkPayload(s) {
     check_interval_seconds: cmd ? interval : null,
     wait_previous: cmd ? Boolean(s.wait_previous) : false,
     run_mode: cmd ? normalizeRunMode(s.run_mode) : 'poll',
+    // '' tells the server to clear it; no command, no device.
+    run_on: cmd ? String(s.run_on || '').trim().toLowerCase() : '',
   }
 }
 

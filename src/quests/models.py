@@ -197,6 +197,7 @@ class QuestStepBase(SQLModel):
     sort_order: int = 0
     # Optional shell check: stdout → progress_current, polled every N seconds.
     check_command: Optional[str] = Field(default=None, max_length=2000)
+    run_on: Optional[str] = Field(default=None, max_length=64)
     check_interval_seconds: Optional[int] = Field(default=None, ge=15)
     wait_previous: bool = False
     run_mode: str = Field(default="poll", max_length=16)
@@ -226,6 +227,7 @@ class QuestStepUpdate(SQLModel):
     progress_total: Optional[int] = Field(default=None, ge=1)
     sort_order: Optional[int] = None
     check_command: Optional[str] = Field(default=None, max_length=2000)
+    run_on: Optional[str] = Field(default=None, max_length=64)
     check_interval_seconds: Optional[int] = Field(default=None, ge=15)
     wait_previous: Optional[bool] = None
     run_mode: Optional[str] = Field(default=None, max_length=16)
@@ -328,6 +330,7 @@ class QuestTemplateBase(SQLModel):
     # total weight = miss. description → step; quest_description → quest
     # description only when the template description is empty.
     emit_pool_command: Optional[str] = Field(default=None, max_length=20000)
+    emit_run_on: Optional[str] = Field(default=None, max_length=64)
     # How many items to draw from the pool per successful roll.
     # Optional JSON overrides of the emit-output limits (max_steps, max_title, …).
     emit_limits: Optional[str] = Field(default=None, max_length=1000)
@@ -363,6 +366,7 @@ class QuestTemplateStepBase(SQLModel):
     progress_max: int = Field(default=1, ge=1)
     sort_order: int = 0
     check_command: Optional[str] = Field(default=None, max_length=2000)
+    run_on: Optional[str] = Field(default=None, max_length=64)
     check_interval_seconds: Optional[int] = Field(default=None, ge=15)
     wait_previous: bool = False
     run_mode: str = Field(default="poll", max_length=16)
@@ -385,6 +389,7 @@ class QuestTemplateStepCreate(SQLModel):
     progress_total: Optional[int] = Field(default=None, ge=1)
     sort_order: int = 0
     check_command: Optional[str] = Field(default=None, max_length=2000)
+    run_on: Optional[str] = Field(default=None, max_length=64)
     check_interval_seconds: Optional[int] = Field(default=None, ge=15)
     wait_previous: bool = False
     run_mode: str = Field(default="poll", max_length=16)
@@ -416,6 +421,7 @@ class QuestTemplateUpdate(SQLModel):
     emit_window_start: Optional[str] = Field(default=None, max_length=8)
     emit_window_end: Optional[str] = Field(default=None, max_length=8)
     emit_pool_command: Optional[str] = Field(default=None, max_length=20000)
+    emit_run_on: Optional[str] = Field(default=None, max_length=64)
     steps: Optional[List[QuestTemplateStepCreate]] = None
     category_id: Optional[int] = None
     questline_id: Optional[int] = None
@@ -671,3 +677,51 @@ class AttachmentRead(SQLModel):
     @field_serializer("uploaded_at", "scanned_at", when_used="json")
     def _ser_utc(self, value: Optional[datetime]) -> Optional[str]:
         return to_utc_iso(value)
+
+
+class Runner(SQLModel, table=True):
+    """A device that executes checks for us: registered with a one-time token, then polls for jobs."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    label: str = Field(max_length=64, unique=True)
+    reg_hash: Optional[str] = Field(default=None, max_length=64)
+    reg_expires_at: Optional[datetime] = None
+    token_hash: Optional[str] = Field(default=None, max_length=64)
+    hostname: Optional[str] = Field(default=None, max_length=128)
+    version: Optional[str] = Field(default=None, max_length=32)
+    last_seen_at: Optional[datetime] = None
+    revoked: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class RunnerJob(SQLModel, table=True):
+    """One command for a runner: queued → assigned → running → success|fail|timeout|lost|skipped|canceled."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    runner_label: str = Field(max_length=64, index=True)
+    kind: str = Field(max_length=16)  # poll | once | emit_pool
+    quest_id: Optional[int] = None
+    step_id: Optional[int] = None
+    template_id: Optional[int] = None
+    title: str = Field(default="", max_length=200)
+    dedupe_key: Optional[str] = Field(default=None, max_length=128)
+    command: str
+    state: str = Field(default="queued", max_length=12)
+    attempt_no: int = Field(default=1)
+    timeout_seconds: int
+    lease_id: Optional[str] = Field(default=None, max_length=36)
+    lease_until: Optional[datetime] = None
+    valid_until: datetime
+    created_at: datetime = Field(default_factory=utcnow)
+    assigned_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    exit_code: Optional[int] = None
+    timed_out: bool = Field(default=False)
+    stdout: str = Field(default="")
+    stderr: str = Field(default="")
+    progress_current: Optional[int] = None
+    progress_total: Optional[int] = None
+    log_tail: str = Field(default="")
+    reason: str = Field(default="")
+    cancel: bool = Field(default=False)

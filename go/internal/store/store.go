@@ -277,7 +277,7 @@ func (s *Store) loadSteps(ctx context.Context, questID int64) ([]domain.Step, er
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, quest_id, title, description, progress_current, progress_total, sort_order,
 			check_command, check_interval_seconds, check_last_run_at,
-			wait_previous, run_mode, run_status
+			wait_previous, run_mode, run_status, run_on
 		FROM queststep WHERE quest_id = ? ORDER BY sort_order, id`, questID)
 	if err != nil {
 		return nil, err
@@ -292,10 +292,10 @@ func (s *Store) loadSteps(ctx context.Context, questID int64) ([]domain.Step, er
 		var qid sql.NullInt64
 		var waitPrev int
 		var runMode sql.NullString
-		var runStatus sql.NullString
+		var runStatus, runOn sql.NullString
 		if err := rows.Scan(
 			&st.ID, &qid, &st.Title, &st.Description, &st.ProgressCurrent, &st.ProgressTotal, &st.SortOrder,
-			&cmd, &interval, &last, &waitPrev, &runMode, &runStatus,
+			&cmd, &interval, &last, &waitPrev, &runMode, &runStatus, &runOn,
 		); err != nil {
 			return nil, err
 		}
@@ -325,6 +325,10 @@ func (s *Store) loadSteps(ctx context.Context, questID int64) ([]domain.Step, er
 		if runStatus.Valid && strings.TrimSpace(runStatus.String) != "" {
 			s := strings.TrimSpace(runStatus.String)
 			st.RunStatus = &s
+		}
+		if runOn.Valid && strings.TrimSpace(runOn.String) != "" {
+			s := strings.TrimSpace(runOn.String)
+			st.RunOn = &s
 		}
 		domain.ClampStep(&st)
 		out = append(out, st)
@@ -377,11 +381,11 @@ func (s *Store) createQuest(ctx context.Context, q domain.Quest, changeKind, cha
 			INSERT INTO queststep (
 				quest_id, title, description, progress_current, progress_total, sort_order,
 				check_command, check_interval_seconds, check_last_run_at,
-				wait_previous, run_mode, run_status
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				wait_previous, run_mode, run_status, run_on
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			qid, st.Title, st.Description, st.ProgressCurrent, st.ProgressTotal, st.SortOrder,
 			nullStr(st.CheckCommand), nullInt(st.CheckIntervalSeconds), nullTime(st.CheckLastRunAt),
-			boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus),
+			boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus), nullStr(st.RunOn),
 		)
 		if err != nil {
 			return domain.Quest{}, err
@@ -462,11 +466,11 @@ func (s *Store) AddStep(ctx context.Context, questID int64, st domain.Step, q do
 		INSERT INTO queststep (
 			quest_id, title, description, progress_current, progress_total, sort_order,
 			check_command, check_interval_seconds, check_last_run_at,
-			wait_previous, run_mode, run_status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			wait_previous, run_mode, run_status, run_on
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		questID, st.Title, st.Description, st.ProgressCurrent, st.ProgressTotal, st.SortOrder,
 		nullStr(st.CheckCommand), nullInt(st.CheckIntervalSeconds), nullTime(st.CheckLastRunAt),
-		boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus),
+		boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus), nullStr(st.RunOn),
 	)
 	if err != nil {
 		return domain.Quest{}, err
@@ -495,11 +499,11 @@ func (s *Store) UpdateStep(ctx context.Context, st domain.Step, q domain.Quest, 
 		UPDATE queststep SET
 			title=?, description=?, progress_current=?, progress_total=?, sort_order=?,
 			check_command=?, check_interval_seconds=?, check_last_run_at=?,
-			wait_previous=?, run_mode=?, run_status=?
+			wait_previous=?, run_mode=?, run_status=?, run_on=?
 		WHERE id=? AND quest_id=?`,
 		st.Title, st.Description, st.ProgressCurrent, st.ProgressTotal, st.SortOrder,
 		nullStr(st.CheckCommand), nullInt(st.CheckIntervalSeconds), nullTime(st.CheckLastRunAt),
-		boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus), st.ID, st.QuestID,
+		boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus), nullStr(st.RunOn), st.ID, st.QuestID,
 	)
 	if err != nil {
 		return domain.Quest{}, err
@@ -712,6 +716,18 @@ func NormalizeRunMode(s string) string {
 	return domain.RunModePoll
 }
 
+// NormalizeRunOn trims and lower-cases a runner label; empty means "here".
+func NormalizeRunOn(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.ToLower(strings.TrimSpace(*v))
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func NormalizeStepCheck(st *domain.Step) {
 	if st.RunMode == "" {
 		st.RunMode = domain.RunModePoll
@@ -724,8 +740,10 @@ func NormalizeStepCheck(st *domain.Step) {
 		st.WaitPrevious = false
 		st.RunMode = domain.RunModePoll
 		st.RunStatus = nil
+		st.RunOn = nil
 		return
 	}
+	st.RunOn = NormalizeRunOn(st.RunOn)
 	if (st.RunMode == domain.RunModePoll || st.RunMode == domain.RunModeWatch) && st.CheckIntervalSeconds == nil {
 		v := 15
 		st.CheckIntervalSeconds = &v
@@ -786,11 +804,11 @@ func (s *Store) UpdateStepComment(ctx context.Context, st domain.Step, q domain.
 		UPDATE queststep SET
 			title=?, description=?, progress_current=?, progress_total=?, sort_order=?,
 			check_command=?, check_interval_seconds=?, check_last_run_at=?,
-			wait_previous=?, run_mode=?, run_status=?
+			wait_previous=?, run_mode=?, run_status=?, run_on=?
 		WHERE id=? AND quest_id=?`,
 		st.Title, st.Description, st.ProgressCurrent, st.ProgressTotal, st.SortOrder,
 		nullStr(st.CheckCommand), nullInt(st.CheckIntervalSeconds), nullTime(st.CheckLastRunAt),
-		boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus), st.ID, st.QuestID,
+		boolInt(st.WaitPrevious), nullRunMode(st.RunMode), nullStr(st.RunStatus), nullStr(st.RunOn), st.ID, st.QuestID,
 	)
 	if err != nil {
 		return domain.Quest{}, err

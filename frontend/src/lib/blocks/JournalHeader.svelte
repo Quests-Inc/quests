@@ -3,12 +3,12 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
 
   /** @type {{
-   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph',
+   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners',
    *   liveStatus: string,
    *   health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
    *   sidebarCollapsed?: boolean,
    *   onToggleSidebar?: (() => void) | null,
-   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph') => void,
+   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners') => void,
    *   onOpenSettings: () => void,
    *   onOpenTemplates: () => void,
    *   onOpenSecrets: () => void,
@@ -492,6 +492,18 @@
     >
       <Icon name="map" size={15} />
       <span class="view-tab__label">Карта</span>
+    </button>
+    <button
+      type="button"
+      class="view-tab"
+      class:view-tab--on={view === 'runners'}
+      role="tab"
+      aria-selected={view === 'runners'}
+      title="Раннеры: устройства, на которых выполняются автопроверки"
+      onclick={() => onViewChange('runners')}
+    >
+      <Icon name="layers" size={15} />
+      <span class="view-tab__label">Раннеры</span>
     </button>
   </div>
   {#snippet fullActions()}

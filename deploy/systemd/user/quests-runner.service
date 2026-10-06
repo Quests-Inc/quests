@@ -1,0 +1,18 @@
+[Unit]
+Description=Quests check runner (executes checks on this device)
+Documentation=file://%h/Quests/deploy/SERVER.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Registered once with:  quests-runner register --server https://… --token <one-time token>
+# (the token comes from `quests-server runner add <label>`); config lands in ~/.config/quests-runner/
+ExecStart=%h/.local/bin/quests-runner run
+Restart=always
+RestartSec=10
+# Checks run as this user: they see its files, packages and services.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+
+[Install]
+WantedBy=default.target

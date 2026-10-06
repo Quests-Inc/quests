@@ -52,7 +52,8 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if isPublicAPI(r.URL.Path) || isSPAAsset(r.URL.Path) {
+		// Runner endpoints check their own runner token (they are not a user session).
+		if isPublicAPI(r.URL.Path) || isSPAAsset(r.URL.Path) || strings.HasPrefix(r.URL.Path, "/api/runner/") {
 			next.ServeHTTP(w, r)
 			return
 		}

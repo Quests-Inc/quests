@@ -89,6 +89,7 @@
   let emitPoolCommand = $state('')
   /** JSON text of the emit limits (empty = defaults) */
   let emitLimitsText = $state('')
+  let emitRunOn = $state('')
   let durationHours = $state('')
   let durationMinutes = $state('')
   let steps = $state(/** @type {ReturnType<typeof templateStepDraft>[]} */ ([]))
@@ -184,7 +185,7 @@
       .join(' · '),
   )
 
-  let poolSummary = $derived(!hasPool ? 'без команды' : emitLimitsText.trim() ? 'команда · свои лимиты' : 'команда')
+  let poolSummary = $derived(!hasPool ? 'без команды' : (emitRunOn.trim() ? `команда на «${emitRunOn.trim()}»` : 'команда') + (emitLimitsText.trim() ? ' · свои лимиты' : ''))
 
   let stepsSummary = $derived.by(() => {
     const n = steps.filter((s) => s.title.trim()).length
@@ -237,6 +238,7 @@
     emitChancePct = t ? Math.round(Math.max(0, Math.min(1, Number(t.emit_chance) || 1)) * 100) : 100
     emitPoolCommand = t?.emit_pool_command ?? ''
     emitLimitsText = t?.emit_limits ? JSON.stringify(t.emit_limits) : ''
+    emitRunOn = t?.emit_run_on ?? ''
     const ws = parseClock(t?.emit_window_start, '09', '00')
     const we = parseClock(t?.emit_window_end, '18', '00')
     windowStartHour = ws.hour
@@ -370,6 +372,7 @@
       timezone: timezone.trim() || LOCAL_TZ,
       emit_pool_command: emitPoolCommand.trim() || null,
       emit_limits: emitLimitsText.trim() ? parseLimits(emitLimitsText) : null,
+      emit_run_on: emitPoolCommand.trim() ? emitRunOn.trim().toLowerCase() || null : null,
       category_id: categoryId === '' ? null : Number(categoryId),
       questline_id: questlineId === '' ? null : Number(questlineId),
       tag_ids: selectedTags.map((t) => t.id),
@@ -834,6 +837,15 @@
           ></textarea>
         </div>
         {#if hasPool}
+          <label class="field">
+            <span class="label">
+              Устройство (необязательно)
+              <HelpTip label="Устройство">
+                <p>Метка раннера (<code>quests-runner</code>), на котором выполнить команду; пусто — на сервере. Устройство офлайн — команда ждёт его до суток, шаблон при этом не считается сломанным: период просто пропускается.</p>
+              </HelpTip>
+            </span>
+            <input type="text" class="mono" placeholder="home" maxlength="32" bind:value={emitRunOn} spellcheck="false" />
+          </label>
           <label class="field">
             <span class="label">
               Лимиты ответа (JSON, необязательно)

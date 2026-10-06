@@ -60,6 +60,7 @@ func runOnce(ctx context.Context, st *store.Store, hub *events.Hub, windows *Win
 		log.Printf("materialize: %v", err)
 	}
 	if checks != nil {
+		checks.ExpireRunnerJobs(ctx)
 		checks.Tick(ctx)
 	}
 }

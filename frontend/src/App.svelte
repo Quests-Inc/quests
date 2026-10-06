@@ -1,6 +1,7 @@
 <script>
   // Quests web UI — orchestrator (state, load, overlays)
   import HistoryPage from './lib/blocks/HistoryPage.svelte'
+import RunnersPage from './lib/blocks/RunnersPage.svelte'
   import GraphPage from './lib/blocks/GraphPage.svelte'
   import { onMount, tick, untrack } from 'svelte'
   import { cubicOut } from 'svelte/easing'
@@ -84,7 +85,7 @@
     db: 'unknown',
   })
   let searchQuery = $state('')
-  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph'} */
+  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'} */
   let view = $state('journal')
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
@@ -1032,7 +1033,8 @@
         raw === 'attachments' ||
         raw === 'calendar' ||
         raw === 'history' ||
-        raw === 'graph'
+        raw === 'graph' ||
+        raw === 'runners'
       ) {
         return raw
       }
@@ -1081,7 +1083,7 @@
   // Header tab order; drives which way a tab switch slides.
   // 'toc' is hidden for now (trial without it, see quest 328); the page and its
   // view branch are kept so the tab can come back by re-adding it here and in the header.
-  const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph']
+  const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph', 'runners']
   let navDir = $state(1)
 
   // The map stays mounted once opened; it is only shown / hidden, with the same
@@ -1713,6 +1715,10 @@
     </div>
   {:else if view === 'graph'}
     <!-- drawn below, outside the keyed viewport -->
+  {:else if view === 'runners'}
+    <div class="journal__runners">
+      <RunnersPage active={view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
+    </div>
   {:else if view === 'history'}
     <div class="journal__history">
       <HistoryPage

@@ -119,7 +119,9 @@ type Step struct {
 	WaitPrevious         bool       `json:"wait_previous"`
 	RunMode              string     `json:"run_mode"`
 	RunStatus            *string    `json:"run_status"`
-	Done                 bool       `json:"done"`
+	// RunOn names the runner (device) that executes the check; nil = this server.
+	RunOn *string `json:"run_on"`
+	Done  bool    `json:"done"`
 }
 
 type Quest struct {
@@ -165,6 +167,7 @@ type StepCreate struct {
 	CheckIntervalSeconds *int    `json:"check_interval_seconds"`
 	WaitPrevious         *bool   `json:"wait_previous"`
 	RunMode              *string `json:"run_mode"`
+	RunOn                *string `json:"run_on"`
 }
 
 type StepUpdate struct {
@@ -177,6 +180,7 @@ type StepUpdate struct {
 	CheckIntervalSeconds *int    `json:"check_interval_seconds"`
 	WaitPrevious         *bool   `json:"wait_previous"`
 	RunMode              *string `json:"run_mode"`
+	RunOn                *string `json:"run_on"`
 }
 
 type QuestCreate struct {

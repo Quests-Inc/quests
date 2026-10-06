@@ -67,7 +67,8 @@ CREATE TABLE queststep (
 	check_last_run_at DATETIME,
 	wait_previous INTEGER NOT NULL DEFAULT 0,
 	run_mode TEXT NOT NULL DEFAULT 'poll',
-	run_status TEXT
+	run_status TEXT,
+	run_on TEXT
 );
 CREATE TABLE questchangelog (
 	id INTEGER PRIMARY KEY,

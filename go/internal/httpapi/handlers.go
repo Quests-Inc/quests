@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -48,6 +49,9 @@ type Server struct {
 	// used by the LLM action-batch assistant to call the same HTTP API the
 	// frontend/CLI use, in-process, regardless of what host QUESTS_HOST binds.
 	SelfBase string
+	// RunnerDone is called once for every runner job that reaches a final state
+	// (result delivered, lease lost, never picked up): the scheduler applies it to the step.
+	RunnerDone func(ctx context.Context, j store.RunnerJob)
 	// WebDAV stores attachment bytes. Nil/unconfigured disables uploads.
 	WebDAV *webdav.Client
 	// ClamAV scans uploads. Unconfigured refuses uploads rather than storing
@@ -88,6 +92,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
 	s.registerGraphDraft(mux)
+	s.registerRunner(mux)
 	s.mountSPA(mux)
 	return mux
 }
@@ -328,6 +333,11 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 				Title: sc.Title, Description: sc.Description,
 				ProgressCurrent: sc.ProgressCurrent, ProgressTotal: sc.ProgressTotal,
 				SortOrder: ord, CheckCommand: cmd, CheckIntervalSeconds: iv,
+				RunOn: store.NormalizeRunOn(sc.RunOn),
+			}
+			if !store.ValidRunOn(st.RunOn) {
+				writeErr(w, http.StatusUnprocessableEntity, "run_on: "+store.ErrBadRunnerLabel.Error())
+				return
 			}
 			if sc.WaitPrevious != nil {
 				st.WaitPrevious = *sc.WaitPrevious
@@ -602,6 +612,11 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 		QuestID: qid, Title: strings.TrimSpace(body.Title), Description: body.Description,
 		ProgressCurrent: body.ProgressCurrent, ProgressTotal: body.ProgressTotal,
 		SortOrder: ord, CheckCommand: cmd, CheckIntervalSeconds: iv,
+		RunOn: store.NormalizeRunOn(body.RunOn),
+	}
+	if !store.ValidRunOn(st.RunOn) {
+		writeErr(w, http.StatusUnprocessableEntity, "run_on: "+store.ErrBadRunnerLabel.Error())
+		return
 	}
 	if body.WaitPrevious != nil {
 		st.WaitPrevious = *body.WaitPrevious
@@ -697,6 +712,13 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.RunMode != nil {
 		st.RunMode = store.NormalizeRunMode(*body.RunMode)
+	}
+	if body.RunOn != nil {
+		st.RunOn = store.NormalizeRunOn(body.RunOn) // "" clears
+		if !store.ValidRunOn(st.RunOn) {
+			writeErr(w, http.StatusUnprocessableEntity, "run_on: "+store.ErrBadRunnerLabel.Error())
+			return
+		}
 	}
 	store.NormalizeStepCheck(st)
 	domain.ClampStep(st)

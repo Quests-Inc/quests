@@ -79,6 +79,10 @@ func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 			if st.RunStatus == nil || *st.RunStatus != domain.RunRunning {
 				continue
 			}
+			// A job on a runner outlives a server restart: its result still arrives.
+			if st.RunOn != nil {
+				continue
+			}
 			fail := domain.RunFail
 			st.RunStatus = &fail
 			st.CheckLastRunAt = &now
@@ -173,6 +177,13 @@ func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step,
 	if _, err := r.Store.UpdateStep(ctx, st, q, "step_progress", st.Title); err != nil {
 		r.unlock(st.ID)
 		log.Printf("checks: mark start step %d: %v", st.ID, err)
+		return
+	}
+	if st.RunOn != nil {
+		// Executed by a runner on another device: queue the job, the result is
+		// applied when it comes back (JobFinished).
+		r.dispatch(ctx, q, st, once)
+		r.unlock(st.ID)
 		return
 	}
 	if once {
@@ -460,4 +471,131 @@ func ParseCheckStdout(out string) (int, bool) {
 	}
 	n, err := strconv.Atoi(toks[len(toks)-1])
 	return n, err == nil
+}
+
+// Runner jobs: how long a job may wait for its device. A one-shot waits a day
+// (a laptop that is away should not fail the quest), a poll reading goes stale fast.
+const (
+	onceJobValidFor = 24 * time.Hour
+	pollJobValidFor = 10 * time.Minute
+)
+
+// dispatch queues the step's check for its runner instead of running it here.
+// At most one job per step and mode is open at a time, so nothing piles up
+// while the device is away.
+func (r *CheckRunner) dispatch(ctx context.Context, q domain.Quest, st domain.Step, once bool) {
+	kind, valid, timeout := store.JobKindPoll, pollJobValidFor, pollTimeout
+	if once {
+		kind, valid, timeout = store.JobKindOnce, onceJobValidFor, onceSafetyTimeout
+	}
+	qid, sid := q.ID, st.ID
+	_, _, err := r.Store.EnqueueJob(ctx, store.JobSpec{
+		RunnerLabel:    *st.RunOn,
+		Kind:           kind,
+		QuestID:        &qid,
+		StepID:         &sid,
+		Title:          q.Title + " · " + st.Title,
+		DedupeKey:      "step:" + strconv.FormatInt(st.ID, 10) + ":" + kind,
+		Command:        strings.TrimSpace(*st.CheckCommand),
+		TimeoutSeconds: int(timeout / time.Second),
+		ValidFor:       valid,
+	})
+	if err != nil {
+		log.Printf("checks: enqueue step %d on %q: %v", st.ID, *st.RunOn, err)
+	}
+}
+
+// JobFinished applies the outcome of a runner job to its step. It is the
+// remote counterpart of exec+apply: a delivered result goes through the same
+// apply/applyOnce; an unreachable device is not a failed command.
+func (r *CheckRunner) JobFinished(ctx context.Context, j store.RunnerJob) {
+	if j.StepID == nil || j.QuestID == nil {
+		return
+	}
+	once := j.Kind == store.JobKindOnce
+	switch j.State {
+	case store.JobSuccess, store.JobFail, store.JobTimeout:
+		exit := -1
+		if j.ExitCode != nil {
+			exit = *j.ExitCode
+		}
+		r.apply(ctx, *j.QuestID, *j.StepID, once, exit, j.Stdout, j.Stderr, j.TimedOut || j.State == store.JobTimeout)
+	case store.JobSkipped:
+		if once {
+			r.releaseOnce(ctx, j, "устройство «"+j.RunnerLabel+"» не вышло на связь за сутки — запущу снова, когда появится")
+		}
+	case store.JobCanceled:
+		if once {
+			// Cancelled by hand: do not queue it again by itself.
+			r.stopOnce(ctx, j, "запуск отменён")
+		}
+	case store.JobAbandoned:
+		if once {
+			// It may have run, so running it again is not safe: report it.
+			r.failOnce(ctx, j, "устройство «"+j.RunnerLabel+"» пропало во время выполнения, результат неизвестен")
+		}
+	}
+	// lost / poll skips: nothing to do — the lease lapse is reported by the jobs list, and a poll tries again.
+}
+
+func (r *CheckRunner) stepOf(ctx context.Context, j store.RunnerJob) (domain.Quest, *domain.Step, bool) {
+	q, err := r.Store.GetQuest(ctx, *j.QuestID)
+	if err != nil {
+		return q, nil, false
+	}
+	for i := range q.Steps {
+		if q.Steps[i].ID == *j.StepID {
+			return q, &q.Steps[i], true
+		}
+	}
+	return q, nil, false
+}
+
+// releaseOnce takes a one-shot back to idle (not started), with a note in the quest log.
+func (r *CheckRunner) releaseOnce(ctx context.Context, j store.RunnerJob, why string) {
+	q, st, ok := r.stepOf(ctx, j)
+	if !ok || st.Done {
+		return
+	}
+	idle := domain.RunIdle
+	st.RunStatus = &idle
+	if _, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_updated", "устройство недоступно", "автошаг «"+st.Title+"»: "+why); err != nil {
+		log.Printf("checks: release step %d: %v", st.ID, err)
+	}
+}
+
+// stopOnce parks a one-shot as failed-to-run without failing its quest.
+func (r *CheckRunner) stopOnce(ctx context.Context, j store.RunnerJob, why string) {
+	q, st, ok := r.stepOf(ctx, j)
+	if !ok || st.Done {
+		return
+	}
+	fail := domain.RunFail
+	st.RunStatus = &fail
+	if _, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_updated", "автошаг остановлен", "автошаг «"+st.Title+"»: "+why); err != nil {
+		log.Printf("checks: stop step %d: %v", st.ID, err)
+	}
+}
+
+// failOnce marks a one-shot failed because its outcome cannot be known.
+func (r *CheckRunner) failOnce(ctx context.Context, j store.RunnerJob, why string) {
+	q, st, ok := r.stepOf(ctx, j)
+	if !ok || st.Done {
+		return
+	}
+	r.applyOnce(ctx, q, st, -1, "", why, false)
+}
+
+// ExpireRunnerJobs settles jobs whose lease or deadline passed and tells their steps.
+func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
+	changed, err := r.Store.ExpireJobs(ctx)
+	if err != nil {
+		log.Printf("checks: expire runner jobs: %v", err)
+	}
+	for _, j := range changed {
+		r.JobFinished(ctx, j)
+	}
+	if _, err := r.Store.PurgeRunnerJobs(ctx, timeutil.NowUTC().Add(-14*24*time.Hour)); err != nil {
+		log.Printf("checks: purge runner jobs: %v", err)
+	}
 }

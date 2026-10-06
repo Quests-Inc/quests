@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/term"
 
@@ -30,6 +31,9 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server token add <name>         mint an API token for a headless client
   quests-server token ls                 list active API tokens
   quests-server token rm <id>            revoke an API token
+  quests-server runner add <label>       register a device that runs checks (prints a one-time registration token)
+  quests-server runner ls                list runners and when they were last seen
+  quests-server runner rm <label>        revoke a runner and cancel its queued jobs
   quests-server backup-now               run one DB+attachments backup tick now
 
 Passwords are never taken from argv or env, so they stay out of shell history.
@@ -42,7 +46,7 @@ func runAdmin(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "useradd", "passwd", "users", "token", "backup-now":
+	case "useradd", "passwd", "users", "token", "runner", "backup-now":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -60,6 +64,11 @@ func runAdmin(args []string) bool {
 
 	if args[0] == "backup-now" {
 		runBackupNow(cfg, sqlDB)
+		return true
+	}
+
+	if args[0] == "runner" {
+		runRunnerCmd(&store.Store{DB: sqlDB}, args[1:])
 		return true
 	}
 
@@ -245,4 +254,59 @@ func promptNewPassword() string {
 func fatal(format string, a ...any) {
 	fmt.Fprintf(os.Stderr, "error: "+format+"\n", a...)
 	os.Exit(1)
+}
+
+func runRunnerCmd(st *store.Store, args []string) {
+	ctx := context.Background()
+	if len(args) == 0 {
+		fatal("usage: quests-server runner add|ls|rm")
+	}
+	switch args[0] {
+	case "add":
+		if len(args) < 2 {
+			fatal("usage: quests-server runner add <label>")
+		}
+		token, err := st.CreateRunner(ctx, args[1])
+		if err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("runner %q created. One-time registration token (valid %d h):\n\n  %s\n\n", args[1], int(store.RegistrationTTL.Hours()), token)
+		fmt.Println("On the device:  quests-runner register --server https://… --token <the token above>")
+	case "ls":
+		runners, err := st.ListRunners(ctx)
+		if err != nil {
+			fatal("%v", err)
+		}
+		if len(runners) == 0 {
+			fmt.Println("no runners — add one with: quests-server runner add <label>")
+			return
+		}
+		now := time.Now()
+		for _, r := range runners {
+			state := "online"
+			switch {
+			case r.Revoked:
+				state = "revoked"
+			case !r.Registered:
+				state = "not registered yet"
+			case !store.RunnerOnline(r, now):
+				state = "offline"
+			}
+			seen := "never"
+			if r.LastSeenAt != nil {
+				seen = r.LastSeenAt.Local().Format("2006-01-02 15:04:05")
+			}
+			fmt.Printf("%s\t%s\tlast seen %s\t%s\n", r.Label, state, seen, r.Hostname)
+		}
+	case "rm":
+		if len(args) < 2 {
+			fatal("usage: quests-server runner rm <label>")
+		}
+		if err := st.RevokeRunner(ctx, args[1]); err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("runner %q revoked\n", args[1])
+	default:
+		fatal("usage: quests-server runner add|ls|rm")
+	}
 }

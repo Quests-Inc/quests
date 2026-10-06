@@ -32,6 +32,7 @@ type emitStepSpec struct {
 	CheckIntervalSeconds *int
 	RunMode              string
 	WaitPrevious         *bool
+	RunOn                *string
 }
 
 type emitSpec struct {
@@ -65,6 +66,7 @@ var specKeys = map[string]bool{
 var stepSpecKeys = map[string]bool{
 	"title": true, "description": true, "progress_total": true, "progress_current": true,
 	"check_command": true, "check_interval_seconds": true, "run_mode": true, "wait_previous": true,
+	"run_on": true,
 }
 
 func parseEmitOutput(b []byte) (emitOutput, error) {
@@ -163,7 +165,7 @@ func decodeEmitSpec(raw map[string]json.RawMessage) (*emitSpec, error) {
 				{"title", &st.Title}, {"description", &st.Description},
 				{"progress_total", &st.ProgressTotal}, {"progress_current", &st.ProgressCurrent},
 				{"check_command", &st.CheckCommand}, {"check_interval_seconds", &st.CheckIntervalSeconds},
-				{"run_mode", &st.RunMode}, {"wait_previous", &st.WaitPrevious},
+				{"run_mode", &st.RunMode}, {"wait_previous", &st.WaitPrevious}, {"run_on", &st.RunOn},
 			} {
 				if err := get(f.key, f.into); err != nil {
 					return nil, err
@@ -270,6 +272,10 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 			step.RunMode = store.NormalizeRunMode(ss.RunMode)
 			if ss.WaitPrevious != nil {
 				step.WaitPrevious = *ss.WaitPrevious
+			}
+			step.RunOn = store.NormalizeRunOn(ss.RunOn)
+			if !store.ValidRunOn(step.RunOn) {
+				return nil, fmt.Errorf("steps[%d]: run_on: %v", i, store.ErrBadRunnerLabel)
 			}
 		}
 		store.NormalizeStepCheck(&step)

@@ -80,7 +80,8 @@ CREATE TABLE queststep (
 	check_last_run_at DATETIME,
 	wait_previous INTEGER NOT NULL DEFAULT 0,
 	run_mode TEXT NOT NULL DEFAULT 'poll',
-	run_status TEXT
+	run_status TEXT,
+	run_on TEXT
 );
 CREATE TABLE questchangelog (
 	id INTEGER PRIMARY KEY,
@@ -108,6 +109,50 @@ CREATE TABLE graphdraft_state (
 	roots TEXT NOT NULL DEFAULT '[]',
 	updated_at DATETIME NOT NULL
 );
+CREATE TABLE runner (
+	id INTEGER PRIMARY KEY,
+	label TEXT NOT NULL UNIQUE,
+	reg_hash TEXT,
+	reg_expires_at DATETIME,
+	token_hash TEXT,
+	hostname TEXT,
+	version TEXT,
+	last_seen_at DATETIME,
+	revoked BOOLEAN NOT NULL DEFAULT 0,
+	created_at DATETIME NOT NULL
+);
+CREATE TABLE runner_job (
+	id INTEGER PRIMARY KEY,
+	runner_label TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	quest_id INTEGER,
+	step_id INTEGER,
+	template_id INTEGER,
+	title TEXT NOT NULL DEFAULT '',
+	dedupe_key TEXT,
+	command TEXT NOT NULL,
+	state TEXT NOT NULL DEFAULT 'queued',
+	attempt_no INTEGER NOT NULL DEFAULT 1,
+	timeout_seconds INTEGER NOT NULL,
+	lease_id TEXT,
+	lease_until DATETIME,
+	valid_until DATETIME NOT NULL,
+	created_at DATETIME NOT NULL,
+	assigned_at DATETIME,
+	started_at DATETIME,
+	finished_at DATETIME,
+	exit_code INTEGER,
+	timed_out BOOLEAN NOT NULL DEFAULT 0,
+	stdout TEXT NOT NULL DEFAULT '',
+	stderr TEXT NOT NULL DEFAULT '',
+	progress_current INTEGER,
+	progress_total INTEGER,
+	log_tail TEXT NOT NULL DEFAULT '',
+	reason TEXT NOT NULL DEFAULT '',
+	cancel BOOLEAN NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX ux_runner_job_open_dedupe ON runner_job (dedupe_key)
+	WHERE dedupe_key IS NOT NULL AND state IN ('queued','assigned','running');
 CREATE TABLE questtemplate (
 	id INTEGER PRIMARY KEY,
 	title TEXT NOT NULL DEFAULT '',
