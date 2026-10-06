@@ -217,7 +217,6 @@
     if (getCtrl() === ac) setCtrl(null)
   }
 
-  let __dbgN = 0
   $effect(() => {
     const q = selected
     const id = q?.id ?? null
@@ -225,17 +224,6 @@
     const description = q?.description || ''
 
     const steps = q?.steps || []
-
-    __dbgN += 1
-    if (__dbgN < 60) {
-      console.log('[qd-effect]', __dbgN, {
-        id, status: q?.status, titleAnim: !!titleAnim, descAnim: !!descAnim,
-        stepDescAnims: [...stepDescAnims.keys()],
-        stepDisplayDesc: [...stepDisplayDesc.entries()],
-        prevStepAutomatedDesc: [...prevStepAutomatedDesc.entries()],
-        steps: steps.map((s) => ({ id: s.id, done: s.done, desc: s.description })),
-      })
-    }
 
     if (id !== lastDetailQuestId) {
       lastDetailQuestId = id
