@@ -19,6 +19,7 @@
   import { toast, toastDone, toastProgress } from '../js/toasts.svelte.js'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
+  import NoteOutline from '../ui/NoteOutline.svelte'
   import RefText from '../ui/RefText.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import AttachmentsBlock from './AttachmentsBlock.svelte'
@@ -524,6 +525,7 @@
   let editEl = $state(/** @type {HTMLTextAreaElement | null} */ (null))
   let titleEl = $state(/** @type {HTMLInputElement | null} */ (null))
   let previewEl = $state(/** @type {HTMLDivElement | null} */ (null))
+  let pageEl = $state(/** @type {HTMLElement | null} */ (null))
   let titleEditing = $state(false)
 
   let titleReadonly = $derived(viewMode === 'formatted' && !titleEditing)
@@ -1279,7 +1281,7 @@
     </div>
   </aside>
 
-  <section class="notes__page">
+  <section class="notes__page" bind:this={pageEl}>
     {#if error}
       <p class="notes__error">{error}</p>
     {/if}
@@ -1538,6 +1540,7 @@
       {/if}
     {/if}
   </section>
+  <NoteOutline scroller={pageEl} content={previewEl} enabled={viewMode === 'formatted'} dep={`${selectedId}:${description}`} />
 </div>
 
 <ContextMenu
@@ -1595,6 +1598,7 @@
 
 <style>
   .notes {
+    position: relative;
     flex: 1 1 auto;
     display: grid;
     grid-template-columns: minmax(14rem, var(--sidebar-width, 16.5rem)) 1fr;
