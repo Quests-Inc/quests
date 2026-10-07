@@ -70,6 +70,11 @@
   /** Private note: description stays collapsed until explicitly revealed. */
   let privateRevealed = $state(false)
   let saving = $state(false)
+  /** The open note was changed from outside (agent, another tab, the bot)
+   * while it has unsaved edits here — the incoming version waits for the
+   * user's say instead of replacing their text. */
+  let external = $state(/** @type {ReturnType<typeof fromRow> | null} */ (null))
+  let flashing = $state(false)
   let deleting = $state(false)
   let deleteOpen = $state(false)
   let deleteTargetId = $state(/** @type {number | null} */ (null))
@@ -277,6 +282,7 @@
   }
 
   function revert() {
+    external = null
     applyForm(saved)
     if (selectedId != null) clearNoteDraft(selectedId)
   }
@@ -433,6 +439,49 @@
     })
   })
 
+  /** Brief highlight of the body when a live update lands. */
+  async function flashBody() {
+    flashing = false
+    await tick()
+    flashing = true
+    setTimeout(() => (flashing = false), 1500)
+  }
+
+  /** Take the server's current version of the open note as the form. */
+  async function adoptExternal(id) {
+    try {
+      const row = await getNote(id)
+      if (selectedId !== id) return
+      detail = row
+      const next = fromRow(row)
+      applyForm(next)
+      saved = next
+      clearNoteDraft(id)
+      external = null
+      void flashBody()
+    } catch (e) {
+      error = e.message || String(e)
+    }
+  }
+
+  // Live updates: the journal reloads the notes list on every server event, so
+  // the open note is compared with its row there. A newer row that differs
+  // from what was loaded means someone else edited it.
+  $effect(() => {
+    const id = loadedId
+    const row = id != null ? notes.find((n) => n.id === id) : null
+    if (!row) return
+    untrack(() => {
+      if (saving) return
+      // A list fetched before our own save landed carries an older row.
+      if (detail?.updated_at && row.updated_at <= detail.updated_at) return
+      const next = fromRow(row)
+      if (draftsEqual(next, saved)) return
+      if (draftsEqual(formDraft(), saved)) void adoptExternal(id)
+      else external = next
+    })
+  })
+
   async function save() {
     if (selectedId == null || saving) return
     const t = title.trim()
@@ -457,6 +506,7 @@
       saved = fromRow(savedRow)
       applyForm(saved)
       clearNoteDraft(selectedId)
+      external = null
       onChanged()
       toast('Сохранено', { kind: 'success', ttl: 1400 })
     } catch (e) {
@@ -1298,6 +1348,17 @@
     {#if selectedId == null}
       <p class="notes__empty">Выберите заметку или создайте новую</p>
     {:else}
+      {#if external}
+        <div class="notes__external" role="status">
+          <span>Заметку изменили снаружи, а у вас есть несохранённые правки.</span>
+          <button type="button" class="notes__external-btn" onclick={() => adoptExternal(selectedId)}>
+            Загрузить новую версию
+          </button>
+          <button type="button" class="notes__external-btn" onclick={() => (external = null)}>
+            Оставить мою
+          </button>
+        </div>
+      {/if}
       <header
         class="notes__head"
         oncontextmenu={(e) => {
@@ -1461,6 +1522,7 @@
         class:notes__split--raw={viewMode === 'raw'}
         class:notes__split--combined={viewMode === 'combined'}
         class:notes__split--formatted={viewMode === 'formatted'}
+        class:notes__split--flash={flashing}
       >
         {#if viewMode !== 'formatted'}
           <MentionTextarea
@@ -1872,6 +1934,47 @@
   .notes__error {
     margin: 0;
     color: var(--color-danger, #b54a3a);
+  }
+
+  .notes__external {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.75rem;
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    border-left: 3px solid var(--color-accent, #c9a227);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 12%, transparent);
+    font-size: 0.85rem;
+  }
+
+  .notes__external-btn {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent, #c9a227);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .notes__split--flash {
+    animation: notes-flash 1.5s ease-out;
+  }
+
+  @keyframes notes-flash {
+    from {
+      background: color-mix(in srgb, var(--color-accent, #c9a227) 22%, transparent);
+    }
+    to {
+      background: transparent;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .notes__split--flash {
+      animation: none;
+    }
   }
 
   .notes__head {
