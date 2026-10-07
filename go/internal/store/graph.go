@@ -69,6 +69,11 @@ type Graph struct {
 
 const graphMaxNodes = 200
 
+// An explicit expansion (a card's own links, opened by hand) may grow the map
+// this far past graphMaxNodes: on a big map the cap is already reached, and a
+// click that adds nothing looks broken.
+const graphExpandExtra = 400
+
 // Description budgets per node card (runes): enough to read, not the whole note.
 const (
 	descQuest = 3000
@@ -395,7 +400,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 			if nodes[k].Depth >= 0 || (x.Only != "" && nodes[k].Type != x.Only) {
 				continue
 			}
-			if len(order) >= graphMaxNodes {
+			if len(order) >= graphMaxNodes+graphExpandExtra {
 				g.Truncated = true
 				break
 			}
