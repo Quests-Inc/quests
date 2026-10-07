@@ -540,6 +540,14 @@
   function autoGrow() {
     const ta = editEl
     if (!ta) return
+    // Collapsing to 'auto' to measure shrinks the page when the textarea is
+    // the tallest thing in it (Текст mode — in Оба the preview column holds
+    // the height up), and the browser clamps the scroll position to the
+    // shorter page; re-growing doesn't bring it back, so typing threw the
+    // page to the top. Put the scroll back before anything paints.
+    const scroller = pageEl
+    const top = scroller?.scrollTop ?? 0
+    const winTop = window.scrollY
     ta.style.height = 'auto'
     let h = ta.scrollHeight
     ta.style.height = `${h}px`
@@ -550,6 +558,8 @@
       h = ta.scrollHeight
       ta.style.height = `${h}px`
     }
+    if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top
+    if (window.scrollY !== winTop) window.scrollTo({ top: winTop })
   }
 
   $effect(() => {
