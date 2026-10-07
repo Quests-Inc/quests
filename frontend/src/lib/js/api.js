@@ -623,7 +623,7 @@ export function getQuestLog(params = {}) {
  */
 export function getGraph(type, id, depth = 2, extra = [], expand = []) {
   const more = extra.map((r) => `${r.type}:${r.id}`).join(',')
-  const open = expand.map((r) => `${r.type}:${r.id}`).join(',')
+  const open = expand.map((r) => `${r.type}:${r.id}${r.only ? `>${r.only}` : ''}`).join(',')
   return request(
     `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}${open ? `&expand=${encodeURIComponent(open)}` : ''}`,
   )

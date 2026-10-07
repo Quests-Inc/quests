@@ -46,6 +46,9 @@ type GraphNode struct {
 	// Hub marks nodes that are shown but not expanded (a questline would
 	// otherwise pull every quest of the line in).
 	Hub bool `json:"hub,omitempty"`
+	// More lists, by entity type, the neighbours that are not on the map
+	// (beyond the depth limit, or cut off) — the unopened links of the card.
+	More map[string][]string `json:"more,omitempty"`
 }
 
 type GraphEdge struct {
@@ -98,6 +101,8 @@ func (s *Store) BuildGraph(ctx context.Context, rootType string, rootID int64, d
 type GraphRoot struct {
 	Type string
 	ID   int64
+	// Only limits an expansion to neighbours of this entity type ("" = all).
+	Only string
 }
 
 // BuildGraphRoots is BuildGraph around several entities at once. The first
@@ -381,11 +386,13 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		if !ok || cur.Depth < 0 {
 			continue
 		}
-		cur.Hub = false
 		next := append([]string(nil), adj[cur.Key]...)
 		sort.Strings(next)
+		if x.Only == "" {
+			cur.Hub = false
+		}
 		for _, k := range next {
-			if nodes[k].Depth >= 0 {
+			if nodes[k].Depth >= 0 || (x.Only != "" && nodes[k].Type != x.Only) {
 				continue
 			}
 			if len(order) >= graphMaxNodes {
@@ -401,6 +408,17 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 	for _, k := range order {
 		n := *nodes[k]
 		n.Links = links[k]
+		seenMore := map[string]bool{}
+		for _, nb := range adj[k] {
+			if nodes[nb].Depth >= 0 || seenMore[nb] {
+				continue
+			}
+			seenMore[nb] = true
+			if n.More == nil {
+				n.More = map[string][]string{}
+			}
+			n.More[nodes[nb].Type] = append(n.More[nodes[nb].Type], nb)
+		}
 		g.Nodes = append(g.Nodes, n)
 		in[k] = true
 	}

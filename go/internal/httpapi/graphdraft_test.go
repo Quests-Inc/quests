@@ -502,3 +502,44 @@ func TestGraphExpandAddsNeighboursBeyondDepth(t *testing.T) {
 		t.Fatalf("expanding b must add c: err=%v", err)
 	}
 }
+
+// A card reports the neighbours that are not on the map, by type, and an
+// expansion limited to one type opens only those.
+func TestGraphMoreAndOnlyExpansion(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	a, b := seedQuest(t, s), seedQuest(t, s)
+	if _, err := s.Store.DB.Exec(`UPDATE quest SET description = ? WHERE id = ?`, fmt.Sprintf("quest=%d", b), a); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Store.DB.Exec(`INSERT INTO note (title, description, created_at, updated_at) VALUES ('n', ?, datetime('now'), datetime('now'))`, fmt.Sprintf("quest=%d", b)); err != nil {
+		t.Fatal(err)
+	}
+	root := []store.GraphRoot{{Type: "quest", ID: a}}
+	g, err := s.Store.BuildGraphExpanded(t.Context(), root, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	find := func(g store.Graph, key string) *store.GraphNode {
+		for i := range g.Nodes {
+			if g.Nodes[i].Key == key {
+				return &g.Nodes[i]
+			}
+		}
+		return nil
+	}
+	bk := fmt.Sprintf("quest:%d", b)
+	bn := find(g, bk)
+	if bn == nil || len(bn.More["note"]) != 1 {
+		t.Fatalf("b must report its note as unopened: %+v", bn)
+	}
+	g, err = s.Store.BuildGraphExpanded(t.Context(), root, 1, []store.GraphRoot{{Type: "quest", ID: b, Only: "step"}})
+	if err != nil || len(find(g, bk).More["note"]) != 1 {
+		t.Fatalf("a step-only expansion must leave the note unopened: err=%v", err)
+	}
+	g, err = s.Store.BuildGraphExpanded(t.Context(), root, 1, []store.GraphRoot{{Type: "quest", ID: b, Only: "note"}})
+	if err != nil || len(find(g, bk).More["note"]) != 0 {
+		t.Fatalf("a note expansion must open the note: err=%v", err)
+	}
+}

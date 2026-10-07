@@ -248,7 +248,11 @@
     const c = center
     const d = depth
     const extra = draft.roots.filter((r) => !(r.type === c.type && r.id === c.id))
-    const open = expandKeys.map((k) => ({ type: k.split(':')[0], id: Number(k.split(':')[1]) }))
+    const open = expandKeys.map((k) => {
+      // "quest:5" opens every link of the card, "quest:5>note" only its notes.
+      const [ref, only] = k.split('>')
+      return { type: ref.split(':')[0], id: Number(ref.split(':')[1]), only }
+    })
     void nonce
     void reloadTick
     const mine = ++seq
@@ -528,6 +532,34 @@
     } catch {
       /* works until reload */
     }
+  }
+
+  const ownExpand = (key) => expandKeys.filter((k) => k === key || k.startsWith(`${key}>`))
+
+  /** A quest the status filter would drop again, so opening it shows nothing. */
+  function statusOff(key) {
+    if (!key.startsWith('quest:')) return false
+    const q = quests.find((x) => x.id === Number(key.slice('quest:'.length)))
+    return Boolean(q) && !questStatuses.has(q.status)
+  }
+
+  /** Unopened links of a card by entity type, as circles on its border. Links
+   * to cards the user took off the map, or to kinds filtered out, are not counted. */
+  function moreOf(n) {
+    if (!n.more || n.draft) return []
+    const out = []
+    for (const type of ENTITY_TYPES) {
+      if (!n.more[type] || !shownTypes.has(type)) continue
+      const count = n.more[type].filter((k) => !hidden.has(k) && !statusOff(k)).length
+      if (count) out.push({ type, count })
+    }
+    return out
+  }
+
+  /** Open only the links of one type of a card. */
+  function openMore(n, type) {
+    const key = `${n.key}>${type}`
+    if (!expandKeys.includes(key) && !expandKeys.includes(n.key)) setExpand([...expandKeys, key])
   }
 
   // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
@@ -1468,8 +1500,8 @@
     // Exploring: bring in what this card is linked to, or take its steps / quests off.
     if (!n.draft) {
       const explore = []
-      if (expandKeys.includes(n.key)) explore.push({ id: 'collapse', label: 'Свернуть связи' })
-      else explore.push({ id: 'expand', label: 'Показать связи' })
+      if (ownExpand(n.key).length) explore.push({ id: 'collapse', label: 'Свернуть связи' })
+      if (!expandKeys.includes(n.key)) explore.push({ id: 'expand', label: 'Показать все связи' })
       if (n.type === 'quest' && childKeys(n, 'step').length) explore.push({ id: 'drop-steps', label: 'Убрать шаги' })
       if (n.type === 'questline' && childKeys(n, 'quest').length) explore.push({ id: 'drop-quests', label: 'Убрать квесты' })
       if (items.length) items.push({ id: 'sep-explore', sep: true })
@@ -1518,11 +1550,11 @@
     else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
     else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
     else if (id === 'add-quest-line' && n) questModal = { open: true, desc: '', at, questlineId: n.id }
-    else if (id === 'new-note') entityModal = { open: true, kind: 'note', at, ...plain }
+    else if (id === 'new-note') await createNoteHere(at, '')
     else if (id === 'new-questline') entityModal = { open: true, kind: 'questline', at, ...plain }
     else if (id === 'new-step') entityModal = { open: true, kind: 'step', at, ...plain }
     else if (id === 'add-step' && n) entityModal = { open: true, kind: 'step', at, ...plain, owner: n.key }
-    else if (id === 'add-note' && n) entityModal = { open: true, kind: 'note', at, ...plain, linkFrom: n.key }
+    else if (id === 'add-note' && n) await createNoteHere(at, n.key)
     else if (id === 'edit' && n) await startEdit(n)
     else if (id === 'copy' && n) await addOp('copy', { source: n.key, pos: at })
     else if (id === 'upload' || id === 'add-file') {
@@ -1540,8 +1572,8 @@
     else if (id === 'edge-nowait' && ctx.edge) await addOp('edit_step', { id: ctx.edge.to, fields: { wait_previous: false } })
     else if (id === 'edge-unline' && ctx.edge) await addOp('edit_quest', { id: ctx.edge.to, fields: { questline_id: null } })
     else if (id === 'edge-unparent' && ctx.edge) await addOp('set_parent', { id: ctx.edge.to, parent: '', was: ctx.edge.from })
-    else if (id === 'expand' && n) setExpand([...expandKeys, n.key])
-    else if (id === 'collapse' && n) setExpand(expandKeys.filter((k) => k !== n.key))
+    else if (id === 'expand' && n) setExpand([...expandKeys.filter((k) => !k.startsWith(`${n.key}>`)), n.key])
+    else if (id === 'collapse' && n) setExpand(expandKeys.filter((k) => k !== n.key && !k.startsWith(`${n.key}>`)))
     else if (id === 'drop-steps' && n) await hideKeys(childKeys(n, 'step'))
     else if (id === 'drop-quests' && n) await hideKeys(childKeys(n, 'quest'))
     else if (id === 'detach-note' && n) await addOp('set_parent', { id: n.key, parent: '', was: parentNote(n) ?? '' })
@@ -1676,12 +1708,36 @@
     if (op && m.linkFrom) await addOp('add_ref', { from: m.linkFrom, to: `note:t${op.id}` })
   }
 
+  const NEW_NOTE = 'Новая заметка'
+
+  /** "Новая заметка", then "Новая заметка (2)", (3)… — the first free one. */
+  function freshNoteTitle() {
+    const taken = new Set([
+      ...notes.map((x) => x.title),
+      ...(view?.nodes ?? []).filter((x) => x.type === 'note').map((x) => x.title),
+      ...draft.ops.map((o) => o.payload?.fields?.title),
+    ])
+    if (!taken.has(NEW_NOTE)) return NEW_NOTE
+    let i = 2
+    while (taken.has(`${NEW_NOTE} (${i})`)) i += 1
+    return `${NEW_NOTE} (${i})`
+  }
+
+  /** A new note appears at the cursor with its title selected, ready to type over. */
+  async function createNoteHere(at, linkFrom) {
+    const title = freshNoteTitle()
+    const op = await addOp('create_note', { fields: { title, description: '' }, pos: at })
+    if (!op) return
+    if (linkFrom) await addOp('add_ref', { from: linkFrom, to: `note:t${op.id}` })
+    await startEditNote({ key: `note:t${op.id}`, draft: true, op: op.id, title }, true)
+  }
+
   /** Note edited on its card: the full text is fetched first (the map shows only the start of long notes). */
   let editing = $state(
-    /** @type {{ key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any } | null} */ (null),
+    /** @type {{ key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any, fresh?: boolean } | null} */ (null),
   )
 
-  async function startEditNote(n) {
+  async function startEditNote(n, fresh = false) {
     if (editing?.key === n.key) return
     try {
       if (n.draft) {
@@ -1695,6 +1751,7 @@
           orig: { title: f.title ?? '', description: f.description ?? '' },
           opId: op.id,
           payload: op.payload,
+          fresh,
         }
       } else {
         const full = await getNote(n.id)
@@ -1733,6 +1790,23 @@
 
   const autofocus = (node) => {
     node.focus()
+  }
+
+  const autofocusIf = (node, on) => {
+    if (on) node.focus()
+  }
+
+  /** Title of a brand-new note: focused with the whole text selected. */
+  const focusSelect = (node) => {
+    // The card is mounted while the map is still hidden for measuring, and a
+    // hidden field cannot take focus — keep trying until it shows.
+    let tries = 0
+    const grab = () => {
+      node.focus()
+      node.select()
+      if (document.activeElement !== node && node.isConnected && tries++ < 30) requestAnimationFrame(grab)
+    }
+    grab()
   }
 
   /** Empty map: no centre, no extra centres, nothing hidden, layout forgotten.
@@ -2045,12 +2119,30 @@
           {:else if editing && editing.key === n.key}
             <div class="gcard__head">
               {@render glyph(n, t)}
-              <input class="gcard__titleedit" bind:value={editing.title} aria-label="Заголовок" />
+              {#if editing.fresh}
+                <input
+                  class="gcard__titleedit"
+                  bind:value={editing.title}
+                  aria-label="Заголовок"
+                  use:focusSelect
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.currentTarget.closest('.gcard')?.querySelector('textarea')?.focus()
+                    } else if (e.key === 'Escape') {
+                      e.stopPropagation()
+                      void finishEdit(true)
+                    }
+                  }}
+                />
+              {:else}
+                <input class="gcard__titleedit" bind:value={editing.title} aria-label="Заголовок" />
+              {/if}
             </div>
             <textarea
               class="gcard__editor"
               bind:value={editing.text}
-              use:autofocus
+              use:autofocusIf={!editing.fresh}
               placeholder="Markdown"
               spellcheck="false"
               onkeydown={(e) => {
@@ -2088,6 +2180,25 @@
             <span class="gcard__title gcard__title--line">{n.title}</span>
             {#if n.type === 'step' && n.progress}
               <span class="gcard__prog">{n.progress}</span>
+            {/if}
+          {/if}
+          {#if !square}
+            {@const more = moreOf(n)}
+            {#if more.length}
+              <div class="gcard__more">
+                {#each more as m (m.type)}
+                  <button
+                    type="button"
+                    class="gcard__dot"
+                    style:--dot={TYPES[m.type].color}
+                    title="{ENTITY_LABELS[m.type]}: {m.count} не на карте. Клик — показать"
+                    aria-label="Показать связи: {ENTITY_LABELS[m.type]}, {m.count}"
+                    onpointerdown={(e) => e.stopPropagation()}
+                    oncontextmenu={(e) => e.stopPropagation()}
+                    onclick={() => openMore(n, m.type)}>{m.count}</button
+                  >
+                {/each}
+              </div>
             {/if}
           {/if}
           {#if touched.has(n.key) && !n.draft}
@@ -2669,7 +2780,7 @@
     padding: 0.15rem 0.35rem;
     border: 1px solid var(--color-border, #333);
     border-radius: 6px;
-    background: var(--color-bg, #121212);
+    background: color-mix(in srgb, var(--c, #888) 14%, var(--color-bg, #121212));
     color: inherit;
     font: inherit;
     font-weight: 600;
@@ -2682,7 +2793,7 @@
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--color-border, #333);
     border-radius: 6px;
-    background: var(--color-bg, #121212);
+    background: color-mix(in srgb, var(--c, #888) 14%, var(--color-bg, #121212));
     color: var(--color-fg, #e8e8e8);
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
@@ -3044,6 +3155,43 @@
     display: inline-flex;
     align-self: center;
     color: var(--line-color, var(--c, #888));
+  }
+
+  /* Links not on the map yet: a circle per entity type on the card's lower border. */
+  .gcard__more {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -11px;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+
+  .gcard__dot {
+    min-width: 21px;
+    height: 21px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    border: 2px solid var(--color-bg, #121212);
+    border-radius: 999px;
+    background: var(--dot, #888);
+    color: #141414;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 17px;
+    text-align: center;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 1px 4px color-mix(in srgb, #000 50%, transparent);
+  }
+
+  .gcard__dot:hover {
+    filter: brightness(1.15);
+    transform: scale(1.12);
   }
 
   /* Unsaved change: a yellow "!" in a circle on the card's top-right corner. */

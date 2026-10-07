@@ -409,13 +409,15 @@ func (s *Server) getGraph(w http.ResponseWriter, r *http.Request) {
 			roots = append(roots, store.GraphRoot{Type: t, ID: n})
 		}
 	}
-	// ?expand=step:3,quest:9 adds the direct neighbours of those cards, however deep they are.
+	// ?expand=step:3,quest:9>note adds the direct neighbours of those cards, however deep they are.
 	var expand []store.GraphRoot
 	for _, part := range strings.Split(q.Get("expand"), ",") {
-		t, idStr, ok := strings.Cut(strings.TrimSpace(part), ":")
+		// "quest:5" opens every neighbour, "quest:5>note" only the notes among them.
+		part, only, _ := strings.Cut(strings.TrimSpace(part), ">")
+		t, idStr, ok := strings.Cut(part, ":")
 		n, err := strconv.ParseInt(idStr, 10, 64)
 		if ok && err == nil && n > 0 {
-			expand = append(expand, store.GraphRoot{Type: t, ID: n})
+			expand = append(expand, store.GraphRoot{Type: t, ID: n, Only: only})
 		}
 	}
 	g, err := s.Store.BuildGraphExpanded(r.Context(), roots, depth, expand)
