@@ -36,6 +36,7 @@
   import { copyText } from '../js/clipboard.js'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
+  import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
 
   /** `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
@@ -124,6 +125,9 @@
   let isSurprise = $derived(emitMode === 'surprise')
   let hasDeadline = $derived(!isSurprise && Boolean(deadlineHour))
   let hasPool = $derived(Boolean(emitPoolCommand.trim()))
+  $effect(() => {
+    if (hasPool) void loadRunners()
+  })
 
   /** @param {string} text */
   function parseLimits(text) {
@@ -839,12 +843,20 @@
         {#if hasPool}
           <label class="field">
             <span class="label">
-              Устройство (необязательно)
+              Устройство
               <HelpTip label="Устройство">
                 <p>Метка раннера (<code>quests-runner</code>), на котором выполнить команду; пусто — на сервере. Устройство офлайн — команда ждёт его до суток, шаблон при этом не считается сломанным: период просто пропускается.</p>
               </HelpTip>
             </span>
-            <input type="text" class="mono" placeholder="home" maxlength="32" bind:value={emitRunOn} spellcheck="false" />
+            <select bind:value={emitRunOn} aria-label="Устройство">
+              <option value="">на сервере</option>
+              {#each runnersList.items as r (r.label)}
+                <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
+              {/each}
+              {#if emitRunOn && !runnersList.items.some((r) => r.label === emitRunOn)}
+                <option value={emitRunOn}>{emitRunOn} (нет такого раннера)</option>
+              {/if}
+            </select>
           </label>
           <label class="field">
             <span class="label">

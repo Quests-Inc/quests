@@ -2,6 +2,7 @@
   import HelpTip from './HelpTip.svelte'
   import OptionPills from './OptionPills.svelte'
   import { mirrorQuestId as findMirrorQuest } from '../js/steps.js'
+  import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
 
   /** A step's auto-check: command, poll interval, mode, pipeline gate.
    * The mode/gate controls only appear once there is a command to run.
@@ -24,6 +25,12 @@
   ]
 
   let hasCommand = $derived(Boolean(String(command || '').trim()))
+
+  // Devices to pick from; a label that is not (or no longer) registered stays selectable so it is not lost silently.
+  $effect(() => {
+    if (hasCommand) void loadRunners()
+  })
+  let missing = $derived(runOn && !runnersList.items.some((r) => r.label === runOn) ? runOn : '')
 
   /** First quest=N in the step's title/description, offered while no command is set. */
   let mirrorQuestId = $derived(hasCommand ? null : findMirrorQuest(text))
@@ -70,23 +77,22 @@
         <input type="checkbox" bind:checked={waitPrevious} />
         ждать предыдущий
       </label>
-      <input
-        type="text"
-        class="mono autocheck__runon"
-        placeholder="устройство"
-        title="Метка раннера, на котором запускать проверку (пусто — на сервере)"
-        aria-label="Раннер"
-        maxlength="32"
-        bind:value={runOn}
-        spellcheck="false"
-      />
+      <select class="autocheck__runon" title="Где запускать проверку" aria-label="Устройство" bind:value={runOn}>
+        <option value="">на сервере</option>
+        {#each runnersList.items as r (r.label)}
+          <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
+        {/each}
+        {#if missing}
+          <option value={missing}>{missing} (нет такого раннера)</option>
+        {/if}
+      </select>
       <HelpTip label="Как работает автопроверка">
         <p><b>Опрос</b> — команда запускается каждые N сек (по умолчанию 60), число из stdout становится прогрессом шага. Можно вывести и JSON: <code>{`{"progress": 2, "total": 5, "description": "…"}`}</code>, все поля необязательны; <code>total</code> меняет максимум шага.</p>
         <p><b>Дочерний квест как шаг:</b> <code>quest=N</code> в названии или описании шага, режим «наблюдение» и команда <code>quests progress N</code> (кнопка-подсказка поставит всё сама).</p>
         <p><b>Наблюдение</b> — как опрос, но продолжается и после закрытия шага (не чаще раза в минуту): если число растёт, шаг открывается снова. Работает только пока квест активен.</p>
         <p><b>Разово</b> — один запуск: код 0 закрывает шаг, иначе квест проваливается.</p>
         <p><b>Ждать предыдущий</b> — шаг стартует только после предыдущего: линейный пайплайн.</p>
-        <p><b>Устройство</b> — метка раннера (<code>quests-runner</code>), на котором запустится команда; пусто — на сервере. Если устройство офлайн, разовая проверка ждёт его до суток и не проваливает квест.</p>
+        <p><b>Устройство</b> — раннер (<code>quests-runner</code>), на котором запустится команда; «на сервере» — как раньше. Раннеры добавляются во вкладке «Раннеры». Если устройство офлайн, разовая проверка ждёт его до суток и не проваливает квест.</p>
       </HelpTip>
     </div>
   {/if}
@@ -115,8 +121,8 @@
   }
 
   .autocheck__opts .autocheck__runon {
-    flex: 0 0 7rem;
-    width: 7rem;
+    flex: 0 1 11rem;
+    min-width: 0;
     font-size: var(--text-xs, 0.75rem);
   }
 
