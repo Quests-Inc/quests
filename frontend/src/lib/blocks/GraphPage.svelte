@@ -153,11 +153,28 @@
       toast(`Сохранено: ${r.applied} ${r.applied === 1 ? 'изменение' : 'изменений'}`, { kind: 'success' })
       // An empty map has nothing to show the saved things on: centre on the first one.
       const made = !center.id ? Object.entries(r.created ?? {}).find(([k]) => k.startsWith('quest:') || k.startsWith('note:') || k.startsWith('questline:')) : null
-      resetPositions()
+      // Saving must not rearrange the map: every card stays where it is, and
+      // the things that were only in the draft keep their spot under their new ids.
+      for (const n of view?.nodes ?? []) {
+        if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) continue
+        const real = r.created?.[n.key]
+        const key = real != null ? `${n.key.split(':')[0]}:${real}` : n.key
+        if (n.type !== 'cluster') saved.set(key, { x: n.x, y: n.y })
+      }
       if (made) {
         center = { type: made[0].split(':')[0], id: Number(made[1]) }
         onCenter?.(center.type, center.id)
       }
+      // Things made on the map with no link to anything on it have nothing to
+      // hang from once saved: keep them as extra centres so they stay put.
+      const kept = [...draft.roots]
+      for (const n of view?.nodes ?? []) {
+        if (!n.draft || n.depth >= 0 || !['quest', 'note', 'questline'].includes(n.type)) continue
+        const id = Number(r.created?.[n.key])
+        if (!id || (center.type === n.type && center.id === id)) continue
+        if (!kept.some((x) => x.type === n.type && x.id === id)) kept.push({ type: n.type, id })
+      }
+      if (kept.length !== draft.roots.length) await putGraphDraftRoots(kept)
       await loadDraft()
       reloadTick += 1
     } catch (e) {
