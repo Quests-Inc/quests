@@ -876,6 +876,47 @@
     ro.observe(el)
     return () => ro.disconnect()
   })
+  // Cards that need no body right now: well outside the window, or so small on
+  // screen (< 1% of the map area) that only the frame reads. They keep their box,
+  // so nothing moves; the markdown inside is simply not built until it matters.
+  const LITE_AREA = 0.01
+  let prevLite = new Set()
+  let lite = $derived.by(() => {
+    const next = new Set()
+    const nodes = view?.nodes
+    // Read everything up front so the dependencies are the same on every run.
+    const { k, x: cx, y: cy } = cam
+    const editingKey = editing?.key
+    if (ready && nodes && stageSize.w && stageSize.h) {
+      const W = stageSize.w
+      const H = stageSize.h
+      for (const n of nodes) {
+        if (n.type !== 'quest' && n.type !== 'note' && !(n.type === 'step' && n.desc)) continue
+        if (editingKey === n.key) continue
+        const sx = (n.x - n.w / 2) * k + cx
+        const sy = (n.y - n.h / 2) * k + cy
+        const sw = n.w * k
+        const sh = n.h * k
+        // One window of margin each way, so panning does not reveal empty frames.
+        const off = sx + sw < -W || sx > 2 * W || sy + sh < -H || sy > 2 * H
+        if (off || sw * sh < W * H * LITE_AREA) next.add(n.key)
+      }
+    }
+    if (next.size === prevLite.size && [...next].every((x) => prevLite.has(x))) return prevLite
+    prevLite = next
+    return next
+  })
+
+  /** Circles per card, worked out once per data/filter change, not per frame. */
+  let moreMap = $derived.by(() => {
+    const m = new Map()
+    for (const n of data?.nodes ?? []) {
+      const r = moreOf(n)
+      if (r.length) m.set(n.key, r)
+    }
+    return m
+  })
+
   let mini = $derived.by(() => {
     const nodes = (view?.nodes ?? []).filter((n) => ready && Number.isFinite(n.x) && n.w)
     if (!nodes.length || !stageSize.w) return null
@@ -2203,6 +2244,8 @@
               <button type="button" class="graph__btn" onclick={() => finishEdit(false)}>Отмена</button>
               <span class="gcard__edithint">Ctrl+Enter — готово · Esc — отмена</span>
             </div>
+          {:else if lite.has(n.key)}
+            <!-- frame only: off-screen or too small to read -->
           {:else if big || withText}
             <div class="gcard__head">
               {@render glyph(n, t)}
@@ -2225,8 +2268,8 @@
               <span class="gcard__prog">{n.progress}</span>
             {/if}
           {/if}
-          {#if !square}
-            {@const more = moreOf(n)}
+          {#if !square && !lite.has(n.key)}
+            {@const more = moreMap.get(n.key) ?? []}
             {#if more.length}
               <div class="gcard__more">
                 {#each more as m (m.type)}
