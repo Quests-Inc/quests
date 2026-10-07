@@ -543,14 +543,38 @@
     return Boolean(q) && !questStatuses.has(q.status)
   }
 
-  /** Unopened links of a card by entity type, as circles on its border. Links
-   * to cards the user took off the map, or to kinds filtered out, are not counted. */
+  /** Cards the user took off the map, per neighbour still on it: key → type → keys.
+   * They are links like any other not shown yet, so they count in the circles. */
+  let hiddenAdj = $derived.by(() => {
+    const out = new Map()
+    if (!hidden.size) return out
+    const add = (from, other) => {
+      if (!hidden.has(other) || hidden.has(from)) return
+      const type = other.slice(0, other.indexOf(':'))
+      if (!out.has(from)) out.set(from, {})
+      const by = out.get(from)
+      if (!by[type]) by[type] = []
+      if (!by[type].includes(other)) by[type].push(other)
+    }
+    for (const e of data?.edges ?? []) {
+      add(e.from, e.to)
+      add(e.to, e.from)
+    }
+    return out
+  })
+
+  /** Unopened links of a card by entity type, as circles on its border: what the
+   * map has not reached yet plus what was taken off it. Kinds filtered out and
+   * quests outside the status filter are not counted — opening them shows nothing. */
   function moreOf(n) {
-    if (!n.more || n.draft) return []
+    if (n.draft) return []
+    const own = n.more ?? {}
+    const gone = hiddenAdj.get(n.key) ?? {}
     const out = []
     for (const type of ENTITY_TYPES) {
-      if (!n.more[type] || !shownTypes.has(type)) continue
-      const count = n.more[type].filter((k) => !hidden.has(k) && !statusOff(k)).length
+      if (!shownTypes.has(type)) continue
+      const keys = [...(own[type] ?? []), ...(gone[type] ?? [])]
+      const count = keys.filter((k) => !statusOff(k)).length
       if (count) out.push({ type, count })
     }
     return out
@@ -558,8 +582,16 @@
 
   /** Open only the links of one type of a card. */
   function openMore(n, type) {
-    const key = `${n.key}>${type}`
-    if (!expandKeys.includes(key) && !expandKeys.includes(n.key)) setExpand([...expandKeys, key])
+    const back = hiddenAdj.get(n.key)?.[type]
+    if (back?.length) {
+      const next = new Set(hidden)
+      for (const k of back) next.delete(k)
+      saveHidden(next)
+    }
+    if (n.more?.[type]?.length) {
+      const key = `${n.key}>${type}`
+      if (!expandKeys.includes(key) && !expandKeys.includes(n.key)) setExpand([...expandKeys, key])
+    }
   }
 
   // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
@@ -1962,12 +1994,6 @@
     {#if expanded.size || loose.size}
       <button type="button" class="graph__btn" onclick={collapseAll}>Свернуть вложения</button>
     {/if}
-    {#if hidden.size}
-      <button type="button" class="graph__btn" title="Вернуть убранные с карты карточки" onclick={() => saveHidden(new Set())}>
-        Показать убранные ({hidden.size})
-      </button>
-    {/if}
-
   </div>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
