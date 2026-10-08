@@ -108,6 +108,13 @@ def main() -> int:
             flag = "" if n_pg == n_src else "   <-- MISMATCH"
             ok = ok and n_pg == n_src
             print(f"{t:24} sqlite={n_src:6} pg={n_pg:6}{flag}")
+        if ok:
+            # Existing accounts own the migrated data: members of workspace 1.
+            cur.execute(
+                "INSERT INTO workspace_member (workspace_id, user_id, role) "
+                "SELECT 1, id, 'owner' FROM appuser ON CONFLICT DO NOTHING"
+            )
+            print(f"workspace 1 members added: {cur.rowcount}")
         if not ok:
             pg.rollback()
             print("row counts differ; rolled back", file=sys.stderr)
