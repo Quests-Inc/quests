@@ -5,6 +5,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   import GraphPage from './lib/blocks/GraphPage.svelte'
   import { onMount, tick, untrack } from 'svelte'
   import { cubicOut } from 'svelte/easing'
+  import { tabSwipe } from './lib/js/tabSwipe.js'
   import {
     deleteQuest,
     deleteQuestStep,
@@ -1160,6 +1161,13 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     replaceSearch(searchForView(next))
   }
 
+  /** A free horizontal swipe on the page steps to the neighbouring header tab. */
+  function swipeTab(dir) {
+    const i = TAB_ORDER.indexOf(view)
+    const next = i === -1 ? null : TAB_ORDER[i + dir]
+    if (next) setView(next)
+  }
+
   /** Opens the relations map centred on one entity. */
   function openGraph(type, id) {
     const from = TAB_ORDER.indexOf(view)
@@ -1690,7 +1698,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
 
   <ToastHost />
 
-  <div class="journal__stage">
+  <div class="journal__stage" use:tabSwipe={swipeTab}>
   {#key view}
   <div
     class="journal__viewport"
