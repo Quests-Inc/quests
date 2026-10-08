@@ -29,9 +29,11 @@ function inspect(target, root) {
   const scrollers = []
   for (let el = target; el && el !== root.parentElement; el = el.parentElement) {
     const cs = getComputedStyle(el)
-    // `none` or vertical-only panning: the element takes horizontal drags itself (the map).
+    // `none` or vertical-only panning: the element takes horizontal drags itself (the map),
+    // unless it says it has nothing to move right now (`data-swipe="free"`, an empty map).
     const ta = cs.touchAction
-    if (ta === 'none' || (ta.includes('pan-y') && !ta.includes('pan-x'))) return 'own'
+    const free = el.getAttribute('data-swipe') === 'free'
+    if (!free && (ta === 'none' || (ta.includes('pan-y') && !ta.includes('pan-x')))) return 'own'
     if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) {
       scrollers.push(scrollRoom(el))
     }

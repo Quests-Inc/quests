@@ -2174,6 +2174,7 @@
   <div
     class="graph__stage"
     class:graph__stage--full={full}
+    data-swipe={view?.nodes?.length ? undefined : 'free'}
     bind:this={stageEl}
     onpointerdowncapture={onTouchDown}
     onpointerdown={onBgDown}
