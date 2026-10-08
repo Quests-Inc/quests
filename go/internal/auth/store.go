@@ -405,3 +405,69 @@ func (s *Store) DeleteUser(id int64) error {
 	_, err := s.DB.Exec(`DELETE FROM appuser WHERE id = ?`, id)
 	return err
 }
+
+// --- a user's own tokens (self-service from the web UI) ---
+
+// MaxUserTokens bounds how many live tokens one account may hold.
+const MaxUserTokens = 25
+
+type UserToken struct {
+	ID         int64   `json:"id"`
+	Name       string  `json:"name"`
+	CreatedAt  string  `json:"created_at"`
+	LastUsedAt *string `json:"last_used_at"`
+}
+
+// ListUserTokens returns the user's live tokens that work in the workspace. A token
+// not pinned to any workspace works in the user's first one.
+func (s *Store) ListUserTokens(userID, workspaceID int64) ([]UserToken, error) {
+	q := `SELECT id, name, created_at, last_used_at FROM apitoken WHERE user_id = ? AND revoked_at IS NULL`
+	args := []any{userID}
+	if s.Workspaces {
+		def, err := s.resolveWorkspace(userID, sql.NullInt64{}, false)
+		if err != nil {
+			return nil, err
+		}
+		// Parameters of an untyped "? = ?" cannot be inferred by PostgreSQL: decide in Go.
+		if workspaceID == def {
+			q += ` AND (workspace_id = ? OR workspace_id IS NULL)`
+		} else {
+			q += ` AND workspace_id = ?`
+		}
+		args = append(args, workspaceID)
+	}
+	rows, err := s.DB.Query(q+` ORDER BY id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []UserToken{}
+	for rows.Next() {
+		var t UserToken
+		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.LastUsedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// CountUserTokens counts the user's live tokens in every workspace.
+func (s *Store) CountUserTokens(userID int64) (int, error) {
+	var n int
+	err := s.DB.QueryRow(`SELECT COUNT(*) FROM apitoken WHERE user_id = ? AND revoked_at IS NULL`, userID).Scan(&n)
+	return n, err
+}
+
+// RevokeUserToken revokes one of the user's own tokens (never someone else's).
+func (s *Store) RevokeUserToken(userID, tokenID int64) error {
+	res, err := s.DB.Exec(`UPDATE apitoken SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL`,
+		timeutil.ToDBUTC(timeutil.NowUTC()), tokenID, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("no such active token")
+	}
+	return nil
+}

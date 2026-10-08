@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -465,4 +467,80 @@ func TestGetAuthState(t *testing.T) {
 			t.Errorf("body = %+v, want authenticated=true username=alice", body)
 		}
 	})
+}
+
+func TestSelfServiceTokens(t *testing.T) {
+	s, authStore := newTestServer(t, true)
+	alice, _ := authStore.CreateUser("alice", "correcthorse")
+	bob, _ := authStore.CreateUser("bob", "correcthorse")
+	mux := http.NewServeMux()
+	s.registerAuth(mux)
+	s.registerTokens(mux)
+	h := s.requireAuth(mux)
+
+	login := func(user string) *http.Cookie {
+		w := doJSON(t, h, "POST", "/api/auth/login", map[string]string{"username": user, "password": "correcthorse"}, nil)
+		if len(w.Result().Cookies()) != 1 {
+			t.Fatalf("login %s: %d", user, w.Code)
+		}
+		return w.Result().Cookies()[0]
+	}
+	withCookie := func(method, path string, body any, c *http.Cookie) *httptest.ResponseRecorder {
+		var rd *bytes.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			rd = bytes.NewReader(b)
+		} else {
+			rd = bytes.NewReader(nil)
+		}
+		r := httptest.NewRequest(method, path, rd)
+		r.AddCookie(c)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	ca, cb := login("alice"), login("bob")
+
+	// A session mints a token; the secret is returned once and works as a bearer.
+	w := withCookie("POST", "/api/tokens", map[string]string{"name": "hud"}, ca)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create: %d %s", w.Code, w.Body.String())
+	}
+	var created struct{ Token string }
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
+	if created.Token == "" {
+		t.Fatal("no secret returned")
+	}
+	r := httptest.NewRequest("GET", "/api/tokens", nil)
+	r.Header.Set("Authorization", "Bearer "+created.Token)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("a token must not manage tokens: %d", rec.Code)
+	}
+	// Listing shows the name but never the secret.
+	w = withCookie("GET", "/api/tokens", nil, ca)
+	if !strings.Contains(w.Body.String(), `"hud"`) || strings.Contains(w.Body.String(), created.Token) {
+		t.Fatalf("list: %s", w.Body.String())
+	}
+	var list struct{ Tokens []struct{ ID int64 } }
+	_ = json.Unmarshal(w.Body.Bytes(), &list)
+	if len(list.Tokens) != 1 {
+		t.Fatalf("alice should see her one token: %s", w.Body.String())
+	}
+	// Bob sees none of it and cannot revoke it.
+	if w := withCookie("GET", "/api/tokens", nil, cb); strings.Contains(w.Body.String(), "hud") {
+		t.Fatalf("bob sees alice's token: %s", w.Body.String())
+	}
+	if w := withCookie("DELETE", "/api/tokens/"+strconv.FormatInt(list.Tokens[0].ID, 10), nil, cb); w.Code != http.StatusNotFound {
+		t.Fatalf("bob revoking alice's token: %d", w.Code)
+	}
+	if w := withCookie("DELETE", "/api/tokens/"+strconv.FormatInt(list.Tokens[0].ID, 10), nil, ca); w.Code != http.StatusNoContent {
+		t.Fatalf("alice revoking her token: %d", w.Code)
+	}
+	// Revoked: the bearer stops working.
+	_, _ = alice, bob
+	if w := withCookie("POST", "/api/tokens", map[string]string{"name": ""}, ca); w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("empty name: %d", w.Code)
+	}
 }

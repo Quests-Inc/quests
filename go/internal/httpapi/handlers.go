@@ -107,6 +107,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerRunner(mux)
 	s.registerWorkspaces(mux)
 	s.registerWorkspaceArchive(mux)
+	s.registerTokens(mux)
 	s.mountSPA(mux)
 	return mux
 }

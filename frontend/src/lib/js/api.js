@@ -530,6 +530,21 @@ export async function importWorkspace(file, { name = '', secrets = false } = {})
   return data
 }
 
+// --- API tokens of the signed-in user (HUD, MCP, Android, CLI, bot) ---
+
+export function fetchTokens() {
+  return request('/api/tokens')
+}
+
+/** The secret comes back once, in `token`. */
+export function createToken(name) {
+  return request('/api/tokens', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+export function revokeToken(id) {
+  return request(`/api/tokens/${id}`, { method: 'DELETE' })
+}
+
 export function renameWorkspace(id, name) {
   return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 }
