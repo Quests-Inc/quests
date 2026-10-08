@@ -21,7 +21,7 @@ import (
 // attachmentsArchiveName derives the sidecar archive name from the DB snapshot
 // filename (quests-….db → quests-…-attachments.tar.zst).
 func attachmentsArchiveName(dbFilename string) string {
-	base := strings.TrimSuffix(dbFilename, ".db")
+	base := strings.TrimSuffix(strings.TrimSuffix(dbFilename, ".db"), ".dump")
 	if base == dbFilename || base == "" {
 		base = dbFilename
 	}
@@ -44,7 +44,12 @@ func listSnapshotWebDAVPaths(snapshotPath string) ([]string, error) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='attachment'`).Scan(&n); err != nil || n == 0 {
 		return nil, nil
 	}
+	return listWebDAVPaths(db)
+}
 
+// listWebDAVPaths returns every distinct webdav_path referenced by attachment
+// metadata (current rows and revisions) in db.
+func listWebDAVPaths(db *sql.DB) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT webdav_path FROM attachment WHERE webdav_path IS NOT NULL AND webdav_path != ''
 		UNION
@@ -85,11 +90,7 @@ func listSnapshotWebDAVPaths(snapshotPath string) ([]string, error) {
 // buildAttachmentsArchive writes a zstd-compressed tar of every WebDAV object
 // listed in the DB snapshot. Missing objects (404) are skipped with a log line.
 // Returns bytes written (compressed file size).
-func buildAttachmentsArchive(ctx context.Context, wd *webdav.Client, snapshotDBPath, archivePath string) (int64, error) {
-	paths, err := listSnapshotWebDAVPaths(snapshotDBPath)
-	if err != nil {
-		return 0, fmt.Errorf("list snapshot paths: %w", err)
-	}
+func buildAttachmentsArchive(ctx context.Context, wd *webdav.Client, paths []string, archivePath string) (int64, error) {
 
 	f, err := os.Create(archivePath)
 	if err != nil {

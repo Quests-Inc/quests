@@ -17,6 +17,8 @@ var ErrConflict = errors.New("conflict")
 
 type Store struct {
 	DB *sql.DB
+	// PGURL is set when DB is PostgreSQL; backups then use pg_dump instead of VACUUM INTO.
+	PGURL string
 }
 
 func (s *Store) ListCategories(ctx context.Context) ([]domain.Category, error) {

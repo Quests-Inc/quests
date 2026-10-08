@@ -121,7 +121,7 @@ func runAdmin(args []string) bool {
 }
 
 func runBackupNow(cfg config.Config, sqlDB *sql.DB) {
-	st := &store.Store{DB: sqlDB}
+	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
 	wd := webdav.New(cfg.WebDAVURL, cfg.WebDAVUser, cfg.WebDAVPass)
 	remote := schedule.NewSFTPRemote(schedule.BackupRemote{
 		Host: cfg.BackupRemoteHost,

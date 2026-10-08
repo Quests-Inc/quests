@@ -68,7 +68,7 @@ func main() {
 	}
 
 	hub := events.New()
-	st := &store.Store{DB: sqlDB}
+	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
 	reg := health.New()
 	reg.SetProbe("db", schema.State, schema.Detail)
 	srv := &httpapi.Server{
