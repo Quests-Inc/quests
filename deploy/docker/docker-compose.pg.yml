@@ -1,0 +1,37 @@
+# PostgreSQL overlay for the prod compose (quest=268). Opt-in: until the data is
+# copied over (docs/postgres.md) keep using docker-compose.yml alone.
+#
+#   docker compose --env-file .env \
+#     -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.pg.yml up -d
+#
+# Needs POSTGRES_PASSWORD in .env.
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    container_name: quests-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quests
+      POSTGRES_DB: quests
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - quests-pg:/var/lib/postgresql/data
+    # No published port: api reaches it on the compose network as postgres:5432.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quests -d quests"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    environment:
+      QUESTS_DATABASE_URL: postgresql://quests:${POSTGRES_PASSWORD}@postgres:5432/quests
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_started
+
+volumes:
+  quests-pg:

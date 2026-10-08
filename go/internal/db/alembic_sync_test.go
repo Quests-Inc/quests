@@ -10,10 +10,20 @@ import (
 // TestExpectedAlembicIsHead keeps expectedAlembic/alembicOrder in step with
 // the migrations in alembic/versions: forgetting to bump them makes a freshly
 // migrated DB look "ahead of the binary" in the health probe.
+//
+// Two chains exist: the legacy SQLite one (alembic/versions, frozen at the
+// baseline of the PostgreSQL one) and the PostgreSQL one (alembic/versions_pg).
+// expectedAlembic must be the PG head; the SQLite head may only lag behind it.
 func TestExpectedAlembicIsHead(t *testing.T) {
-	files, err := filepath.Glob("../../../alembic/versions/*.py")
+	checkAlembicChain(t, "../../../alembic/versions_pg/*.py", true)
+	checkAlembicChain(t, "../../../alembic/versions/*.py", false)
+}
+
+func checkAlembicChain(t *testing.T, glob string, mustBeExpected bool) {
+	t.Helper()
+	files, err := filepath.Glob(glob)
 	if err != nil || len(files) == 0 {
-		t.Skip("alembic/versions not found")
+		t.Skip(glob + " not found")
 	}
 	revRe := regexp.MustCompile(`(?m)^revision(?:: str)? = ["']([0-9a-f]+)["']`)
 	downRe := regexp.MustCompile(`(?m)^down_revision(?:: [^=]+)? = ["']([0-9a-f]+)["']`)
@@ -37,8 +47,8 @@ func TestExpectedAlembicIsHead(t *testing.T) {
 			heads = append(heads, r)
 		}
 	}
-	if len(heads) != 1 || heads[0] != expectedAlembic {
-		t.Fatalf("alembic heads = %v, expectedAlembic = %s", heads, expectedAlembic)
+	if len(heads) != 1 || (mustBeExpected && heads[0] != expectedAlembic) {
+		t.Fatalf("%s: alembic heads = %v, expectedAlembic = %s", glob, heads, expectedAlembic)
 	}
 	if alembicOrder[len(alembicOrder)-1] != expectedAlembic {
 		t.Fatalf("alembicOrder must end with expectedAlembic")

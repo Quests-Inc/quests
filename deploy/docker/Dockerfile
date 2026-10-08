@@ -29,6 +29,7 @@ package main
 import (
 	_ "github.com/gabriel-vasile/mimetype"
 	_ "github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/gorilla/websocket"
 	_ "github.com/klauspost/compress/zstd"
 	_ "github.com/pkg/sftp"
@@ -75,6 +76,13 @@ RUN uv sync --locked --no-dev
 
 # --- API runtime: Go server + SPA + Alembic migrate ---
 FROM python-base AS api
+# pg_dump for PostgreSQL backups: the client must be at least the server's major
+# version, which Debian's own package is not — take it from the PGDG repo.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-common \
+    && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+    && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && rm -rf /var/lib/apt/lists/*
 RUN uv sync --locked --no-dev --extra pdf
 COPY --from=go-build /out/quests-server /usr/local/bin/quests-server
 COPY --from=go-build /out/quests /usr/local/bin/quests
