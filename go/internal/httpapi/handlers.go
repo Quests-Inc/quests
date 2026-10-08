@@ -131,6 +131,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, detail string) {
+	// A store refusal (command on the server in an untrusted workspace) is a 403, wherever it surfaced.
+	if status >= 500 && strings.Contains(detail, store.ErrServerExec.Error()) {
+		status = http.StatusForbidden
+	}
 	writeJSON(w, status, map[string]string{"detail": detail})
 }
 

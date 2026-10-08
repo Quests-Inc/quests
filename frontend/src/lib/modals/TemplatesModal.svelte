@@ -37,6 +37,7 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
+  import { loadWorkspaceInfo, wsInfo } from '../js/workspaceInfo.svelte.js'
 
   /** `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
@@ -126,7 +127,10 @@
   let hasDeadline = $derived(!isSurprise && Boolean(deadlineHour))
   let hasPool = $derived(Boolean(emitPoolCommand.trim()))
   $effect(() => {
-    if (hasPool) void loadRunners()
+    if (hasPool) {
+      void loadRunners()
+      void loadWorkspaceInfo()
+    }
   })
 
   /** @param {string} text */
@@ -849,7 +853,11 @@
               </HelpTip>
             </span>
             <select bind:value={emitRunOn} aria-label="Устройство">
-              <option value="">на сервере</option>
+              {#if wsInfo.serverExec}
+                <option value="">на сервере</option>
+              {:else}
+                <option value="" disabled>выберите устройство</option>
+              {/if}
               {#each runnersList.items as r (r.label)}
                 <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
               {/each}

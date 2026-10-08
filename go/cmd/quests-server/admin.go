@@ -34,6 +34,8 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server workspace ls             list workspaces and their members
   quests-server workspace add <name> <user>   create a workspace owned by <user>
   quests-server workspace member <id> <user>  add <user> to workspace <id>
+  quests-server workspace trust|untrust <id>  allow/forbid running check and emit commands on the server
+                                         (host-only on purpose: never reachable from the web UI or API)
   quests-server token ls                 list active API tokens
   quests-server token rm <id>            revoke an API token
   quests-server runner add <label>       register a device that runs checks (prints a one-time registration token;
@@ -400,8 +402,16 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 		if err != nil {
 			fatal("%v", err)
 		}
+		all, err := wst.AllWorkspaces(ctx)
+		if err != nil {
+			fatal("%v", err)
+		}
+		allByID := map[int64]store.Workspace{}
+		for _, w := range all {
+			allByID[w.ID] = w
+		}
 		for _, id := range ids {
-			fmt.Printf("%d\t%s\tmembers: %s\n", id, seen[id].Name, strings.Join(members[id], ", "))
+			fmt.Printf("%d\t%s\t%s\tmembers: %s\n", id, seen[id].Name, trustLabel(allByID[id].Trusted), strings.Join(members[id], ", "))
 		}
 	case "add":
 		if len(args) < 3 {
@@ -413,6 +423,22 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			fatal("%v", err)
 		}
 		fmt.Printf("created workspace %q (id=%d) owned by %s\n", w.Name, w.ID, u.Username)
+	case "trust", "untrust":
+		if len(args) < 2 {
+			fatal("usage: quests-server workspace %s <id>", args[0])
+		}
+		id, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			fatal("workspace id must be a number")
+		}
+		if err := wst.SetWorkspaceTrusted(ctx, id, args[0] == "trust"); err != nil {
+			fatal("%v", err)
+		}
+		if args[0] == "trust" {
+			fmt.Printf("workspace %d is trusted: its checks and emit commands may run on this server\n", id)
+		} else {
+			fmt.Printf("workspace %d is untrusted: server-side commands are refused, runners only\n", id)
+		}
 	case "member":
 		if len(args) < 3 {
 			fatal("usage: quests-server workspace member <id> <user>")
@@ -429,4 +455,11 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 	default:
 		fatal("unknown workspace command %q", args[0])
 	}
+}
+
+func trustLabel(t bool) string {
+	if t {
+		return "trusted"
+	}
+	return "untrusted"
 }

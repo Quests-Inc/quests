@@ -828,6 +828,9 @@ func execEmitPoolCommand(parent context.Context, st *store.Store, templateID int
 	defer cancel()
 	started := time.Now()
 	info.Status = "error"
+	if !st.ServerExecAllowed(parent) {
+		return emitOutput{}, info, store.ErrServerExec
+	}
 	defer func() { info.Duration = time.Since(started) }()
 
 	var secrets map[string]string
@@ -860,7 +863,7 @@ func execEmitPoolCommand(parent context.Context, st *store.Store, templateID int
 	}
 
 	killTree(cmd)
-	cmd.Env = os.Environ()
+	cmd.Env = CommandEnv()
 	if ws := wsctx.From(ctx); ws > 0 {
 		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))
 	}

@@ -293,7 +293,10 @@ func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"current": cur, "workspaces": list, "enabled": s.Store.WorkspacesEnabled()})
+	writeJSON(w, http.StatusOK, map[string]any{"current": cur, "workspaces": list, "enabled": s.Store.WorkspacesEnabled(),
+		// Whether this workspace may run check/emit commands on the server (else: runners only).
+		"server_exec": s.Store.ServerExecAllowed(r.Context()),
+	})
 }
 
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {

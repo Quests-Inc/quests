@@ -167,6 +167,11 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 }
 
 func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step, once bool) {
+	// Server-side execution is the operator's privilege: untrusted workspaces
+	// only run checks on runners, whatever is stored (quest=348).
+	if st.RunOn == nil && !r.Store.ServerExecAllowed(ctx) {
+		return
+	}
 	if !r.tryLock(st.ID) {
 		return
 	}
@@ -221,7 +226,7 @@ func (r *CheckRunner) exec(parent context.Context, questID, stepID int64, comman
 		log.Printf("checks: secrets for step %d: %v", stepID, serr)
 	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
-	cmd.Env = append(os.Environ(), r.Env...)
+	cmd.Env = append(CommandEnv(), r.Env...)
 	if ws := wsctx.From(parent); ws > 0 {
 		// Commands that call the CLI back act in the workspace of their quest.
 		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))

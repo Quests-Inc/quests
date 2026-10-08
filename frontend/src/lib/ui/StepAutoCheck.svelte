@@ -3,6 +3,7 @@
   import OptionPills from './OptionPills.svelte'
   import { mirrorQuestId as findMirrorQuest } from '../js/steps.js'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
+  import { loadWorkspaceInfo, wsInfo } from '../js/workspaceInfo.svelte.js'
 
   /** A step's auto-check: command, poll interval, mode, pipeline gate.
    * The mode/gate controls only appear once there is a command to run.
@@ -28,12 +29,15 @@
 
   // Devices to pick from; a label that is not (or no longer) registered stays selectable so it is not lost silently.
   $effect(() => {
-    if (hasCommand) void loadRunners()
+    if (hasCommand) {
+      void loadRunners()
+      void loadWorkspaceInfo()
+    }
   })
   let missing = $derived(runOn && !runnersList.items.some((r) => r.label === runOn) ? runOn : '')
 
   /** First quest=N in the step's title/description, offered while no command is set. */
-  let mirrorQuestId = $derived(hasCommand ? null : findMirrorQuest(text))
+  let mirrorQuestId = $derived(hasCommand || !wsInfo.serverExec ? null : findMirrorQuest(text))
 
   function useMirrorCheck() {
     if (mirrorQuestId == null) return
@@ -78,7 +82,11 @@
         ждать предыдущий
       </label>
       <select class="autocheck__runon" title="Где запускать проверку" aria-label="Устройство" bind:value={runOn}>
-        <option value="">на сервере</option>
+        {#if wsInfo.serverExec}
+          <option value="">на сервере</option>
+        {:else}
+          <option value="" disabled>выберите устройство</option>
+        {/if}
         {#each runnersList.items as r (r.label)}
           <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
         {/each}
@@ -86,6 +94,13 @@
           <option value={missing}>{missing} (нет такого раннера)</option>
         {/if}
       </select>
+      {#if !wsInfo.serverExec}
+        <span class="autocheck__note">
+          {runnersList.items.length
+            ? 'Команды на сервере в этом пространстве запрещены — запускайте на своём устройстве.'
+            : 'Команды на сервере в этом пространстве запрещены. Подключите раннер во вкладке «Раннеры».'}
+        </span>
+      {/if}
       <HelpTip label="Как работает автопроверка">
         <p><b>Опрос</b> — команда запускается каждые N сек (по умолчанию 60), число из stdout становится прогрессом шага. Можно вывести и JSON: <code>{`{"progress": 2, "total": 5, "description": "…"}`}</code>, все поля необязательны; <code>total</code> меняет максимум шага.</p>
         <p><b>Дочерний квест как шаг:</b> <code>quest=N</code> в названии или описании шага, режим «наблюдение» и команда <code>quests progress N</code> (кнопка-подсказка поставит всё сама).</p>
@@ -118,6 +133,12 @@
   .autocheck__row .autocheck__interval {
     flex: 0 0 4.5rem;
     width: 4.5rem;
+  }
+
+  .autocheck__note {
+    flex-basis: 100%;
+    font-size: 0.78rem;
+    color: var(--color-fg-muted);
   }
 
   .autocheck__opts .autocheck__runon {
