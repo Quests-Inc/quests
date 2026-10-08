@@ -301,6 +301,8 @@
     if (e.key === 'Escape') {
       if (linking) cancelLink()
       else if (selectMode) toggleSelectMode()
+      // An open menu or dialog takes this Esc for itself.
+      else if (full && !ctx.open && !typing(e)) toggleFull()
       return
     }
     if (!active || e.altKey) return
@@ -325,6 +327,36 @@
     else return
     e.preventDefault()
   }
+
+  // Full screen: the field covers the window (CSS), and where the browser
+  // allows it the window itself goes full screen too, hiding its chrome.
+  // Leaving the browser's full screen (its own Esc) leaves ours as well.
+  let full = $state(false)
+  let nativeFull = false
+  function toggleFull() {
+    full = !full
+    if (full) {
+      const el = document.documentElement
+      if (!document.fullscreenElement && el.requestFullscreen) {
+        el.requestFullscreen().then(
+          () => (nativeFull = true),
+          () => {},
+        )
+      }
+    } else if (nativeFull) {
+      nativeFull = false
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    }
+  }
+  function onFullscreenChange() {
+    if (!document.fullscreenElement && nativeFull) {
+      nativeFull = false
+      full = false
+    }
+  }
+  $effect(() => {
+    if (!active && untrack(() => full)) toggleFull()
+  })
 
   /** Collapses bulky attachment lists into one cluster node. */
   function prepare(g, open_) {
@@ -872,14 +904,25 @@
   $effect(() => {
     const el = stageEl
     if (!el) return
-    const ro = new ResizeObserver(() => (stageSize = { w: el.clientWidth, h: el.clientHeight }))
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth
+      const h = el.clientHeight
+      // Keep the middle of the view in place when the field grows or shrinks
+      // (full screen, window resize); a hidden page (size 0) changes nothing.
+      const prev = untrack(() => stageSize)
+      if (prev.w && prev.h && w && h) {
+        const c = untrack(() => cam)
+        cam = { ...c, x: c.x + (w - prev.w) / 2, y: c.y + (h - prev.h) / 2 }
+      }
+      if (w && h) stageSize = { w, h }
+    })
     ro.observe(el)
     return () => ro.disconnect()
   })
   // Cards that need no body right now: well outside the window, or so small on
-  // screen (< 1% of the map area) that only the frame reads. They keep their box,
+  // screen (< 0.5% of the map area) that only the frame reads. They keep their box,
   // so nothing moves; the markdown inside is simply not built until it matters.
-  const LITE_AREA = 0.01
+  const LITE_AREA = 0.005
   let prevLite = new Set()
   let lite = $derived.by(() => {
     const next = new Set()
@@ -2035,6 +2078,7 @@
 <svelte:window
   onkeydown={onKey}
 />
+<svelte:document onfullscreenchange={onFullscreenChange} />
 
 <div class="graph">
   <div class="graph__tools">
@@ -2129,6 +2173,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="graph__stage"
+    class:graph__stage--full={full}
     bind:this={stageEl}
     onpointerdowncapture={onTouchDown}
     onpointerdown={onBgDown}
@@ -2469,6 +2514,17 @@
       <button
         type="button"
         class="gtool"
+        class:gtool--on={full}
+        aria-pressed={full}
+        title={full ? 'Выйти из полноэкранного режима (Esc)' : 'Полноэкранный режим'}
+        aria-label="Полноэкранный режим"
+        onclick={toggleFull}
+      >
+        <Icon name={full ? 'fullscreen-exit' : 'fullscreen'} size={16} />
+      </button>
+      <button
+        type="button"
+        class="gtool"
         disabled={!canClear}
         title="Очистить карту (Shift+Delete): центр, добавленные центры и скрытое. Журнал изменений остаётся"
         aria-label="Очистить карту"
@@ -2757,6 +2813,16 @@
     border-radius: var(--pill-radius, 12px);
     background: var(--pill-bg, #0f0f0f);
     overflow: hidden;
+  }
+
+  /* Above the journal chrome, below modals (50) and menus (80). */
+  .graph__stage--full {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
   }
 
   .graph__msg,

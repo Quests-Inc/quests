@@ -36,6 +36,8 @@
   import arrange from '../../assets/icons/arrange.svg?raw'
   import clearIcon from '../../assets/icons/clear.svg?raw'
   import fit from '../../assets/icons/fit.svg?raw'
+  import fullscreen from '../../assets/icons/fullscreen.svg?raw'
+  import fullscreenExit from '../../assets/icons/fullscreen-exit.svg?raw'
   import select from '../../assets/icons/select.svg?raw'
   import sidebar from '../../assets/icons/sidebar.svg?raw'
   import subtract from '../../assets/icons/subtract.svg?raw'
@@ -65,6 +67,8 @@
     'eye-off': eyeOff,
     'file-download': fileDownload,
     fit,
+    fullscreen,
+    'fullscreen-exit': fullscreenExit,
     filter,
     flag,
     folder,
