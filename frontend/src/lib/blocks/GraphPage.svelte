@@ -1096,6 +1096,54 @@
   // Pan / zoom / card drag. Dragging a card works from anywhere except its
   // scrollable text and links, so reading and scrolling are not hijacked.
   let drag = null
+  const MIN_K = 0.2
+  const MAX_K = 2.5
+  /** Zooms to `k` keeping the stage point (px, py) on the same world point. */
+  function zoomAt(k, px, py) {
+    k = Math.max(MIN_K, Math.min(MAX_K, k))
+    cam = { k, x: px - ((px - cam.x) / cam.k) * k, y: py - ((py - cam.y) / cam.k) * k }
+  }
+
+  // Touch pointers currently down on the stage; two of them make a pinch.
+  const touches = new Map()
+  /** Puts cards moved by an interrupted drag back where they started. */
+  function undoDrag() {
+    if (!drag?.moved) return
+    if (drag.kind === 'node') {
+      drag.n.x = drag.nx
+      drag.n.y = drag.ny
+    }
+    for (const s of drag.items ?? drag.members ?? []) {
+      s.m.x = s.x
+      s.m.y = s.y
+    }
+    view = view && { ...view }
+  }
+  function pinchStart() {
+    const [a, b] = [...touches.values()]
+    const r = stageEl?.getBoundingClientRect()
+    if (!r) return
+    drag = {
+      kind: 'pinch',
+      d: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+      // World point under the midpoint: it stays under the fingers' midpoint.
+      wx: ((a.x + b.x) / 2 - r.left - cam.x) / cam.k,
+      wy: ((a.y + b.y) / 2 - r.top - cam.y) / cam.k,
+      k: cam.k,
+    }
+  }
+  /** Capture phase, so a second finger on a card starts a pinch, not a card drag. */
+  function onTouchDown(e) {
+    if (e.pointerType !== 'touch') return
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (touches.size !== 2) return
+    e.stopPropagation()
+    e.preventDefault()
+    undoDrag()
+    marquee = null
+    pinchStart()
+    stageEl?.setPointerCapture(e.pointerId)
+  }
   function onBgDown(e) {
     if (e.target.closest('[data-gkey]')) return
     // Middle button always pans, also in selection mode.
@@ -1168,6 +1216,20 @@
     stageEl?.setPointerCapture(e.pointerId)
   }
   function onMove(e) {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (drag?.kind === 'pinch') {
+      if (touches.size < 2) return
+      const [a, b] = [...touches.values()]
+      const r = stageEl?.getBoundingClientRect()
+      if (!r) return
+      const k = Math.max(MIN_K, Math.min(MAX_K, (drag.k * Math.hypot(a.x - b.x, a.y - b.y)) / drag.d))
+      cam = {
+        k,
+        x: (a.x + b.x) / 2 - r.left - drag.wx * k,
+        y: (a.y + b.y) / 2 - r.top - drag.wy * k,
+      }
+      return
+    }
     if (linking) linkCursor = worldAt(e)
     if (!drag) return
     if (drag.kind === 'marquee') {
@@ -1205,7 +1267,14 @@
       view = view && { ...view }
     }
   }
-  function onUp() {
+  function onUp(e) {
+    touches.delete(e.pointerId)
+    if (drag?.kind === 'pinch') {
+      // Lifting one finger keeps panning with the other one.
+      const rest = [...touches.values()][0]
+      drag = rest ? { kind: 'pan', x: rest.x, y: rest.y, cx: cam.x, cy: cam.y } : null
+      return
+    }
     if (drag?.kind === 'marquee' && marquee) {
       const m = marquee
       marquee = null
@@ -1249,10 +1318,13 @@
     e.preventDefault()
     const r = stageEl?.getBoundingClientRect()
     if (!r) return
-    const k = Math.max(0.2, Math.min(2.5, cam.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)))
-    const px = e.clientX - r.left
-    const py = e.clientY - r.top
-    cam = { k, x: px - ((px - cam.x) / cam.k) * k, y: py - ((py - cam.y) / cam.k) * k }
+    // A touchpad pinch arrives as ctrl+wheel with small, frequent deltas:
+    // follow them proportionally instead of a fixed step per event (capped,
+    // so a ctrl+mouse-wheel notch is no bigger than a plain one).
+    const f = e.ctrlKey
+      ? Math.exp(-Math.max(-11, Math.min(11, e.deltaY)) * 0.01)
+      : e.deltaY < 0 ? 1.12 : 1 / 1.12
+    zoomAt(cam.k * f, e.clientX - r.left, e.clientY - r.top)
   }
 
   /** Folds an expanded attachment group back into its cluster node. */
@@ -2058,6 +2130,7 @@
   <div
     class="graph__stage"
     bind:this={stageEl}
+    onpointerdowncapture={onTouchDown}
     onpointerdown={onBgDown}
     onpointermove={onMove}
     onpointerup={onUp}
