@@ -42,7 +42,7 @@
    "gridPos": {
     "x": 0,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
@@ -86,7 +86,8 @@
         }
        }
       }
-     ]
+     ],
+     "noValue": "нет данных"
     },
     "overrides": []
    },
@@ -104,15 +105,228 @@
   {
    "id": 3,
    "type": "stat",
+   "title": "Проба: API напрямую",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 3,
+    "y": 1,
+    "w": 3,
+    "h": 4
+   },
+   "targets": [
+    {
+     "expr": "probe_success{probe=\"api\"}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "DOWN",
+         "color": "red"
+        },
+        "1": {
+         "text": "UP",
+         "color": "green"
+        }
+       }
+      }
+     ],
+     "noValue": "нет данных"
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Проба: nginx :8080",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 1,
+    "w": 3,
+    "h": 4
+   },
+   "targets": [
+    {
+     "expr": "probe_success{probe=\"nginx\"}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "DOWN",
+         "color": "red"
+        },
+        "1": {
+         "text": "UP",
+         "color": "green"
+        }
+       }
+      }
+     ],
+     "noValue": "нет данных"
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Проба: публичный адрес",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 9,
+    "y": 1,
+    "w": 3,
+    "h": 4
+   },
+   "targets": [
+    {
+     "expr": "probe_success{probe=\"public\"}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "DOWN",
+         "color": "red"
+        },
+        "1": {
+         "text": "UP",
+         "color": "green"
+        }
+       }
+      }
+     ],
+     "noValue": "нет данных"
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
    "title": "Postgres (exporter)",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 4,
+    "x": 12,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
@@ -156,7 +370,8 @@
         }
        }
       }
-     ]
+     ],
+     "noValue": "нет данных"
     },
     "overrides": []
    },
@@ -172,63 +387,7 @@
    }
   },
   {
-   "id": 4,
-   "type": "stat",
-   "title": "Проб компонентов не ок",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "gridPos": {
-    "x": 8,
-    "y": 1,
-    "w": 4,
-    "h": 4
-   },
-   "targets": [
-    {
-     "expr": "count(quests_component_up{component=~\"db|webdav|clamav|backup\"} == 0) or vector(0)",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "prometheus"
-     },
-     "instant": true
-    }
-   ],
-   "fieldConfig": {
-    "defaults": {
-     "unit": "short",
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       }
-      ]
-     },
-     "mappings": []
-    },
-    "overrides": []
-   },
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ]
-    },
-    "colorMode": "background",
-    "graphMode": "none",
-    "textMode": "auto"
-   }
-  },
-  {
-   "id": 5,
+   "id": 7,
    "type": "stat",
    "title": "Возраст бэкапа",
    "datasource": {
@@ -236,14 +395,14 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 12,
+    "x": 15,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
     {
-     "expr": "time() - quests_backup_last_success_timestamp_seconds",
+     "expr": "time() - last_over_time(quests_backup_last_success_timestamp_seconds[1d])",
      "refId": "A",
      "datasource": {
       "type": "prometheus",
@@ -272,7 +431,8 @@
        }
       ]
      },
-     "mappings": []
+     "mappings": [],
+     "noValue": "нет данных"
     },
     "overrides": []
    },
@@ -288,7 +448,7 @@
    }
   },
   {
-   "id": 6,
+   "id": 8,
    "type": "stat",
    "title": "Диск / свободно",
    "datasource": {
@@ -296,9 +456,9 @@
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 16,
+    "x": 18,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
@@ -333,6 +493,7 @@
       ]
      },
      "mappings": [],
+     "noValue": "нет данных",
      "decimals": 0
     },
     "overrides": []
@@ -349,22 +510,22 @@
    }
   },
   {
-   "id": 7,
+   "id": 9,
    "type": "stat",
-   "title": "5xx за час",
+   "title": "5xx приложения за час",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
    },
    "gridPos": {
-    "x": 20,
+    "x": 21,
     "y": 1,
-    "w": 4,
+    "w": 3,
     "h": 4
    },
    "targets": [
     {
-     "expr": "sum(increase(quests_http_requests_total{code=~\"5..\"}[1h])) or vector(0)",
+     "expr": "sum(increase(quests_http_requests_total{code=~\"5..\"}[1h]))",
      "refId": "A",
      "datasource": {
       "type": "prometheus",
@@ -393,7 +554,8 @@
        }
       ]
      },
-     "mappings": []
+     "mappings": [],
+     "noValue": "нет данных"
     },
     "overrides": []
    },
@@ -409,19 +571,116 @@
    }
   },
   {
-   "id": 8,
+   "id": 10,
+   "type": "timeseries",
+   "title": "Проба: доступно (1) / недоступно (0)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "expr": "probe_success",
+     "legendFormat": "{{probe}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "max": 1.1,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "lineInterpolation": "stepAfter"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 11,
+   "type": "timeseries",
+   "title": "Проба: HTTP-код ответа (502 при падении API, 0 = нет ответа)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "expr": "probe_http_status_code",
+     "legendFormat": "{{probe}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "lineInterpolation": "stepAfter"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 12,
    "type": "row",
    "title": "HTTP API",
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 5,
+    "y": 14,
     "w": 24,
     "h": 1
    }
   },
   {
-   "id": 9,
+   "id": 13,
    "type": "timeseries",
    "title": "Запросов в секунду по кодам",
    "datasource": {
@@ -430,7 +689,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 6,
+    "y": 15,
     "w": 8,
     "h": 8
    },
@@ -470,7 +729,7 @@
    }
   },
   {
-   "id": 10,
+   "id": 14,
    "type": "timeseries",
    "title": "Задержка (p50 / p95 / p99)",
    "datasource": {
@@ -479,7 +738,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 6,
+    "y": 15,
     "w": 8,
     "h": 8
    },
@@ -537,16 +796,16 @@
    }
   },
   {
-   "id": 11,
+   "id": 15,
    "type": "timeseries",
-   "title": "Доля ошибок 5xx",
+   "title": "Доля ошибок 5xx (только пока API жив)",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
    },
    "gridPos": {
     "x": 16,
-    "y": 6,
+    "y": 15,
     "w": 8,
     "h": 8
    },
@@ -588,7 +847,7 @@
    }
   },
   {
-   "id": 12,
+   "id": 16,
    "type": "timeseries",
    "title": "Самые медленные маршруты (p95)",
    "datasource": {
@@ -597,7 +856,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 14,
+    "y": 23,
     "w": 12,
     "h": 8
    },
@@ -637,7 +896,7 @@
    }
   },
   {
-   "id": 13,
+   "id": 17,
    "type": "timeseries",
    "title": "WebSocket-клиенты и запросы в обработке",
    "datasource": {
@@ -646,7 +905,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 14,
+    "y": 23,
     "w": 12,
     "h": 8
    },
@@ -695,19 +954,19 @@
    }
   },
   {
-   "id": 14,
+   "id": 18,
    "type": "row",
    "title": "Данные приложения",
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 22,
+    "y": 31,
     "w": 24,
     "h": 1
    }
   },
   {
-   "id": 15,
+   "id": 19,
    "type": "timeseries",
    "title": "Квесты по статусам",
    "datasource": {
@@ -716,7 +975,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 23,
+    "y": 32,
     "w": 8,
     "h": 8
    },
@@ -756,7 +1015,7 @@
    }
   },
   {
-   "id": 16,
+   "id": 20,
    "type": "timeseries",
    "title": "Задачи раннеров по состояниям",
    "datasource": {
@@ -765,7 +1024,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 23,
+    "y": 32,
     "w": 8,
     "h": 8
    },
@@ -805,7 +1064,7 @@
    }
   },
   {
-   "id": 17,
+   "id": 21,
    "type": "timeseries",
    "title": "Вложения (байты) и заметки",
    "datasource": {
@@ -814,7 +1073,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 23,
+    "y": 32,
     "w": 8,
     "h": 8
    },
@@ -854,19 +1113,19 @@
    }
   },
   {
-   "id": 18,
+   "id": 22,
    "type": "row",
    "title": "Процесс и база",
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 31,
+    "y": 40,
     "w": 24,
     "h": 1
    }
   },
   {
-   "id": 19,
+   "id": 23,
    "type": "timeseries",
    "title": "Память и горутины API",
    "datasource": {
@@ -875,7 +1134,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 32,
+    "y": 41,
     "w": 8,
     "h": 8
    },
@@ -924,7 +1183,7 @@
    }
   },
   {
-   "id": 20,
+   "id": 24,
    "type": "timeseries",
    "title": "Пул соединений БД",
    "datasource": {
@@ -933,7 +1192,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 32,
+    "y": 41,
     "w": 8,
     "h": 8
    },
@@ -991,7 +1250,7 @@
    }
   },
   {
-   "id": 21,
+   "id": 25,
    "type": "timeseries",
    "title": "Postgres: размер БД и соединения",
    "datasource": {
@@ -1000,7 +1259,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 32,
+    "y": 41,
     "w": 8,
     "h": 8
    },
@@ -1049,19 +1308,19 @@
    }
   },
   {
-   "id": 22,
+   "id": 26,
    "type": "row",
    "title": "Хост",
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 40,
+    "y": 49,
     "w": 24,
     "h": 1
    }
   },
   {
-   "id": 23,
+   "id": 27,
    "type": "timeseries",
    "title": "CPU, %",
    "datasource": {
@@ -1070,7 +1329,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 41,
+    "y": 50,
     "w": 8,
     "h": 8
    },
@@ -1112,7 +1371,7 @@
    }
   },
   {
-   "id": 24,
+   "id": 28,
    "type": "timeseries",
    "title": "Память, %",
    "datasource": {
@@ -1121,7 +1380,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 41,
+    "y": 50,
     "w": 8,
     "h": 8
    },
@@ -1163,7 +1422,7 @@
    }
   },
   {
-   "id": 25,
+   "id": 29,
    "type": "timeseries",
    "title": "Диск /: свободно, байт",
    "datasource": {
@@ -1172,7 +1431,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 41,
+    "y": 50,
     "w": 8,
     "h": 8
    },

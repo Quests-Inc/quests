@@ -12,6 +12,28 @@ scrape_configs:
     static_configs:
       - targets: ["api:8765"]
 
+  # External view: the API directly, the nginx front door, and the public address through the gateway.
+  # An app can only count the errors it served; when it is down (a deploy, a crash) it counts nothing,
+  # while these probes keep seeing 502 / timeouts.
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ["http://api:8765/api/ping"]
+        labels: {probe: api}
+      - targets: ["http://frontend/api/ping"]
+        labels: {probe: nginx}
+      - targets: ["https://quests.84-38-180-123.sslip.io/api/ping"]
+        labels: {probe: public}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
   - job_name: node
     static_configs:
       - targets: ["node-exporter:9100"]

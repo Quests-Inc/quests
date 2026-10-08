@@ -45,6 +45,14 @@ services:
       - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
 
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: quests-blackbox
+    restart: unless-stopped
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ../monitoring/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+
   node-exporter:
     image: prom/node-exporter:v1.8.2
     container_name: quests-node-exporter
