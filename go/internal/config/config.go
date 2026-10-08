@@ -12,9 +12,12 @@ type Config struct {
 	Root    string
 	DataDir string
 	DBPath  string
-	Host    string
-	Port    int
-	CORS    []string
+	// DatabaseURL (QUESTS_DATABASE_URL, postgres://…) switches from the SQLite
+	// file at DBPath to PostgreSQL.
+	DatabaseURL string
+	Host        string
+	Port        int
+	CORS        []string
 	// AuthMode is "auto" (enforce as soon as an account exists), "on" or "off".
 	AuthMode string
 	// SecureCookies marks the session cookie Secure. Enable behind HTTPS.
@@ -123,6 +126,7 @@ func Load() Config {
 		Root:             root,
 		DataDir:          data,
 		DBPath:           filepath.Join(data, "quests.db"),
+		DatabaseURL:      strings.TrimSpace(os.Getenv("QUESTS_DATABASE_URL")),
 		Host:             host,
 		Port:             port,
 		CORS:             cors,

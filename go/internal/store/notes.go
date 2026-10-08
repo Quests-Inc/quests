@@ -453,23 +453,25 @@ func (s *Store) ListLinkCorpus(ctx context.Context) ([]LinkDoc, error) {
 		defer rows.Close()
 		for rows.Next() {
 			var d LinkDoc
-			if err := rows.Scan(&d.Kind, &d.ID, &d.Title, &d.Body); err != nil {
+			var desc string
+			if err := rows.Scan(&d.Kind, &d.ID, &d.Title, &desc); err != nil {
 				return err
 			}
+			d.Body = d.Title + "\n" + desc
 			out = append(out, d)
 		}
 		return rows.Err()
 	}
-	if err := add(`SELECT 'note', id, title, title || char(10) || description FROM note`); err != nil {
+	if err := add(`SELECT 'note', id, title, description FROM note`); err != nil {
 		return nil, err
 	}
-	if err := add(`SELECT 'quest', id, title, title || char(10) || description FROM quest`); err != nil {
+	if err := add(`SELECT 'quest', id, title, description FROM quest`); err != nil {
 		return nil, err
 	}
-	if err := add(`SELECT 'questline', id, title, title || char(10) || description FROM questline`); err != nil {
+	if err := add(`SELECT 'questline', id, title, description FROM questline`); err != nil {
 		return nil, err
 	}
-	if err := add(`SELECT 'step', id, title, title || char(10) || description FROM queststep`); err != nil {
+	if err := add(`SELECT 'step', id, title, description FROM queststep`); err != nil {
 		return nil, err
 	}
 	return out, nil

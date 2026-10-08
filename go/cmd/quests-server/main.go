@@ -29,7 +29,7 @@ func main() {
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
 
-	sqlDB, schema, err := db.Open(cfg.DBPath)
+	sqlDB, schema, err := db.OpenConfigured(cfg.DBPath, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("db: %v", err)
 	}

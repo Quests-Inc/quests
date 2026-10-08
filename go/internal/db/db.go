@@ -66,6 +66,14 @@ type SchemaStatus struct {
 	Detail   string
 }
 
+// OpenConfigured opens PostgreSQL when databaseURL is set, else the SQLite file.
+func OpenConfigured(path, databaseURL string) (*sql.DB, SchemaStatus, error) {
+	if databaseURL != "" {
+		return OpenPostgres(databaseURL)
+	}
+	return Open(path)
+}
+
 func Open(path string) (*sql.DB, SchemaStatus, error) {
 	var zero SchemaStatus
 	if err := os.MkdirAll(dirOf(path), 0o755); err != nil {

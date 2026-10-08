@@ -8,6 +8,7 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "aiosqlite>=0.20",
     "alembic>=1.18.5",
+    "psycopg[binary]>=3.2",
     "python-dotenv>=1.2.2",
 ]
 

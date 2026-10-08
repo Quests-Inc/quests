@@ -6,7 +6,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
-from quests.config import DATABASE_URL_SYNC, DATA_DIR, DB_PATH, ROOT
+from quests.config import DATABASE_URL_SYNC, DATA_DIR, DB_PATH, IS_POSTGRES, ROOT
 
 ALEMBIC_INI = ROOT / "alembic.ini"
 
@@ -16,6 +16,9 @@ def alembic_config() -> Config:
     cfg = Config(str(ALEMBIC_INI))
     cfg.set_main_option("sqlalchemy.url", DATABASE_URL_SYNC)
     cfg.set_main_option("script_location", str(ROOT / "alembic"))
+    # PostgreSQL has its own chain: a baseline of the SQLite one, then PG-only revisions.
+    versions = "versions_pg" if IS_POSTGRES else "versions"
+    cfg.set_main_option("version_locations", str(ROOT / "alembic" / versions))
     return cfg
 
 
@@ -27,7 +30,7 @@ def _sync_engine():
 
 
 def _has_table(name: str) -> bool:
-    if not DB_PATH.exists():
+    if not IS_POSTGRES and not DB_PATH.exists():
         return False
     engine = _sync_engine()
     try:

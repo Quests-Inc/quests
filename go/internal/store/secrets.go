@@ -283,13 +283,14 @@ func (s *Store) ResolveTemplateSecrets(ctx context.Context, templateID int64) (m
 // have an auto-check. Called inside DeleteTemplate's transaction.
 func copyTemplateSecretsToLiveQuests(ctx context.Context, tx *sql.Tx, templateID int64) error {
 	_, err := tx.ExecContext(ctx, `
-		INSERT OR IGNORE INTO secret (quest_id, key, value, created_at, updated_at)
+		INSERT INTO secret (quest_id, key, value, created_at, updated_at)
 		SELECT q.id, s.key, s.value, s.created_at, s.updated_at
 		FROM quest q JOIN secret s ON s.template_id = ?
 		WHERE q.template_id = ? AND q.status IN ('active', 'frozen', 'expired')
 		  AND EXISTS (
 		    SELECT 1 FROM queststep st
-		    WHERE st.quest_id = q.id AND st.check_command IS NOT NULL AND TRIM(st.check_command) != '')`,
+		    WHERE st.quest_id = q.id AND st.check_command IS NOT NULL AND TRIM(st.check_command) != '')
+		ON CONFLICT DO NOTHING`,
 		templateID, templateID)
 	return err
 }

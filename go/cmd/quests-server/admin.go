@@ -56,7 +56,7 @@ func runAdmin(args []string) bool {
 
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
-	sqlDB, _, err := db.Open(cfg.DBPath)
+	sqlDB, _, err := db.OpenConfigured(cfg.DBPath, cfg.DatabaseURL)
 	if err != nil {
 		fatal("db: %v", err)
 	}
