@@ -85,6 +85,9 @@ services:
   # this by compose service name — reaches it via 127.0.0.1, same as api.
   # Loopback-only publish: nothing outside this host has business calling it.
   stt:
+    # Optional personal-client stack (profile "bot"): not part of the multi-user platform, see docs/telegram-bot.md.
+    # Enable with COMPOSE_PROFILES=bot in .env (the prod host has it).
+    profiles: ["bot"]
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
@@ -114,6 +117,7 @@ services:
 
   # host network: proxy on 127.0.0.1:12334 is reachable (bridge → host.docker.internal is not)
   bot:
+    profiles: ["bot"]
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
