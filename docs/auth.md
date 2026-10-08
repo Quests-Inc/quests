@@ -96,3 +96,9 @@ QUESTS_API_TOKEN=<секрет>
 
 При `QUESTS_SECURE_COOKIES=1` кука помечается `Secure` и по обычному http
 браузер её отбросит — включать только вместе с реальным TLS.
+
+## Workspaces
+
+On PostgreSQL an account can belong to several isolated workspaces (see `docs/postgres.md`).
+A browser session works in one at a time (Settings → Пространства); an API token is pinned to the
+workspace it was minted for: `quests-server token add <name> [user] --workspace <id>`.

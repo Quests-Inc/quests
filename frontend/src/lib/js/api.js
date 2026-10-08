@@ -478,6 +478,20 @@ export function logout() {
   return request('/api/auth/logout', { method: 'POST' })
 }
 
+// --- workspaces (isolated data spaces of one account) ---
+
+export function fetchWorkspaces() {
+  return request('/api/workspaces')
+}
+
+export function createWorkspace(name) {
+  return request('/api/workspaces', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+export function switchWorkspace(id) {
+  return request(`/api/workspaces/${id}/switch`, { method: 'POST' })
+}
+
 // --- attachments (bytes live on WebDAV; we only ever talk to the API proxy) ---
 
 function ownerAttachmentsPath(ownerType, ownerId, attachmentId) {

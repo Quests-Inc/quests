@@ -4,6 +4,7 @@
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import { hotkeyGroups } from '../js/hotkeys.js'
+  import { fetchWorkspaces, createWorkspace, switchWorkspace } from '../js/api.js'
 
   /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
   let {
@@ -30,6 +31,53 @@
       queueMicrotask(() => hotkeysEl?.scrollIntoView({ block: 'start' }))
     }
   })
+
+  /** Workspaces of the signed-in account; switching reloads the app into the other space. */
+  let wsList = $state(/** @type {{ id: number, name: string }[]} */ ([]))
+  let wsCurrent = $state(0)
+  let wsEnabled = $state(false)
+  let wsNewName = $state('')
+  let wsBusy = $state(false)
+  let wsError = $state('')
+
+  $effect(() => {
+    if (!open || !onLogout) return
+    fetchWorkspaces()
+      .then((r) => {
+        wsEnabled = !!r?.enabled
+        wsList = r?.workspaces ?? []
+        wsCurrent = r?.current ?? 0
+      })
+      .catch(() => (wsEnabled = false))
+  })
+
+  async function pickWorkspace(id) {
+    if (wsBusy || id === wsCurrent) return
+    wsBusy = true
+    wsError = ''
+    try {
+      await switchWorkspace(id)
+      location.reload()
+    } catch (e) {
+      wsError = e?.message || 'не удалось переключить'
+      wsBusy = false
+    }
+  }
+
+  async function addWorkspace() {
+    const name = wsNewName.trim()
+    if (!name || wsBusy) return
+    wsBusy = true
+    wsError = ''
+    try {
+      const w = await createWorkspace(name)
+      await switchWorkspace(w.id)
+      location.reload()
+    } catch (e) {
+      wsError = e?.message || 'не удалось создать'
+      wsBusy = false
+    }
+  }
 
   function selectTheme(id) {
     themeId = applyTheme(id)
@@ -176,6 +224,47 @@
           {/each}
         </section>
 
+        {#if onLogout && wsEnabled}
+          <section class="block">
+            <h3 class="block__title">Пространства</h3>
+            <p class="block__hint">
+              Отдельные наборы квестов, заметок и шаблонов: данные не пересекаются.
+            </p>
+            <ul class="ws">
+              {#each wsList as w (w.id)}
+                <li>
+                  <button
+                    type="button"
+                    class="ws__item"
+                    class:ws__item--on={w.id === wsCurrent}
+                    disabled={wsBusy}
+                    onclick={() => pickWorkspace(w.id)}
+                  >
+                    {w.name}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            <form
+              class="ws__new"
+              onsubmit={(e) => {
+                e.preventDefault()
+                addWorkspace()
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Новое пространство"
+                maxlength="80"
+                bind:value={wsNewName}
+                disabled={wsBusy}
+              />
+              <button type="submit" disabled={wsBusy || !wsNewName.trim()}>Создать</button>
+            </form>
+            {#if wsError}<p class="ws__err">{wsError}</p>{/if}
+          </section>
+        {/if}
+
         {#if onLogout}
           <section class="block">
             <h3 class="block__title">Аккаунт</h3>
@@ -226,6 +315,47 @@
   .keys__label {
     font-size: 0.85rem;
     color: var(--color-fg);
+  }
+
+  .ws {
+    list-style: none;
+    margin: 0 0 var(--space-3, 0.75rem);
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .ws__item {
+    padding: 6px 12px;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--color-fg);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .ws__item--on {
+    border-color: var(--color-accent, var(--color-fg));
+    cursor: default;
+  }
+
+  .ws__new {
+    display: flex;
+    gap: 8px;
+  }
+
+  .ws__new input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ws__err {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    color: var(--color-danger);
   }
 
   .account {

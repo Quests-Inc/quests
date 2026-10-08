@@ -21,6 +21,7 @@ import (
 	"github.com/valirum/quests/go/internal/schedule"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 const adminUsage = `quests-server admin commands (run on the host holding quests.db):
@@ -35,7 +36,8 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server workspace member <id> <user>  add <user> to workspace <id>
   quests-server token ls                 list active API tokens
   quests-server token rm <id>            revoke an API token
-  quests-server runner add <label>       register a device that runs checks (prints a one-time registration token)
+  quests-server runner add <label>       register a device that runs checks (prints a one-time registration token;
+                                         PostgreSQL: in workspace $QUESTS_WORKSPACE, default 1)
   quests-server runner ls                list runners and when they were last seen
   quests-server runner rm <label>        revoke a runner and cancel its queued jobs
   quests-server backup-now               run one DB+attachments backup tick now
@@ -286,6 +288,18 @@ func fatal(format string, a ...any) {
 
 func runRunnerCmd(st *store.Store, args []string) {
 	ctx := context.Background()
+	if st.WorkspacesEnabled() {
+		// Runners belong to a workspace: QUESTS_WORKSPACE picks it (default 1).
+		ws := int64(store.DefaultWorkspaceID)
+		if raw := strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE")); raw != "" {
+			n, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || n <= 0 {
+				fatal("QUESTS_WORKSPACE must be a workspace id")
+			}
+			ws = n
+		}
+		ctx = wsctx.With(ctx, ws)
+	}
 	if len(args) == 0 {
 		fatal("usage: quests-server runner add|ls|rm")
 	}
