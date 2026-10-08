@@ -22,7 +22,9 @@ curl -sS http://SERVER:8765/api/auth/state
 # {"auth_required":true,...}  →  нужен токен для HUD
 ```
 
-## 1. Bearer-токен на сервере
+## 1. Bearer-токен
+
+**Из интерфейса (проще всего):** Настройки → Подключения → создать токен «HUD» — см. [connecting-clients.md](connecting-clients.md). Ниже — то же с хоста сервера.
 
 **Docker (compose `quests-api`):**
 
