@@ -20,8 +20,13 @@ type Payload map[string]any
 // (gorilla allows one concurrent writer).
 type Client struct {
 	Conn *websocket.Conn
-	mu   sync.Mutex
+	// Workspace is the workspace this peer listens to (0 = all, i.e. no workspaces).
+	Workspace int64
+	mu        sync.Mutex
 }
+
+// visible reports whether an event of workspace ws (0 = system-wide) is for this peer.
+func (c *Client) visible(ws int64) bool { return ws == 0 || c.Workspace == 0 || c.Workspace == ws }
 
 func (c *Client) WriteJSON(v any) error {
 	c.mu.Lock()
@@ -50,6 +55,7 @@ type Hub struct {
 	recent         []Payload
 	pendingFocus   *int64
 	pendingFocusAt time.Time
+	pendingFocusWS int64
 }
 
 func New() *Hub {
@@ -59,13 +65,13 @@ func New() *Hub {
 	}
 }
 
-func (h *Hub) AddClient(conn *websocket.Conn) (*Client, Payload) {
-	c := &Client{Conn: conn}
+func (h *Hub) AddClient(conn *websocket.Conn, ws int64) (*Client, Payload) {
+	c := &Client{Conn: conn, Workspace: ws}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[c] = struct{}{}
 	hello := Payload{"type": "hello", "revision": h.Revision}
-	if focus := h.focusIfFreshLocked(); focus != nil {
+	if focus := h.focusIfFreshLocked(ws); focus != nil {
 		hello["pending_focus"] = *focus
 	}
 	return c, hello
@@ -86,8 +92,8 @@ func (h *Hub) RemoveClient(c *Client) {
 	}
 }
 
-func (h *Hub) focusIfFreshLocked() *int64 {
-	if h.pendingFocus == nil {
+func (h *Hub) focusIfFreshLocked(ws int64) *int64 {
+	if h.pendingFocus == nil || (ws != 0 && h.pendingFocusWS != 0 && ws != h.pendingFocusWS) {
 		return nil
 	}
 	if time.Since(h.pendingFocusAt) > FocusTTL {
@@ -96,17 +102,18 @@ func (h *Hub) focusIfFreshLocked() *int64 {
 	return h.pendingFocus
 }
 
-func (h *Hub) PeekPendingFocus() *int64 {
+func (h *Hub) PeekPendingFocus(ws int64) *int64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.focusIfFreshLocked()
+	return h.focusIfFreshLocked(ws)
 }
 
-func (h *Hub) SetPendingFocus(questID int64) {
+func (h *Hub) SetPendingFocus(questID, ws int64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pendingFocus = &questID
 	h.pendingFocusAt = time.Now()
+	h.pendingFocusWS = ws
 }
 
 func (h *Hub) GetRevision() int {
@@ -115,13 +122,15 @@ func (h *Hub) GetRevision() int {
 	return h.Revision
 }
 
-func (h *Hub) EventsSince(since int) []Payload {
+// EventsSince returns recent events newer than revision since that are visible
+// from workspace ws (0 = all).
+func (h *Hub) EventsSince(since int, ws int64) []Payload {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	out := make([]Payload, 0)
 	for _, e := range h.recent {
 		rev := asInt(e["revision"])
-		if rev > since {
+		if rev > since && (ws == 0 || int64(asInt(e["workspace"])) == 0 || int64(asInt(e["workspace"])) == ws) {
 			out = append(out, e)
 		}
 	}
@@ -152,10 +161,13 @@ func (h *Hub) clientSnapshot() []*Client {
 }
 
 // send writes outside h.mu so a slow socket cannot stall Publish / HTTP.
-func (h *Hub) send(raw []byte) int {
+func (h *Hub) send(raw []byte, ws int64) int {
 	clients := h.clientSnapshot()
 	delivered := 0
 	for _, c := range clients {
+		if !c.visible(ws) {
+			continue
+		}
 		if err := c.WriteRaw(websocket.TextMessage, raw); err != nil {
 			h.RemoveClient(c)
 			continue
@@ -165,17 +177,17 @@ func (h *Hub) send(raw []byte) int {
 	return delivered
 }
 
-func (h *Hub) Broadcast(payload Payload) int {
+func (h *Hub) Broadcast(payload Payload, ws int64) int {
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return 0
 	}
-	return h.send(raw)
+	return h.send(raw, ws)
 }
 
-func (h *Hub) FocusQuest(questID int64) int {
-	h.SetPendingFocus(questID)
-	return h.Broadcast(Payload{"type": "ui_focus_quest", "quest_id": questID})
+func (h *Hub) FocusQuest(questID, ws int64) int {
+	h.SetPendingFocus(questID, ws)
+	return h.Broadcast(Payload{"type": "ui_focus_quest", "quest_id": questID}, ws)
 }
 
 func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
@@ -211,6 +223,9 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 	if opts.Automated {
 		payload["automated"] = true
 	}
+	if opts.Workspace > 0 {
+		payload["workspace"] = opts.Workspace
+	}
 	for k, v := range opts.Extra {
 		payload[k] = v
 	}
@@ -220,7 +235,7 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 	}
 	raw, _ := json.Marshal(payload)
 	h.mu.Unlock()
-	h.send(raw)
+	h.send(raw, opts.Workspace)
 	// Fire-and-forget user hooks (script/webhook/socket).
 	go func(p Payload) {
 		ev := map[string]any{}
@@ -233,6 +248,8 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 }
 
 type PublishOpts struct {
+	// Workspace routes the event to that workspace's peers (0 = everyone).
+	Workspace    int64
 	QuestID      *int64
 	Title        string
 	Detail       string

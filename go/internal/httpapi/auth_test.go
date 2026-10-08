@@ -349,7 +349,7 @@ func TestBearerToken_AuthenticatesAndBypassesOriginCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret, err := authStore.CreateAPIToken(u.ID, "cli")
+	secret, err := authStore.CreateAPIToken(u.ID, "cli", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestBearerToken_RevokedTokenRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret, err := authStore.CreateAPIToken(u.ID, "cli")
+	secret, err := authStore.CreateAPIToken(u.ID, "cli", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

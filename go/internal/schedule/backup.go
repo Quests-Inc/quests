@@ -94,7 +94,7 @@ func RunBackupOnce(ctx context.Context, st *store.Store, wd *webdav.Client, data
 		var paths []string
 		var archErr error
 		if st.PGURL != "" {
-			paths, archErr = listWebDAVPaths(st.DB)
+			paths, archErr = listAllWebDAVPaths(ctx, st)
 		} else {
 			paths, archErr = listSnapshotWebDAVPaths(localPath)
 		}

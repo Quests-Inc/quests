@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"errors"
+	"github.com/valirum/quests/go/internal/db"
 	"strings"
 	"time"
 
@@ -19,12 +20,75 @@ var (
 	ErrWeakPassword = errors.New("password must be at least 8 characters")
 )
 
-type Store struct{ DB *sql.DB }
+type Store struct {
+	DB *sql.DB
+	// Workspaces enables workspace resolution (PostgreSQL with the workspaces
+	// migration). Off, every caller is in workspace 1 and no workspace table is read.
+	Workspaces bool
+}
 
 type User struct {
 	ID       int64
 	Username string
 	IsActive bool
+	// WorkspaceID is the workspace this session / token works in (see resolveWorkspace).
+	WorkspaceID int64
+}
+
+// DefaultWorkspaceID is where everything lived before workspaces existed.
+const DefaultWorkspaceID = 1
+
+var ErrNotMember = errors.New("not a member of that workspace")
+
+// resolveWorkspace picks the workspace for a session/token: the one it is
+// pinned to if the user is still a member, else the user's first membership.
+func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64) (int64, error) {
+	if !s.Workspaces {
+		return DefaultWorkspaceID, nil
+	}
+	if pinned.Valid {
+		ok, err := s.IsMember(userID, pinned.Int64)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			return pinned.Int64, nil
+		}
+	}
+	var id int64
+	err := s.DB.QueryRow(`SELECT workspace_id FROM workspace_member WHERE user_id = ? ORDER BY workspace_id LIMIT 1`, userID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotMember
+	}
+	return id, err
+}
+
+func (s *Store) IsMember(userID, workspaceID int64) (bool, error) {
+	if !s.Workspaces {
+		return workspaceID == DefaultWorkspaceID, nil
+	}
+	var n int
+	err := s.DB.QueryRow(`SELECT 1 FROM workspace_member WHERE user_id = ? AND workspace_id = ?`, userID, workspaceID).Scan(&n)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// SetSessionWorkspace pins a login session to a workspace the user belongs to.
+func (s *Store) SetSessionWorkspace(secret string, userID, workspaceID int64) error {
+	if !s.Workspaces {
+		return errors.New("workspaces are not enabled")
+	}
+	ok, err := s.IsMember(userID, workspaceID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotMember
+	}
+	_, err = s.DB.Exec(`UPDATE usersession SET workspace_id = ? WHERE token_hash = ?`, workspaceID, HashToken(secret))
+	return err
 }
 
 // Principal is whoever made a request: a user, plus how they proved it.
@@ -63,7 +127,7 @@ func (s *Store) CreateUser(username, password string) (User, error) {
 		username, hash, timeutil.ToDBUTC(timeutil.NowUTC()),
 	)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") {
+		if db.IsUniqueViolation(err) {
 			return User{}, ErrUserExists
 		}
 		return User{}, err
@@ -167,13 +231,18 @@ func (s *Store) LookupSession(secret string) (User, error) {
 	var (
 		u         User
 		expiresAt string
+		pinned    sql.NullInt64
 	)
+	wsCol := "NULL"
+	if s.Workspaces {
+		wsCol = "s.workspace_id"
+	}
 	err := s.DB.QueryRow(
-		`SELECT u.id, u.username, u.is_active, s.expires_at
+		`SELECT u.id, u.username, u.is_active, s.expires_at, `+wsCol+`
 		   FROM usersession s JOIN appuser u ON u.id = s.user_id
 		  WHERE s.token_hash = ?`,
 		HashToken(secret),
-	).Scan(&u.ID, &u.Username, &u.IsActive, &expiresAt)
+	).Scan(&u.ID, &u.Username, &u.IsActive, &expiresAt, &pinned)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNoUser
 	}
@@ -185,6 +254,9 @@ func (s *Store) LookupSession(secret string) (User, error) {
 		return User{}, ErrNoUser
 	}
 	if !u.IsActive {
+		return User{}, ErrNoUser
+	}
+	if u.WorkspaceID, err = s.resolveWorkspace(u.ID, pinned); err != nil {
 		return User{}, ErrNoUser
 	}
 	_, _ = s.DB.Exec(`UPDATE usersession SET last_seen_at = ? WHERE token_hash = ?`,
@@ -214,7 +286,8 @@ type TokenInfo struct {
 }
 
 // CreateAPIToken returns the secret exactly once; only its hash is persisted.
-func (s *Store) CreateAPIToken(userID int64, name string) (string, error) {
+// workspaceID pins the token to a workspace (0 = the user's first one).
+func (s *Store) CreateAPIToken(userID int64, name string, workspaceID int64) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		name = "unnamed"
@@ -222,6 +295,25 @@ func (s *Store) CreateAPIToken(userID int64, name string) (string, error) {
 	secret, hash, err := NewToken()
 	if err != nil {
 		return "", err
+	}
+	if workspaceID > 0 {
+		ok, err := s.IsMember(userID, workspaceID)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", ErrNotMember
+		}
+		if s.Workspaces {
+			_, err = s.DB.Exec(
+				`INSERT INTO apitoken (user_id, name, token_hash, created_at, workspace_id) VALUES (?, ?, ?, ?, ?)`,
+				userID, name, hash, timeutil.ToDBUTC(timeutil.NowUTC()), workspaceID,
+			)
+			if err != nil {
+				return "", err
+			}
+			return secret, nil
+		}
 	}
 	_, err = s.DB.Exec(
 		`INSERT INTO apitoken (user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?)`,
@@ -235,16 +327,21 @@ func (s *Store) CreateAPIToken(userID int64, name string) (string, error) {
 
 func (s *Store) LookupAPIToken(secret string) (User, string, error) {
 	var (
-		u    User
-		name string
+		u      User
+		name   string
+		pinned sql.NullInt64
 	)
 	hash := HashToken(secret)
+	wsCol := "NULL"
+	if s.Workspaces {
+		wsCol = "t.workspace_id"
+	}
 	err := s.DB.QueryRow(
-		`SELECT u.id, u.username, u.is_active, t.name
+		`SELECT u.id, u.username, u.is_active, t.name, `+wsCol+`
 		   FROM apitoken t JOIN appuser u ON u.id = t.user_id
 		  WHERE t.token_hash = ? AND t.revoked_at IS NULL`,
 		hash,
-	).Scan(&u.ID, &u.Username, &u.IsActive, &name)
+	).Scan(&u.ID, &u.Username, &u.IsActive, &name, &pinned)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, "", ErrNoUser
 	}
@@ -252,6 +349,9 @@ func (s *Store) LookupAPIToken(secret string) (User, string, error) {
 		return User{}, "", err
 	}
 	if !u.IsActive {
+		return User{}, "", ErrNoUser
+	}
+	if u.WorkspaceID, err = s.resolveWorkspace(u.ID, pinned); err != nil {
 		return User{}, "", ErrNoUser
 	}
 	_, _ = s.DB.Exec(`UPDATE apitoken SET last_used_at = ? WHERE token_hash = ?`,

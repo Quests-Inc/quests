@@ -12,6 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // The store layer is written in SQLite dialect (`?` placeholders,
@@ -22,12 +24,18 @@ import (
 //     LastInsertId is served from the returned row.
 //
 // Everything else must be portable SQL (ON CONFLICT, LIKE, …).
+//
+// Workspaces: the workspace on the statement's context (wsctx) is written to
+// the session setting app.workspace_id before the statement runs, which is what
+// the row-level-security policies compare against. No workspace on the context
+// means the empty setting, i.e. no rows visible (fail closed).
 
 // noIDTables are insert targets without a serial `id` column.
 var noIDTables = map[string]bool{
-	"quest_tag":       true,
-	"template_tag":    true,
-	"alembic_version": true,
+	"quest_tag":        true,
+	"template_tag":     true,
+	"alembic_version":  true,
+	"workspace_member": true,
 }
 
 var insertRe = regexp.MustCompile(`(?is)^\s*INSERT\s+INTO\s+"?([a-z_][a-z0-9_]*)"?`)
@@ -72,6 +80,9 @@ func insertReturningID(q string) bool {
 	return !strings.Contains(strings.ToUpper(q), "RETURNING")
 }
 
+// appRole is the non-owner role the API drops to so RLS policies bind it.
+const appRole = "quests_app"
+
 type pgConnector struct{ inner driver.Connector }
 
 func (c pgConnector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -79,12 +90,60 @@ func (c pgConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pgConn{cn}, nil
+	pc := &pgConn{Conn: cn}
+	if err := pc.dropToAppRole(ctx); err != nil {
+		_ = cn.Close()
+		return nil, err
+	}
+	return pc, nil
 }
 
 func (c pgConnector) Driver() driver.Driver { return c.inner.Driver() }
 
-type pgConn struct{ driver.Conn }
+type pgConn struct {
+	driver.Conn
+	// ws is the app.workspace_id the session currently has ("" = unset, "?" = unknown).
+	ws string
+}
+
+// dropToAppRole makes RLS apply to this connection. Without the role (a database
+// that predates the workspaces migration) the connection stays as it is.
+func (c *pgConn) dropToAppRole(ctx context.Context) error {
+	q := c.Conn.(driver.QueryerContext)
+	rows, err := q.QueryContext(ctx, "SELECT 1 FROM pg_roles WHERE rolname = '"+appRole+"'", nil)
+	if err != nil {
+		return err
+	}
+	dest := make([]driver.Value, 1)
+	has := rows.Next(dest) == nil
+	_ = rows.Close()
+	if !has {
+		return nil
+	}
+	if _, err := c.Conn.(driver.ExecerContext).ExecContext(ctx, "SET ROLE "+appRole, nil); err != nil {
+		return fmt.Errorf("set role %s: %w", appRole, err)
+	}
+	return nil
+}
+
+// useWorkspace points the session's app.workspace_id at ctx's workspace.
+func (c *pgConn) useWorkspace(ctx context.Context) error {
+	want := ""
+	if id := wsctx.From(ctx); id > 0 {
+		want = strconv.FormatInt(id, 10)
+	}
+	if c.ws == want {
+		return nil
+	}
+	_, err := c.Conn.(driver.ExecerContext).ExecContext(ctx, "SELECT set_config('app.workspace_id', $1, false)",
+		[]driver.NamedValue{{Ordinal: 1, Value: want}})
+	if err != nil {
+		c.ws = "?"
+		return err
+	}
+	c.ws = want
+	return nil
+}
 
 func (c *pgConn) Prepare(q string) (driver.Stmt, error) { return c.Conn.Prepare(rebind(q)) }
 
@@ -93,7 +152,26 @@ func (c *pgConn) PrepareContext(ctx context.Context, q string) (driver.Stmt, err
 }
 
 func (c *pgConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return c.Conn.(driver.ConnBeginTx).BeginTx(ctx, opts)
+	if err := c.useWorkspace(ctx); err != nil {
+		return nil, err
+	}
+	tx, err := c.Conn.(driver.ConnBeginTx).BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &pgTx{Tx: tx, c: c}, nil
+}
+
+// pgTx forgets the tracked workspace on rollback: a set_config issued inside the
+// transaction is undone with it.
+type pgTx struct {
+	driver.Tx
+	c *pgConn
+}
+
+func (t *pgTx) Rollback() error {
+	t.c.ws = "?"
+	return t.Tx.Rollback()
 }
 
 func (c *pgConn) Ping(ctx context.Context) error {
@@ -125,10 +203,16 @@ func (c *pgConn) CheckNamedValue(nv *driver.NamedValue) error {
 }
 
 func (c *pgConn) QueryContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Rows, error) {
+	if err := c.useWorkspace(ctx); err != nil {
+		return nil, err
+	}
 	return c.Conn.(driver.QueryerContext).QueryContext(ctx, rebind(q), args)
 }
 
 func (c *pgConn) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error) {
+	if err := c.useWorkspace(ctx); err != nil {
+		return nil, err
+	}
 	if insertReturningID(q) {
 		rows, err := c.Conn.(driver.QueryerContext).QueryContext(ctx, rebind(q)+" RETURNING id", args)
 		if err != nil {
@@ -176,7 +260,7 @@ func OpenPostgres(url string) (*sql.DB, SchemaStatus, error) {
 		_ = sqlDB.Close()
 		return nil, zero, err
 	}
-	st, err := assertMigrated(sqlDB)
+	st, err := assertMigrated(sqlDB, expectedAlembic)
 	if err != nil {
 		_ = sqlDB.Close()
 		return nil, zero, err

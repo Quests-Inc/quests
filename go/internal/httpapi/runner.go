@@ -11,6 +11,7 @@ import (
 
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // Runner protocol. A runner only makes outgoing requests:
@@ -64,7 +65,16 @@ func (s *Server) runnerRegister(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	token, run, err := s.Store.RegisterRunner(r.Context(), strings.TrimSpace(in.Token), in.Hostname, in.Version)
+	ctx := r.Context()
+	if s.Store.WorkspacesEnabled() {
+		ws, werr := s.Store.RunnerWorkspaceByReg(ctx, strings.TrimSpace(in.Token))
+		if werr != nil {
+			writeErr(w, http.StatusUnauthorized, werr.Error())
+			return
+		}
+		ctx = wsctx.With(ctx, ws)
+	}
+	token, run, err := s.Store.RegisterRunner(ctx, strings.TrimSpace(in.Token), in.Hostname, in.Version)
 	if errors.Is(err, store.ErrRunnerToken) {
 		writeErr(w, http.StatusUnauthorized, err.Error())
 		return

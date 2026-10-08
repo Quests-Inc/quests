@@ -13,13 +13,13 @@ import (
 //
 // Two chains exist: the legacy SQLite one (alembic/versions, frozen at the
 // baseline of the PostgreSQL one) and the PostgreSQL one (alembic/versions_pg).
-// expectedAlembic must be the PG head; the SQLite head may only lag behind it.
+// expectedAlembic must be the PG head and expectedAlembicSQLite the SQLite one.
 func TestExpectedAlembicIsHead(t *testing.T) {
-	checkAlembicChain(t, "../../../alembic/versions_pg/*.py", true)
-	checkAlembicChain(t, "../../../alembic/versions/*.py", false)
+	checkAlembicChain(t, "../../../alembic/versions_pg/*.py", expectedAlembic)
+	checkAlembicChain(t, "../../../alembic/versions/*.py", expectedAlembicSQLite)
 }
 
-func checkAlembicChain(t *testing.T, glob string, mustBeExpected bool) {
+func checkAlembicChain(t *testing.T, glob, wantHead string) {
 	t.Helper()
 	files, err := filepath.Glob(glob)
 	if err != nil || len(files) == 0 {
@@ -47,8 +47,8 @@ func checkAlembicChain(t *testing.T, glob string, mustBeExpected bool) {
 			heads = append(heads, r)
 		}
 	}
-	if len(heads) != 1 || (mustBeExpected && heads[0] != expectedAlembic) {
-		t.Fatalf("%s: alembic heads = %v, expectedAlembic = %s", glob, heads, expectedAlembic)
+	if len(heads) != 1 || heads[0] != wantHead {
+		t.Fatalf("%s: alembic heads = %v, want %s", glob, heads, wantHead)
 	}
 	if alembicOrder[len(alembicOrder)-1] != expectedAlembic {
 		t.Fatalf("alembicOrder must end with expectedAlembic")

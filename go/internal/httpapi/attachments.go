@@ -96,8 +96,8 @@ func (s *Server) attachmentFor(r *http.Request, ownerType string) (store.Attachm
 }
 
 // logAttachment records an attachment event against the attachment and its owner.
-func (s *Server) logAttachment(kind string, a store.Attachment, detail string) {
-	_ = s.Store.LogEvent(context.WithoutCancel(context.Background()), store.ChangeEvent{
+func (s *Server) logAttachment(ctx context.Context, kind string, a store.Attachment, detail string) {
+	_ = s.Store.LogEvent(context.WithoutCancel(ctx), store.ChangeEvent{
 		Kind: kind, EntityType: "attachment", EntityID: a.ID,
 		ParentType: a.OwnerType, ParentID: a.OwnerID, Title: a.Filename, Detail: detail,
 	})
@@ -344,8 +344,8 @@ func (s *Server) postAttachment(w http.ResponseWriter, r *http.Request, ownerTyp
 	out["available"] = true
 	out["source_updated"] = false
 	out["last_modified"] = nil
-	s.logAttachment("attachment_added", a, "загружено")
-	s.publishSilent("attachment_created", a.Filename, map[string]any{
+	s.logAttachment(r.Context(), "attachment_added", a, "загружено")
+	s.publishSilent(r.Context(), "attachment_created", a.Filename, map[string]any{
 		"attachment_id": a.ID,
 		"owner_type":    a.OwnerType,
 		"owner_id":      a.OwnerID,
@@ -574,20 +574,20 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 		}
 	}
 	if body.CurrentRevision != nil {
-		s.logAttachment("attachment_version", updated, fmt.Sprintf("текущая версия v%d", updated.CurrentRevision))
+		s.logAttachment(r.Context(), "attachment_version", updated, fmt.Sprintf("текущая версия v%d", updated.CurrentRevision))
 	}
 	if body.Hidden != nil && *body.Hidden != a.Hidden {
 		if *body.Hidden {
-			s.logAttachment("attachment_hidden", updated, "скрыто")
+			s.logAttachment(r.Context(), "attachment_hidden", updated, "скрыто")
 		} else {
-			s.logAttachment("attachment_hidden", updated, "возвращено")
+			s.logAttachment(r.Context(), "attachment_hidden", updated, "возвращено")
 		}
 	}
 	if body.Comment == nil && body.CurrentRevision == nil && body.Hidden == nil {
 		writeJSON(w, 200, store.AttachmentToRead(a))
 		return
 	}
-	s.publishSilent("attachment_updated", updated.Filename, map[string]any{
+	s.publishSilent(r.Context(), "attachment_updated", updated.Filename, map[string]any{
 		"attachment_id": updated.ID,
 		"owner_type":    updated.OwnerType,
 		"owner_id":      updated.OwnerID,
@@ -728,8 +728,8 @@ func (s *Server) postAttachmentRevision(w http.ResponseWriter, r *http.Request, 
 	out["available"] = true
 	out["source_updated"] = false
 	out["last_modified"] = nil
-	s.logAttachment("attachment_version", updated, fmt.Sprintf("новая версия v%d", updated.CurrentRevision))
-	s.publishSilent("attachment_updated", updated.Filename, map[string]any{
+	s.logAttachment(r.Context(), "attachment_version", updated, fmt.Sprintf("новая версия v%d", updated.CurrentRevision))
+	s.publishSilent(r.Context(), "attachment_updated", updated.Filename, map[string]any{
 		"attachment_id": updated.ID,
 		"owner_type":    updated.OwnerType,
 		"owner_id":      updated.OwnerID,
@@ -771,8 +771,8 @@ func (s *Server) deleteAttachmentRevision(w http.ResponseWriter, r *http.Request
 			fmt.Printf("attachment %d rev %d: file left on webdav: %v\n", a.ID, revN, err)
 		}
 	}
-	s.logAttachment("attachment_version", a, fmt.Sprintf("удалена версия v%d", revN))
-	s.publishSilent("attachment_updated", a.Filename, map[string]any{
+	s.logAttachment(r.Context(), "attachment_version", a, fmt.Sprintf("удалена версия v%d", revN))
+	s.publishSilent(r.Context(), "attachment_updated", a.Filename, map[string]any{
 		"attachment_id": a.ID,
 		"owner_type":    a.OwnerType,
 		"owner_id":      a.OwnerID,
@@ -819,8 +819,8 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request, ownerT
 			}
 		}
 	}
-	s.logAttachment("attachment_deleted", a, "удалено")
-	s.publishSilent("attachment_deleted", a.Filename, map[string]any{
+	s.logAttachment(r.Context(), "attachment_deleted", a, "удалено")
+	s.publishSilent(r.Context(), "attachment_deleted", a.Filename, map[string]any{
 		"attachment_id": a.ID,
 		"owner_type":    a.OwnerType,
 		"owner_id":      a.OwnerID,

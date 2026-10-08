@@ -3,7 +3,7 @@
 
     uv run python scripts/sqlite_to_pg.py data/quests.db postgresql://user@host/db [--force]
 
-The target must have been migrated first (`QUESTS_DATABASE_URL=… uv run quests-migrate`)
+The target must have been migrated first (any PG revision; copied rows go to workspace 1) (`QUESTS_DATABASE_URL=… uv run quests-migrate`)
 and be empty (--force truncates it). Tables are copied in foreign-key order, serial
 sequences are advanced past the copied ids, and row counts are compared at the end.
 Everything runs in one transaction: any failure leaves the target untouched.
@@ -17,7 +17,9 @@ import sys
 
 import psycopg
 
-SKIP = {"alembic_version"}
+# workspace/workspace_member are created (and seeded with workspace 1) by the PG migrations.
+SKIP = {"alembic_version", "workspace", "workspace_member"}
+SQLITE_REV = "1a2b3c4d5e6f"
 
 
 def fk_order(cur: psycopg.Cursor) -> list[str]:
@@ -31,7 +33,7 @@ def fk_order(cur: psycopg.Cursor) -> list[str]:
     )
     deps: dict[str, set[str]] = {t: set() for t in tables}
     for child, parent in cur.fetchall():
-        if child != parent:
+        if child != parent and child in deps and parent in tables:
             deps[child].add(parent)
     order: list[str] = []
     while deps:
@@ -63,11 +65,11 @@ def main() -> int:
         if missing:
             print(f"WARNING: SQLite tables with no PG counterpart (skipped): {sorted(missing)}")
 
-        cur.execute("SELECT version_num FROM alembic_version")
-        pg_rev = cur.fetchone()
         src_rev = src.execute("SELECT version_num FROM alembic_version").fetchone()
-        if not pg_rev or not src_rev or pg_rev[0] != src_rev[0]:
-            raise SystemExit(f"schema revision mismatch: sqlite={src_rev and src_rev[0]} pg={pg_rev and pg_rev[0]}")
+        if not src_rev or src_rev[0] != SQLITE_REV:
+            raise SystemExit(f"sqlite revision {src_rev and src_rev[0]} != {SQLITE_REV}: migrate the SQLite DB first")
+        # Rows copied without an explicit workspace_id land in workspace 1.
+        cur.execute("SELECT set_config('app.workspace_id', '1', false)")
 
         if args.force:
             cur.execute("TRUNCATE " + ", ".join(order) + " RESTART IDENTITY CASCADE")

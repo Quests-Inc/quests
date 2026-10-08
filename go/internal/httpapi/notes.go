@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"io"
 	"net/http"
 	"os"
@@ -149,7 +150,7 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 			created = copied
 		}
 	}
-	s.logNote("note_created", created, "создана", 0)
+	s.logNote(r.Context(), "note_created", created, "создана", 0)
 	writeJSON(w, 201, s.notePayloadFiltered(r, created))
 }
 
@@ -261,7 +262,7 @@ func (s *Server) patchNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote("note_updated", updated, "изменена", 10*time.Minute)
+	s.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
 	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
 }
 
@@ -284,7 +285,7 @@ func (s *Server) deleteNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote("note_deleted", cur, "удалена", 0)
+	s.logNote(r.Context(), "note_deleted", cur, "удалена", 0)
 	w.WriteHeader(204)
 }
 
@@ -373,7 +374,7 @@ func (s *Server) postNoteIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote("note_updated", updated, "изменена", 10*time.Minute)
+	s.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
 	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
 }
 
@@ -388,7 +389,7 @@ func (s *Server) deleteNoteIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote("note_updated", updated, "изменена", 10*time.Minute)
+	s.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
 	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
 }
 
@@ -510,19 +511,20 @@ func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []map[str
 
 // logNote records the note event in the change log (kind names follow the
 // hub's note_* events) and publishes it live.
-func (s *Server) logNote(kind string, n store.Note, detail string, coalesce time.Duration) {
-	_ = s.Store.LogEvent(context.WithoutCancel(context.Background()), store.ChangeEvent{
+func (s *Server) logNote(ctx context.Context, kind string, n store.Note, detail string, coalesce time.Duration) {
+	_ = s.Store.LogEvent(context.WithoutCancel(ctx), store.ChangeEvent{
 		Kind: kind, EntityType: "note", EntityID: n.ID, Title: n.Title, Detail: detail, Coalesce: coalesce,
 	})
-	s.publishNote(kind, n)
+	s.publishNote(ctx, kind, n)
 }
 
-func (s *Server) publishNote(kind string, n store.Note) {
+func (s *Server) publishNote(ctx context.Context, kind string, n store.Note) {
 	if s.Hub == nil {
 		return
 	}
 	silent := ""
 	s.Hub.Publish(kind, events.PublishOpts{
+		Workspace:   wsctx.From(ctx),
 		Title:       n.Title,
 		Description: n.Description,
 		Detail:      "",
@@ -535,17 +537,18 @@ func (s *Server) publishNote(kind string, n store.Note) {
 
 // publishSilent wakes journal tabs (they reload on any quests_changed) without
 // a HUD toast or sound. Same contract as note events.
-func (s *Server) publishSilent(kind, title string, extra map[string]any) {
+func (s *Server) publishSilent(ctx context.Context, kind, title string, extra map[string]any) {
 	if s.Hub == nil {
 		return
 	}
 	silent := ""
 	s.Hub.Publish(kind, events.PublishOpts{
-		Title:  title,
-		Toast:  false,
-		Source: "api",
-		Sound:  &silent,
-		Extra:  extra,
+		Workspace: wsctx.From(ctx),
+		Title:     title,
+		Toast:     false,
+		Source:    "api",
+		Sound:     &silent,
+		Extra:     extra,
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/db"
 	"regexp"
 	"strings"
 	"time"
@@ -135,7 +136,7 @@ func (s *Store) CreateRunner(ctx context.Context, label string) (string, error) 
 		`INSERT INTO runner (label, reg_hash, reg_expires_at, revoked, created_at) VALUES (?, ?, ?, 0, ?)`,
 		label, hash, timeutil.ToDBUTC(now.Add(RegistrationTTL)), timeutil.ToDBUTC(now))
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") {
+		if db.IsUniqueViolation(err) {
 			return "", ErrRunnerExists
 		}
 		return "", err
@@ -332,7 +333,7 @@ func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, crea
 		sp.RunnerLabel, sp.Kind, sp.QuestID, sp.StepID, sp.TemplateID, trimTo(sp.Title, 200), dk, sp.Command,
 		s.nextAttempt(ctx, sp.DedupeKey), sp.TimeoutSeconds, timeutil.ToDBUTC(now.Add(sp.ValidFor)), timeutil.ToDBUTC(now))
 	if err != nil {
-		if sp.DedupeKey != "" && strings.Contains(err.Error(), "UNIQUE") {
+		if sp.DedupeKey != "" && db.IsUniqueViolation(err) {
 			j, gerr := s.OpenJobByKey(ctx, sp.DedupeKey)
 			return j, false, gerr
 		}

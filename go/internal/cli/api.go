@@ -92,6 +92,10 @@ func (c *Client) Do(method, path string, query map[string]string, body any) (jso
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
+	// Pick a workspace explicitly (tokens are pinned, this only narrows/switches within membership).
+	if ws := strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE")); ws != "" {
+		req.Header.Set("X-Quests-Workspace", ws)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

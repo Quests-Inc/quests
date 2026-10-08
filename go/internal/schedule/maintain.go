@@ -31,7 +31,7 @@ func RunMaintenanceLoop(ctx context.Context, st *store.Store, hub *events.Hub, w
 		return
 	}
 	if checks != nil {
-		checks.FailStaleRunning(ctx)
+		_ = st.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) { checks.FailStaleRunning(wctx) })
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	pool := newPoolRunner()
@@ -47,7 +47,17 @@ func RunMaintenanceLoop(ctx context.Context, st *store.Store, hub *events.Hub, w
 	}
 }
 
+// runOnce does one maintenance pass over every workspace, each under its own
+// workspace context so row-level security scopes what the pass can see.
 func runOnce(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner, pool *poolRunner) {
+	if err := st.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+		runOnceIn(wctx, st, hub, windows, rng, checks, pool)
+	}); err != nil {
+		log.Printf("maintenance: workspaces: %v", err)
+	}
+}
+
+func runOnceIn(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner, pool *poolRunner) {
 	if _, err := ExpireOverdue(ctx, st, hub); err != nil {
 		log.Printf("expire: %v", err)
 	}

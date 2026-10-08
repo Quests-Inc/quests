@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -62,7 +63,7 @@ type Server struct {
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.cors(s.requireAuth(s.routes()))
+	return s.cors(s.requireAuth(s.withWorkspace(s.routes())))
 }
 
 // routes builds the API routes without the cors/auth wrappers; the draft
@@ -93,6 +94,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerLLMActions(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
+	s.registerWorkspaces(mux)
 	s.mountSPA(mux)
 	return mux
 }
@@ -371,7 +373,8 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 	quiet, source := s.publishOpts(r)
 	qid := created.ID
 	s.Hub.Publish("quest_created", events.PublishOpts{
-		QuestID: &qid, Title: created.Title, Description: created.Description,
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &qid, Title: created.Title, Description: created.Description,
 		Detail: "создано задание", Toast: !quiet, Source: source,
 		Significance: string(created.Significance),
 		Automated:    created.Automated,
@@ -540,7 +543,8 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 	quiet, source := s.publishOpts(r)
 	qid := updated.ID
 	s.Hub.Publish(kind, events.PublishOpts{
-		QuestID: &qid, Title: updated.Title, Description: updated.Description,
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
 		Detail: detail, Toast: !quiet && toast, Source: source,
 		Significance: string(updated.Significance),
 		Automated:    updated.Automated,
@@ -570,7 +574,8 @@ func (s *Server) deleteQuest(w http.ResponseWriter, r *http.Request) {
 	}
 	quiet, source := s.publishOpts(r)
 	s.Hub.Publish("quest_deleted", events.PublishOpts{
-		QuestID: &id, Title: q.Title, Description: q.Description,
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &id, Title: q.Title, Description: q.Description,
 		Detail: "удалено", Toast: !quiet, Source: source,
 		Automated: q.Automated,
 	})
@@ -645,7 +650,8 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 	id := updated.ID
 	_ = quiet
 	s.Hub.Publish("quest_updated", events.PublishOpts{
-		QuestID: &id, Title: updated.Title, Detail: "+шаги: 1",
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &id, Title: updated.Title, Detail: "+шаги: 1",
 		Toast: false, Source: source, Significance: string(updated.Significance),
 		Automated: updated.Automated,
 	})
@@ -743,7 +749,8 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 	id := updated.ID
 	toast := kind == "step_completed" || kind == "quest_completed"
 	s.Hub.Publish(kind, events.PublishOpts{
-		QuestID: &id, Title: updated.Title, Detail: detail,
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &id, Title: updated.Title, Detail: detail,
 		Toast: !quiet && toast, Source: source, Significance: string(updated.Significance),
 		StepTitle: st.Title, Automated: updated.Automated,
 	})
@@ -796,7 +803,8 @@ func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
 	id := updated.ID
 	_ = quiet
 	s.Hub.Publish("quest_updated", events.PublishOpts{
-		QuestID: &id, Title: updated.Title, Detail: "−шаги: 1",
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &id, Title: updated.Title, Detail: "−шаги: 1",
 		Toast: false, Source: source, Significance: string(updated.Significance),
 		Automated: updated.Automated,
 	})

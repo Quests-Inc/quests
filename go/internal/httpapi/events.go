@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"log"
 	"net/http"
 	"strconv"
@@ -29,7 +30,7 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 			since = n
 		}
 	}
-	ev := s.Hub.EventsSince(since)
+	ev := s.Hub.EventsSince(since, wsctx.From(r.Context()))
 	if ev == nil {
 		ev = []events.Payload{}
 	}
@@ -47,11 +48,11 @@ func (s *Server) postFocusQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "quest_id required")
 		return
 	}
-	clients := s.Hub.FocusQuest(body.QuestID)
+	clients := s.Hub.FocusQuest(body.QuestID, wsctx.From(r.Context()))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"quest_id":      body.QuestID,
 		"clients":       clients,
-		"pending_focus": s.Hub.PeekPendingFocus(),
+		"pending_focus": s.Hub.PeekPendingFocus(wsctx.From(r.Context())),
 	})
 }
 
@@ -61,7 +62,7 @@ func (s *Server) wsEvents(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ws upgrade: %v", err)
 		return
 	}
-	client, hello := s.Hub.AddClient(conn)
+	client, hello := s.Hub.AddClient(conn, wsctx.From(r.Context()))
 	if err := client.WriteJSON(hello); err != nil {
 		s.Hub.RemoveClient(client)
 		return

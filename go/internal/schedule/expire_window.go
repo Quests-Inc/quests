@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
@@ -77,6 +78,7 @@ func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int
 		}
 		qid := updated.ID
 		hub.Publish("quest_expired", events.PublishOpts{
+			Workspace:    wsctx.From(ctx),
 			QuestID:      &qid,
 			Title:        updated.Title,
 			Description:  updated.Description,
@@ -147,6 +149,7 @@ func (w *WindowNotifier) Notify(ctx context.Context, st *store.Store, hub *event
 		}
 		qid := q.ID
 		hub.Publish("quest_started", events.PublishOpts{
+			Workspace:    wsctx.From(ctx),
 			QuestID:      &qid,
 			Title:        q.Title,
 			Description:  q.Description,

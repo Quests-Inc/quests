@@ -28,7 +28,11 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server useradd <username>       create an account (prompts for a password)
   quests-server passwd <username>        change an account's password
   quests-server users                    list accounts
-  quests-server token add <name>         mint an API token for a headless client
+  quests-server token add <name> [user] [--workspace <id>]
+                                         mint an API token for a headless client (PostgreSQL: bound to a workspace)
+  quests-server workspace ls             list workspaces and their members
+  quests-server workspace add <name> <user>   create a workspace owned by <user>
+  quests-server workspace member <id> <user>  add <user> to workspace <id>
   quests-server token ls                 list active API tokens
   quests-server token rm <id>            revoke an API token
   quests-server runner add <label>       register a device that runs checks (prints a one-time registration token)
@@ -46,7 +50,7 @@ func runAdmin(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "useradd", "passwd", "users", "token", "runner", "backup-now":
+	case "useradd", "passwd", "users", "token", "runner", "backup-now", "workspace":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -72,7 +76,8 @@ func runAdmin(args []string) bool {
 		return true
 	}
 
-	st := &auth.Store{DB: sqlDB}
+	st := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != ""}
+	wst := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
 
 	switch args[0] {
 	case "useradd":
@@ -88,6 +93,13 @@ func runAdmin(args []string) bool {
 			fatal("%v", err)
 		}
 		fmt.Printf("created account %q (id=%d)\n", u.Username, u.ID)
+		if wst.WorkspacesEnabled() {
+			w, err := wst.EnsureUserWorkspace(context.Background(), u.ID, u.Username)
+			if err != nil {
+				fatal("workspace: %v", err)
+			}
+			fmt.Printf("workspace %q (id=%d)\n", w.Name, w.ID)
+		}
 		fmt.Println("auth is now enforced on this instance — restart the server to apply.")
 	case "passwd":
 		if len(args) < 2 {
@@ -116,6 +128,8 @@ func runAdmin(args []string) bool {
 		}
 	case "token":
 		runTokenCmd(st, args[1:])
+	case "workspace":
+		runWorkspaceCmd(st, wst, args[1:])
 	}
 	return true
 }
@@ -164,23 +178,37 @@ func runTokenCmd(st *auth.Store, args []string) {
 		if len(users) == 0 {
 			fatal("create an account first: quests-server useradd <username>")
 		}
+		var wsID int64
+		var pos []string
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--workspace" && i+1 < len(args) {
+				n, err := strconv.ParseInt(args[i+1], 10, 64)
+				if err != nil || n <= 0 {
+					fatal("--workspace needs a workspace id")
+				}
+				wsID = n
+				i++
+				continue
+			}
+			pos = append(pos, args[i])
+		}
 		owner := users[0]
-		if len(args) >= 3 {
+		if len(pos) >= 2 {
 			owner = auth.User{}
 			for _, u := range users {
-				if u.Username == strings.ToLower(args[2]) {
+				if u.Username == strings.ToLower(pos[1]) {
 					owner = u
 				}
 			}
 			if owner.ID == 0 {
-				fatal("no such account: %s", args[2])
+				fatal("no such account: %s", pos[1])
 			}
 		}
-		secret, err := st.CreateAPIToken(owner.ID, args[1])
+		secret, err := st.CreateAPIToken(owner.ID, pos[0], wsID)
 		if err != nil {
 			fatal("%v", err)
 		}
-		fmt.Printf("token for %q (owner %s):\n\n  %s\n\n", args[1], owner.Username, secret)
+		fmt.Printf("token for %q (owner %s):\n\n  %s\n\n", pos[0], owner.Username, secret)
 		fmt.Println("Shown once — only its hash is stored. Put it in the client's env:")
 		fmt.Printf("  QUESTS_API_TOKEN=%s\n", secret)
 	case "ls":
@@ -308,5 +336,83 @@ func runRunnerCmd(st *store.Store, args []string) {
 		fmt.Printf("runner %q revoked\n", args[1])
 	default:
 		fatal("usage: quests-server runner add|ls|rm")
+	}
+}
+
+func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
+	if !wst.WorkspacesEnabled() {
+		fatal("workspaces need PostgreSQL (set QUESTS_DATABASE_URL)")
+	}
+	ctx := context.Background()
+	userByName := func(name string) auth.User {
+		users, err := st.ListUsers()
+		if err != nil {
+			fatal("%v", err)
+		}
+		for _, u := range users {
+			if u.Username == strings.ToLower(name) {
+				return u
+			}
+		}
+		fatal("no such account: %s", name)
+		return auth.User{}
+	}
+	if len(args) == 0 {
+		fatal("usage: quests-server workspace ls|add|member")
+	}
+	switch args[0] {
+	case "ls":
+		users, err := st.ListUsers()
+		if err != nil {
+			fatal("%v", err)
+		}
+		members := map[int64][]string{}
+		var order []int64
+		seen := map[int64]store.Workspace{}
+		for _, u := range users {
+			ws, err := wst.UserWorkspaces(ctx, u.ID)
+			if err != nil {
+				fatal("%v", err)
+			}
+			for _, w := range ws {
+				if _, ok := seen[w.ID]; !ok {
+					seen[w.ID] = w
+					order = append(order, w.ID)
+				}
+				members[w.ID] = append(members[w.ID], u.Username)
+			}
+		}
+		ids, err := wst.WorkspaceIDs(ctx)
+		if err != nil {
+			fatal("%v", err)
+		}
+		for _, id := range ids {
+			fmt.Printf("%d\t%s\tmembers: %s\n", id, seen[id].Name, strings.Join(members[id], ", "))
+		}
+	case "add":
+		if len(args) < 3 {
+			fatal("usage: quests-server workspace add <name> <user>")
+		}
+		u := userByName(args[2])
+		w, err := wst.CreateWorkspace(ctx, u.ID, args[1], store.DefaultWorkspaceID)
+		if err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("created workspace %q (id=%d) owned by %s\n", w.Name, w.ID, u.Username)
+	case "member":
+		if len(args) < 3 {
+			fatal("usage: quests-server workspace member <id> <user>")
+		}
+		id, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			fatal("workspace id must be a number")
+		}
+		u := userByName(args[2])
+		if err := wst.AddWorkspaceMember(ctx, id, u.ID, "owner"); err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("%s is now a member of workspace %d\n", u.Username, id)
+	default:
+		fatal("unknown workspace command %q", args[0])
 	}
 }

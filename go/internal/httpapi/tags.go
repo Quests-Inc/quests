@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"net/http"
 	"strconv"
 	"strings"
@@ -76,7 +77,7 @@ func (s *Server) createTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("tag_created", t.Label, map[string]any{"tag_id": t.ID, "slug": t.Slug})
+	s.publishSilent(r.Context(), "tag_created", t.Label, map[string]any{"tag_id": t.ID, "slug": t.Slug})
 	writeJSON(w, 201, t)
 }
 
@@ -104,7 +105,7 @@ func (s *Server) patchTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Label/color changes show on quest rows — wake journal tabs.
-	s.publishSilent("tag_updated", t.Label, map[string]any{"tag_id": t.ID, "slug": t.Slug})
+	s.publishSilent(r.Context(), "tag_updated", t.Label, map[string]any{"tag_id": t.ID, "slug": t.Slug})
 	writeJSON(w, 200, t)
 }
 
@@ -131,7 +132,7 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("tag_deleted", t.Label, map[string]any{"tag_id": id, "slug": t.Slug})
+	s.publishSilent(r.Context(), "tag_deleted", t.Label, map[string]any{"tag_id": id, "slug": t.Slug})
 	w.WriteHeader(204)
 }
 
@@ -167,12 +168,13 @@ func (s *Server) putQuestTags(w http.ResponseWriter, r *http.Request) {
 	if s.Hub != nil {
 		qid := q.ID
 		s.Hub.Publish("quest_updated", events.PublishOpts{
-			QuestID: &qid,
-			Title:   q.Title,
-			Detail:  "теги",
-			Toast:   false,
-			Source:  "api",
-			Sound:   &silent,
+			Workspace: wsctx.From(r.Context()),
+			QuestID:   &qid,
+			Title:     q.Title,
+			Detail:    "теги",
+			Toast:     false,
+			Source:    "api",
+			Sound:     &silent,
 		})
 	}
 	writeJSON(w, 200, q.Tags)
@@ -206,7 +208,7 @@ func (s *Server) putTemplateTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title, _ := row["title"].(string)
-	s.publishSilent("template_updated", title, map[string]any{"template_id": id})
+	s.publishSilent(r.Context(), "template_updated", title, map[string]any{"template_id": id})
 	writeJSON(w, 200, row["tags"])
 }
 

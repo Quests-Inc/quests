@@ -18,7 +18,7 @@ func TestCheckAlembicVersionMatch(t *testing.T) {
 }
 
 func TestCheckAlembicVersionOlderFails(t *testing.T) {
-	older := alembicOrder[len(alembicOrder)-2]
+	older := alembicOrder[len(alembicOrder)-3]
 	_, err := checkAlembicVersion(older)
 	if err == nil {
 		t.Fatal("expected error for older alembic")
@@ -79,7 +79,7 @@ func TestOpenAcceptsCurrentAndRejectsOlder(t *testing.T) {
 		}
 	}
 
-	seed(expectedAlembic)
+	seed(expectedAlembicSQLite)
 	dbOK, st, err := Open(path)
 	if err != nil {
 		t.Fatalf("open current: %v", err)
@@ -99,7 +99,7 @@ func TestOpenAcceptsCurrentAndRejectsOlder(t *testing.T) {
 		t.Fatalf("ahead state=%q", st.State)
 	}
 
-	older := alembicOrder[len(alembicOrder)-2]
+	older := alembicOrder[len(alembicOrder)-3]
 	seed(older)
 	if _, _, err := Open(path); err == nil {
 		t.Fatal("older db must fail open")

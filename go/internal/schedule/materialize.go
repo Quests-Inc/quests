@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"log"
 	"math/rand"
 	"os"
@@ -301,6 +302,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		qid := createdQ.ID
 		detail := "Период " + key
 		hub.Publish("quest_appeared", events.PublishOpts{
+			Workspace:   wsctx.From(ctx),
 			QuestID:     &qid,
 			Title:       createdQ.Title,
 			Description: createdQ.Description,
@@ -859,6 +861,9 @@ func execEmitPoolCommand(parent context.Context, st *store.Store, templateID int
 
 	killTree(cmd)
 	cmd.Env = os.Environ()
+	if ws := wsctx.From(ctx); ws > 0 {
+		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))
+	}
 	for name, value := range secrets {
 		cmd.Env = append(cmd.Env, name+"="+value)
 	}
@@ -1046,6 +1051,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 	qid := createdQ.ID
 	if hub != nil {
 		hub.Publish("quest_appeared", events.PublishOpts{
+			Workspace:    wsctx.From(ctx),
 			QuestID:      &qid,
 			Title:        createdQ.Title,
 			Description:  createdQ.Description,

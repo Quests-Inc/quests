@@ -90,7 +90,7 @@ func (s *Server) createQuestline(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("questline_created", questlineTitle(row), map[string]any{"questline_id": row["id"]})
+	s.publishSilent(r.Context(), "questline_created", questlineTitle(row), map[string]any{"questline_id": row["id"]})
 	writeJSON(w, 201, row)
 }
 
@@ -110,7 +110,7 @@ func (s *Server) patchQuestline(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("questline_updated", questlineTitle(row), map[string]any{"questline_id": id})
+	s.publishSilent(r.Context(), "questline_updated", questlineTitle(row), map[string]any{"questline_id": id})
 	writeJSON(w, 200, row)
 }
 
@@ -135,7 +135,7 @@ func (s *Server) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("questline_deleted", title, map[string]any{"questline_id": id})
+	s.publishSilent(r.Context(), "questline_deleted", title, map[string]any{"questline_id": id})
 	w.WriteHeader(204)
 }
 
@@ -217,7 +217,7 @@ func (s *Server) postQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("questline_updated", questlineTitle(row), map[string]any{"questline_id": id})
+	s.publishSilent(r.Context(), "questline_updated", questlineTitle(row), map[string]any{"questline_id": id})
 	writeJSON(w, 200, row)
 }
 
@@ -232,7 +232,7 @@ func (s *Server) deleteQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent("questline_updated", questlineTitle(row), map[string]any{"questline_id": id})
+	s.publishSilent(r.Context(), "questline_updated", questlineTitle(row), map[string]any{"questline_id": id})
 	writeJSON(w, 200, row)
 }
 

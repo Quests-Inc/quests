@@ -69,7 +69,7 @@ func TestDeadlineSetWithOpenWindow(t *testing.T) {
 
 func countStarted(hub *events.Hub) int {
 	n := 0
-	for _, e := range hub.EventsSince(0) {
+	for _, e := range hub.EventsSince(0, 0) {
 		if e["kind"] == "quest_started" {
 			n++
 		}

@@ -288,7 +288,7 @@ func TestAPITokenLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	secret, err := s.CreateAPIToken(u.ID, "overlay")
+	secret, err := s.CreateAPIToken(u.ID, "overlay", 0)
 	if err != nil {
 		t.Fatalf("CreateAPIToken: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestCreateAPITokenDefaultsName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret, err := s.CreateAPIToken(u.ID, "   ")
+	secret, err := s.CreateAPIToken(u.ID, "   ", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

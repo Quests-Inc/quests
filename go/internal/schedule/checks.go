@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"log"
 	"os"
 	"os/exec"
@@ -98,7 +99,8 @@ func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 			}
 			qid := updated.ID
 			r.Hub.Publish("quest_failed", events.PublishOpts{
-				QuestID: &qid, Title: updated.Title, Description: updated.Description,
+				Workspace: wsctx.From(ctx),
+				QuestID:   &qid, Title: updated.Title, Description: updated.Description,
 				Detail: "провалено", Toast: true, Source: "system",
 				Significance: string(updated.Significance), StepTitle: st.Title,
 				Automated: updated.Automated,
@@ -189,7 +191,8 @@ func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step,
 	if once {
 		qid := q.ID
 		r.Hub.Publish("step_auto_running", events.PublishOpts{
-			QuestID: &qid, Title: q.Title, Detail: st.Title,
+			Workspace: wsctx.From(ctx),
+			QuestID:   &qid, Title: q.Title, Detail: st.Title,
 			Toast: true, Source: "system", Significance: string(q.Significance),
 			StepTitle: st.Title, Automated: q.Automated,
 		})
@@ -219,6 +222,10 @@ func (r *CheckRunner) exec(parent context.Context, questID, stepID int64, comman
 	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Env = append(os.Environ(), r.Env...)
+	if ws := wsctx.From(parent); ws > 0 {
+		// Commands that call the CLI back act in the workspace of their quest.
+		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))
+	}
 	for name, value := range secrets {
 		cmd.Env = append(cmd.Env, name+"="+value)
 	}
@@ -320,7 +327,8 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 	}
 	qid := updated.ID
 	r.Hub.Publish(kind, events.PublishOpts{
-		QuestID: &qid, Title: updated.Title, Description: updated.Description,
+		Workspace: wsctx.From(ctx),
+		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
 		Detail: detail, Toast: toast, Source: "system",
 		Significance: string(updated.Significance), StepTitle: st.Title,
 		Automated: updated.Automated,
@@ -350,7 +358,8 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q domain.Quest, st *domain.
 		}
 		qid := updated.ID
 		r.Hub.Publish(kind, events.PublishOpts{
-			QuestID: &qid, Title: updated.Title, Description: updated.Description,
+			Workspace: wsctx.From(ctx),
+			QuestID:   &qid, Title: updated.Title, Description: updated.Description,
 			Detail: detail, Toast: true, Source: "system",
 			Significance: string(updated.Significance), StepTitle: st.Title,
 			Automated: updated.Automated,
@@ -378,7 +387,8 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q domain.Quest, st *domain.
 	}
 	qid := updated.ID
 	r.Hub.Publish("quest_failed", events.PublishOpts{
-		QuestID: &qid, Title: updated.Title, Description: updated.Description,
+		Workspace: wsctx.From(ctx),
+		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
 		Detail: "провалено", Toast: true, Source: "system",
 		Significance: string(updated.Significance), StepTitle: st.Title,
 		Automated: updated.Automated,

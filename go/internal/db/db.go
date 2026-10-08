@@ -2,15 +2,23 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	_ "modernc.org/sqlite"
 )
 
-// expectedAlembic is the schema revision this binary was built against.
-// Keep in sync with alembic heads; append new ids to alembicOrder when adding migrations.
-const expectedAlembic = "1a2b3c4d5e6f"
+// expectedAlembic is the PostgreSQL schema revision this binary was built
+// against (head of alembic/versions_pg). Append new ids to alembicOrder when
+// adding migrations. The SQLite chain is frozen at expectedAlembicSQLite.
+const expectedAlembic = "c7e1a9b3d5f2"
+
+// expectedAlembicSQLite is the head of the legacy SQLite chain (alembic/versions).
+const expectedAlembicSQLite = "1a2b3c4d5e6f"
 
 // alembicOrder is oldest→newest. Unknown DB revisions are treated as ahead of
 // this binary (deploy race: migrate applied before the new image lands).
@@ -55,6 +63,7 @@ var alembicOrder = []string{
 	"d5e6f7a8b9c0",
 	"e6f7a8b9c0d1",
 	"1a2b3c4d5e6f",
+	"c7e1a9b3d5f2",
 }
 
 // SchemaStatus is the alembic check outcome for health probes / logs.
@@ -91,7 +100,7 @@ func Open(path string) (*sql.DB, SchemaStatus, error) {
 		_ = sqlDB.Close()
 		return nil, zero, err
 	}
-	st, err := assertMigrated(sqlDB)
+	st, err := assertMigrated(sqlDB, expectedAlembicSQLite)
 	if err != nil {
 		_ = sqlDB.Close()
 		return nil, zero, err
@@ -108,7 +117,7 @@ func dirOf(path string) string {
 	return "."
 }
 
-func assertMigrated(db *sql.DB) (SchemaStatus, error) {
+func assertMigrated(db *sql.DB, expected string) (SchemaStatus, error) {
 	var ver string
 	err := db.QueryRow(`SELECT version_num FROM alembic_version LIMIT 1`).Scan(&ver)
 	if err == sql.ErrNoRows {
@@ -117,7 +126,7 @@ func assertMigrated(db *sql.DB) (SchemaStatus, error) {
 	if err != nil {
 		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (run Python migrate first)", err)
 	}
-	return checkAlembicVersion(ver)
+	return checkAlembicVersionAgainst(ver, expected, alembicOrder)
 }
 
 func checkAlembicVersion(ver string) (SchemaStatus, error) {
@@ -156,4 +165,16 @@ func indexOf(xs []string, want string) int {
 		}
 	}
 	return -1
+}
+
+// IsUniqueViolation reports a UNIQUE / primary-key conflict on either backend.
+func IsUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return strings.Contains(err.Error(), "UNIQUE")
 }

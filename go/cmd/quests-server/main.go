@@ -38,7 +38,7 @@ func main() {
 		log.Printf("db: warning: %s", schema.Detail)
 	}
 
-	authStore := &auth.Store{DB: sqlDB}
+	authStore := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != ""}
 	userCount, err := authStore.CountUsers()
 	if err != nil {
 		log.Fatalf("auth: %v", err)

@@ -100,7 +100,7 @@ func (s *Store) UpdateDraftOpPayload(ctx context.Context, id int64, payload json
 // DraftRoots returns the extra map roots kept with the draft, as raw JSON.
 func (s *Store) DraftRoots(ctx context.Context) (json.RawMessage, error) {
 	var roots string
-	err := s.DB.QueryRowContext(ctx, `SELECT roots FROM graphdraft_state WHERE id = 1`).Scan(&roots)
+	err := s.DB.QueryRowContext(ctx, `SELECT roots FROM graphdraft_state ORDER BY id LIMIT 1`).Scan(&roots)
 	if err != nil {
 		return json.RawMessage("[]"), nil //nolint:nilerr // no row yet = no roots
 	}
@@ -108,10 +108,16 @@ func (s *Store) DraftRoots(ctx context.Context) (json.RawMessage, error) {
 }
 
 func (s *Store) SetDraftRoots(ctx context.Context, roots json.RawMessage) error {
-	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO graphdraft_state (id, roots, updated_at) VALUES (1, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET roots = excluded.roots, updated_at = excluded.updated_at`,
-		string(roots), timeutil.ToDBUTC(timeutil.NowUTC()))
+	// One row per workspace (row-level security scopes the UPDATE); insert on first use.
+	now := timeutil.ToDBUTC(timeutil.NowUTC())
+	res, err := s.DB.ExecContext(ctx, `UPDATE graphdraft_state SET roots = ?, updated_at = ?`, string(roots), now)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil
+	}
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO graphdraft_state (roots, updated_at) VALUES (?, ?)`, string(roots), now)
 	return err
 }
 

@@ -11,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 func TestRebind(t *testing.T) {
@@ -94,6 +96,19 @@ func openTestPG(t *testing.T) *sql.DB {
 	if _, err := conn.ExecContext(context.Background(), string(baseline)); err != nil {
 		t.Fatalf("apply baseline: %v", err)
 	}
+	// If the workspaces migration ever ran on this server the pool drops to quests_app.
+	var hasRole int
+	if err := conn.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM pg_roles WHERE rolname = 'quests_app'`).Scan(&hasRole); err == nil && hasRole > 0 {
+		for _, g := range []string{
+			`GRANT USAGE ON SCHEMA ` + schema + ` TO quests_app`,
+			`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ` + schema + ` TO quests_app`,
+			`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ` + schema + ` TO quests_app`,
+		} {
+			if _, err := conn.ExecContext(context.Background(), g); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	pool := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
 	t.Cleanup(func() { _ = pool.Close() })
 	return pool
@@ -155,5 +170,162 @@ func TestPGLastInsertIDAndPlaceholders(t *testing.T) {
 	}
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// openTestPGWorkspaces is openTestPG plus the workspaces migration, with the
+// quests_app grants pointed at the throwaway schema. The pool drops to
+// quests_app (as the API does), so RLS applies. Needs a role that may CREATE ROLE.
+func openTestPGWorkspaces(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+	url := os.Getenv("QUESTS_TEST_PG_URL")
+	if url == "" {
+		t.Skip("QUESTS_TEST_PG_URL not set")
+	}
+	cfg, err := pgx.ParseConfig(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := fmt.Sprintf("t_%d", time.Now().UnixNano())
+	cfg.RuntimeParams["search_path"] = schema
+	admin, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`)
+		_ = admin.Close()
+	})
+	if _, err := admin.Exec(`CREATE SCHEMA ` + schema); err != nil {
+		t.Fatal(err)
+	}
+	conn, err := admin.Conn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	ctx := context.Background()
+	if _, err := conn.ExecContext(ctx, `SET search_path TO `+schema); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"1a2b3c4d5e6f_pg_baseline.py", "c7e1a9b3d5f2_workspaces.sql"} {
+		path := filepath.Join("..", "..", "..", "alembic", "versions_pg", f)
+		if f == "1a2b3c4d5e6f_pg_baseline.py" {
+			path = filepath.Join("..", "..", "..", "alembic", "versions_pg", "baseline.sql")
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := conn.ExecContext(ctx, string(b)); err != nil {
+			t.Fatalf("apply %s: %v", f, err)
+		}
+	}
+	for _, g := range []string{
+		`GRANT USAGE ON SCHEMA ` + schema + ` TO quests_app`,
+		`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ` + schema + ` TO quests_app`,
+		`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ` + schema + ` TO quests_app`,
+	} {
+		if _, err := conn.ExecContext(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pool := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
+	t.Cleanup(func() { _ = pool.Close() })
+	return pool, schema
+}
+
+func TestPGWorkspaceIsolation(t *testing.T) {
+	pool, _ := openTestPGWorkspaces(t)
+	bg := context.Background()
+	ws1, ws2 := wsctx.With(bg, 1), wsctx.With(bg, 2)
+	if _, err := pool.ExecContext(bg, `INSERT INTO workspace (id, name) VALUES (2, 'two') ON CONFLICT DO NOTHING`); err != nil {
+		t.Fatal(err)
+	}
+	now := "2026-01-02 03:04:05.000000"
+	insertQuest := func(ctx context.Context, title string) (int64, error) {
+		res, err := pool.ExecContext(ctx, `INSERT INTO quest (title, description, status, pinned, sort_order, created_at, updated_at)
+			VALUES (?, '', 'active', 0, 0, ?, ?)`, title, now, now)
+		if err != nil {
+			return 0, err
+		}
+		return res.LastInsertId()
+	}
+	count := func(ctx context.Context) int {
+		var n int
+		if err := pool.QueryRowContext(ctx, `SELECT COUNT(*) FROM quest`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	// A workspace-less context sees and writes nothing (fail closed).
+	if _, err := insertQuest(bg, "orphan"); err == nil {
+		t.Fatal("insert without a workspace must fail")
+	}
+	id1, err := insertQuest(ws1, "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := insertQuest(ws2, "two"); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(bg); n != 0 {
+		t.Fatalf("no workspace sees %d rows", n)
+	}
+	if n1, n2 := count(ws1), count(ws2); n1 != 1 || n2 != 1 {
+		t.Fatalf("ws1=%d ws2=%d, want 1/1", n1, n2)
+	}
+	// Another workspace can neither read, change nor delete the row.
+	var title string
+	if err := pool.QueryRowContext(ws2, `SELECT title FROM quest WHERE id = ?`, id1).Scan(&title); err != sql.ErrNoRows {
+		t.Fatalf("cross-workspace read: %q %v", title, err)
+	}
+	res, err := pool.ExecContext(ws2, `UPDATE quest SET title = 'hacked' WHERE id = ?`, id1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := res.RowsAffected(); n != 0 {
+		t.Fatalf("cross-workspace update touched %d rows", n)
+	}
+	res, err = pool.ExecContext(ws2, `DELETE FROM quest WHERE id = ?`, id1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := res.RowsAffected(); n != 0 {
+		t.Fatalf("cross-workspace delete touched %d rows", n)
+	}
+	// Writing a row into another workspace is rejected by the policy.
+	if _, err := pool.ExecContext(ws2, `INSERT INTO quest (title, description, status, pinned, sort_order, created_at, updated_at, workspace_id)
+		VALUES ('smuggled', '', 'active', 0, 0, ?, ?, 1)`, now, now); err == nil {
+		t.Fatal("inserting into a foreign workspace must fail")
+	}
+	// The same connection flips workspaces correctly, also inside a transaction.
+	tx, err := pool.BeginTx(ws2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inTx int
+	if err := tx.QueryRowContext(ws2, `SELECT COUNT(*) FROM quest`).Scan(&inTx); err != nil || inTx != 1 {
+		t.Fatalf("tx count=%d err=%v", inTx, err)
+	}
+	if _, err := tx.ExecContext(ws2, `INSERT INTO quest (title, description, status, pinned, sort_order, created_at, updated_at)
+		VALUES ('rolled back', '', 'active', 0, 0, ?, ?)`, now, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if n1, n2 := count(ws1), count(ws2); n1 != 1 || n2 != 1 {
+		t.Fatalf("after rollback ws1=%d ws2=%d, want 1/1", n1, n2)
+	}
+	// Per-workspace uniqueness: both workspaces can own the same category slug.
+	for _, ctx := range []context.Context{ws1, ws2} {
+		if _, err := pool.ExecContext(ctx, `INSERT INTO questcategory (slug, label, sort_order, created_at) VALUES ('work', 'Work', 0, ?)`, now); err != nil {
+			t.Fatalf("category per workspace: %v", err)
+		}
+	}
+	if _, err := pool.ExecContext(ws1, `INSERT INTO questcategory (slug, label, sort_order, created_at) VALUES ('work', 'Again', 0, ?)`, now); err == nil {
+		t.Fatal("duplicate slug within a workspace must fail")
 	}
 }

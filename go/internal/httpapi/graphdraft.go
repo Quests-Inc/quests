@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/wsctx"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -726,8 +727,8 @@ func (s *Server) postAttachmentOwner(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logAttachment("attachment_moved", a, fmt.Sprintf("перенесено: %s %d → %s %d", before.OwnerType, before.OwnerID, a.OwnerType, a.OwnerID))
-	s.publishSilent("attachment_updated", a.Filename, map[string]any{
+	s.logAttachment(r.Context(), "attachment_moved", a, fmt.Sprintf("перенесено: %s %d → %s %d", before.OwnerType, before.OwnerID, a.OwnerType, a.OwnerID))
+	s.publishSilent(r.Context(), "attachment_updated", a.Filename, map[string]any{
 		"attachment_id": a.ID, "owner_type": a.OwnerType, "owner_id": a.OwnerID,
 	})
 	writeJSON(w, 200, store.AttachmentToRead(a))
@@ -815,7 +816,8 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 	for _, q := range []domain.Quest{from, to} {
 		id := q.ID
 		s.Hub.Publish("quest_updated", events.PublishOpts{
-			QuestID: &id, Title: q.Title, Detail: "перенос шага", Source: "web", Significance: string(q.Significance),
+			Workspace: wsctx.From(r.Context()),
+			QuestID:   &id, Title: q.Title, Detail: "перенос шага", Source: "web", Significance: string(q.Significance),
 		})
 	}
 	nf, _ := s.Store.GetQuest(r.Context(), fromID)

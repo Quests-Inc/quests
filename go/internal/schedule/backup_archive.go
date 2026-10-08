@@ -15,6 +15,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	_ "modernc.org/sqlite"
 
+	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
 )
 
@@ -44,20 +45,47 @@ func listSnapshotWebDAVPaths(snapshotPath string) ([]string, error) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='attachment'`).Scan(&n); err != nil || n == 0 {
 		return nil, nil
 	}
-	return listWebDAVPaths(db)
+	return listWebDAVPaths(context.Background(), db)
+}
+
+// listAllWebDAVPaths collects attachment paths from every workspace of a live
+// PostgreSQL database (row-level security shows one workspace at a time).
+func listAllWebDAVPaths(ctx context.Context, st *store.Store) ([]string, error) {
+	var out []string
+	var firstErr error
+	seen := map[string]struct{}{}
+	err := st.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+		paths, err := listWebDAVPaths(wctx, st.DB)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			return
+		}
+		for _, p := range paths {
+			if _, ok := seen[p]; !ok {
+				seen[p] = struct{}{}
+				out = append(out, p)
+			}
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, firstErr
 }
 
 // listWebDAVPaths returns every distinct webdav_path referenced by attachment
 // metadata (current rows and revisions) in db.
-func listWebDAVPaths(db *sql.DB) ([]string, error) {
-	rows, err := db.Query(`
+func listWebDAVPaths(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT webdav_path FROM attachment WHERE webdav_path IS NOT NULL AND webdav_path != ''
 		UNION
 		SELECT webdav_path FROM attachment_revision WHERE webdav_path IS NOT NULL AND webdav_path != ''
 		ORDER BY 1`)
 	if err != nil {
 		// attachment_revision may be missing on older schemas.
-		rows, err = db.Query(`
+		rows, err = db.QueryContext(ctx, `
 			SELECT webdav_path FROM attachment
 			WHERE webdav_path IS NOT NULL AND webdav_path != ''
 			ORDER BY 1`)
