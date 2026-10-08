@@ -16,6 +16,7 @@ import (
 	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/health"
 	"github.com/valirum/quests/go/internal/httpapi"
+	"github.com/valirum/quests/go/internal/metrics"
 	"github.com/valirum/quests/go/internal/schedule"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
@@ -78,6 +79,8 @@ func main() {
 		SecureCookies: cfg.SecureCookies,
 		InternalToken: internalToken,
 		Health:        reg,
+		Metrics:       metrics.New(sqlDB, st, hub, reg),
+		MetricsToken:  cfg.MetricsToken,
 		Hub:           hub,
 		CORS:          cfg.CORS,
 		DataDir:       cfg.DataDir,

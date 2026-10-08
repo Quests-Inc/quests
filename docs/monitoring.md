@@ -7,7 +7,7 @@ already see their runners / HUD / bot in Settings → Сервисы.
 |---|---|---|
 | **Uptime Kuma** | the home server (`arch`), `docker-compose.monitoring.yml` | probes, uptime graph and %, alerts |
 | **Edge watchdog** | the gateway VPS, `deploy/monitoring/edge-probe.sh` | availability seen from outside the home server, **log only** (covers the case where `arch` itself is down — Kuma would be down with it) |
-| Prometheus + Grafana | *(next step)* | trends: latency, DB size, host load |
+| **Prometheus + Grafana** | the home server, same overlay | trends: API latency/errors, quests and runner queue, DB pool and size, host CPU/RAM/disk, backup age |
 
 ## Uptime Kuma
 
@@ -27,6 +27,21 @@ already see their runners / HUD / bot in Settings → Сервисы.
    works there (e-mail, a webhook, …).
 
 Kuma's data lives in the `kuma-data` volume; it is not part of the DB backups.
+
+## Metrics: Prometheus + Grafana
+
+Same overlay (`MONITORING=1`). Extra `.env` values: `QUESTS_METRICS_TOKEN` (bearer token for `GET /metrics`; empty switches
+the endpoint off), `GRAFANA_ADMIN_PASSWORD`; optional `GRAFANA_PORT` (3002), `PROMETHEUS_RETENTION` (90d).
+
+- `GET /metrics` on the API (token-guarded, aggregates only — no workspace names or ids, sums over all workspaces):
+  request count / latency by route pattern, in-flight requests, WebSocket clients, quests by status, runner jobs by state,
+  attachments, newest backup age/size, health probes, DB pool, Go runtime. The gateway must not publish it
+  (`respond /metrics 404` in the edge Caddyfile).
+- Prometheus scrapes `api:8765/metrics`, `node-exporter` (host: CPU, RAM, disk), `postgres-exporter` (size, connections)
+  and itself every 15 s; no ports are published for any of them.
+- Grafana (`http://<server>:3002`, user `admin`, password from `.env`) comes with the Prometheus data source and the
+  «Quests — обзор» dashboard provisioned from `deploy/monitoring/grafana/`. Edit the JSON in the repo, not in the UI
+  (provisioned dashboards are read-only there).
 
 ## Edge watchdog (gateway VPS)
 

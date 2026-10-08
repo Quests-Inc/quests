@@ -35,6 +35,8 @@ services:
       # first one with:
       #   docker compose exec api quests-server useradd <username>
       QUESTS_AUTH: ${QUESTS_AUTH:-auto}
+      # Bearer token for GET /metrics (Prometheus, docs/monitoring.md); empty = endpoint off.
+      QUESTS_METRICS_TOKEN: ${QUESTS_METRICS_TOKEN:-}
       # Set to 1 when this instance is served over HTTPS (marks the session
       # cookie Secure). Leave 0 for plain http, or the browser drops the cookie.
       QUESTS_SECURE_COOKIES: ${QUESTS_SECURE_COOKIES:-0}

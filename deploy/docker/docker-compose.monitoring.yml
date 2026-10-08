@@ -25,5 +25,64 @@ services:
       retries: 3
       start_period: 40s
 
+
+  # --- metrics (quest=345): Prometheus scrapes the API's /metrics (bearer QUESTS_METRICS_TOKEN),
+  # the host (node-exporter) and Postgres; Grafana draws them. Needs QUESTS_METRICS_TOKEN and
+  # GRAFANA_ADMIN_PASSWORD in .env; Prometheus and the exporters publish no ports.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: quests-prometheus
+    restart: unless-stopped
+    environment:
+      QUESTS_METRICS_TOKEN: ${QUESTS_METRICS_TOKEN:?set QUESTS_METRICS_TOKEN in .env}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        printf '%s' "$$QUESTS_METRICS_TOKEN" > /tmp/metrics_token &&
+        exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml
+        --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: quests-node-exporter
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+)($$|/)
+    volumes:
+      - /:/host:ro,rslave
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: quests-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://quests:${POSTGRES_PASSWORD:-}@postgres:5432/quests?sslmode=disable
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: quests-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   kuma-data:
+  prometheus-data:
+  grafana-data:

@@ -17,6 +17,7 @@ import (
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/health"
+	"github.com/valirum/quests/go/internal/metrics"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
@@ -24,12 +25,15 @@ import (
 )
 
 type Server struct {
-	Store   *store.Store
-	Health  *health.Registry
-	Hub     *events.Hub
-	CORS    []string
-	DataDir string
-	Root    string
+	// Metrics serves /metrics (nil = not built in); MetricsToken guards it (empty = disabled).
+	Metrics      *metrics.Metrics
+	MetricsToken string
+	Store        *store.Store
+	Health       *health.Registry
+	Hub          *events.Hub
+	CORS         []string
+	DataDir      string
+	Root         string
 	// Auth backs login, sessions and API tokens.
 	Auth *auth.Store
 	// AuthRequired gates every /api/ route and /ws. Off only for a bootstrap
@@ -63,13 +67,20 @@ type Server struct {
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.cors(s.requireAuth(s.withWorkspace(s.routes())))
+	h := s.cors(s.requireAuth(s.withWorkspace(s.routes())))
+	if s.Metrics != nil {
+		h = s.Metrics.Middleware(h)
+	}
+	return h
 }
 
 // routes builds the API routes without the cors/auth wrappers; the draft
 // commit uses it to call handlers directly.
 func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
+	if s.Metrics != nil {
+		mux.Handle("GET /metrics", s.Metrics.Handler(s.MetricsToken))
+	}
 	mux.HandleFunc("GET /api/health", s.getHealth)
 	mux.HandleFunc("POST /api/health/heartbeat", s.postHeartbeat)
 	mux.HandleFunc("GET /api/categories", s.listCategories)

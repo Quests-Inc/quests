@@ -281,3 +281,10 @@ func QuietFromQuery(raw string) bool {
 		return false
 	}
 }
+
+// ClientCount is the number of connected WebSocket peers.
+func (h *Hub) ClientCount() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.clients)
+}

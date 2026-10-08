@@ -15,9 +15,11 @@ type Config struct {
 	// DatabaseURL (QUESTS_DATABASE_URL, postgres://…) switches from the SQLite
 	// file at DBPath to PostgreSQL.
 	DatabaseURL string
-	Host        string
-	Port        int
-	CORS        []string
+	// MetricsToken (QUESTS_METRICS_TOKEN) is the bearer token for GET /metrics; empty disables the endpoint.
+	MetricsToken string
+	Host         string
+	Port         int
+	CORS         []string
 	// AuthMode is "auto" (enforce as soon as an account exists), "on" or "off".
 	AuthMode string
 	// SecureCookies marks the session cookie Secure. Enable behind HTTPS.
@@ -127,6 +129,7 @@ func Load() Config {
 		DataDir:          data,
 		DBPath:           filepath.Join(data, "quests.db"),
 		DatabaseURL:      strings.TrimSpace(os.Getenv("QUESTS_DATABASE_URL")),
+		MetricsToken:     strings.TrimSpace(os.Getenv("QUESTS_METRICS_TOKEN")),
 		Host:             host,
 		Port:             port,
 		CORS:             cors,
