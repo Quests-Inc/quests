@@ -24,4 +24,4 @@ awk -F, -v now="$now" '
   while read -r start mins tail; do
     echo "$(date -d @"$start" '+%Y-%m-%d %H:%M')  ${mins} min ${tail:-}"
   done
-[ -f "$LOG_DIR/events.log" ] && { echo "--- last events"; tail -5 "$LOG_DIR/events.log"; }
+if [ -f "$LOG_DIR/events.log" ]; then echo "--- last events"; tail -5 "$LOG_DIR/events.log"; fi
