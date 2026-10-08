@@ -22,7 +22,7 @@ sudo pacman -S gtk4 gtk4-layer-shell python-gobject
 ./scripts/bootstrap.sh
 ```
 
-Подтянет Python-зависимости (`uv sync`), соберёт Go CLI/API, `npm install` во `frontend/`, создаст `data/` и накатит миграции.
+Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `npm install` во `frontend/`, создаст `data/` и накатит миграции.
 
 ## Запуск
 
@@ -83,3 +83,6 @@ User systemd units: [`deploy/systemd/`](deploy/systemd/).
 Docker (api / bot / frontend): [`deploy/docker/`](deploy/docker/).  
 HUD на удалённый API (токен, unit, niri): [`docs/hud-workstation.md`](docs/hud-workstation.md).  
 CI на `main` деплоит на прод сам (self-hosted runner прямо на сервере): [`docs/deploy-ssh.md`](docs/deploy-ssh.md).
+
+> **Не запускайте голый `uv sync`.** Он синхронизирует окружение точно и удаляет необязательные пакеты (`mcp`, `aiogram`, `weasyprint`, `faster-whisper`):
+> `quests-mcp`, бот и PDF-экспорт тогда падают с `No module named …`. Всегда `uv sync --group dev --all-extras` (так делает `scripts/bootstrap.sh`).
