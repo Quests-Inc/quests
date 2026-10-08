@@ -115,8 +115,10 @@
     <ul class="tokens">
       {#each tokens as t (t.id)}
         <li class="tokens__row">
-          <span class="tokens__name">{t.name}</span>
-          <span class="tokens__meta">создан {when(t.created_at)} · использован {when(t.last_used_at)}</span>
+          <span class="tokens__text">
+            <span class="tokens__name">{t.name}</span>
+            <span class="tokens__meta">создан {when(t.created_at)} · использован {when(t.last_used_at)}</span>
+          </span>
           <button type="button" class="btn btn--danger tokens__x" onclick={() => revoke(t)}>Отозвать</button>
         </li>
       {/each}
@@ -183,25 +185,37 @@
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 0.4rem;
   }
+  /* Name over meta on the left, the action pinned to the right edge — rows keep one shape
+     whatever the text length (a flex-wrap row let the button drop to its own line). */
   .tokens__row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.25rem 0.75rem;
-    min-height: 2rem;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--color-border, #333);
+  }
+  .tokens__row:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .tokens__text {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
   }
   .tokens__name {
     font-size: var(--text-sm, 0.875rem);
     color: var(--color-fg);
+    overflow-wrap: anywhere;
   }
   .tokens__meta {
     font-size: 0.75rem;
     color: var(--color-fg-muted, #9a9a9a);
   }
   .tokens__x {
-    margin-left: auto;
+    white-space: nowrap;
   }
   .how {
     margin: 0;
