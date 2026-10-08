@@ -16,6 +16,7 @@ import (
 type loginLimiter struct {
 	mu       sync.Mutex
 	attempts map[string]*loginAttempts
+	invites  map[string][]time.Time
 }
 
 type loginAttempts struct {
@@ -30,7 +31,33 @@ const (
 )
 
 func newLoginLimiter() *loginLimiter {
-	return &loginLimiter{attempts: make(map[string]*loginAttempts)}
+	return &loginLimiter{attempts: make(map[string]*loginAttempts), invites: make(map[string][]time.Time)}
+}
+
+const (
+	inviteWindow = 10 * time.Minute
+	inviteMax    = 30
+)
+
+// tryInvite counts one invitation-link request from key and reports whether it
+// is within budget (inviteMax per inviteWindow). Tokens are 256-bit, so this
+// is hygiene against enumeration noise, not the actual protection.
+func (l *loginLimiter) tryInvite(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	recent := l.invites[key][:0]
+	for _, t := range l.invites[key] {
+		if now.Sub(t) < inviteWindow {
+			recent = append(recent, t)
+		}
+	}
+	if len(recent) >= inviteMax {
+		l.invites[key] = recent
+		return false
+	}
+	l.invites[key] = append(recent, now)
+	return true
 }
 
 // allow reports whether a login attempt from key may proceed, and if not,

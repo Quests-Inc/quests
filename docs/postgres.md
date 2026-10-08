@@ -79,6 +79,13 @@ even through a query that forgot a filter.
   `QUESTS_WORKSPACE=<id> quests-server runner add <label>`.
 - **Accounts:** `quests-server useradd` gives the first account workspace 1 (the migrated data) and every
   later one a new personal workspace with the default categories. `quests-server workspace ls|add|member`.
+- **Members and invitations:** roles `owner` / `member` (members get full data access, owners also manage
+  people). Settings → Пространства lists members (owners remove anyone, anyone leaves; the last owner cannot)
+  and mints a one-time invitation link (`/?invite=<token>`, 7 days, only its hash is stored). Opening it:
+  a logged-in account joins; otherwise the page signs up a new account (login + password) that joins. This is
+  the only self-service signup. An account left in no workspace stays signed in and is offered to create one.
+  API: `GET/DELETE /api/workspaces/{id}/members`, `POST /api/workspaces/{id}/invites`,
+  `GET|POST /api/invites/{token}[/accept]`.
 - Category slugs, tag slugs and runner labels are unique per workspace.
 
 Tests: `QUESTS_TEST_PG_URL=… go test ./go/internal/db` includes `TestPGWorkspaceIsolation` (needs a login

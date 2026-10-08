@@ -4,7 +4,14 @@
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import { hotkeyGroups } from '../js/hotkeys.js'
-  import { fetchWorkspaces, createWorkspace, switchWorkspace } from '../js/api.js'
+  import {
+    fetchWorkspaces,
+    createWorkspace,
+    switchWorkspace,
+    fetchMembers,
+    removeMember,
+    createInvite,
+  } from '../js/api.js'
 
   /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
   let {
@@ -50,6 +57,60 @@
       })
       .catch(() => (wsEnabled = false))
   })
+
+  /** Members of the current workspace and an invitation link, owners only. */
+  let members = $state(/** @type {{ user_id: number, username: string, role: string }[]} */ ([]))
+  let myRole = $state('')
+  let inviteUrl = $state('')
+  let inviteCopied = $state(false)
+
+  $effect(() => {
+    if (!open || !wsCurrent) return
+    inviteUrl = ''
+    fetchMembers(wsCurrent)
+      .then((r) => {
+        members = r?.members ?? []
+        myRole = r?.role ?? ''
+      })
+      .catch(() => {
+        members = []
+        myRole = ''
+      })
+  })
+
+  async function newInvite() {
+    if (wsBusy) return
+    wsError = ''
+    try {
+      const r = await createInvite(wsCurrent)
+      inviteUrl = location.origin + r.path
+      inviteCopied = false
+    } catch (e) {
+      wsError = e?.message || 'не удалось создать приглашение'
+    }
+  }
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      inviteCopied = true
+    } catch {
+      /* the field is selectable — copy by hand */
+    }
+  }
+
+  async function dropMember(m) {
+    const me = m.username === username
+    if (!confirm(me ? 'Выйти из этого пространства?' : `Убрать ${m.username} из пространства?`)) return
+    wsError = ''
+    try {
+      await removeMember(wsCurrent, m.user_id)
+      if (me) location.reload()
+      else members = members.filter((x) => x.user_id !== m.user_id)
+    } catch (e) {
+      wsError = e?.message || 'не удалось убрать'
+    }
+  }
 
   async function pickWorkspace(id) {
     if (wsBusy || id === wsCurrent) return
@@ -245,6 +306,32 @@
                 </li>
               {/each}
             </ul>
+            {#if members.length}
+              <h4 class="ws__sub">Участники</h4>
+              <ul class="members">
+                {#each members as m (m.user_id)}
+                  <li class="members__row">
+                    <span>{m.username}{m.role === 'owner' ? ' · владелец' : ''}</span>
+                    {#if myRole === 'owner' || m.username === username}
+                      <button type="button" class="members__x" onclick={() => dropMember(m)}>
+                        {m.username === username ? 'выйти' : 'убрать'}
+                      </button>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+              {#if myRole === 'owner'}
+                {#if inviteUrl}
+                  <div class="ws__new">
+                    <input type="text" readonly value={inviteUrl} onfocus={(e) => e.currentTarget.select()} />
+                    <button type="button" onclick={copyInvite}>{inviteCopied ? 'Скопировано' : 'Копировать'}</button>
+                  </div>
+                  <p class="block__hint">Одноразовая ссылка, действует 7 дней.</p>
+                {:else}
+                  <button type="button" class="ws__invite" onclick={newInvite}>Пригласить по ссылке</button>
+                {/if}
+              {/if}
+            {/if}
             <form
               class="ws__new"
               onsubmit={(e) => {
@@ -340,6 +427,45 @@
   .ws__item--on {
     border-color: var(--color-accent, var(--color-fg));
     cursor: default;
+  }
+
+  .ws__sub {
+    margin: var(--space-3, 0.75rem) 0 var(--space-1, 0.25rem);
+    font-size: var(--text-xs, 0.8rem);
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .members {
+    list-style: none;
+    margin: 0 0 var(--space-2, 0.5rem);
+    padding: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .members__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--color-fg);
+  }
+
+  .members__x,
+  .ws__invite {
+    padding: 4px 10px;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--color-fg-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .ws__invite {
+    margin-bottom: var(--space-3, 0.75rem);
   }
 
   .ws__new {

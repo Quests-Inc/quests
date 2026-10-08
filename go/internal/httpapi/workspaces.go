@@ -69,6 +69,11 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 			ws = id
 		}
 		if ws <= 0 {
+			// An account without any workspace may only manage workspaces / sessions.
+			if strings.HasPrefix(path, "/api/workspaces") || strings.HasPrefix(path, "/api/auth/") {
+				next.ServeHTTP(w, r)
+				return
+			}
 			writeErr(w, http.StatusForbidden, "no workspace")
 			return
 		}
@@ -80,11 +85,198 @@ func (s *Server) registerWorkspaces(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/workspaces", s.listWorkspaces)
 	mux.HandleFunc("POST /api/workspaces", s.createWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/switch", s.switchWorkspace)
+	mux.HandleFunc("GET /api/workspaces/{id}/members", s.listMembers)
+	mux.HandleFunc("DELETE /api/workspaces/{id}/members/{uid}", s.removeMember)
+	mux.HandleFunc("POST /api/workspaces/{id}/invites", s.createInvite)
+	mux.HandleFunc("GET /api/invites/{token}", s.getInvite)
+	mux.HandleFunc("POST /api/invites/{token}/accept", s.acceptInvite)
+}
+
+// memberOf checks that the caller belongs to workspace {id} and returns the id
+// and their role. Callers without an account (auth off) are refused: members
+// and invitations only make sense with accounts.
+func (s *Server) memberOf(w http.ResponseWriter, r *http.Request) (int64, string, auth.User, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	p, ok := PrincipalFrom(r.Context())
+	if err != nil || id <= 0 || !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+		writeErr(w, http.StatusBadRequest, "needs an account and a workspace id")
+		return 0, "", auth.User{}, false
+	}
+	role, err := s.Store.MemberRole(r.Context(), id, p.User.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return 0, "", auth.User{}, false
+	}
+	if role == "" {
+		// Do not reveal whether the workspace exists.
+		writeErr(w, http.StatusNotFound, "workspace not found")
+		return 0, "", auth.User{}, false
+	}
+	return id, role, p.User, true
+}
+
+func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
+	id, role, _, ok := s.memberOf(w, r)
+	if !ok {
+		return
+	}
+	members, err := s.Store.WorkspaceMembers(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"members": members, "role": role})
+}
+
+// removeMember lets an owner remove anyone, and anyone leave.
+func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
+	id, role, me, ok := s.memberOf(w, r)
+	if !ok {
+		return
+	}
+	uid, err := strconv.ParseInt(r.PathValue("uid"), 10, 64)
+	if err != nil || uid <= 0 {
+		writeErr(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	if uid != me.ID && role != store.RoleOwner {
+		writeErr(w, http.StatusForbidden, "only an owner can remove other members")
+		return
+	}
+	switch err := s.Store.RemoveWorkspaceMember(r.Context(), id, uid); {
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, "not a member")
+	case errors.Is(err, store.ErrLastOwner):
+		writeErr(w, http.StatusConflict, err.Error())
+	case err != nil:
+		writeErr(w, http.StatusInternalServerError, err.Error())
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// createInvite mints a one-time link (owners only). The secret is shown once.
+func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
+	id, role, me, ok := s.memberOf(w, r)
+	if !ok {
+		return
+	}
+	if role != store.RoleOwner {
+		writeErr(w, http.StatusForbidden, "only an owner can invite")
+		return
+	}
+	secret, exp, err := s.Store.CreateInvite(r.Context(), id, me.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"token":      secret,
+		"path":       "/?invite=" + secret,
+		"expires_at": exp.UTC().Format("2006-01-02T15:04:05Z"),
+	})
+}
+
+func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
+	if !s.limiter().tryInvite(loginClientKey(r)) {
+		writeErr(w, http.StatusTooManyRequests, "слишком много запросов")
+		return
+	}
+	name, exp, err := s.Store.InviteInfo(r.Context(), r.PathValue("token"))
+	if errors.Is(err, store.ErrInviteInvalid) {
+		writeErr(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	_, loggedIn := s.principal(r)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"workspace":     name,
+		"expires_at":    exp.UTC().Format("2006-01-02T15:04:05Z"),
+		"authenticated": loggedIn,
+	})
+}
+
+// acceptInvite spends an invitation. A logged-in caller joins with their account;
+// otherwise username+password create a new account that joins (the only way to
+// sign up on this instance besides the admin CLI).
+func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
+	if !s.AuthRequired || !s.Store.WorkspacesEnabled() {
+		writeErr(w, http.StatusBadRequest, "invitations need accounts and workspaces")
+		return
+	}
+	if !s.originAllowed(r) {
+		writeErr(w, http.StatusForbidden, "cross-origin request rejected")
+		return
+	}
+	if !s.limiter().tryInvite(loginClientKey(r)) {
+		writeErr(w, http.StatusTooManyRequests, "слишком много попыток, повторите позже")
+		return
+	}
+	secret := r.PathValue("token")
+	if _, _, err := s.Store.InviteInfo(r.Context(), secret); err != nil {
+		writeErr(w, http.StatusNotFound, store.ErrInviteInvalid.Error())
+		return
+	}
+
+	var user auth.User
+	created := false
+	if p, ok := s.principal(r); ok && p.User.ID != 0 {
+		user = p.User
+	} else {
+		var body struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<14)).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid JSON")
+			return
+		}
+		u, err := s.Auth.CreateUser(body.Username, body.Password)
+		switch {
+		case errors.Is(err, auth.ErrUserExists):
+			writeErr(w, http.StatusConflict, "такой логин уже занят — войдите и откройте ссылку снова")
+			return
+		case errors.Is(err, auth.ErrWeakPassword):
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		case err != nil:
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		user, created = u, true
+	}
+
+	wsID, err := s.Store.ClaimInvite(r.Context(), secret, user.ID)
+	if err != nil {
+		if created {
+			_ = s.Auth.DeleteUser(user.ID) // lost a race for the invitation: undo the signup
+		}
+		if errors.Is(err, store.ErrInviteInvalid) {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if created {
+		secretSess, err := s.startSession(w, r, user.ID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		_ = s.Auth.SetSessionWorkspace(secretSess, user.ID, wsID)
+	} else if c, err := r.Cookie(SessionCookie); err == nil {
+		_ = s.Auth.SetSessionWorkspace(c.Value, user.ID, wsID)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"workspace_id": wsID, "username": user.Username, "created": created})
 }
 
 func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	cur := wsctx.From(r.Context())
-	if cur == 0 {
+	if p, ok := PrincipalFrom(r.Context()); cur == 0 && !(ok && p.User.ID != 0) {
 		cur = store.DefaultWorkspaceID
 	}
 	var list []store.Workspace

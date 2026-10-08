@@ -58,7 +58,9 @@ func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64) (int64, err
 	var id int64
 	err := s.DB.QueryRow(`SELECT workspace_id FROM workspace_member WHERE user_id = ? ORDER BY workspace_id LIMIT 1`, userID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrNotMember
+		// No membership (e.g. removed from their last workspace): still logged in,
+		// but with no workspace until they create one or accept an invitation.
+		return 0, nil
 	}
 	return id, err
 }
@@ -389,4 +391,10 @@ func (s *Store) RevokeAPIToken(id int64) error {
 		return errors.New("no such active token")
 	}
 	return nil
+}
+
+// DeleteUser removes an account (used to undo a signup whose invitation was lost to a race).
+func (s *Store) DeleteUser(id int64) error {
+	_, err := s.DB.Exec(`DELETE FROM appuser WHERE id = ?`, id)
+	return err
 }

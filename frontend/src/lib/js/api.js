@@ -488,6 +488,30 @@ export function createWorkspace(name) {
   return request('/api/workspaces', { method: 'POST', body: JSON.stringify({ name }) })
 }
 
+export function fetchMembers(workspaceId) {
+  return request(`/api/workspaces/${workspaceId}/members`)
+}
+
+export function removeMember(workspaceId, userId) {
+  return request(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' })
+}
+
+export function createInvite(workspaceId) {
+  return request(`/api/workspaces/${workspaceId}/invites`, { method: 'POST' })
+}
+
+export function fetchInvite(token) {
+  return request(`/api/invites/${encodeURIComponent(token)}`)
+}
+
+/** Spend an invitation: with a session joins as that account, else `body` {username, password} signs up. */
+export function acceptInvite(token, body = {}) {
+  return request(`/api/invites/${encodeURIComponent(token)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export function switchWorkspace(id) {
   return request(`/api/workspaces/${id}/switch`, { method: 'POST' })
 }

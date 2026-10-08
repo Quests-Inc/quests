@@ -58,9 +58,14 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   import NotesPage from './lib/blocks/NotesPage.svelte'
   import AttachmentsPage from './lib/blocks/AttachmentsPage.svelte'
   import LoginScreen from './lib/blocks/LoginScreen.svelte'
+  import InviteScreen from './lib/blocks/InviteScreen.svelte'
+  import NoWorkspaceScreen from './lib/blocks/NoWorkspaceScreen.svelte'
 
   /** Auth gate: null = still checking, true/false = decided. */
   let authed = $state(null)
+  /** Invitation link (?invite=…): shown instead of the journal until accepted. */
+  let noWorkspace = $state(false)
+  const inviteToken = new URLSearchParams(location.search).get('invite')
   /** Whether this instance uses accounts at all (false on an open local one). */
   let authRequired = $state(false)
   let username = $state('')
@@ -1436,6 +1441,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
 
     let cancelled = false
     ;(async () => {
+      if (inviteToken) return // the invitation screen owns the page
       let state
       try {
         state = await fetchAuthState()
@@ -1453,6 +1459,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
       }
       username = state.username ?? ''
       authed = true
+      if (state.auth_required && state.workspace_id === 0) {
+        noWorkspace = true
+        loading = false
+        return
+      }
       stopApp = startApp()
     })()
 
@@ -1670,7 +1681,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   })
 </script>
 
-{#if authed === false}
+{#if inviteToken}
+  <InviteScreen token={inviteToken} />
+{:else if noWorkspace}
+  <NoWorkspaceScreen />
+{:else if authed === false}
   <LoginScreen {onAuthenticated} />
 {:else if authed === null}
   <div class="boot-gate"></div>

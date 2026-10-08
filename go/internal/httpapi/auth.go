@@ -30,6 +30,10 @@ func PrincipalFrom(ctx context.Context) (auth.Principal, bool) {
 // auth-state probe the SPA uses to decide whether to show the login screen,
 // and a bare liveness ping for uptime monitors.
 func isPublicAPI(path string) bool {
+	// Invitation links are opened before any account exists; the handlers check what they need.
+	if strings.HasPrefix(path, "/api/invites/") {
+		return true
+	}
 	switch path {
 	case "/api/auth/login", "/api/auth/state", "/api/ping":
 		return true
@@ -203,10 +207,21 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.limiter().recordSuccess(key)
-	secret, expires, err := s.Auth.CreateSession(u.ID, r.Header.Get("User-Agent"))
-	if err != nil {
+	if _, err := s.startSession(w, r, u.ID); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"authenticated": true,
+		"username":      u.Username,
+	})
+}
+
+// startSession logs userID in: creates the session row and sets the cookie. Returns the secret.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) (string, error) {
+	secret, expires, err := s.Auth.CreateSession(userID, r.Header.Get("User-Agent"))
+	if err != nil {
+		return "", err
 	}
 	go func() { _ = s.Auth.PurgeExpiredSessions() }()
 	http.SetCookie(w, &http.Cookie{
@@ -218,10 +233,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		Secure:   s.SecureCookies || requestIsHTTPS(r),
 	})
-	writeJSON(w, http.StatusOK, map[string]any{
-		"authenticated": true,
-		"username":      u.Username,
-	})
+	return secret, nil
 }
 
 func (s *Server) postLogout(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +268,8 @@ func (s *Server) getAuthState(w http.ResponseWriter, r *http.Request) {
 	if p, ok := s.principal(r); ok {
 		resp["authenticated"] = true
 		resp["username"] = p.User.Username
+		// 0 = signed in but in no workspace (the SPA offers to create one).
+		resp["workspace_id"] = p.User.WorkspaceID
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
