@@ -95,6 +95,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
 	s.registerWorkspaces(mux)
+	s.registerWorkspaceArchive(mux)
 	s.mountSPA(mux)
 	return mux
 }

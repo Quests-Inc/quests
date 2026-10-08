@@ -297,7 +297,7 @@ func (s *Store) CreateAttachment(ctx context.Context, a Attachment) (Attachment,
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.OwnerType, a.OwnerID, a.Filename, a.WebDAVPath, a.SizeBytes,
 		a.ContentTypeDeclared, a.ContentTypeDetected, a.Comment,
-		timeutil.ToDBUTC(a.UploadedAt), a.ScanStatus, scanned, a.CurrentRevision, a.Hidden)
+		timeutil.ToDBUTC(a.UploadedAt), a.ScanStatus, scanned, a.CurrentRevision, boolInt(a.Hidden))
 	if err != nil {
 		return Attachment{}, err
 	}
@@ -434,7 +434,7 @@ func (s *Store) SetCurrentAttachmentRevision(ctx context.Context, attachmentID i
 }
 
 func (s *Store) SetAttachmentHidden(ctx context.Context, id int64, hidden bool) (Attachment, error) {
-	res, err := s.DB.ExecContext(ctx, `UPDATE attachment SET hidden = ? WHERE id = ?`, hidden, id)
+	res, err := s.DB.ExecContext(ctx, `UPDATE attachment SET hidden = ? WHERE id = ?`, boolInt(hidden), id)
 	if err != nil {
 		return Attachment{}, err
 	}

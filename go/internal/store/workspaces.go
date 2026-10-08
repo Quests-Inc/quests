@@ -413,3 +413,9 @@ func (s *Store) PurgeWorkspace(ctx context.Context, id int64) error {
 	_, err := s.DB.ExecContext(ctx, `DELETE FROM workspace WHERE id = ? AND deleted_at IS NOT NULL`, id)
 	return err
 }
+
+// AbortWorkspace hard-deletes a workspace that was just created for an import that failed.
+func (s *Store) AbortWorkspace(ctx context.Context, id int64) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM workspace WHERE id = ?`, id)
+	return err
+}

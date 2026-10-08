@@ -529,7 +529,7 @@ func (s *Store) CompleteJob(ctx context.Context, id int64, leaseID string, res J
 	}
 	r, err := s.DB.ExecContext(ctx, `UPDATE runner_job SET state = ?, exit_code = ?, timed_out = ?, stdout = ?, stderr = ?,
 		finished_at = ?, started_at = COALESCE(started_at, ?), reason = '' WHERE id = ? AND lease_id = ? AND state IN ('assigned','running','lost')`,
-		state, res.Exit, res.TimedOut, res.Stdout, res.Stderr, timeutil.ToDBUTC(now), timeutil.ToDBUTC(now), id, leaseID)
+		state, res.Exit, boolInt(res.TimedOut), res.Stdout, res.Stderr, timeutil.ToDBUTC(now), timeutil.ToDBUTC(now), id, leaseID)
 	if err != nil {
 		return RunnerJob{}, false, err
 	}

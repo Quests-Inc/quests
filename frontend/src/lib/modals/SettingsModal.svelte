@@ -13,6 +13,8 @@
     createInvite,
     renameWorkspace,
     deleteWorkspace,
+    workspaceExportUrl,
+    importWorkspace,
   } from '../js/api.js'
 
   /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
@@ -116,6 +118,31 @@
       location.reload()
     } catch (e) {
       wsError = e?.message || 'не удалось удалить'
+      wsBusy = false
+    }
+  }
+
+  /** Whole-workspace archive: download (owners) and import into a new workspace. */
+  let exportSecrets = $state(false)
+  let importSecrets = $state(false)
+  let importReport = $state('')
+  let importInput = $state(/** @type {HTMLInputElement | null} */ (null))
+
+  async function onImportFile(event) {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file || wsBusy) return
+    wsBusy = true
+    wsError = ''
+    importReport = ''
+    try {
+      const r = await importWorkspace(file, { secrets: importSecrets })
+      const rep = r.report || {}
+      importReport = `Создано пространство «${r.name}». Команд на сервере убрано: ${rep.stripped_commands ?? 0}, битых ссылок: ${rep.dangling_refs ?? 0}.`
+      await switchWorkspace(r.workspace_id)
+      setTimeout(() => location.reload(), 1500)
+    } catch (e) {
+      wsError = e?.message || 'не удалось импортировать'
       wsBusy = false
     }
   }
@@ -403,6 +430,18 @@
                 {/if}
               {/if}
             {/if}
+            <h4 class="ws__sub">Архив</h4>
+            <div class="ws__new">
+              {#if myRole === 'owner'}
+                <a class="ws__invite" href={workspaceExportUrl(wsCurrent, { secrets: exportSecrets })} download>Скачать архив</a>
+                <label class="ws__check"><input type="checkbox" bind:checked={exportSecrets} /> с секретами</label>
+              {/if}
+              <button type="button" class="ws__invite" disabled={wsBusy} onclick={() => importInput?.click()}>Импортировать архив…</button>
+              <label class="ws__check"><input type="checkbox" bind:checked={importSecrets} /> с секретами</label>
+              <input type="file" accept=".zip,application/zip" hidden bind:this={importInput} onchange={onImportFile} />
+            </div>
+            <p class="block__hint">Импорт всегда создаёт новое пространство и перенумеровывает сущности вместе со ссылками. Команды на сервере из архива не переносятся.</p>
+            {#if importReport}<p class="block__hint">{importReport}</p>{/if}
             <form
               class="ws__new"
               onsubmit={(e) => {
@@ -498,6 +537,18 @@
   .ws__item--on {
     border-color: var(--color-accent, var(--color-fg));
     cursor: default;
+  }
+
+  .ws__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: var(--color-fg-muted);
+  }
+
+  a.ws__invite {
+    text-decoration: none;
   }
 
   .ws__sub {

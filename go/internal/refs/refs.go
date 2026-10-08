@@ -43,3 +43,23 @@ func FilterKind(list []Ref, kind string) []Ref {
 	}
 	return out
 }
+
+// Rewrite replaces kind=ID tokens through resolve, which returns the full
+// replacement token (or false to leave a token as it is). Same grammar as Parse,
+// so whatever the app would show as a link is what gets rewritten.
+func Rewrite(text string, resolve func(kind string, id int64) (string, bool)) string {
+	if text == "" {
+		return text
+	}
+	return TokenRe.ReplaceAllStringFunc(text, func(tok string) string {
+		m := TokenRe.FindStringSubmatch(tok)
+		id, err := strconv.ParseInt(m[2], 10, 64)
+		if err != nil || id <= 0 {
+			return tok
+		}
+		if repl, ok := resolve(m[1], id); ok {
+			return repl
+		}
+		return tok
+	})
+}

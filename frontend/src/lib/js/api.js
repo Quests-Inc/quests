@@ -512,6 +512,24 @@ export function acceptInvite(token, body = {}) {
   })
 }
 
+/** URL of the archive download for a workspace (the browser handles the file). */
+export function workspaceExportUrl(id, { secrets = false } = {}) {
+  return `${BASE}/api/workspaces/${id}/export${secrets ? '?secrets=1' : ''}`
+}
+
+/** Import an archive into a NEW workspace. Not through request(): this is multipart, not JSON. */
+export async function importWorkspace(file, { name = '', secrets = false } = {}) {
+  const form = new FormData()
+  form.append('file', file)
+  if (name) form.append('name', name)
+  if (secrets) form.append('secrets', '1')
+  const res = await fetch(`${BASE}/api/workspaces/import`, { method: 'POST', body: form, credentials: 'same-origin' })
+  if (res.status === 401 && onUnauthorized) onUnauthorized()
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`)
+  return data
+}
+
 export function renameWorkspace(id, name) {
   return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 }

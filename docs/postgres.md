@@ -100,6 +100,16 @@ even through a query that forgot a filter.
   (files on WebDAV first, then the rows; cascades over every table). `quests-server workspace restore <id>`
   undoes it before that; `workspace ls` lists pending purges. Trusted workspaces cannot be deleted until
   `workspace untrust <id>`.
+- **Export / import (quest=349):** Settings → Пространства → Архив. Export (owners) streams a zip:
+  `manifest.json`, `tables/<table>.jsonl` (quests, steps, questlines, notes, templates, tags, categories,
+  attachments, change log, emit state; secrets only with `?secrets=1`), `files/` (attachment bytes from WebDAV)
+  and `icons/`. Import (any account, needs a ClamAV-scanned upload path for files) always creates a **new**
+  workspace owned by the importer and renumbers everything: foreign keys go through old→new id maps and the
+  `kind=ID` references in text are rewritten with the same maps. A reference to something that is not in the
+  archive becomes `kind#ID` (otherwise it could start pointing at an unrelated entity that carries that id in the
+  new workspace). Commands that would run on the server are dropped (the new workspace is untrusted), runner
+  commands are kept. The import is one transaction: a bad archive (unknown column, wrong version, infected file)
+  leaves nothing behind, neither rows nor files.
 - Category slugs, tag slugs and runner labels are unique per workspace.
 
 Tests: `QUESTS_TEST_PG_URL=… go test ./go/internal/db` includes `TestPGWorkspaceIsolation` (needs a login

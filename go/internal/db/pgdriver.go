@@ -196,6 +196,16 @@ func (c *pgConn) IsValid() bool {
 }
 
 func (c *pgConn) CheckNamedValue(nv *driver.NamedValue) error {
+	// Boolean-ish columns are INTEGER 0/1 in the PG schema (as they are in SQLite), so a
+	// Go bool argument is sent as that integer.
+	if b, ok := nv.Value.(bool); ok {
+		if b {
+			nv.Value = int64(1)
+		} else {
+			nv.Value = int64(0)
+		}
+		return nil
+	}
 	if n, ok := c.Conn.(driver.NamedValueChecker); ok {
 		return n.CheckNamedValue(nv)
 	}

@@ -329,3 +329,19 @@ func TestPGWorkspaceIsolation(t *testing.T) {
 		t.Fatal("duplicate slug within a workspace must fail")
 	}
 }
+
+func TestPGBoolArgsAreIntegers(t *testing.T) {
+	pool := openTestPG(t)
+	ctx := context.Background()
+	if _, err := pool.ExecContext(ctx, `INSERT INTO questcategory (slug, label, sort_order, created_at) VALUES ('c', 'C', 0, '2026-01-01 00:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	// A Go bool into an INTEGER 0/1 column (attachment.hidden, runner_job.timed_out, …).
+	if _, err := pool.ExecContext(ctx, `INSERT INTO note (title, description, pinned, sort_order, created_at, updated_at, is_readme) VALUES ('n', '', ?, 0, '2026-01-01', '2026-01-01', ?)`, true, false); err != nil {
+		t.Fatalf("bool args: %v", err)
+	}
+	var pinned, readme int
+	if err := pool.QueryRowContext(ctx, `SELECT pinned, is_readme FROM note WHERE title = 'n'`).Scan(&pinned, &readme); err != nil || pinned != 1 || readme != 0 {
+		t.Fatalf("pinned=%d readme=%d err=%v", pinned, readme, err)
+	}
+}
