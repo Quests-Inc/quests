@@ -80,7 +80,7 @@ func insertReturningID(q string) bool {
 	return !strings.Contains(strings.ToUpper(q), "RETURNING")
 }
 
-// appRole is the non-owner role the API drops to so RLS policies bind it.
+// appRole is the non-owner role the API drops to so that the RLS policies bind it.
 const appRole = "quests_app"
 
 type pgConnector struct{ inner driver.Connector }
