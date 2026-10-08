@@ -919,13 +919,18 @@
     ro.observe(el)
     return () => ro.disconnect()
   })
-  // Cards that need no body right now: well outside the window, or so small on
-  // screen (< 0.5% of the map area) that only the frame reads. They keep their box,
-  // so nothing moves; the markdown inside is simply not built until it matters.
+  // How much of a card is built right now, by its share of the map area on screen:
+  // 'lite' — frame only (< 0.5%, or well outside the window); 'title' — the head
+  // without the markdown body (0.5–1%); full (not in the map) — everything.
+  // Cards keep their box, so nothing moves; the body is simply not built until
+  // it matters. Each threshold has ±5% slack around the card's current tier, so
+  // a card sitting right on a border does not flicker while zooming.
   const LITE_AREA = 0.005
-  let prevLite = new Set()
-  let lite = $derived.by(() => {
-    const next = new Set()
+  const FULL_AREA = 0.01
+  const SLACK = 1.05
+  let prevTier = new Map()
+  let tier = $derived.by(() => {
+    const next = new Map()
     const nodes = view?.nodes
     // Read everything up front so the dependencies are the same on every run.
     const { k, x: cx, y: cy } = cam
@@ -942,11 +947,20 @@
         const sh = n.h * k
         // One window of margin each way, so panning does not reveal empty frames.
         const off = sx + sw < -W || sx > 2 * W || sy + sh < -H || sy > 2 * H
-        if (off || sw * sh < W * H * LITE_AREA) next.add(n.key)
+        if (off) {
+          next.set(n.key, 'lite')
+          continue
+        }
+        const share = (sw * sh) / (W * H)
+        const was = prevTier.get(n.key) ?? 'full'
+        const lite = share < (was === 'lite' ? LITE_AREA * SLACK : LITE_AREA / SLACK)
+        const full = share >= (was === 'full' ? FULL_AREA / SLACK : FULL_AREA * SLACK)
+        if (lite) next.set(n.key, 'lite')
+        else if (!full) next.set(n.key, 'title')
       }
     }
-    if (next.size === prevLite.size && [...next].every((x) => prevLite.has(x))) return prevLite
-    prevLite = next
+    if (next.size === prevTier.size && [...next].every(([key, t]) => prevTier.get(key) === t)) return prevTier
+    prevTier = next
     return next
   })
 
@@ -1141,9 +1155,12 @@
   let drag = null
   const MIN_K = 0.2
   const MAX_K = 2.5
+  /** Limits a zoom step that starts at `from`. Fit can go below MIN_K on a big
+   * map; from there zooming in must not jump straight to MIN_K. */
+  const clampK = (k, from) => Math.max(Math.min(MIN_K, from), Math.min(Math.max(MAX_K, from), k))
   /** Zooms to `k` keeping the stage point (px, py) on the same world point. */
   function zoomAt(k, px, py) {
-    k = Math.max(MIN_K, Math.min(MAX_K, k))
+    k = clampK(k, cam.k)
     cam = { k, x: px - ((px - cam.x) / cam.k) * k, y: py - ((py - cam.y) / cam.k) * k }
   }
 
@@ -1265,7 +1282,7 @@
       const [a, b] = [...touches.values()]
       const r = stageEl?.getBoundingClientRect()
       if (!r) return
-      const k = Math.max(MIN_K, Math.min(MAX_K, (drag.k * Math.hypot(a.x - b.x, a.y - b.y)) / drag.d))
+      const k = clampK((drag.k * Math.hypot(a.x - b.x, a.y - b.y)) / drag.d, drag.k)
       cam = {
         k,
         x: (a.x + b.x) / 2 - r.left - drag.wx * k,
@@ -2363,7 +2380,7 @@
               <button type="button" class="graph__btn" onclick={() => finishEdit(false)}>Отмена</button>
               <span class="gcard__edithint">Ctrl+Enter — готово · Esc — отмена</span>
             </div>
-          {:else if lite.has(n.key)}
+          {:else if tier.get(n.key) === 'lite'}
             <!-- frame only: off-screen or too small to read -->
           {:else if big || withText}
             <div class="gcard__head">
@@ -2375,7 +2392,7 @@
                 <span class="gcard__prog">{n.progress}</span>
               {/if}
             </div>
-            {#if n.desc}
+            {#if n.desc && tier.get(n.key) !== 'title'}
               <div class="gcard__body" style:max-height="{big ? CARD[n.type].max : CARD.stepBody.max}px">
                 <MarkdownBody source={n.desc} labels={{}} onRef={(k, id) => onOpen?.(k, id)} />
               </div>
@@ -2387,7 +2404,7 @@
               <span class="gcard__prog">{n.progress}</span>
             {/if}
           {/if}
-          {#if !square && !lite.has(n.key)}
+          {#if !square && tier.get(n.key) !== 'lite'}
             {@const more = moreMap.get(n.key) ?? []}
             {#if more.length}
               <div class="gcard__more">
