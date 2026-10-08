@@ -34,6 +34,7 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server workspace ls             list workspaces and their members
   quests-server workspace add <name> <user>   create a workspace owned by <user>
   quests-server workspace member <id> <user>  add <user> to workspace <id>
+  quests-server workspace restore <id>   undo a deletion within 7 days (ls shows pending purges)
   quests-server workspace trust|untrust <id>  allow/forbid running check and emit commands on the server
                                          (host-only on purpose: never reachable from the web UI or API)
   quests-server token ls                 list active API tokens
@@ -411,7 +412,14 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			allByID[w.ID] = w
 		}
 		for _, id := range ids {
-			fmt.Printf("%d\t%s\t%s\tmembers: %s\n", id, seen[id].Name, trustLabel(allByID[id].Trusted), strings.Join(members[id], ", "))
+			fmt.Printf("%d\t%s\t%s\tmembers: %s\n", id, allByID[id].Name, trustLabel(allByID[id].Trusted), strings.Join(members[id], ", "))
+		}
+		dels, err := wst.DeletedWorkspaces(ctx)
+		if err != nil {
+			fatal("%v", err)
+		}
+		for _, d := range dels {
+			fmt.Printf("%d\t%s\tDELETED, purge after %s (workspace restore %d)\n", d.ID, d.Name, d.PurgeAt.Local().Format("2006-01-02 15:04"), d.ID)
 		}
 	case "add":
 		if len(args) < 3 {
@@ -423,6 +431,18 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			fatal("%v", err)
 		}
 		fmt.Printf("created workspace %q (id=%d) owned by %s\n", w.Name, w.ID, u.Username)
+	case "restore":
+		if len(args) < 2 {
+			fatal("usage: quests-server workspace restore <id>")
+		}
+		id, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			fatal("workspace id must be a number")
+		}
+		if err := wst.RestoreWorkspace(ctx, id); err != nil {
+			fatal("%v (already purged, or not deleted?)", err)
+		}
+		fmt.Printf("workspace %d restored\n", id)
 	case "trust", "untrust":
 		if len(args) < 2 {
 			fatal("usage: quests-server workspace %s <id>", args[0])

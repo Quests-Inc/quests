@@ -11,6 +11,8 @@
     fetchMembers,
     removeMember,
     createInvite,
+    renameWorkspace,
+    deleteWorkspace,
   } from '../js/api.js'
 
   /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
@@ -77,6 +79,46 @@
         myRole = ''
       })
   })
+
+  /** Rename / delete the current workspace (owners). */
+  let renameTo = $state('')
+  let deleting = $state(false)
+  let deleteConfirm = $state('')
+  let currentName = $derived(wsList.find((w) => w.id === wsCurrent)?.name ?? '')
+
+  $effect(() => {
+    renameTo = currentName
+    deleting = false
+    deleteConfirm = ''
+  })
+
+  async function saveName() {
+    const name = renameTo.trim()
+    if (!name || name === currentName || wsBusy) return
+    wsBusy = true
+    wsError = ''
+    try {
+      await renameWorkspace(wsCurrent, name)
+      wsList = wsList.map((w) => (w.id === wsCurrent ? { ...w, name } : w))
+    } catch (e) {
+      wsError = e?.message || 'не удалось переименовать'
+    } finally {
+      wsBusy = false
+    }
+  }
+
+  async function confirmDelete() {
+    if (wsBusy || deleteConfirm.trim() !== currentName) return
+    wsBusy = true
+    wsError = ''
+    try {
+      await deleteWorkspace(wsCurrent, deleteConfirm.trim())
+      location.reload()
+    } catch (e) {
+      wsError = e?.message || 'не удалось удалить'
+      wsBusy = false
+    }
+  }
 
   async function newInvite() {
     if (wsBusy) return
@@ -321,6 +363,35 @@
                 {/each}
               </ul>
               {#if myRole === 'owner'}
+                <h4 class="ws__sub">Это пространство</h4>
+                <form
+                  class="ws__new"
+                  onsubmit={(e) => {
+                    e.preventDefault()
+                    saveName()
+                  }}
+                >
+                  <input type="text" maxlength="80" bind:value={renameTo} disabled={wsBusy} aria-label="Название" />
+                  <button type="submit" disabled={wsBusy || !renameTo.trim() || renameTo.trim() === currentName}>Переименовать</button>
+                </form>
+                {#if deleting}
+                  <p class="block__hint">
+                    Пространство скроется сразу, а его данные удалятся через 7 дней (до этого их может вернуть администратор сервера).
+                    Введите название «{currentName}», чтобы подтвердить.
+                  </p>
+                  <form
+                    class="ws__new"
+                    onsubmit={(e) => {
+                      e.preventDefault()
+                      confirmDelete()
+                    }}
+                  >
+                    <input type="text" bind:value={deleteConfirm} disabled={wsBusy} aria-label="Название для подтверждения" />
+                    <button type="submit" class="ws__danger" disabled={wsBusy || deleteConfirm.trim() !== currentName}>Удалить</button>
+                  </form>
+                {:else}
+                  <button type="button" class="ws__invite ws__danger" onclick={() => (deleting = true)}>Удалить пространство…</button>
+                {/if}
                 {#if inviteUrl}
                   <div class="ws__new">
                     <input type="text" readonly value={inviteUrl} onfocus={(e) => e.currentTarget.select()} />
@@ -462,6 +533,10 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     cursor: pointer;
+  }
+
+  .ws__danger {
+    color: var(--color-danger);
   }
 
   .ws__invite {

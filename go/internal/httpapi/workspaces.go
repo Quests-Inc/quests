@@ -85,6 +85,8 @@ func (s *Server) registerWorkspaces(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/workspaces", s.listWorkspaces)
 	mux.HandleFunc("POST /api/workspaces", s.createWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/switch", s.switchWorkspace)
+	mux.HandleFunc("PATCH /api/workspaces/{id}", s.renameWorkspace)
+	mux.HandleFunc("DELETE /api/workspaces/{id}", s.deleteWorkspace)
 	mux.HandleFunc("GET /api/workspaces/{id}/members", s.listMembers)
 	mux.HandleFunc("DELETE /api/workspaces/{id}/members/{uid}", s.removeMember)
 	mux.HandleFunc("POST /api/workspaces/{id}/invites", s.createInvite)
@@ -355,4 +357,71 @@ func (s *Server) switchWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"current": id})
+}
+
+func (s *Server) renameWorkspace(w http.ResponseWriter, r *http.Request) {
+	id, role, _, ok := s.memberOf(w, r)
+	if !ok {
+		return
+	}
+	if role != store.RoleOwner {
+		writeErr(w, http.StatusForbidden, "only an owner can rename")
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<14)).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	switch err := s.Store.RenameWorkspace(r.Context(), id, body.Name); {
+	case errors.Is(err, store.ErrWorkspaceName):
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, "workspace not found")
+	case err != nil:
+		writeErr(w, http.StatusInternalServerError, err.Error())
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"id": id, "name": strings.TrimSpace(body.Name)})
+	}
+}
+
+// deleteWorkspace hides the workspace and schedules its purge (owners only, name must be typed).
+func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
+	id, role, _, ok := s.memberOf(w, r)
+	if !ok {
+		return
+	}
+	if role != store.RoleOwner {
+		writeErr(w, http.StatusForbidden, "only an owner can delete a workspace")
+		return
+	}
+	var body struct {
+		Confirm string `json:"confirm"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<14)).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	name, err := s.Store.WorkspaceName(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	if strings.TrimSpace(body.Confirm) != name {
+		writeErr(w, http.StatusUnprocessableEntity, "введите название пространства для подтверждения")
+		return
+	}
+	purgeAt, err := s.Store.DeleteWorkspace(r.Context(), id)
+	switch {
+	case errors.Is(err, store.ErrWorkspaceTrusted):
+		writeErr(w, http.StatusConflict, err.Error())
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, "workspace not found")
+	case err != nil:
+		writeErr(w, http.StatusInternalServerError, err.Error())
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"purge_at": purgeAt.UTC().Format("2006-01-02T15:04:05Z")})
+	}
 }

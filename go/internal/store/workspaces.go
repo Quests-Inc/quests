@@ -35,7 +35,7 @@ func (s *Store) WorkspaceIDs(ctx context.Context) ([]int64, error) {
 	if !s.WorkspacesEnabled() {
 		return []int64{DefaultWorkspaceID}, nil
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM workspace ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, 
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT w.id, w.name, w.created_at, m.role, w.trusted
 		FROM workspace w JOIN workspace_member m ON m.workspace_id = w.id
-		WHERE m.user_id = ? ORDER BY w.id`, userID)
+		WHERE m.user_id = ? AND w.deleted_at IS NULL ORDER BY w.id`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
 	if !s.WorkspacesEnabled() {
 		return []Workspace{{ID: DefaultWorkspaceID, Name: "Основное", Role: "owner", Trusted: true}}, nil
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, trusted FROM workspace ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, trusted FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (s *Store) ServerExecAllowed(ctx context.Context) bool {
 		return false
 	}
 	var trusted int
-	if err := s.DB.QueryRowContext(ctx, `SELECT trusted FROM workspace WHERE id = ?`, id).Scan(&trusted); err != nil {
+	if err := s.DB.QueryRowContext(ctx, `SELECT trusted FROM workspace WHERE id = ? AND deleted_at IS NULL`, id).Scan(&trusted); err != nil {
 		return false // unknown = not trusted
 	}
 	return trusted != 0
@@ -285,4 +285,131 @@ func (s *Store) guardExec(ctx context.Context, command, runOn *string) error {
 		return nil
 	}
 	return ErrServerExec
+}
+
+// --- rename / delete (quest=347) ---
+
+// WorkspacePurgeAfter is how long a deleted workspace can still be restored.
+const WorkspacePurgeAfter = 7 * 24 * time.Hour
+
+var ErrWorkspaceTrusted = errors.New("доверенное пространство нельзя удалить: сначала снимите доверие на сервере (workspace untrust)")
+
+// RenameWorkspace changes the display name.
+func (s *Store) RenameWorkspace(ctx context.Context, id int64, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ErrWorkspaceName
+	}
+	if len([]rune(name)) > 80 {
+		name = string([]rune(name)[:80])
+	}
+	res, err := s.DB.ExecContext(ctx, `UPDATE workspace SET name = ? WHERE id = ? AND deleted_at IS NULL`, name, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// WorkspaceName returns the name of a live workspace.
+func (s *Store) WorkspaceName(ctx context.Context, id int64) (string, error) {
+	var name string
+	err := s.DB.QueryRowContext(ctx, `SELECT name FROM workspace WHERE id = ? AND deleted_at IS NULL`, id).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return name, err
+}
+
+// DeleteWorkspace hides a workspace at once (its tokens, runners and sessions stop
+// working) and schedules the purge. Trusted workspaces are refused: untrust them
+// from the host first, so the operator's own space is never one click away from gone.
+func (s *Store) DeleteWorkspace(ctx context.Context, id int64) (purgeAt time.Time, err error) {
+	var trusted int
+	if err := s.DB.QueryRowContext(ctx, `SELECT trusted FROM workspace WHERE id = ? AND deleted_at IS NULL`, id).Scan(&trusted); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, ErrNotFound
+		}
+		return time.Time{}, err
+	}
+	if trusted != 0 {
+		return time.Time{}, ErrWorkspaceTrusted
+	}
+	now := timeutil.NowUTC()
+	if _, err := s.DB.ExecContext(ctx, `UPDATE workspace SET deleted_at = ? WHERE id = ?`, timeutil.ToDBUTC(now), id); err != nil {
+		return time.Time{}, err
+	}
+	return now.Add(WorkspacePurgeAfter), nil
+}
+
+// RestoreWorkspace undoes a deletion that has not been purged yet (host CLI).
+func (s *Store) RestoreWorkspace(ctx context.Context, id int64) error {
+	res, err := s.DB.ExecContext(ctx, `UPDATE workspace SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+type DeletedWorkspace struct {
+	ID      int64
+	Name    string
+	PurgeAt time.Time
+}
+
+// DeletedWorkspaces lists workspaces awaiting their purge.
+func (s *Store) DeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error) {
+	if !s.WorkspacesEnabled() {
+		return nil, nil
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, deleted_at FROM workspace WHERE deleted_at IS NOT NULL ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DeletedWorkspace
+	for rows.Next() {
+		var d DeletedWorkspace
+		var at string
+		if err := rows.Scan(&d.ID, &d.Name, &at); err != nil {
+			return nil, err
+		}
+		t, _ := timeutil.ParseFlexible(at)
+		d.PurgeAt = t.Add(WorkspacePurgeAfter)
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// DueForPurge returns deleted workspaces whose grace period is over.
+func (s *Store) DueForPurge(ctx context.Context) ([]int64, error) {
+	if !s.WorkspacesEnabled() {
+		return nil, nil
+	}
+	cutoff := timeutil.NowUTC().Add(-WorkspacePurgeAfter)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM workspace WHERE deleted_at IS NOT NULL AND deleted_at < ? ORDER BY id`, timeutil.ToDBUTC(cutoff))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// PurgeWorkspace removes the workspace row; every table's workspace_id cascades.
+func (s *Store) PurgeWorkspace(ctx context.Context, id int64) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM workspace WHERE id = ? AND deleted_at IS NOT NULL`, id)
+	return err
 }

@@ -94,6 +94,12 @@ even through a query that forgot a filter.
   for it on purpose. The UI hides «на сервере» in untrusted workspaces. Commands run with the server's database
   credentials (`QUESTS_DATABASE_URL`, `POSTGRES_*`, `PG*`) removed from their environment; the rest of the root
   `.env` still passes through for the operator's own scripts.
+- **Rename / delete (quest=347):** owners rename and delete from Settings → Пространства (deleting needs the
+  exact name typed). A deleted workspace disappears at once — its tokens, runners and sessions stop (a token
+  never falls back to another workspace; a session moves to the user's next one) — and is purged after 7 days
+  (files on WebDAV first, then the rows; cascades over every table). `quests-server workspace restore <id>`
+  undoes it before that; `workspace ls` lists pending purges. Trusted workspaces cannot be deleted until
+  `workspace untrust <id>`.
 - Category slugs, tag slugs and runner labels are unique per workspace.
 
 Tests: `QUESTS_TEST_PG_URL=… go test ./go/internal/db` includes `TestPGWorkspaceIsolation` (needs a login

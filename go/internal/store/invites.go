@@ -33,7 +33,8 @@ type Member struct {
 // MemberRole returns the user's role in the workspace ("" = not a member).
 func (s *Store) MemberRole(ctx context.Context, workspaceID, userID int64) (string, error) {
 	var role string
-	err := s.DB.QueryRowContext(ctx, `SELECT role FROM workspace_member WHERE workspace_id = ? AND user_id = ?`, workspaceID, userID).Scan(&role)
+	err := s.DB.QueryRowContext(ctx, `SELECT m.role FROM workspace_member m JOIN workspace w ON w.id = m.workspace_id
+		 WHERE m.workspace_id = ? AND m.user_id = ? AND w.deleted_at IS NULL`, workspaceID, userID).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -107,7 +108,7 @@ func (s *Store) InviteInfo(ctx context.Context, secret string) (name string, exp
 	err = s.DB.QueryRowContext(ctx, `
 		SELECT w.name, i.expires_at
 		FROM workspace_invite i JOIN workspace w ON w.id = i.workspace_id
-		WHERE i.token_hash = ? AND i.used_at IS NULL AND i.expires_at > ?`,
+		WHERE i.token_hash = ? AND i.used_at IS NULL AND i.expires_at > ? AND w.deleted_at IS NULL`,
 		auth.HashToken(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&name, &exp)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", time.Time{}, ErrInviteInvalid
@@ -127,6 +128,7 @@ func (s *Store) ClaimInvite(ctx context.Context, secret string, userID int64) (i
 	err := s.DB.QueryRowContext(ctx, `
 		UPDATE workspace_invite SET used_at = ?, used_by = ?
 		WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+		  AND workspace_id IN (SELECT id FROM workspace WHERE deleted_at IS NULL)
 		RETURNING workspace_id, role`,
 		timeutil.ToDBUTC(timeutil.NowUTC()), userID, auth.HashToken(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&wsID, &role)
 	if errors.Is(err, sql.ErrNoRows) {

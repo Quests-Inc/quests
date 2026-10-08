@@ -512,6 +512,15 @@ export function acceptInvite(token, body = {}) {
   })
 }
 
+export function renameWorkspace(id, name) {
+  return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+}
+
+/** Hides the workspace now and purges it after a grace period; `confirm` must be its exact name. */
+export function deleteWorkspace(id, confirm) {
+  return request(`/api/workspaces/${id}`, { method: 'DELETE', body: JSON.stringify({ confirm }) })
+}
+
 export function switchWorkspace(id) {
   return request(`/api/workspaces/${id}/switch`, { method: 'POST' })
 }

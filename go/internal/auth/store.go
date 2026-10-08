@@ -42,7 +42,7 @@ var ErrNotMember = errors.New("not a member of that workspace")
 
 // resolveWorkspace picks the workspace for a session/token: the one it is
 // pinned to if the user is still a member, else the user's first membership.
-func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64) (int64, error) {
+func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64, strict bool) (int64, error) {
 	if !s.Workspaces {
 		return DefaultWorkspaceID, nil
 	}
@@ -54,9 +54,15 @@ func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64) (int64, err
 		if ok {
 			return pinned.Int64, nil
 		}
+		if strict {
+			// An API token pinned to a workspace that is gone (or that the user left) must
+			// stop working, not quietly start writing into some other workspace.
+			return 0, nil
+		}
 	}
 	var id int64
-	err := s.DB.QueryRow(`SELECT workspace_id FROM workspace_member WHERE user_id = ? ORDER BY workspace_id LIMIT 1`, userID).Scan(&id)
+	err := s.DB.QueryRow(`SELECT m.workspace_id FROM workspace_member m JOIN workspace w ON w.id = m.workspace_id
+		 WHERE m.user_id = ? AND w.deleted_at IS NULL ORDER BY m.workspace_id LIMIT 1`, userID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		// No membership (e.g. removed from their last workspace): still logged in,
 		// but with no workspace until they create one or accept an invitation.
@@ -70,7 +76,8 @@ func (s *Store) IsMember(userID, workspaceID int64) (bool, error) {
 		return workspaceID == DefaultWorkspaceID, nil
 	}
 	var n int
-	err := s.DB.QueryRow(`SELECT 1 FROM workspace_member WHERE user_id = ? AND workspace_id = ?`, userID, workspaceID).Scan(&n)
+	err := s.DB.QueryRow(`SELECT 1 FROM workspace_member m JOIN workspace w ON w.id = m.workspace_id
+		 WHERE m.user_id = ? AND m.workspace_id = ? AND w.deleted_at IS NULL`, userID, workspaceID).Scan(&n)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -258,7 +265,7 @@ func (s *Store) LookupSession(secret string) (User, error) {
 	if !u.IsActive {
 		return User{}, ErrNoUser
 	}
-	if u.WorkspaceID, err = s.resolveWorkspace(u.ID, pinned); err != nil {
+	if u.WorkspaceID, err = s.resolveWorkspace(u.ID, pinned, false); err != nil {
 		return User{}, ErrNoUser
 	}
 	_, _ = s.DB.Exec(`UPDATE usersession SET last_seen_at = ? WHERE token_hash = ?`,
@@ -353,7 +360,7 @@ func (s *Store) LookupAPIToken(secret string) (User, string, error) {
 	if !u.IsActive {
 		return User{}, "", ErrNoUser
 	}
-	if u.WorkspaceID, err = s.resolveWorkspace(u.ID, pinned); err != nil {
+	if u.WorkspaceID, err = s.resolveWorkspace(u.ID, pinned, true); err != nil {
 		return User{}, "", ErrNoUser
 	}
 	_, _ = s.DB.Exec(`UPDATE apitoken SET last_used_at = ? WHERE token_hash = ?`,
