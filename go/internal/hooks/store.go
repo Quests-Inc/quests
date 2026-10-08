@@ -26,7 +26,13 @@ var eventAliases = map[string][]string{
 	"expire":           {"quest_expired"},
 }
 
+// DefaultWorkspace is where a hook lives when its file entry names none (everything that
+// existed before workspaces did).
+const DefaultWorkspace int64 = 1
+
 type Hook struct {
+	// Workspace limits the hook to one workspace's events; 0 = every workspace (operator-wide).
+	Workspace  int64
 	ID         string
 	Name       string
 	Enabled    bool
@@ -40,8 +46,16 @@ type Hook struct {
 	TimeoutSec float64
 }
 
-func (h Hook) Matches(kind string, questID *int64) bool {
+// Matches reports whether the hook fires for an event. eventWorkspace is the workspace the event
+// belongs to; 0 (system events, or a server without workspaces) counts as the default workspace.
+func (h Hook) Matches(kind string, questID *int64, eventWorkspace int64) bool {
 	if !h.Enabled {
+		return false
+	}
+	if eventWorkspace <= 0 {
+		eventWorkspace = DefaultWorkspace
+	}
+	if h.Workspace != 0 && h.Workspace != eventWorkspace {
 		return false
 	}
 	ok := false
@@ -115,6 +129,8 @@ func EventAliases() map[string][]string {
 }
 
 type fileHook struct {
+	// Workspace: absent = the default workspace, 0 = all workspaces, N = that workspace.
+	Workspace  *int64   `json:"workspace,omitempty"`
 	ID         string   `json:"id"`
 	Name       string   `json:"name"`
 	Enabled    bool     `json:"enabled"`
@@ -158,8 +174,12 @@ func Load(path string) ([]Hook, error) {
 		if typ == "" {
 			typ = "script"
 		}
+		ws := DefaultWorkspace
+		if h.Workspace != nil {
+			ws = *h.Workspace
+		}
 		out = append(out, Hook{
-			ID: h.ID, Name: h.Name, Enabled: h.Enabled,
+			Workspace: ws, ID: h.ID, Name: h.Name, Enabled: h.Enabled,
 			Events: expanded, EventsRaw: append([]string{}, h.Events...),
 			Type: typ, QuestID: h.QuestID, Command: h.Command,
 			URL: h.URL, Path: h.Path, TimeoutSec: h.TimeoutSec,
@@ -183,8 +203,9 @@ func Save(hooks []Hook, path string) error {
 		if len(ev) == 0 {
 			ev = h.Events
 		}
+		ws := h.Workspace
 		payload.Hooks = append(payload.Hooks, fileHook{
-			ID: h.ID, Name: h.Name, Enabled: h.Enabled, Events: ev, Type: h.Type,
+			Workspace: &ws, ID: h.ID, Name: h.Name, Enabled: h.Enabled, Events: ev, Type: h.Type,
 			QuestID: h.QuestID, Command: h.Command, URL: h.URL, Path: h.Path, TimeoutSec: h.TimeoutSec,
 		})
 	}
@@ -201,7 +222,7 @@ func newID() string {
 	return hex.EncodeToString(b)
 }
 
-func Add(events []string, hookType string, questID *int64, name, command, url, path string, timeout float64, enabled bool) (Hook, error) {
+func Add(events []string, hookType string, questID *int64, name, command, url, path string, timeout float64, enabled bool, workspace int64) (Hook, error) {
 	expanded := ExpandEvents(events)
 	if len(expanded) == 0 {
 		return Hook{}, fmt.Errorf("нужен хотя бы один event")
@@ -233,7 +254,7 @@ func Add(events []string, hookType string, questID *int64, name, command, url, p
 		}
 	}
 	h := Hook{
-		ID: newID(), Name: strings.TrimSpace(name), Enabled: enabled,
+		Workspace: workspace, ID: newID(), Name: strings.TrimSpace(name), Enabled: enabled,
 		Events: expanded, EventsRaw: raw, Type: hookType, QuestID: questID,
 		Command: command, URL: url, Path: path, TimeoutSec: timeout,
 	}

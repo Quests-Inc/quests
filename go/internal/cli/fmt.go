@@ -159,6 +159,12 @@ func FmtHookLine(h Hook) string {
 	if h.QuestID != nil {
 		scope = fmt.Sprintf("quest#%d", *h.QuestID)
 	}
+	switch h.Workspace {
+	case 0:
+		scope += "@all"
+	default:
+		scope += fmt.Sprintf("@ws%d", h.Workspace)
+	}
 	ev := strings.Join(h.EventsRaw, ",")
 	if ev == "" {
 		ev = strings.Join(h.Events, ",")

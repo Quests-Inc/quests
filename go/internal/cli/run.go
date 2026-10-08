@@ -1253,7 +1253,7 @@ func hookDict(h Hook) map[string]any {
 		"id": h.ID, "name": h.Name, "enabled": h.Enabled,
 		"events": h.EventsRaw, "events_expanded": h.Events, "type": h.Type,
 		"quest_id": h.QuestID, "command": h.Command, "url": h.URL, "path": h.Path,
-		"timeout_sec": h.TimeoutSec,
+		"timeout_sec": h.TimeoutSec, "workspace": h.Workspace,
 	}
 }
 
@@ -1294,6 +1294,7 @@ func cmdHookAdd(args []string, asJSON bool) (int, error) {
 	path := fs.String("path", "", "")
 	timeout := fs.Float64("timeout", 30, "")
 	disabled := fs.Bool("disabled", false, "")
+	workspace := fs.String("workspace", "1", "")
 	if err := fs.Parse(args); err != nil {
 		return 2, nil
 	}
@@ -1304,7 +1305,18 @@ func cmdHookAdd(args []string, asJSON bool) (int, error) {
 	if *quest >= 0 {
 		qid = quest
 	}
-	h, err := AddHook(events, *typ, qid, *name, *command, *url, *path, *timeout, !*disabled)
+	var ws int64 = 1
+	switch strings.ToLower(strings.TrimSpace(*workspace)) {
+	case "all", "*", "0":
+		ws = 0 // operator-wide: events of every workspace
+	default:
+		n, perr := strconv.ParseInt(strings.TrimSpace(*workspace), 10, 64)
+		if perr != nil || n < 1 {
+			return 1, fmt.Errorf("--workspace: номер пространства или all")
+		}
+		ws = n
+	}
+	h, err := AddHook(events, *typ, qid, *name, *command, *url, *path, *timeout, !*disabled, ws)
 	if err != nil {
 		return 1, err
 	}

@@ -34,6 +34,7 @@ func Dispatch(event map[string]any) int {
 			qid = &n
 		}
 	}
+	ws := eventWorkspace(event)
 	list, err := Load("")
 	if err != nil {
 		log.Printf("hooks load: %v", err)
@@ -41,7 +42,7 @@ func Dispatch(event map[string]any) int {
 	}
 	n := 0
 	for _, h := range list {
-		if !h.Matches(kind, qid) {
+		if !h.Matches(kind, qid, ws) {
 			continue
 		}
 		n++
@@ -117,4 +118,20 @@ func nullStr(v any) string {
 		return ""
 	}
 	return fmt.Sprint(v)
+}
+
+// eventWorkspace reads the workspace the hub stamped on the event (0 = none).
+func eventWorkspace(event map[string]any) int64 {
+	switch v := event["workspace"].(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case json.Number:
+		n, _ := v.Int64()
+		return n
+	}
+	return 0
 }
