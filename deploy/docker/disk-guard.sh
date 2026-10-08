@@ -27,7 +27,7 @@ if [ "$after" -ge "$THRESHOLD" ]; then
   if [ -n "$token" ]; then
     curl -fsS -m 10 -X POST http://127.0.0.1:8765/api/quests \
       -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-      -d "{\"title\":\"Диск прода заполнен на ${after}%\",\"description\":\"После очистки dangling-образов всё ещё ${after}% (порог ${THRESHOLD}%). Смотри docker system df и volumes.\",\"significance\":\"rare\",\"status\":\"active\"}" \
+      -d "{\"title\":\"Диск прода заполнен на ${after}%\",\"description\":\"После очистки dangling-образов всё ещё ${after}% (порог ${THRESHOLD}%). Смотри docker system df и volumes.\",\"significance\":\"epic\",\"status\":\"active\"}" \
       >/dev/null && echo "alert quest created"
   else
     echo "disk at ${after}% but no QUESTS_API_TOKEN to raise a quest"
