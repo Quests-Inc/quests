@@ -19,6 +19,11 @@ fi
 git fetch origin main
 git reset --hard origin/main
 
+# Uptime Kuma (docs/monitoring.md) is switched on by MONITORING=1 in .env.
+if grep -q '^MONITORING=1' .env 2>/dev/null; then
+  COMPOSE="$COMPOSE -f deploy/docker/docker-compose.monitoring.yml"
+fi
+
 # shellcheck disable=SC2086
 $COMPOSE pull
 # shellcheck disable=SC2086

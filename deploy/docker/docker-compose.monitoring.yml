@@ -1,0 +1,29 @@
+# Uptime Kuma overlay (quest=345): probes, uptime graph and alerts for the stack.
+# Opt-in: MONITORING=1 in .env makes ci-deploy.sh add this file (otherwise `--remove-orphans`
+# would delete the container on the next deploy).
+#
+#   docker compose --env-file .env -f deploy/docker/docker-compose.yml \
+#     -f deploy/docker/docker-compose.monitoring.yml up -d kuma
+#
+# First start: open http://<host>:${KUMA_PORT:-3001}, create the admin account, then
+# `deploy/monitoring/kuma-monitors.py` adds the probes (docs/monitoring.md).
+
+services:
+  kuma:
+    image: louislam/uptime-kuma:1
+    container_name: quests-kuma
+    restart: unless-stopped
+    volumes:
+      - kuma-data:/app/data
+    ports:
+      - "${KUMA_PORT:-3001}:3001"
+    # Same compose network as the stack: probes address services by name (api, frontend, postgres, clamav).
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  kuma-data:
