@@ -26,7 +26,10 @@ already see their runners / HUD / bot in Settings → Сервисы.
    Kuma in a plain container has no Telegram proxy; if `api.telegram.org` is blocked from the host, use a channel that
    works there (e-mail, a webhook, …).
 
-Kuma's data lives in the `kuma-data` volume; it is not part of the DB backups.
+Kuma's data lives in the `kuma-data` volume. `deploy/docker/backup-monitoring.sh` (cron, daily 04:30) tars the Kuma and Grafana
+volumes (14 kept) into `~/QuestsBackups-monitoring/` and mirrors them to the PC (`~/QuestsBackups/monitoring/`) when it is on.
+Each service is stopped for the seconds the tar takes so the SQLite files are consistent. Prometheus is not backed up (large, rebuilds
+itself; dashboards and data source come from the repo). Restore steps are in the script header.
 
 ## Metrics: Prometheus + Grafana
 
