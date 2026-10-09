@@ -1,5 +1,6 @@
 <script>
   import Icon from '../ui/Icon.svelte'
+  import DateInput from '../ui/DateInput.svelte'
   import { getQuestLog, listTags } from '../js/api.js'
   import { parseApiDate } from '../js/time.js'
   import { KINDS, detailOf } from '../js/historyKinds.js'
@@ -267,13 +268,7 @@
           <option value={p.id}>{p.label}</option>
         {/each}
       </select>
-      <input
-        class="hist__select"
-        type="date"
-        bind:value={day}
-        aria-label="Конкретный день"
-        title="Конкретный день"
-      />
+      <DateInput bind:value={day} label="Конкретный день" clearable />
       {#if filtersOn}
         <button type="button" class="hist__reset" onclick={reset}>
           <Icon name="close" size={12} /> Сбросить

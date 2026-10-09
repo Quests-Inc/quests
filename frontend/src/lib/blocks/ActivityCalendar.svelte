@@ -4,6 +4,7 @@
   import { QUEST_STATUS_LABELS } from '../js/api.js'
   import { statusColor } from '../js/questFormat.js'
   import Icon from '../ui/Icon.svelte'
+  import DateInput from '../ui/DateInput.svelte'
   import RefText from '../ui/RefText.svelte'
 
   /** @type {{
@@ -507,11 +508,11 @@
     <div class="activity-cal__period" role="group" aria-label="Период просмотра">
       <label class="activity-cal__period-field">
         <span>с</span>
-        <input type="date" lang="ru-RU" bind:value={rangeFrom} />
+        <DateInput bind:value={rangeFrom} label="Период с" />
       </label>
       <label class="activity-cal__period-field">
         <span>по</span>
-        <input type="date" lang="ru-RU" bind:value={rangeTo} />
+        <DateInput bind:value={rangeTo} label="Период по" />
       </label>
     </div>
   </header>

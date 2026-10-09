@@ -28,6 +28,7 @@
   import FormSection from '../ui/FormSection.svelte'
   import HelpTip from '../ui/HelpTip.svelte'
   import TimeSelect from '../ui/TimeSelect.svelte'
+  import DateInput from '../ui/DateInput.svelte'
   import DurationInput from '../ui/DurationInput.svelte'
   import StepsEditor from '../ui/StepsEditor.svelte'
   import SuggestChip from '../ui/SuggestChip.svelte'
@@ -457,7 +458,7 @@
       </label>
       {#if deadlineOn}
         <div class="inline-line">
-          <input class="deadline-date" type="date" lang="ru-RU" bind:value={deadlineDate} required aria-label="Дата срока" />
+          <DateInput bind:value={deadlineDate} label="Дата срока" />
           <TimeSelect bind:hour={deadlineHour} bind:minute={deadlineMinute} label="Время срока" />
         </div>
         <div class="inline-line">
