@@ -25,6 +25,7 @@ func (s *Server) registerNotes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes", s.listNotes)
 	mux.HandleFunc("POST /api/notes", s.createNote)
 	mux.HandleFunc("GET /api/notes/search", s.searchNotes)
+	mux.HandleFunc("GET /api/notes/{id}/search", s.searchInNote)
 	mux.HandleFunc("POST /api/notes/{id}/feedback", s.noteFeedback)
 	mux.HandleFunc("PUT /api/notes/{id}/weight", s.noteWeight)
 	mux.HandleFunc("DELETE /api/notes/{id}/stats", s.resetNoteStats)
@@ -653,6 +654,25 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"q": strings.TrimSpace(q.Get("q")), "hits": hits, "marks": []string{store.MarkOpen, store.MarkClose}})
+}
+
+// searchInNote finds a query inside one note with the same rules as the notes search; the answer is
+// the matched words (to mark them in the text) and the number of paragraphs that carry them.
+func (s *Server) searchInNote(w http.ResponseWriter, r *http.Request) {
+	_, n, ok := s.noteForStats(w, r)
+	if !ok {
+		return
+	}
+	if src := requestSource(r); src != nil && *src == "mcp" && n.IsPrivate {
+		writeErr(w, 404, "Note not found")
+		return
+	}
+	res, err := s.Store.SearchInNote(r.Context(), n.Description, r.URL.Query().Get("q"))
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, res)
 }
 
 // noteFeedback is the cheap explicit signal: this note was useful (or misleading) for the task at hand.

@@ -85,3 +85,18 @@ func TestSearchPlainRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
 		t.Fatal("blank query must return nothing")
 	}
 }
+
+func TestSearchInNotePlain(t *testing.T) {
+	st := &Store{}
+	body := "Как выкатить сервис.\n\nДеплой делает ci-deploy.sh.\n\nБорщ и пельмени"
+	r, err := st.SearchInNote(context.Background(), body, "ltgkjq") // "деплой" in the wrong layout
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Passages != 1 || len(r.Terms) != 1 || r.Terms[0] != "деплой" {
+		t.Fatalf("result = %+v", r)
+	}
+	if r, _ := st.SearchInNote(context.Background(), body, "zzz"); r.Passages != 0 || len(r.Terms) != 0 {
+		t.Fatalf("a missing word matched: %+v", r)
+	}
+}

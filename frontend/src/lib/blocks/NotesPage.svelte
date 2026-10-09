@@ -9,6 +9,7 @@
   } from '../js/api.js'
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
   import NoteCheck from '../ui/NoteCheck.svelte'
+  import NoteFind from '../ui/NoteFind.svelte'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.js'
   import {
@@ -625,6 +626,13 @@
 
   let editEl = $state(/** @type {HTMLTextAreaElement | null} */ (null))
   let titleEl = $state(/** @type {HTMLInputElement | null} */ (null))
+  let findOpen = $state(false)
+  function onFindKey(e) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && selectedId) {
+      e.preventDefault()
+      findOpen = true
+    }
+  }
   let previewEl = $state(/** @type {HTMLDivElement | null} */ (null))
   let pageEl = $state(/** @type {HTMLElement | null} */ (null))
   let titleEditing = $state(false)
@@ -998,7 +1006,7 @@
     return [
       { id: 'copy-id', label: `Копировать note=${ctxNoteId}` },
       { id: 'sep-copy', sep: true },
-      { id: 'rename', label: 'Переименовать' },
+      ...(searchActive ? [] : [{ id: 'rename', label: 'Переименовать' }]),
       {
         id: 'flags',
         label: 'Флаги',
@@ -1288,6 +1296,8 @@
   )
 </script>
 
+<svelte:window onkeydown={onFindKey} />
+
 <div class="notes" class:notes--sidebar-collapsed={sidebarCollapsed}>
   <aside class="notes__tree">
     <div class="notes__tools">
@@ -1328,7 +1338,7 @@
           <ul class="hits">
             {#each searchHits as h (h.id)}
               <li>
-                <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)}>
+                <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)} oncontextmenu={(e) => openNoteMenu(e, h)}>
                   <span class="hit__title">{h.title || 'Без названия'}{#if h.outdated}<span class="notes__outdated" title={h.outdated_reason || 'Устарела по проверке актуальности'}>устарела</span>{/if}</span>
                   <span class="hit__where">{WHERE_LABEL[h.where] ?? ''}</span>
                   {#if h.snippet}<span class="hit__snippet">{@html snippetHtml(h.snippet)}</span>{/if}
@@ -1573,6 +1583,7 @@
             {/each}
           </nav>
           <div class="notes__modes" role="radiogroup" aria-label="Режим просмотра">
+            <button type="button" class="notes__mode" class:notes__mode--on={findOpen} aria-pressed={findOpen} title="Поиск в заметке (Ctrl+F)" onclick={() => (findOpen = !findOpen)}>Найти</button>
             {#each VIEW_MODES as mode (mode.id)}
               <button
                 type="button"
@@ -1598,6 +1609,9 @@
           </button>
         </div>
       {:else}
+      {#if findOpen}
+        <NoteFind noteId={selectedId} container={viewMode === 'raw' ? null : previewEl} dep={description} onClose={() => (findOpen = false)} />
+      {/if}
       <div
         class="notes__split"
         class:notes__split--raw={viewMode === 'raw'}

@@ -883,3 +883,8 @@ export function disableMyMfa(code) {
 export function regenerateRecoveryCodes(code) {
   return request('/api/me/2fa/recovery', { method: 'POST', body: JSON.stringify({ code }) })
 }
+
+/** Search inside one note with the notes search's rules: { terms: matched words, passages: paragraph count }. */
+export function searchInNote(id, q) {
+  return request(`/api/notes/${id}/search?q=${encodeURIComponent(q)}`)
+}
