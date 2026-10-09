@@ -11,6 +11,7 @@
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
   import NoteCheck from '../ui/NoteCheck.svelte'
   import NoteFind from '../ui/NoteFind.svelte'
+  import { parseFlagQuery, passesFlags, flagSuggestions, completeFlag } from '../js/searchFlags.js'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.js'
   import {
@@ -132,30 +133,26 @@
       isCategory !== saved.isCategory,
   )
 
-  /** Notes whose own check says they are out of date (quest=370). */
-  let anyOutdated = $derived(notes.some((n) => n.outdated))
-  let onlyOutdated = $state(false)
+  /** Filters typed into the search box as `flag:name` (`-flag:name` = without it). */
+  const NOTE_FLAGS = {
+    outdated: { label: 'устарела', test: (n) => !!n.outdated, aliases: ['stale'] },
+    readme: { label: 'README', test: (n) => !!n.is_readme },
+    private: { label: 'PRIVATE', test: (n) => !!n.is_private },
+    category: { label: 'CATEGORY', test: (n) => !!n.is_category },
+    pinned: { label: 'закреплена', test: (n) => !!n.pinned, aliases: ['pin'] },
+    check: { label: 'есть проверка актуальности', test: (n) => !!n.has_check },
+  }
+  let parsedSearch = $derived(parseFlagQuery(search, NOTE_FLAGS))
+  let searchText = $derived(parsedSearch.text)
+  let flagHints = $derived(flagSuggestions(search, NOTE_FLAGS))
+  const flagOk = (n) => passesFlags(parsedSearch, NOTE_FLAGS, n)
 
   let filtered = $derived.by(() => {
-    const q = search.trim().toLowerCase()
-    if (!q && !onlyOutdated) return notes
-    if (!q) return withAncestors(notes.filter((n) => n.outdated))
-    if (onlyOutdated) return withAncestors(notes.filter((n) => n.outdated && `${n.title || ''} ${n.description || ''}`.toLowerCase().includes(q)))
-    const byId = new Map(notes.map((n) => [n.id, n]))
-    /** @type {Set<number>} */
-    const visible = new Set()
-    for (const n of notes) {
-      if (!`${n.title || ''} ${n.description || ''}`.toLowerCase().includes(q)) continue
-      visible.add(n.id)
-      let cur = n
-      while (cur.parent_id != null) {
-        const parent = byId.get(cur.parent_id)
-        if (!parent) break
-        visible.add(parent.id)
-        cur = parent
-      }
-    }
-    return notes.filter((n) => visible.has(n.id))
+    const q = searchText.toLowerCase()
+    if (!q && !parsedSearch.active) return notes
+    return withAncestors(
+      notes.filter((n) => flagOk(n) && (!q || `${n.title || ''} ${n.description || ''}`.toLowerCase().includes(q))),
+    )
   })
 
   /** The given notes and the chain of their parents, in the original order. */
@@ -180,7 +177,7 @@
   /** Ranked server results for the query (null = not asked / unavailable → the tree filter above stays). */
   let searchHits = $state(/** @type {any[] | null} */ (null))
   $effect(() => {
-    const q = search.trim()
+    const q = searchText
     if (q.length < 2) {
       searchHits = null
       return
@@ -188,8 +185,8 @@
     let stale = false
     const timer = setTimeout(async () => {
       try {
-        const r = await searchNotes(q)
-        if (!stale) searchHits = r?.hits ?? []
+        const r = await searchNotes(q, parsedSearch.active ? 50 : 30)
+        if (!stale) searchHits = (r?.hits ?? []).filter((h) => flagOk(noteById(h.id) ?? h))
       } catch {
         if (!stale) searchHits = null
       }
@@ -1321,19 +1318,13 @@
 <div class="notes" class:notes--sidebar-collapsed={sidebarCollapsed}>
   <aside class="notes__tree">
     <div class="notes__tools">
-      <input class="search" type="search" placeholder="Поиск…" bind:value={search} />
-      {#if anyOutdated || onlyOutdated}
-        <button
-          type="button"
-          class="btn notes__outdated-filter"
-          class:notes__outdated-filter--on={onlyOutdated}
-          aria-pressed={onlyOutdated}
-          title="Только заметки, помеченные проверкой как устаревшие"
-          onclick={() => (onlyOutdated = !onlyOutdated)}
-        >
-          устар.
-        </button>
-      {/if}
+      <input
+        class="search"
+        type="search"
+        placeholder="Поиск…"
+        title="Фильтры по флагам: flag:outdated, flag:readme, flag:private, flag:category, flag:pinned, flag:check; -flag:… — без флага"
+        bind:value={search}
+      />
       <button
         type="button"
         class="btn btn--accent notes__add"
@@ -1343,6 +1334,19 @@
         +
       </button>
     </div>
+    {#if flagHints || parsedSearch.unknown.length}
+      <div class="notes__flaghints" role="listbox" aria-label="Флаги">
+        {#if flagHints}
+          {#each flagHints.items as f (f.id)}
+            <button type="button" class="notes__flagchip" onclick={() => (search = completeFlag(search, f.id, flagHints.neg))}>
+              {flagHints.neg ? '-' : ''}flag:{f.id}<span>{f.label}</span>
+            </button>
+          {/each}
+        {:else}
+          <span class="notes__flagwarn">Неизвестный флаг: {parsedSearch.unknown.join(', ')}</span>
+        {/if}
+      </div>
+    {/if}
     <div
       class="notes__list"
       data-nav-root
@@ -1830,14 +1834,37 @@
     border-bottom: 1px solid var(--color-border, #333);
   }
 
-  .notes__outdated-filter {
-    flex: 0 0 auto;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.72rem;
+  .notes__flaghints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--color-border, #333);
   }
-  .notes__outdated-filter--on {
+  .notes__flagchip {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: baseline;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+  .notes__flagchip span {
+    font-family: var(--font-ui, sans-serif);
+    font-size: 0.68rem;
+    color: var(--color-fg-subtle, #6e6e6e);
+  }
+  .notes__flagchip:hover {
+    border-color: var(--color-fg-muted, #9a9a9a);
+  }
+  .notes__flagwarn {
+    font-size: 0.72rem;
     color: var(--color-danger, #b54a3a);
-    border-color: var(--color-danger, #b54a3a);
   }
   .hits {
     list-style: none;
