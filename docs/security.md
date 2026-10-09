@@ -35,7 +35,7 @@ you add from the host (`quests-server workspace trust`), and **no invitations**:
 ## Re-check after changes
 
 ```bash
-uv run python scripts/security_probe.py --base http://127.0.0.1:8765 --owner <user> --password '<pw>'
+python3 scripts/security_probe.py --base http://127.0.0.1:8765 --owner <user>   # asks for the password
 ```
 
 Run it against a **scratch** instance: it creates a workspace, an attacker account and a few rows (it removes what it can).

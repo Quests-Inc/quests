@@ -6,17 +6,22 @@ main one). The probe invites a throw-away "attacker" into a fresh workspace and 
 from there, to reach or change what belongs to the owner's workspace. Every check
 prints PASS or FAIL; exit status 1 on any FAIL.
 
-    uv run python scripts/security_probe.py --base http://127.0.0.1:8765 \\
-        --owner alice --password '...'
+    python3 scripts/security_probe.py --base http://127.0.0.1:8765 --owner alice
+
+Standard library only (no uv, no venv). The password is asked for without echo, or read
+from $QUESTS_PROBE_PASSWORD; it is deliberately not a command-line argument (shell
+history, `ps`).
 
 Run it against a scratch instance (it creates quests, workspaces and an account).
 """
 from __future__ import annotations
 
 import argparse
+import getpass
 import http.cookiejar
 import io
 import json
+import os
 import re
 import secrets
 import sys
@@ -65,8 +70,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8765")
     ap.add_argument("--owner", required=True)
-    ap.add_argument("--password", required=True)
     a = ap.parse_args()
+    a.password = os.environ.get("QUESTS_PROBE_PASSWORD") or getpass.getpass(f"Password for {a.owner}: ")
 
     owner = Client(a.base)
     c, _, _ = owner.req("POST", "/api/auth/login", {"username": a.owner, "password": a.password})
