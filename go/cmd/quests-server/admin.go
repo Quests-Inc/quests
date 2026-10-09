@@ -30,6 +30,7 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server useradd <username>       create an account (prompts for a password)
   quests-server passwd <username>        change an account's password
   quests-server users                    list accounts (with their two-factor state)
+  quests-server secrets-check            does the current encryption key open every sealed value (secrets, LLM keys, 2FA secrets)?
   quests-server 2fa-reset <username>     drop an account's two-factor sign-in and end its sessions (lost phone and recovery codes)
   quests-server token add <name> [user] [--workspace <id>]
                                          mint an API token for a headless client (PostgreSQL: bound to a workspace)
@@ -57,7 +58,7 @@ func runAdmin(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "useradd", "passwd", "users", "2fa-reset", "token", "runner", "backup-now", "workspace":
+	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "backup-now", "workspace":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -90,7 +91,7 @@ func runAdmin(args []string) bool {
 		fatal("secrets: %v", berr)
 	}
 	st := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != "", Box: box}
-	wst := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
+	wst := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL, Box: box}
 
 	switch args[0] {
 	case "useradd":
@@ -142,6 +143,22 @@ func runAdmin(args []string) bool {
 			}
 			fmt.Printf("%d\t%s\t%s\n", u.ID, u.Username, state)
 		}
+	case "secrets-check":
+		counts, err := wst.SealedHealth(context.Background())
+		if err != nil {
+			fatal("%v", err)
+		}
+		bad := 0
+		fmt.Printf("%-10s %6s %9s %11s %6s\n", "table", "total", "readable", "unreadable", "plain")
+		for _, c := range counts {
+			fmt.Printf("%-10s %6d %9d %11d %6d\n", c.Table, c.Total, c.Readable, c.Unreadable, c.Plain)
+			bad += c.Unreadable
+		}
+		if bad > 0 {
+			fmt.Println("\nsome values do not open with the current key: it is not the key that sealed them (see docs/security.md)")
+			os.Exit(1)
+		}
+		fmt.Println("\nthe current key opens everything it should")
 	case "2fa-reset":
 		if len(args) < 2 {
 			fatal("usage: quests-server 2fa-reset <username>")

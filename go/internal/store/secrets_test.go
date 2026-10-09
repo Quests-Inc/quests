@@ -251,3 +251,29 @@ func TestSecretsAreSealedAtRest(t *testing.T) {
 		t.Fatalf("values readable under the wrong key: %v", got)
 	}
 }
+
+func TestSealedHealthTellsWhichKeySealed(t *testing.T) {
+	t.Setenv("QUESTS_SECRET_KEY", "")
+	box, _ := secretbox.Load(t.TempDir())
+	st := openSecretsDB(t)
+	st.Box = box
+	ctx := context.Background()
+	mustSet(t, st, oLine, "A", "one")
+	mustSet(t, st, oQuest, "B", "two")
+	if _, err := st.DB.Exec(`INSERT INTO secret (step_id, key, value, created_at, updated_at) VALUES (1000, 'OLD', 'plain', datetime('now'), datetime('now'))`); err != nil {
+		t.Fatal(err)
+	}
+	h, err := st.SealedHealth(ctx)
+	if err != nil || len(h) != 1 {
+		t.Fatalf("health: %+v %v", h, err)
+	}
+	if c := h[0]; c.Total != 3 || c.Readable != 2 || c.Plain != 1 || c.Unreadable != 0 {
+		t.Fatalf("with the right key: %+v", c)
+	}
+	other, _ := secretbox.Load(t.TempDir())
+	st.Box = other
+	h, _ = st.SealedHealth(ctx)
+	if c := h[0]; c.Unreadable != 2 || c.Readable != 0 {
+		t.Fatalf("with another key: %+v", c)
+	}
+}

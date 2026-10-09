@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"strings"
 
 	"github.com/valirum/quests/go/internal/timeutil"
@@ -149,6 +150,11 @@ func (s *Store) VerifySecondFactor(userID int64, code string) error {
 	}
 	code = strings.TrimSpace(code)
 	secret, enabled, last, err := s.loadSecret(userID)
+	if errors.Is(err, secretbox.ErrBadKey) && enabled {
+		// The sealed secret does not open (the server key was lost or replaced): a recovery
+		// code, which does not depend on it, still gets the person in to re-enrol.
+		return s.spendRecoveryCode(userID, code)
+	}
 	if err != nil {
 		return err
 	}

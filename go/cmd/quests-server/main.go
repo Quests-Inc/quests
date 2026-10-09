@@ -81,6 +81,16 @@ func main() {
 	} else if n > 0 {
 		log.Printf("secrets: sealed %d stored value(s)", n)
 	}
+	if counts, err := st.SealedHealth(context.Background()); err != nil {
+		log.Printf("secrets: checking sealed values: %v", err)
+	} else {
+		for _, c := range counts {
+			if c.Unreadable > 0 {
+				log.Printf("WARNING secrets: %d of %d sealed value(s) in %s cannot be opened with the current key "+
+					"(was data/secret.key or QUESTS_SECRET_KEY replaced?) — see `quests-server secrets-check`", c.Unreadable, c.Total, c.Table)
+			}
+		}
+	}
 	reg := health.New()
 	reg.SetProbe("db", schema.State, schema.Detail)
 	srv := &httpapi.Server{

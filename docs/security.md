@@ -38,7 +38,10 @@ Quest/step/template secret values are sealed with the same server key as the ass
 so a database dump or a backup alone does not reveal them. Values written before are sealed at the next start.
 An export made with `secrets=1` carries the plain values (the archive is the user's to protect) and an import seals
 them again. **Keep `QUESTS_SECRET_KEY` (or `data/secret.key`) apart from the backups**: sealed values and saved LLM
-keys cannot be opened without it — a lost key means re-entering them, nothing else.
+keys cannot be opened without it — a lost key means re-entering them, nothing else (an account with 2FA signs in
+with a recovery code, then re-enrols; `quests-server 2fa-reset <user>` is the host-side way). `quests-server
+secrets-check` says whether the current key opens every sealed value; the server logs a warning at start when it
+does not. Full write-up: quests note "Шифрование секретов".
 
 ## Grants (quest=360)
 

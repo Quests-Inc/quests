@@ -397,3 +397,80 @@ func ReservedSecretName(key string) bool {
 	}
 	return false
 }
+
+// SealedCounts says how many stored values of one table the current key opens.
+type SealedCounts struct {
+	Table      string `json:"table"`
+	Total      int    `json:"total"`
+	Readable   int    `json:"readable"`
+	Unreadable int    `json:"unreadable"`
+	Plain      int    `json:"plain"` // not sealed yet (secret values written before sealing existed)
+}
+
+func (c *SealedCounts) add(s *Store, v string) {
+	if v == "" {
+		return
+	}
+	c.Total++
+	switch {
+	case !strings.HasPrefix(v, sealedPrefix):
+		c.Plain++
+	default:
+		if _, err := s.Box.Open(v); err != nil {
+			c.Unreadable++
+		} else {
+			c.Readable++
+		}
+	}
+}
+
+// SealedHealth checks every sealed value in the database against the current key: secrets,
+// users' LLM keys, second-factor secrets. Unreadable > 0 means the key is not the one that sealed them.
+func (s *Store) SealedHealth(ctx context.Context) ([]SealedCounts, error) {
+	if s.Box == nil {
+		return nil, nil
+	}
+	sec, llm, totp := SealedCounts{Table: "secret"}, SealedCounts{Table: "user_llm"}, SealedCounts{Table: "user_totp"}
+	var failure error
+	err := s.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+		rows, err := s.DB.QueryContext(wctx, `SELECT value FROM secret`)
+		if err != nil {
+			failure = err
+			return
+		}
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err == nil {
+				sec.add(s, v)
+			}
+		}
+		rows.Close()
+	})
+	if err != nil {
+		return nil, err
+	}
+	if failure != nil {
+		return nil, failure
+	}
+	out := []SealedCounts{sec}
+	if s.WorkspacesEnabled() {
+		for _, q := range []struct {
+			c   *SealedCounts
+			sql string
+		}{{&llm, `SELECT api_key_enc FROM user_llm`}, {&totp, `SELECT secret_enc FROM user_totp`}} {
+			rows, err := s.DB.QueryContext(ctx, q.sql)
+			if err != nil {
+				return nil, err
+			}
+			for rows.Next() {
+				var v string
+				if err := rows.Scan(&v); err == nil {
+					q.c.add(s, v)
+				}
+			}
+			rows.Close()
+		}
+		out = append(out, llm, totp)
+	}
+	return out, nil
+}
