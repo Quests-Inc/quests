@@ -1046,3 +1046,34 @@ func TestGraphEdgesAndOrphans(t *testing.T) {
 		t.Fatal("missing root must be an error")
 	}
 }
+
+// A workspace's attachments (current files and old revisions) stop at its quota.
+func TestAttachmentWorkspaceQuota(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	clam := fakeClamd(t, "stream: OK")
+	s := newAttachmentServer(t, dav.URL, clam, 0)
+	s.WorkspaceQuota = 100
+	qid := seedQuest(t, s)
+	path := fmt.Sprintf("/api/quests/%d/attachments", qid)
+
+	if w := postFile(t, s.Handler(), path, "a.bin", "", bytes.Repeat([]byte("a"), 60)); w.Code != 201 {
+		t.Fatalf("first upload: %d %s", w.Code, w.Body.String())
+	}
+	w := postFile(t, s.Handler(), path, "b.bin", "", bytes.Repeat([]byte("b"), 60))
+	if w.Code != 413 || !strings.Contains(w.Body.String(), "квота") {
+		t.Fatalf("second upload passed the quota: %d %s", w.Code, w.Body.String())
+	}
+	if w := postFile(t, s.Handler(), path, "c.bin", "", bytes.Repeat([]byte("c"), 40)); w.Code != 201 {
+		t.Fatalf("an upload that fits was refused: %d %s", w.Code, w.Body.String())
+	}
+	used, err := s.Store.AttachmentUsage(context.Background())
+	if err != nil || used != 100 {
+		t.Fatalf("usage = %d, %v", used, err)
+	}
+
+	s.WorkspaceQuota = 0 // unlimited
+	if w := postFile(t, s.Handler(), path, "d.bin", "", bytes.Repeat([]byte("d"), 500)); w.Code != 201 {
+		t.Fatalf("no quota set, upload refused: %d", w.Code)
+	}
+}

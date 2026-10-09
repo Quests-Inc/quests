@@ -19,6 +19,9 @@ export const wsx = $state({
   current: 0,
   members: /** @type {{ user_id: number, username: string, role: string }[]} */ ([]),
   myRole: '',
+  /** Attachment bytes the current workspace keeps, and its cap (0 = none). */
+  attachmentsUsed: 0,
+  attachmentsQuota: 0,
   busy: false,
   error: '',
   notice: '',
@@ -34,6 +37,8 @@ export async function loadWorkspaceState() {
     wsx.enabled = !!r?.enabled
     wsx.list = r?.workspaces ?? []
     wsx.current = r?.current ?? 0
+    wsx.attachmentsUsed = r?.attachments_used ?? 0
+    wsx.attachmentsQuota = r?.attachments_quota ?? 0
     wsx.loaded = true
     if (wsx.enabled && wsx.current) {
       const m = await fetchMembers(wsx.current)

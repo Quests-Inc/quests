@@ -97,9 +97,22 @@ func (s *Store) ReadTable(ctx context.Context, spec TableSpec, fn func(row map[s
 			return err
 		}
 		row := make(map[string]any, len(cols))
+		skip := false
 		for i, c := range cols {
 			if c == "workspace_id" {
 				continue
+			}
+			if spec.Name == "secret" && c == "value" {
+				// Archives carry the value itself (sealed values would only open on this server).
+				if str, ok := vals[i].(string); ok {
+					plain, okOpen := s.openSecret(str)
+					if !okOpen {
+						skip = true // not readable under this key: leave the row out
+						break
+					}
+					row[c] = plain
+					continue
+				}
 			}
 			switch v := vals[i].(type) {
 			case []byte:
@@ -109,6 +122,9 @@ func (s *Store) ReadTable(ctx context.Context, spec TableSpec, fn func(row map[s
 			default:
 				row[c] = v
 			}
+		}
+		if skip {
+			continue
 		}
 		if err := fn(row); err != nil {
 			return err
@@ -337,6 +353,15 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 				vals["custom_icon"] = nil // icon files are re-attached by the caller
 			}
 
+			if spec.Name == "secret" {
+				if str, ok := vals["value"].(string); ok {
+					sealed, err := s.sealSecret(str)
+					if err != nil {
+						return err
+					}
+					vals["value"] = sealed
+				}
+			}
 			names := make([]string, 0, len(vals))
 			args := make([]any, 0, len(vals))
 			for c, v := range vals {

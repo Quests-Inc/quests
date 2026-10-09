@@ -259,6 +259,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := wsctx.With(r.Context(), ws.ID)
 	var uploaded []string
+	var importedBytes int64
 	abort := func(status int, msg string) {
 		for _, path := range uploaded {
 			_ = s.WebDAV.Delete(context.WithoutCancel(ctx), path)
@@ -281,6 +282,11 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 			if f.UncompressedSize64 > uint64(maxFile) {
 				return "", fmt.Errorf("вложение %q больше %d МБ", filename, maxFile>>20)
 			}
+			if over, used, qerr := s.overQuota(ctx, int64(f.UncompressedSize64)+importedBytes); qerr != nil {
+				return "", qerr
+			} else if over {
+				return "", errors.New(quotaMessage(used+importedBytes, s.WorkspaceQuota))
+			}
 			rc, err := f.Open()
 			if err != nil {
 				return "", err
@@ -302,6 +308,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 				return "", fmt.Errorf("загрузка на файловый сервер: %w", err)
 			}
 			uploaded = append(uploaded, newPath)
+			importedBytes += int64(len(raw)) // rows are inserted after the callback returns: count them here
 			return newPath, nil
 		}
 	}

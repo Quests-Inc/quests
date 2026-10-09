@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ type Store struct {
 	DB *sql.DB
 	// PGURL is set when DB is PostgreSQL; backups then use pg_dump instead of VACUUM INTO.
 	PGURL string
+	// Box seals secret values at rest (nil = stored as given, e.g. in tests).
+	Box *secretbox.Box
 }
 
 func (s *Store) ListCategories(ctx context.Context) ([]domain.Category, error) {

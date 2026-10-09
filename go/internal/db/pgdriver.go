@@ -82,6 +82,10 @@ func insertReturningID(q string) bool {
 	return !strings.Contains(strings.ToUpper(q), "RETURNING")
 }
 
+// SkipAppRole keeps connections on the login (owner) role. Only the host-side admin commands
+// set it: they change what the API role is not allowed to (workspace trust, passwords).
+var SkipAppRole bool
+
 // appRole is the non-owner role the API drops to so that the RLS policies bind it.
 const appRole = "quests_app"
 
@@ -111,6 +115,9 @@ type pgConn struct {
 // dropToAppRole makes RLS apply to this connection. Without the role (a database
 // that predates the workspaces migration) the connection stays as it is.
 func (c *pgConn) dropToAppRole(ctx context.Context) error {
+	if SkipAppRole {
+		return nil
+	}
 	q := c.Conn.(driver.QueryerContext)
 	rows, err := q.QueryContext(ctx, "SELECT 1 FROM pg_roles WHERE rolname = '"+appRole+"'", nil)
 	if err != nil {

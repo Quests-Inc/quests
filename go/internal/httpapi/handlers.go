@@ -65,6 +65,8 @@ type Server struct {
 	ClamAV *clamav.Client
 	// MaxUploadBytes caps a single attachment.
 	MaxUploadBytes int64
+	// WorkspaceQuota caps the attachment bytes of one workspace (0 = unlimited).
+	WorkspaceQuota int64
 	// Secrets seals what is stored for an account (its LLM key). Nil = nothing can be stored.
 	Secrets *secretbox.Box
 

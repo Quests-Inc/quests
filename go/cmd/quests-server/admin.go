@@ -67,6 +67,8 @@ func runAdmin(args []string) bool {
 
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
+	// Admin commands run as the database owner: they are the ones allowed to change what the API role cannot.
+	db.SkipAppRole = true
 	sqlDB, _, err := db.OpenConfigured(cfg.DBPath, cfg.DatabaseURL)
 	if err != nil {
 		fatal("db: %v", err)

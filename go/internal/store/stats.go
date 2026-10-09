@@ -18,8 +18,10 @@ type Stats struct {
 	RunnersActive   int
 	Attachments     int
 	AttachmentBytes int64
-	LastBackupAt    int64 // unix seconds of the newest successful backup (0 = none)
-	LastBackupBytes int64
+	// AttachmentBytesMax is the largest single workspace, revisions included (quota headroom).
+	AttachmentBytesMax int64
+	LastBackupAt       int64 // unix seconds of the newest successful backup (0 = none)
+	LastBackupBytes    int64
 }
 
 // AggregateStats sums the counters over all workspaces (each one read under its own context).
@@ -64,6 +66,11 @@ func (s *Store) AggregateStats(ctx context.Context) (Stats, error) {
 		note(s.DB.QueryRowContext(wctx, `SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM attachment`).Scan(&n, &b))
 		st.Attachments += n
 		st.AttachmentBytes += b.Int64
+		if used, uerr := s.AttachmentUsage(wctx); uerr == nil && used > st.AttachmentBytesMax {
+			st.AttachmentBytesMax = used
+		} else {
+			note(uerr)
+		}
 	})
 	note(err)
 	// Backups are instance-level (backuplog is not per workspace).

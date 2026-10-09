@@ -292,6 +292,9 @@ func (s *Server) postAttachment(w http.ResponseWriter, r *http.Request, ownerTyp
 		writeErr(w, 413, fmt.Sprintf("file exceeds %d MB", maxBytes>>20))
 		return
 	}
+	if !s.checkQuota(w, r.Context(), int64(len(raw))) {
+		return
+	}
 
 	declared := strings.TrimSpace(hdr.Header.Get("Content-Type"))
 	detected := mimetype.Detect(raw).String()
@@ -667,6 +670,9 @@ func (s *Server) postAttachmentRevision(w http.ResponseWriter, r *http.Request, 
 	}
 	if int64(len(raw)) > maxBytes {
 		writeErr(w, 413, fmt.Sprintf("file exceeds %d MB", maxBytes>>20))
+		return
+	}
+	if !s.checkQuota(w, r.Context(), int64(len(raw))) {
 		return
 	}
 

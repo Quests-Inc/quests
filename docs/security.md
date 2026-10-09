@@ -32,6 +32,27 @@ you add from the host (`quests-server workspace trust`), and **no invitations**:
   after 10 recent failures (a stall, not a lockout), at most 4 concurrent hashes; logins are `[a-z0-9._-]{2,32}`;
   a password change ends all sessions.
 
+## Secrets at rest (quest=357)
+
+Quest/step/template secret values are sealed with the same server key as the assistant keys (`v1:` + AES-256-GCM),
+so a database dump or a backup alone does not reveal them. Values written before are sealed at the next start.
+An export made with `secrets=1` carries the plain values (the archive is the user's to protect) and an import seals
+them again. **Keep `QUESTS_SECRET_KEY` (or `data/secret.key`) apart from the backups**: sealed values and saved LLM
+keys cannot be opened without it — a lost key means re-entering them, nothing else.
+
+## Grants (quest=360)
+
+The API connects as the owner role and drops to `quests_app`. Migration `c8e0a2b4d6f3` takes from it what is the
+host's: it cannot flip `workspace.trusted` (the switch for running commands on the host), rewrite a password hash or
+re-activate an account (only `last_login_at`), or touch `alembic_version`. The admin commands (`quests-server
+workspace trust|untrust`, `passwd`, `2fa-reset`…) run as the owner (`db.SkipAppRole`). Test: `TestPGAPIRoleGrants`.
+
+## Quotas (quest=358)
+
+A workspace keeps at most `QUESTS_WORKSPACE_QUOTA_MB` (default 2048) of attachments, all file versions counted;
+an upload, a new revision, a staged draft file or an import that would pass it gets `413` with the usage. Settings →
+Пространство shows the usage; `quests_workspace_attachment_bytes_max` (Prometheus) is the largest workspace.
+
 ## The assistant's LLM key (quest=356)
 
 The text → quests assistant runs on the **account's own provider and key** (Settings → Ассистент): Groq, OpenAI,
@@ -59,8 +80,8 @@ Run it against a **scratch** instance: it creates a workspace, an attacker accou
 ## Known gaps (accepted for now)
 
 - Tables without row-level security (`appuser`, `usersession`, `apitoken`, `workspace*`, `backuplog`) are readable by the
-  API role: only an SQL injection could reach them. No injection is known; every dynamic identifier is validated.
-- Secrets are stored as plain text in PostgreSQL and in backups (and in an export made with `secrets=1`).
+  API role (it must read password hashes to check logins): only an SQL injection could reach them. No injection is
+  known; every dynamic identifier is validated. What the API role can no longer *change* is listed under "Grants".
 - No per-account storage quota for attachments; two-factor sign-in is optional (an operator policy that requires it for owners of a trusted workspace is not built); Grafana/Kuma have their own logins only.
 - `X-Forwarded-For` is trusted for throttling (the gateway rewrites it; a client on the LAN could forge it — the
   per-login stall covers that).

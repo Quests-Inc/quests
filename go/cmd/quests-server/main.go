@@ -75,7 +75,12 @@ func main() {
 	}
 
 	hub := events.New()
-	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
+	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL, Box: secrets}
+	if n, err := st.SealLegacySecrets(context.Background()); err != nil {
+		log.Printf("secrets: sealing existing values: %v", err)
+	} else if n > 0 {
+		log.Printf("secrets: sealed %d stored value(s)", n)
+	}
 	reg := health.New()
 	reg.SetProbe("db", schema.State, schema.Detail)
 	srv := &httpapi.Server{
@@ -96,6 +101,7 @@ func main() {
 		WebDAV:         webdav.New(cfg.WebDAVURL, cfg.WebDAVUser, cfg.WebDAVPass),
 		ClamAV:         clamav.New(cfg.ClamAVAddr),
 		MaxUploadBytes: cfg.MaxUploadBytes,
+		WorkspaceQuota: cfg.WorkspaceQuotaBytes,
 		Secrets:        secrets,
 	}
 

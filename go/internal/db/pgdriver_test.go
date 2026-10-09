@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -343,5 +344,70 @@ func TestPGBoolArgsAreIntegers(t *testing.T) {
 	var pinned, readme int
 	if err := pool.QueryRowContext(ctx, `SELECT pinned, is_readme FROM note WHERE title = 'n'`).Scan(&pinned, &readme); err != nil || pinned != 1 || readme != 0 {
 		t.Fatalf("pinned=%d readme=%d err=%v", pinned, readme, err)
+	}
+}
+
+// The API role may not change what is the host's: workspace trust, password hashes, the
+// schema revision (migration c8e0a2b4d6f3) — while still doing what the API needs.
+func TestPGAPIRoleGrants(t *testing.T) {
+	pool, schema := openTestPGWorkspaces(t)
+	url := os.Getenv("QUESTS_TEST_PG_URL")
+	admin, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	conn, err := admin.Conn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	ctx := context.Background()
+	if _, err := conn.ExecContext(ctx, `SET search_path TO `+schema); err != nil {
+		t.Fatal(err)
+	}
+	// The helper stops at the workspaces migration; the later columns the grants name come from here.
+	for _, q := range []string{
+		`ALTER TABLE workspace ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`,
+		`ALTER TABLE workspace ADD COLUMN IF NOT EXISTS trusted INTEGER NOT NULL DEFAULT 0`,
+		`CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)`,
+		`INSERT INTO alembic_version VALUES ('v')`,
+		`GRANT SELECT, INSERT, UPDATE, DELETE ON alembic_version TO quests_app`,
+	} {
+		if _, err := conn.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	grants, err := os.ReadFile(filepath.Join("..", "..", "..", "alembic", "versions_pg", "c8e0a2b4d6f3_api_role_grants.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, string(grants)); err != nil {
+		t.Fatalf("apply grants: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, `INSERT INTO appuser (id, username, password_hash, is_active, created_at) VALUES (1, 'u', 'hash', 1, now())`); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range []struct{ name, stmt string }{
+		{"flip workspace trust", `UPDATE workspace SET trusted = 1 WHERE id = 1`},
+		{"rewrite a password hash", `UPDATE appuser SET password_hash = 'x' WHERE id = 1`},
+		{"re-activate an account", `UPDATE appuser SET is_active = 1 WHERE id = 1`},
+		{"forge the schema revision", `UPDATE alembic_version SET version_num = 'x'`},
+	} {
+		if _, err := pool.ExecContext(ctx, c.stmt); err == nil {
+			t.Errorf("the API role could %s", c.name)
+		} else if !strings.Contains(err.Error(), "permission denied") {
+			t.Errorf("%s: unexpected error %v", c.name, err)
+		}
+	}
+	for _, c := range []struct{ name, stmt string }{
+		{"rename a workspace", `UPDATE workspace SET name = 'renamed' WHERE id = 1`},
+		{"soft-delete a workspace", `UPDATE workspace SET deleted_at = now() WHERE id = 1`},
+		{"record a login", `UPDATE appuser SET last_login_at = now() WHERE id = 1`},
+	} {
+		if _, err := pool.ExecContext(ctx, c.stmt); err != nil {
+			t.Errorf("the API role must still %s: %v", c.name, err)
+		}
 	}
 }

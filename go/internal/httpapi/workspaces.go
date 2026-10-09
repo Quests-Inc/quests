@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -331,10 +332,10 @@ func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"current": cur, "workspaces": list, "enabled": s.Store.WorkspacesEnabled(),
+	writeJSON(w, http.StatusOK, mergeMaps(map[string]any{"current": cur, "workspaces": list, "enabled": s.Store.WorkspacesEnabled(),
 		// Whether this workspace may run check/emit commands on the server (else: runners only).
 		"server_exec": s.Store.ServerExecAllowed(r.Context()),
-	})
+	}, s.attachmentUsage(r.Context())))
 }
 
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -464,4 +465,20 @@ func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"purge_at": purgeAt.UTC().Format("2006-01-02T15:04:05Z")})
 	}
+}
+
+// attachmentUsage reports how much of the attachment quota the current workspace uses.
+func (s *Server) attachmentUsage(ctx context.Context) map[string]any {
+	used, err := s.Store.AttachmentUsage(ctx)
+	if err != nil {
+		return map[string]any{}
+	}
+	return map[string]any{"attachments_used": used, "attachments_quota": s.WorkspaceQuota}
+}
+
+func mergeMaps(a, b map[string]any) map[string]any {
+	for k, v := range b {
+		a[k] = v
+	}
+	return a
 }

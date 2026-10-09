@@ -133,6 +133,7 @@ var (
 	dRunners   = prometheus.NewDesc("quests_runners", "Registered, not revoked runners.", nil, nil)
 	dAttach    = prometheus.NewDesc("quests_attachments", "Attachments.", nil, nil)
 	dAttBytes  = prometheus.NewDesc("quests_attachment_bytes", "Attachment bytes (current revisions).", nil, nil)
+	dAttMax    = prometheus.NewDesc("quests_workspace_attachment_bytes_max", "Attachment bytes (all revisions) of the largest workspace.", nil, nil)
 	dBackupAt  = prometheus.NewDesc("quests_backup_last_success_timestamp_seconds", "Newest successful DB backup.", nil, nil)
 	dBackupSz  = prometheus.NewDesc("quests_backup_last_size_bytes", "Size of the newest successful DB backup.", nil, nil)
 	dWS        = prometheus.NewDesc("quests_ws_clients", "Connected WebSocket clients.", nil, nil)
@@ -141,7 +142,7 @@ var (
 )
 
 func (c *appCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, d := range []*prometheus.Desc{dQuests, dNotes, dWorkspace, dJobs, dRunners, dAttach, dAttBytes, dBackupAt, dBackupSz, dWS, dProbe, dStatsOK} {
+	for _, d := range []*prometheus.Desc{dQuests, dNotes, dWorkspace, dJobs, dRunners, dAttach, dAttBytes, dAttMax, dBackupAt, dBackupSz, dWS, dProbe, dStatsOK} {
 		ch <- d
 	}
 }
@@ -183,6 +184,7 @@ func (c *appCollector) Collect(ch chan<- prometheus.Metric) {
 	gauge(dRunners, float64(s.RunnersActive))
 	gauge(dAttach, float64(s.Attachments))
 	gauge(dAttBytes, float64(s.AttachmentBytes))
+	gauge(dAttMax, float64(s.AttachmentBytesMax))
 	gauge(dBackupAt, float64(s.LastBackupAt))
 	gauge(dBackupSz, float64(s.LastBackupBytes))
 	if c.hub != nil {

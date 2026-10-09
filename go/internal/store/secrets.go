@@ -78,8 +78,86 @@ func (s *Store) SecretOwnerExists(ctx context.Context, o SecretOwner) (bool, err
 	return err == nil, err
 }
 
+// sealedPrefix marks a value sealed by secretbox. Rows from before sealing hold the bare value.
+const sealedPrefix = "v1:"
+
+func (s *Store) sealSecret(v string) (string, error) {
+	if s.Box == nil {
+		return v, nil
+	}
+	return s.Box.Seal(v)
+}
+
+// openSecret returns the plain value of a stored one; ok=false means it cannot be opened
+// (sealed under another key), and the secret is left out rather than handed over as ciphertext.
+func (s *Store) openSecret(stored string) (string, bool) {
+	if s.Box == nil || !strings.HasPrefix(stored, sealedPrefix) {
+		return stored, true // not sealed: a legacy plain row (sealed at the next start)
+	}
+	plain, err := s.Box.Open(stored)
+	if err != nil {
+		return "", false
+	}
+	return plain, true
+}
+
+// SealLegacySecrets seals values stored in the clear, in every workspace. It runs at start;
+// a value that merely looks sealed but cannot be opened is a plain value that begins with "v1:".
+func (s *Store) SealLegacySecrets(ctx context.Context) (int, error) {
+	if s.Box == nil {
+		return 0, nil
+	}
+	total := 0
+	var failure error
+	err := s.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+		rows, err := s.DB.QueryContext(wctx, `SELECT id, value FROM secret`)
+		if err != nil {
+			failure = err
+			return
+		}
+		type row struct {
+			id int64
+			v  string
+		}
+		var todo []row
+		for rows.Next() {
+			var r row
+			if err := rows.Scan(&r.id, &r.v); err != nil {
+				failure = err
+				break
+			}
+			if strings.HasPrefix(r.v, sealedPrefix) {
+				if _, err := s.Box.Open(r.v); err == nil {
+					continue
+				}
+			}
+			todo = append(todo, r)
+		}
+		rows.Close()
+		for _, r := range todo {
+			sealed, err := s.Box.Seal(r.v)
+			if err == nil {
+				_, err = s.DB.ExecContext(wctx, `UPDATE secret SET value = ? WHERE id = ?`, sealed, r.id)
+			}
+			if err != nil {
+				failure = err
+				return
+			}
+			total++
+		}
+	})
+	if err != nil {
+		return total, err
+	}
+	return total, failure
+}
+
 // SetSecret upserts one secret value for an owner.
 func (s *Store) SetSecret(ctx context.Context, o SecretOwner, key, value string) error {
+	value, err := s.sealSecret(value)
+	if err != nil {
+		return err
+	}
 	col, err := o.column()
 	if err != nil {
 		return err
@@ -192,7 +270,9 @@ func (s *Store) secretValues(ctx context.Context, o SecretOwner) (map[string]str
 		if err := rows.Scan(&k, &v); err != nil {
 			return nil, err
 		}
-		out[k] = v
+		if plain, ok := s.openSecret(v); ok {
+			out[k] = plain
+		}
 	}
 	return out, rows.Err()
 }

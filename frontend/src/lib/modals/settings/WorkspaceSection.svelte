@@ -14,6 +14,8 @@
   /** @type {{ username?: string }} */
   let { username = '' } = $props()
 
+  const mb = (n) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} ГБ` : `${(n / (1 << 20)).toFixed(n < 10 << 20 ? 1 : 0)} МБ`)
+
   let newName = $state('')
   let renameTo = $state(currentWorkspaceName())
   let deleting = $state(false)
@@ -77,6 +79,14 @@
 
 {#if wsx.members.length}
   <SettingsBlock title="Это пространство">
+    {#if wsx.attachmentsQuota > 0}
+      <div class="usage" title="Вложения всех версий файлов">
+        <span>Вложения: {mb(wsx.attachmentsUsed)} из {mb(wsx.attachmentsQuota)}</span>
+        <progress class:usage--high={wsx.attachmentsUsed / wsx.attachmentsQuota > 0.9} max={wsx.attachmentsQuota} value={wsx.attachmentsUsed}></progress>
+      </div>
+    {:else}
+      <p class="usage">Вложения: {mb(wsx.attachmentsUsed)}</p>
+    {/if}
     {#if isOwner}
       <form
         class="row"
@@ -156,6 +166,22 @@
 {#if wsx.error}<p class="err" role="alert">{wsx.error}</p>{/if}
 
 <style>
+  .usage {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+  .usage progress {
+    width: 100%;
+    height: 0.4rem;
+    accent-color: var(--color-accent, #c9a227);
+  }
+  .usage progress.usage--high {
+    accent-color: var(--color-danger, #b54a3a);
+  }
+
   .chips {
     list-style: none;
     margin: 0;

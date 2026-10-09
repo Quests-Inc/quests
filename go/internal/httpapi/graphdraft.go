@@ -645,6 +645,9 @@ func (s *Server) postGraphDraftFile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 413, fmt.Sprintf("file exceeds %d MB", maxBytes>>20))
 		return
 	}
+	if !s.checkQuota(w, r.Context(), int64(len(raw))) {
+		return
+	}
 	declared := strings.TrimSpace(hdr.Header.Get("Content-Type"))
 	detected := mimetype.Detect(raw).String()
 	res, err := s.ClamAV.Scan(r.Context(), bytes.NewReader(raw))

@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"database/sql"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"reflect"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -194,5 +196,58 @@ func TestMaskSecrets(t *testing.T) {
 	got := MaskSecrets("login hunter2 failed, xy ok, tok-12345!", secrets)
 	if got != "login *** failed, xy ok, ***!" {
 		t.Fatalf("got %q (values under 4 chars must be left alone)", got)
+	}
+}
+
+func TestSecretsAreSealedAtRest(t *testing.T) {
+	t.Setenv("QUESTS_SECRET_KEY", "")
+	box, err := secretbox.Load(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := openSecretsDB(t)
+	st.Box = box
+	ctx := context.Background()
+
+	mustSet(t, st, oLine, "TOKEN", "hunter2-plain")
+	var raw string
+	if err := st.DB.QueryRow(`SELECT value FROM secret WHERE key = 'TOKEN'`).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw == "hunter2-plain" || !strings.HasPrefix(raw, "v1:") {
+		t.Fatalf("stored in the clear: %q", raw)
+	}
+	got, err := st.ResolveSecrets(ctx, oStep)
+	if err != nil || got["TOKEN"] != "hunter2-plain" {
+		t.Fatalf("resolve: %v %v", got, err)
+	}
+
+	// A row from before sealing is read as is, then sealed by the start-up pass; a plain value
+	// that merely begins with the marker is sealed too.
+	if _, err := st.DB.Exec(`INSERT INTO secret (quest_id, key, value, created_at, updated_at) VALUES
+		(100, 'OLD', 'legacy-value', datetime('now'), datetime('now')),
+		(100, 'ODD', 'v1:looks-sealed-but-is-not', datetime('now'), datetime('now'))`); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.ResolveSecrets(ctx, oQuest); got["OLD"] != "legacy-value" {
+		t.Fatalf("legacy row unreadable before sealing: %v", got)
+	}
+	n, err := st.SealLegacySecrets(ctx)
+	if err != nil || n != 2 {
+		t.Fatalf("SealLegacySecrets = %d, %v (want 2)", n, err)
+	}
+	got, _ = st.ResolveSecrets(ctx, oQuest)
+	if got["OLD"] != "legacy-value" || got["ODD"] != "v1:looks-sealed-but-is-not" || got["TOKEN"] != "hunter2-plain" {
+		t.Fatalf("after sealing: %v", got)
+	}
+	if n, _ := st.SealLegacySecrets(ctx); n != 0 {
+		t.Fatalf("second pass re-sealed %d rows", n)
+	}
+
+	// Sealed under another key: left out, never handed over as ciphertext.
+	other, _ := secretbox.Load(t.TempDir())
+	st2 := &Store{DB: st.DB, Box: other}
+	if got, _ := st2.ResolveSecrets(ctx, oQuest); len(got) != 0 {
+		t.Fatalf("values readable under the wrong key: %v", got)
 	}
 }
