@@ -46,7 +46,7 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, serr.Error())
 		return
 	}
-	if p, ok := PrincipalFrom(r.Context()); ok && !s.limiter().tryLLM(strconv.FormatInt(p.User.ID, 10)+p.TokenName) {
+	if p, ok := PrincipalFrom(r.Context()); ok && !s.limiter().tryLLM(strconv.FormatInt(p.User.ID, 10)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов к ассистенту, повторите позже")
 		return
 	}

@@ -41,10 +41,12 @@ volume; without it saved keys cannot be opened and are simply re-entered**), sho
 and changed only from a browser session (not with an API token).
 
 - A user-typed endpoint must be `https` and resolve to public addresses only (no loopback, LAN, link-local/metadata,
-  CGNAT); the connection itself refuses internal addresses and redirects are not followed, and the provider's reply
+  CGNAT); the request goes to the address resolved and checked at that moment (TLS and `Host` keep the real name), so DNS
+  cannot be re-pointed inward between the check and the connection — also when the operator routes LLM traffic
+  through a proxy; redirects are not followed, and the provider's reply
   body is not echoed back. Otherwise the field would be a server-side request forgery.
 - Accounts without a key get the server's key (`QUESTS_GROQ_API_KEY`) only if they are the operator, or the operator set
-  `QUESTS_LLM_SHARED=1`; everyone else is told to add their own. 20 requests / 10 min and 8000 characters per request.
+  `QUESTS_LLM_SHARED=1`; everyone else is told to add their own. 20 requests / 10 min per account (all of its tokens together) and 8000 characters per request.
 
 ## Re-check after changes
 

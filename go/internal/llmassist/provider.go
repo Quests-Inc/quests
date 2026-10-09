@@ -2,6 +2,7 @@ package llmassist
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -91,6 +92,58 @@ func CheckBaseURL(raw string) (string, error) {
 	return raw, nil
 }
 
+// publicIP resolves host and returns an address to connect to, refusing the host when ANY of
+// its addresses is internal (a name that also points inward is not trusted).
+func publicIP(host string) (netip.Addr, error) {
+	if ip, err := netip.ParseAddr(host); err == nil {
+		if blockedIP(ip) {
+			return netip.Addr{}, ErrBaseURL
+		}
+		return ip, nil
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return netip.Addr{}, fmt.Errorf("адрес провайдера не разрешается: %s", host)
+	}
+	var pick netip.Addr
+	for _, raw := range ips {
+		a, ok := netip.AddrFromSlice(raw)
+		if !ok || blockedIP(a) {
+			return netip.Addr{}, ErrBaseURL
+		}
+		if !pick.IsValid() || (a.Unmap().Is4() && !pick.Unmap().Is4()) {
+			pick = a.Unmap()
+		}
+	}
+	return pick, nil
+}
+
+// do sends req with the client for s. A user-chosen endpoint is resolved right here and the
+// request goes to the address that was checked (TLS and the Host header keep the real name):
+// connecting by name later — directly, or through a proxy that resolves it itself — would let
+// DNS be pointed at this server's own network between the check and the connection.
+func do(s Settings, req *http.Request) (*http.Response, error) {
+	c := clientFor(s)
+	if s.Untrusted {
+		host := req.URL.Hostname()
+		ip, err := publicIP(host)
+		if err != nil {
+			return nil, err
+		}
+		port := req.URL.Port()
+		if port == "" {
+			port = "443"
+		}
+		req.Host = req.URL.Host
+		req.URL.Host = net.JoinHostPort(ip.String(), port)
+		c.Transport.(*http.Transport).TLSClientConfig = &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	}
+	return httpDo(c, req)
+}
+
+// httpDo is the single place a request leaves; tests replace it.
+var httpDo = func(c *http.Client, r *http.Request) (*http.Response, error) { return c.Do(r) }
+
 // clientFor builds the HTTP client for a request. Settings the account owner typed in
 // (Untrusted) get a dialer that refuses internal addresses at connect time — so a
 // name that resolved to something public when saved cannot be re-pointed inward later —
@@ -134,7 +187,7 @@ func Ping(ctx context.Context, s Settings) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+s.APIKey)
 	req.Header.Set("User-Agent", "quests-bot/1.0")
-	resp, err := clientFor(s).Do(req)
+	resp, err := do(s, req)
 	if err != nil {
 		return llmErrf("не удалось связаться с провайдером: %v", err)
 	}

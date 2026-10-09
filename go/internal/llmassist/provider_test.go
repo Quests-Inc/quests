@@ -2,6 +2,7 @@ package llmassist
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -78,3 +79,39 @@ func TestWithUserPresetsAndCustom(t *testing.T) {
 		t.Fatal("WithUser must not modify the receiver")
 	}
 }
+
+func TestPublicIPRefusesInternalAndLiteral(t *testing.T) {
+	for _, bad := range []string{"127.0.0.1", "10.1.2.3", "169.254.169.254", "::1", "100.100.1.1"} {
+		if _, err := publicIP(bad); err == nil {
+			t.Errorf("%s must be refused", bad)
+		}
+	}
+	if ip, err := publicIP("8.8.4.4"); err != nil || ip.String() != "8.8.4.4" {
+		t.Errorf("public literal: %v %v", ip, err)
+	}
+}
+
+// A request to a user-chosen endpoint is rewritten to the checked address, keeping the real
+// name for TLS and Host; one whose name resolves inward never leaves the machine.
+func TestDoPinsTheCheckedAddress(t *testing.T) {
+	var seenHost, seenURLHost string
+	prev := httpDo
+	httpDo = func(c *http.Client, r *http.Request) (*http.Response, error) {
+		seenHost, seenURLHost = r.Host, r.URL.Host
+		return nil, errStopHere
+	}
+	defer func() { httpDo = prev }()
+	req, _ := http.NewRequest(http.MethodGet, "https://8.8.4.4:8443/v1/models", nil)
+	_, _ = do(Settings{Untrusted: true, Timeout: time.Second}, req)
+	if seenURLHost != "8.8.4.4:8443" || seenHost != "8.8.4.4:8443" {
+		t.Fatalf("literal kept: host=%q url=%q", seenHost, seenURLHost)
+	}
+	req2, _ := http.NewRequest(http.MethodGet, "https://127.0.0.1/v1", nil)
+	called := false
+	httpDo = func(c *http.Client, r *http.Request) (*http.Response, error) { called = true; return nil, errStopHere }
+	if _, err := do(Settings{Untrusted: true, Timeout: time.Second}, req2); err == nil || called {
+		t.Fatalf("an internal address must be refused before any request (called=%v, err=%v)", called, err)
+	}
+}
+
+var errStopHere = errors.New("stop")

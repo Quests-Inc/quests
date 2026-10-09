@@ -133,7 +133,7 @@ func ExtractActionBatch(ctx context.Context, settings Settings, text string, pc 
 	// some regions, same reason the old Python client set this.
 	req.Header.Set("User-Agent", "quests-bot/1.0")
 
-	resp, err := clientFor(settings).Do(req)
+	resp, err := do(settings, req)
 	if err != nil {
 		return ActionBatch{}, llmErrf("не удалось связаться с провайдером: %v", err)
 	}
