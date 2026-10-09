@@ -99,7 +99,7 @@ func (s *Store) ReadTable(ctx context.Context, spec TableSpec, fn func(row map[s
 		row := make(map[string]any, len(cols))
 		skip := false
 		for i, c := range cols {
-			if c == "workspace_id" {
+			if c == "workspace_id" || c == "search_tsv" { // search_tsv is generated: rebuilt on import
 				continue
 			}
 			if spec.Name == "secret" && c == "value" {
@@ -247,7 +247,7 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 			oldID, _ := toInt64(row["id"])
 			vals := map[string]any{}
 			for c, v := range row {
-				if c == "id" || c == "workspace_id" {
+				if c == "id" || c == "workspace_id" || c == "search_tsv" {
 					continue
 				}
 				if !identRe.MatchString(c) || !cols[c] {

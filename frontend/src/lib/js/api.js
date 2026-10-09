@@ -845,6 +845,11 @@ export function testMyLLM(form) {
 
 // --- two-factor sign-in (the account's own, session only) ---
 
+/** Ranked note search: [{ id, title, score, where: 'title'|'body'|'fuzzy', snippet (matches in ⟪ ⟫), … }]. */
+export function searchNotes(q, limit = 30) {
+  return request(`/api/notes/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+}
+
 export function getMyMfa() {
   return request('/api/me/2fa')
 }

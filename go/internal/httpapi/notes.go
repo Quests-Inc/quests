@@ -22,6 +22,7 @@ import (
 func (s *Server) registerNotes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes", s.listNotes)
 	mux.HandleFunc("POST /api/notes", s.createNote)
+	mux.HandleFunc("GET /api/notes/search", s.searchNotes)
 	mux.HandleFunc("GET /api/notes/{id}", s.getNote)
 	mux.HandleFunc("PATCH /api/notes/{id}", s.patchNote)
 	mux.HandleFunc("DELETE /api/notes/{id}", s.deleteNote)
@@ -582,4 +583,22 @@ func noteJSONInt(v any) (int, bool) {
 		return 0, false
 	}
 	return int(*p), true
+}
+
+// searchNotes ranks notes against a query: stemmed words in Russian and English, prefixes, the
+// other keyboard layout, typos in titles. Each hit says where it matched and carries a fragment
+// with the matches marked (⟪ ⟫). An agent (MCP) is never shown PRIVATE notes.
+func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	opts := store.SearchOpts{Limit: limit}
+	if src := requestSource(r); src != nil && *src == "mcp" {
+		opts.ExcludePrivate = true
+	}
+	hits, err := s.Store.SearchNotes(r.Context(), q.Get("q"), opts)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"q": strings.TrimSpace(q.Get("q")), "hits": hits, "marks": []string{store.MarkOpen, store.MarkClose}})
 }

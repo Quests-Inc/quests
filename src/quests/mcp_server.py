@@ -1526,6 +1526,23 @@ def list_notes(
 
 @server.tool(
     description=(
+        "Search notes like a search engine: ranked by relevance, not by substring. Understands "
+        "Russian and English word forms (квесты/квестов), prefixes of the last word, the other "
+        "keyboard layout (ghbdtn → привет), small typos in titles, \"exact phrases\" and -excluded words. "
+        "Each hit has id, title, score, where it matched (title | body | fuzzy) and a snippet with "
+        "the matched words in ⟪ ⟫ — read the snippet to decide whether to open the note with "
+        "get_note_context. PRIVATE notes never appear here. Prefer this to list_notes when you "
+        "look for what a note says rather than where it sits in the tree."
+    )
+)
+def search_notes(q: str, limit: int = 10) -> dict[str, Any]:
+    if not str(q).strip():
+        raise ValueError("q is empty")
+    return _api_get("/api/notes/search", {"q": q, "limit": max(1, min(int(limit), 50))}) or {"hits": []}
+
+
+@server.tool(
+    description=(
         "List only CATEGORY notes (folder-like aggregators of the notes vault): "
         "id, title, path, direct child count, and hint — the first line of the "
         "category's description, i.e. what belongs there. Cheap (a handful of "

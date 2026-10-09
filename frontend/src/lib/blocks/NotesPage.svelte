@@ -5,7 +5,9 @@
     deleteNote,
     getNote,
     updateNote,
+    searchNotes,
   } from '../js/api.js'
+  import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.js'
   import {
@@ -146,6 +148,29 @@
   })
 
   let searchActive = $derived(search.trim().length > 0)
+
+  /** Ranked server results for the query (null = not asked / unavailable → the tree filter above stays). */
+  let searchHits = $state(/** @type {any[] | null} */ (null))
+  $effect(() => {
+    const q = search.trim()
+    if (q.length < 2) {
+      searchHits = null
+      return
+    }
+    let stale = false
+    const timer = setTimeout(async () => {
+      try {
+        const r = await searchNotes(q)
+        if (!stale) searchHits = r?.hits ?? []
+      } catch {
+        if (!stale) searchHits = null
+      }
+    }, 220)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  })
 
   /** Grouping key for the tree: the open note's own live `parentId` field
    * (even before it's written into noteDrafts — that only happens once the
@@ -1258,7 +1283,23 @@
       ondragleave={onListDragLeave}
       ondrop={onListDrop}
     >
-      {#if notes.length === 0}
+      {#if searchActive && searchHits}
+        {#if searchHits.length === 0}
+          <p class="empty">Ничего не найдено</p>
+        {:else}
+          <ul class="hits">
+            {#each searchHits as h (h.id)}
+              <li>
+                <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)}>
+                  <span class="hit__title">{h.title || 'Без названия'}</span>
+                  <span class="hit__where">{WHERE_LABEL[h.where] ?? ''}</span>
+                  {#if h.snippet}<span class="hit__snippet">{@html snippetHtml(h.snippet)}</span>{/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {:else if notes.length === 0}
         <p class="empty">Пока пусто — это хранилище знания, не список дел.</p>
       {:else if roots.length === 0 && search}
         <p class="empty">Ничего не найдено</p>
@@ -1700,6 +1741,51 @@
     gap: 0.4rem;
     padding: 0.55rem 0.6rem;
     border-bottom: 1px solid var(--color-border, #333);
+  }
+
+  .hits {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  .hit {
+    display: grid;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+  }
+  .hit:hover,
+  .hit--on {
+    background: var(--color-bg-hover, #2a2a2a);
+  }
+  .hit__title {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-fg);
+  }
+  .hit__where {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle, #6e6e6e);
+  }
+  .hit__snippet {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--color-fg-muted, #9a9a9a);
+    overflow-wrap: anywhere;
+  }
+  .hit__snippet :global(mark) {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 35%, transparent);
+    color: var(--color-fg);
+    border-radius: 2px;
   }
 
   .notes__tools .search {
