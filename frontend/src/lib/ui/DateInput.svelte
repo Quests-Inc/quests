@@ -117,16 +117,18 @@
   .date-input__btn {
     box-sizing: border-box;
     height: var(--hist-h, auto);
-    padding: 0.3rem 0.6rem;
+    padding: 0.45rem 0.7rem;
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
-    background: transparent;
-    color: inherit;
-    font: inherit;
+    background: var(--color-bg, #121212);
+    color: var(--color-fg, #e8e8e8);
+    font-family: var(--font-ui, sans-serif);
     font-size: var(--text-sm, 0.875rem);
     font-variant-numeric: tabular-nums;
     cursor: pointer;
   }
+  .date-input__btn:hover,
+  .date-input__btn[aria-expanded='true'] { border-color: var(--color-accent, #c9a227); }
 
   .date-input__pop {
     position: fixed;
@@ -136,6 +138,7 @@
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
     background: var(--color-bg-raised, #1a1a1a);
+    color: var(--color-fg, #e8e8e8);
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
   }
 
