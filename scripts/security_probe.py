@@ -155,7 +155,14 @@ def main() -> int:
     c, r, _ = evil.req("POST", "/api/health/heartbeat", {"component": "overlay", "detail": "fake"})
     check("members cannot post heartbeats", c == 403, str(c))
 
-    # 7. Hostile archive.
+    # 7. The assistant's endpoint is the user's to choose, not a way into this server's network.
+    for url in ("https://127.0.0.1:8765/v1", "https://169.254.169.254/v1", "http://api.openai.com/v1"):
+        c, r, _ = evil.req("PUT", "/api/me/llm", {"provider": "custom", "base_url": url, "model": "m", "api_key": "k" * 12})
+        check(f"assistant endpoint {url} is refused", c == 422, str(c))
+    c, r, _ = evil.req("GET", "/api/me/llm")
+    check("assistant key is never returned", c == 200 and "api_key" not in json.dumps(r))
+
+    # 8. Hostile archive.
     import zipfile
     bio = io.BytesIO()
     with zipfile.ZipFile(bio, "w") as z:
