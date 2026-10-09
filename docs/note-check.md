@@ -35,14 +35,21 @@ workspace, `QUESTS_WORKSPACE`.
   (see [security.md](security.md)).
 - MCP: `set_note_check`, `check_note_now`.
 
-## Example: a note about files in a git repo
+## Example: a note about files in a public GitHub repo
 
-Put `<!-- verified: <commit> -->` in the note and use `scripts/note_check_git.py`:
+The reference commit lives **in the command itself**, not in the note: you re-pin it by hand when you have
+rewritten the note, so nothing is trusted blindly. The command needs only `curl` and `jq` (no checkout, no saved
+script, so it also runs on a runner without the repository). One compare call tells which files changed since the pin:
 
-```bash
-python3 scripts/note_check_git.py --repo ~/projects/Quests go/cmd/quests-server/admin.go
+```sh
+REF=9aac35e
+PATHS="docs/search.md go/internal/store/search.go"
+curl -sf "https://api.github.com/repos/OWNER/REPO/compare/$REF...main" | jq -c --arg p "$PATHS" --arg r "$REF" \
+  '($p|split(" ")) as $w | [.files[].filename | select(. as $f | $w | index($f))] as $c
+   | if ($c|length) > 0 then {outdated:1, reason:("после " + $r + " изменено: " + ($c|join(", ")))} else {outdated:0} end'
 ```
 
-It is outdated when any path has a newer commit than the marker. To mark the note fresh again, edit the
-marker to the commit the note now describes (`git log -1 --format=%h -- <paths>`). A missing marker or an
-unknown commit is an error (exit 2).
+An unknown `REF` or an API failure prints nothing, which is an error (the verdict stays). The unauthenticated GitHub
+API allows 60 requests an hour per address — fine for an hourly check; for a private repository or a busier
+schedule put a token in the note's secrets and add `-H "Authorization: Bearer $GITHUB_TOKEN"`. The compare API lists
+at most 300 files, so a huge range may hide a change: re-pin before it gets that far.
