@@ -2481,6 +2481,7 @@
        flex-gap of padding below it, so «Вложения» clears its divider by the
        same amount the links label clears the divider above. */
     margin-top: 0;
+    margin-bottom: 0;
     padding-top: var(--space-4, 1rem);
     border-top: 1px solid var(--color-border, #333);
   }

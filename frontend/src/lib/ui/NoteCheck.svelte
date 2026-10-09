@@ -1,5 +1,6 @@
 <script>
   import HelpTip from './HelpTip.svelte'
+  import Icon from './Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '../js/api.js'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
   import { loadWorkspaceInfo, wsInfo } from '../js/workspaceInfo.svelte.js'
@@ -100,6 +101,7 @@
 <div class="nc">
   <button type="button" class="nc__head" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="nc__title">Проверка актуальности</span>
+    <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
     {#if check?.outdated}
       <span class="nc__chip nc__chip--bad" title={check.reason}>устарела</span>
     {:else if active && check?.last_run_at && !check?.error}
@@ -172,19 +174,23 @@
   .nc__head {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.3rem;
     padding: 0;
     background: transparent;
     border: 0;
-    color: inherit;
-    font: inherit;
+    line-height: 1;
     cursor: pointer;
     text-align: left;
-  }
-  .nc__title {
-    font-size: var(--text-xs, 0.75rem);
-    letter-spacing: 0.06em;
+    font: inherit;
+    font-family: var(--font-ui, sans-serif);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
+    font-variant: small-caps;
+    font-weight: 500;
+    color: var(--color-fg-subtle, #6e6e6e);
+  }
+  .nc__head:hover {
     color: var(--color-fg-muted, #9a9a9a);
   }
   .nc__chip {
@@ -192,6 +198,9 @@
     border: 1px solid var(--color-border, #333);
     border-radius: 999px;
     font-size: 0.7rem;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant: normal;
     color: var(--color-fg-muted, #9a9a9a);
   }
   .nc__chip--bad {
