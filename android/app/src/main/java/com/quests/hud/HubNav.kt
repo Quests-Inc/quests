@@ -9,7 +9,7 @@ package com.quests.hud
 object HubNav {
     const val TAB_JOURNAL = "journal"
     // Linear, no wrap: settings through calendar.
-    val TAB_ORDER = listOf("journal", "toc", "notes", "attachments", "calendar")
+    val TAB_ORDER = listOf("journal", "notes", "attachments", "calendar")
 
     var pendingTab: String? = null
 

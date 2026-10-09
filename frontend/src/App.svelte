@@ -54,7 +54,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   import QuestSidebar from './lib/blocks/QuestSidebar.svelte'
   import QuestDetail from './lib/blocks/QuestDetail.svelte'
   import ActivityCalendar from './lib/blocks/ActivityCalendar.svelte'
-  import TocPage from './lib/blocks/TocPage.svelte'
   import NotesPage from './lib/blocks/NotesPage.svelte'
   import AttachmentsPage from './lib/blocks/AttachmentsPage.svelte'
   import LoginScreen from './lib/blocks/LoginScreen.svelte'
@@ -91,7 +90,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     db: 'unknown',
   })
   let searchQuery = $state('')
-  /** @type {'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'} */
+  /** @type {'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'} */
   let view = $state('journal')
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
@@ -1118,8 +1117,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   // Header tab order; drives which way a tab switch slides.
-  // 'toc' is hidden for now (trial without it, see quest 328); the page and its
-  // view branch are kept so the tab can come back by re-adding it here and in the header.
   const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph', 'runners']
   let navDir = $state(1)
 
@@ -1738,21 +1735,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
           const quest = quests.find((q) => q.id === id)
           if (quest) openQuestContextMenu(event, quest)
         }}
-      />
-    </div>
-  {:else if view === 'toc'}
-    <div class="journal__toc">
-      <TocPage
-        {matchedQuests}
-        {categories}
-        {questlines}
-        bind:searchQuery
-        {nowMs}
-        labels={refLabels}
-        onRef={onJournalRef}
-        onSelectQuest={selectQuestFromUi}
-        onLineContextMenu={openLineContextMenu}
-        onQuestContextMenu={openQuestContextMenu}
       />
     </div>
   {:else if view === 'notes'}

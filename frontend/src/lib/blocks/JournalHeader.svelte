@@ -3,12 +3,12 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
 
   /** @type {{
-   *   view: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners',
+   *   view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners',
    *   liveStatus: string,
    *   health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
    *   sidebarCollapsed?: boolean,
    *   onToggleSidebar?: (() => void) | null,
-   *   onViewChange: (v: 'journal' | 'toc' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners') => void,
+   *   onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners') => void,
    *   onOpenSettings: () => void,
    *   onOpenTemplates: () => void,
    *   onOpenSecrets: () => void,
@@ -63,7 +63,7 @@
   let menuX = $state(0)
   let menuY = $state(0)
 
-  let showLowActions = $derived(view === 'journal' || view === 'toc' || view === 'notes')
+  let showLowActions = $derived(view === 'journal' || view === 'notes')
 
   /** @type {'full' | 'icons' | 'icons-core' | 'icons-primary'} */
   let actionsMode = $state('full')
@@ -432,7 +432,6 @@
       <Icon name="scroll" size={15} />
       <span class="view-tab__label">Журнал</span>
     </button>
-    <!-- «Оглавление» (view 'toc') temporarily hidden: trial without it. -->
     <button
       type="button"
       class="view-tab"
@@ -515,7 +514,7 @@
       <Icon name="settings" />
       <span class="btn__text">Настройки</span>
     </button>
-    {#if view === 'journal' || view === 'toc' || view === 'notes'}
+    {#if view === 'journal' || view === 'notes'}
       <button type="button" class="btn" title="Шаблоны" aria-label="Шаблоны периодики">
         <Icon name="repeat" />
         <span class="btn__text">Шаблоны</span>
