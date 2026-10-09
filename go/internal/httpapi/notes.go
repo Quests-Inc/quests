@@ -648,10 +648,26 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 		opts.ExcludePrivate = true
 		opts.Agent = true
 	}
+	want := parseNoteFlagFilter(q.Get("flags"))
+	if want.bad != "" {
+		writeErr(w, http.StatusUnprocessableEntity, "unknown flag: "+want.bad+" (known: "+noteFlagNames+")")
+		return
+	}
+	if want.active() {
+		// Filtering happens after ranking: look at the widest candidate set, then cut to the limit.
+		opts.Limit = 50
+	}
 	hits, err := s.Store.SearchNotes(r.Context(), q.Get("q"), opts)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if want.active() {
+		hits, err = s.filterHitsByFlags(r, hits, want, limit)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"q": strings.TrimSpace(q.Get("q")), "hits": hits, "marks": []string{store.MarkOpen, store.MarkClose}})
 }
@@ -749,4 +765,101 @@ func (s *Server) writePopularity(w http.ResponseWriter, r *http.Request, n store
 		return
 	}
 	writeJSON(w, 200, pop[n.ID])
+}
+
+// noteFlagNames are the flags a note search can filter on (flags=outdated,-private,…).
+const noteFlagNames = "outdated|stale, readme, private, category, pinned|pin, check"
+
+type noteFlagFilter struct {
+	include, exclude []string
+	bad              string
+}
+
+func (f noteFlagFilter) active() bool { return len(f.include)+len(f.exclude) > 0 }
+
+func canonNoteFlag(name string) string {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "outdated", "stale":
+		return "outdated"
+	case "readme", "private", "category", "check":
+		return strings.ToLower(strings.TrimSpace(name))
+	case "pinned", "pin":
+		return "pinned"
+	}
+	return ""
+}
+
+// parseNoteFlagFilter reads "outdated,-private" (a minus means "without the flag").
+func parseNoteFlagFilter(raw string) noteFlagFilter {
+	var f noteFlagFilter
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		neg := strings.HasPrefix(part, "-")
+		name := canonNoteFlag(strings.TrimPrefix(part, "-"))
+		if name == "" {
+			f.bad = part
+			return f
+		}
+		if neg {
+			f.exclude = append(f.exclude, name)
+		} else {
+			f.include = append(f.include, name)
+		}
+	}
+	return f
+}
+
+func (s *Server) filterHitsByFlags(r *http.Request, hits []store.SearchHit, f noteFlagFilter, limit int) ([]store.SearchHit, error) {
+	rows, err := s.Store.ListNotes(r.Context(), store.NoteFilter{})
+	if err != nil {
+		return nil, err
+	}
+	checks, _ := s.Store.NoteChecks(r.Context())
+	byID := make(map[int64]store.Note, len(rows))
+	for _, n := range rows {
+		byID[n.ID] = n
+	}
+	has := func(id int64, flag string) bool {
+		n := byID[id]
+		switch flag {
+		case "outdated":
+			return checks[id].Outdated
+		case "readme":
+			return n.IsReadme
+		case "private":
+			return n.IsPrivate
+		case "category":
+			return n.IsCategory
+		case "pinned":
+			return n.Pinned
+		case "check":
+			return checks[id].Active()
+		}
+		return false
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	out := make([]store.SearchHit, 0, len(hits))
+next:
+	for _, h := range hits {
+		for _, fl := range f.include {
+			if !has(h.ID, fl) {
+				continue next
+			}
+		}
+		for _, fl := range f.exclude {
+			if has(h.ID, fl) {
+				continue next
+			}
+		}
+		out = append(out, h)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
 }

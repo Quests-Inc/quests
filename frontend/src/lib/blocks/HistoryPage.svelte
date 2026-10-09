@@ -1,4 +1,6 @@
 <script>
+  import { parseFlagQuery } from '../js/searchFlags.js'
+  import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
   import DateInput from '../ui/DateInput.svelte'
   import { getQuestLog, listTags } from '../js/api.js'
@@ -15,6 +17,20 @@
   let { active = true, nonce = 0, categories = [], questlines = [], onOpen } = $props()
 
   const PAGE = 100
+
+  /** `flag:…` in the search box set the same filters as the selectors (a flag wins over its selector). */
+  const HIST_FLAGS = {
+    quest: { label: 'квесты', test: () => true },
+    note: { label: 'заметки', test: () => true },
+    attachment: { label: 'вложения', test: () => true },
+    done: { label: 'выполнено', test: () => true },
+    created: { label: 'создано', test: () => true, aliases: ['new'] },
+    edited: { label: 'правки', test: () => true, aliases: ['edit', 'updated'] },
+    missed: { label: 'провалы и отсрочки', test: () => true, aliases: ['miss', 'failed'] },
+    deleted: { label: 'удаления', test: () => true, aliases: ['del'] },
+    today: { label: 'сегодня', test: () => true },
+  }
+  const HIST_KIND_OF = { done: 'done', created: 'new', edited: 'edit', missed: 'miss', deleted: 'del' }
 
   const ENTITIES = [
     { id: '', label: 'Всё' },
@@ -67,6 +83,10 @@
   }
 
   let search = $state(param('q'))
+  let parsedSearch = $derived(parseFlagQuery(search, HIST_FLAGS))
+  let effEntity = $derived(parsedSearch.include.find((f) => ['quest', 'note', 'attachment'].includes(f)) ?? entity)
+  let effKindGroup = $derived(HIST_KIND_OF[parsedSearch.include.find((f) => HIST_KIND_OF[f]) ?? ''] ?? kindGroup)
+  let effPeriod = $derived(parsedSearch.include.includes('today') ? 'today' : period)
   let entity = $state(param('et'))
   let kindGroup = $state(param('kg'))
   let questlineId = $state(param('ql'))
@@ -116,10 +136,10 @@
       const from = dayStart(day)
       return { from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1) }
     }
-    if (period) {
+    if (effPeriod) {
       const now = new Date()
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const back = period === 'today' ? 0 : Number(period) - 1
+      const back = effPeriod === 'today' ? 0 : Number(effPeriod) - 1
       return { from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - back), to: null }
     }
     return { from: null, to: null }
@@ -133,17 +153,17 @@
     try {
       const { from, to } = range()
       const last = append ? rows[rows.length - 1] : null
-      const kinds = KIND_GROUPS.find((g) => g.id === kindGroup)?.kinds ?? []
+      const kinds = KIND_GROUPS.find((g) => g.id === effKindGroup)?.kinds ?? []
       const data = await getQuestLog({
         limit: PAGE,
-        entity_type: entity || 'all',
+        entity_type: effEntity || 'all',
         kind: kinds.join(','),
         questline_id: questlineId,
         category_id: categoryId,
         tag_id: tagId,
         from: from?.toISOString(),
         to: to?.toISOString(),
-        q: search.trim(),
+        q: parsedSearch.text,
         before_id: last?.id,
         before_at: last?.at,
       })
@@ -160,7 +180,7 @@
 
   $effect(() => {
     if (!active) return
-    void [search, entity, kindGroup, questlineId, categoryId, tagId, period, day, nonce]
+    void [parsedSearch.text, effEntity, effKindGroup, effPeriod, entity, kindGroup, questlineId, categoryId, tagId, period, day, nonce]
     syncUrl()
     // Typing in the search box shouldn't fire a request per keystroke.
     const t = setTimeout(() => load(false), search ? 250 : 0)
@@ -262,6 +282,7 @@
         placeholder="Поиск по названию и описанию события…"
         bind:value={search}
         aria-label="Поиск по истории"
+        title="Фильтры: flag:quest, flag:note, flag:attachment, flag:done, flag:created, flag:edited, flag:missed, flag:deleted, flag:today"
       />
       <select class="hist__select" bind:value={period} aria-label="Период">
         {#each PERIODS as p (p.id)}
@@ -275,6 +296,7 @@
         </button>
       {/if}
     </div>
+    <FlagHints value={search} flags={HIST_FLAGS} parsed={parsedSearch} onPick={(v) => (search = v)} />
     <div class="hist__row">
       <div class="hist__seg" role="group" aria-label="Что менялось">
         {#each ENTITIES as e (e.id)}

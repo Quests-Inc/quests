@@ -1,8 +1,10 @@
-/** `flag:name` / `-flag:name` tokens in a search box: filters typed next to the words.
- *  parseFlagQuery('деплой flag:outdated -flag:private', FLAGS) → { text: 'деплой', include: ['outdated'], exclude: ['private'], unknown: [] }
- *  A flag set is { name: { label, test(item) → boolean, aliases?: string[] } } — each widget brings its own. */
+/** `flag:name` / `-flag:name` (and `key:value`) tokens in a search box: filters typed next to the words.
+ *  parseFlagQuery('деплой flag:outdated -flag:private sig:epic', FLAGS, { sig: { test(item, v) {…} } })
+ *    → { text: 'деплой', include: ['outdated'], exclude: ['private'], values: [{key:'sig', value:'epic', neg:false}], unknown: [] }
+ *  A flag set is { name: { label, test(item) → boolean, aliases?: string[] } } — each widget brings its own.
+ *  `keys` are value filters ({ test(item, value) → boolean, label }); a token with another key stays in the text. */
 
-const TOKEN = /(^|\s)(-?)(?:flag|f):([^\s]*)/giu
+const TOKEN = /(^|\s)(-?)([\p{L}]+):([^\s]*)/giu
 
 function resolve(flags, name) {
   const key = name.toLowerCase()
@@ -12,27 +14,37 @@ function resolve(flags, name) {
   return null
 }
 
-export function parseFlagQuery(raw, flags) {
+export function parseFlagQuery(raw, flags, keys = {}) {
   const include = []
   const exclude = []
   const unknown = []
+  const values = []
   const text = String(raw ?? '')
-    .replace(TOKEN, (_m, lead, neg, name) => {
-      const id = name ? resolve(flags, name) : null
-      if (id) (neg ? exclude : include).push(id)
-      else if (name) unknown.push(name)
-      return lead
+    .replace(TOKEN, (m, lead, neg, key, name) => {
+      const k = key.toLowerCase()
+      if (k === 'flag' || k === 'f') {
+        const id = name ? resolve(flags, name) : null
+        if (id) (neg ? exclude : include).push(id)
+        else if (name) unknown.push(name)
+        return lead
+      }
+      if (keys[k] && name) {
+        values.push({ key: k, value: name, neg: !!neg })
+        return lead
+      }
+      return m
     })
     .replace(/\s+/g, ' ')
     .trim()
-  return { text, include, exclude, unknown, active: include.length + exclude.length > 0 }
+  return { text, include, exclude, values, unknown, active: include.length + exclude.length + values.length > 0 }
 }
 
-/** Does the item pass every flag filter of the parsed query? */
-export function passesFlags(parsed, flags, item) {
+/** Does the item pass every filter of the parsed query? */
+export function passesFlags(parsed, flags, item, keys = {}) {
   if (!parsed.active) return true
   for (const id of parsed.include) if (!flags[id].test(item)) return false
   for (const id of parsed.exclude) if (flags[id].test(item)) return false
+  for (const v of parsed.values) if (keys[v.key].test(item, v.value) === v.neg) return false
   return true
 }
 

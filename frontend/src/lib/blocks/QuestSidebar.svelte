@@ -3,6 +3,9 @@
   import Icon from '../ui/Icon.svelte'
   import RefText from '../ui/RefText.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
+  import FlagHints from '../ui/FlagHints.svelte'
+  import { parseFlagQuery } from '../js/searchFlags.js'
+  import { QUEST_FLAGS, QUEST_KEYS } from '../js/questFlags.js'
   import {
     isQuestInactive,
     periodBadge,
@@ -117,6 +120,8 @@
     })
   })
 
+  let parsedSearch = $derived(parseFlagQuery(searchQuery, QUEST_FLAGS, QUEST_KEYS))
+
   function isCategoryOpen(key) {
     return categoryOpen[key] !== false
   }
@@ -134,7 +139,9 @@
       placeholder="Поиск…"
       bind:value={searchQuery}
       aria-label="Поиск по названию, разделу, квестлайну, описанию, шагам"
+      title="Фильтры: flag:done, flag:overdue, flag:pinned, flag:automated, flag:deadline, flag:steps, flag:check, flag:overlay-hidden, sig:epic, tag:infra; -flag:… — без флага"
     />
+    <FlagHints value={searchQuery} flags={QUEST_FLAGS} parsed={parsedSearch} onPick={(v) => (searchQuery = v)} />
     <label class="sidebar__filter">
       <input type="checkbox" bind:checked={showAllQuests} />
       <span>Показывать завершённые</span>

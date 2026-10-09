@@ -1590,13 +1590,18 @@ def rate_note(note_id: int, useful: bool) -> dict[str, Any]:
         "Each hit has id, title, score, where it matched (title | body | fuzzy) and a snippet with "
         "the matched words in ⟪ ⟫ — read the snippet to decide whether to open the note with "
         "get_note_context. PRIVATE notes never appear here. Prefer this to list_notes when you "
-        "look for what a note says rather than where it sits in the tree."
+        "look for what a note says rather than where it sits in the tree. `flags` narrows by note flags, "
+        "comma-separated, a minus means \"without\": e.g. flags=\"-outdated\" skips notes marked stale "
+        "(known: outdated, readme, category, pinned, check; private never reaches an agent)."
     )
 )
-def search_notes(q: str, limit: int = 10) -> dict[str, Any]:
+def search_notes(q: str, limit: int = 10, flags: str = "") -> dict[str, Any]:
     if not str(q).strip():
         raise ValueError("q is empty")
-    return _api_get("/api/notes/search", {"q": q, "limit": max(1, min(int(limit), 50))}) or {"hits": []}
+    params: dict[str, Any] = {"q": q, "limit": max(1, min(int(limit), 50))}
+    if flags.strip():
+        params["flags"] = flags.strip()
+    return _api_get("/api/notes/search", params) or {"hits": []}
 
 
 @server.tool(

@@ -1,4 +1,6 @@
 <script>
+  import { parseFlagQuery, passesFlags } from '../js/searchFlags.js'
+  import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
@@ -114,14 +116,30 @@
     return m ? m[1].toUpperCase() : ''
   }
 
+  /** Filters typed into the search box as `flag:name` (`-flag:name` = without it). */
+  const ATT_FLAGS = {
+    hidden: { label: 'скрыто', test: (a) => !!a.hidden },
+    image: { label: 'картинка', test: (a) => /^image\//i.test(a.content_type_detected || a.content_type_declared || '') },
+    pdf: { label: 'PDF', test: (a) => /pdf/i.test(a.content_type_detected || a.content_type_declared || '') },
+    quest: { label: 'у квеста', test: (a) => ownerKind(a) === 'quest' },
+    note: { label: 'у заметки', test: (a) => ownerKind(a) === 'note' },
+    questline: { label: 'у квестлайна', test: (a) => ownerKind(a) === 'questline' },
+    unscanned: { label: 'не проверено антивирусом', test: (a) => !!a.scan_status && a.scan_status !== 'clean' },
+    big: { label: 'больше 5 МБ', test: (a) => (a.size_bytes || 0) > 5 * 1024 * 1024 },
+    revised: { label: 'есть старые версии', test: (a) => (a.revision_count || 0) > 1 },
+  }
+  let parsedSearch = $derived(parseFlagQuery(search, ATT_FLAGS))
+
   let hiddenCount = $derived(attachments.filter((a) => a.hidden).length)
   let activeCount = $derived(attachments.length - hiddenCount)
 
   let filtered = $derived.by(() => {
-    const q = search.trim().toLowerCase()
+    const q = parsedSearch.text.toLowerCase()
+    const asksHidden = parsedSearch.include.includes('hidden')
     const out = attachments.filter((a) => {
       if (kindFilter !== 'all' && ownerKind(a) !== kindFilter) return false
-      if (stateFilter === 'active' && a.hidden) return false
+      if (!passesFlags(parsedSearch, ATT_FLAGS, a)) return false
+      if (stateFilter === 'active' && a.hidden && !asksHidden) return false
       if (stateFilter === 'hidden' && !a.hidden) return false
       if (!q) return true
       return `${a.filename || ''} ${a.comment || ''} ${ownerLabel(a)} ${a.content_type_detected || ''}`
@@ -382,6 +400,7 @@
         placeholder="Поиск по имени, комментарию, владельцу…"
         bind:value={search}
         aria-label="Поиск вложений"
+        title="Фильтры: flag:hidden, flag:image, flag:pdf, flag:quest, flag:note, flag:questline, flag:unscanned, flag:big, flag:revised; -flag:… — без флага"
       />
       <select class="attpage__select" bind:value={sort} aria-label="Сортировка">
         {#each SORTS as s (s.id)}
@@ -399,6 +418,7 @@
         <Icon name="folder" size={16} />
       </button>
     </div>
+    <FlagHints value={search} flags={ATT_FLAGS} parsed={parsedSearch} onPick={(v) => (search = v)} />
     <div class="attpage__row2">
       <div class="attpage__seg" role="group" aria-label="Тип владельца">
         {#each KINDS as k (k.id)}

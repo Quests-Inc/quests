@@ -2,6 +2,8 @@
   import { untrack } from 'svelte'
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
+  import FlagHints from '../ui/FlagHints.svelte'
+  import { ENTITY_FLAGS, findEntities } from '../js/entityFlags.js'
 
   /** Search box over quests and notes; picks one existing entity.
    * @type {{
@@ -37,23 +39,9 @@
     queueMicrotask(() => input?.focus())
   })
 
-  let matches = $derived.by(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return []
-    const out = []
-    const scan = (type, list) => {
-      if (!types.includes(type)) return
-      for (const x of list) {
-        if ((x.title || '').toLowerCase().includes(q) || `${type}=${x.id}` === q) {
-          out.push({ type, id: x.id, title: x.title })
-        }
-      }
-    }
-    scan('questline', questlines)
-    scan('quest', quests)
-    scan('note', notes)
-    return out.slice(0, 50)
-  })
+  let found = $derived(findEntities(query, { questlines, quests, notes, types }))
+  let matches = $derived(found.items)
+  let parsed = $derived(found.parsed)
 
   function pick(m) {
     onPick(m.type, m.id)
@@ -74,6 +62,7 @@
         if (e.key === 'Enter' && matches.length) pick(matches[0])
       }}
     />
+    <FlagHints value={query} flags={ENTITY_FLAGS} parsed={parsed} onPick={(v) => (query = v)} />
     <ul class="find__list">
       {#each matches as m (m.type + m.id)}
         <li>
@@ -83,7 +72,7 @@
           </button>
         </li>
       {:else}
-        {#if query.trim()}
+        {#if query.trim() || parsed.active}
           <li class="find__empty">Ничего не найдено</li>
         {/if}
       {/each}

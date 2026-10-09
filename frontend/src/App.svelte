@@ -29,6 +29,8 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   import { seedAttachmentIndex, invalidateAttachmentLiveFlags, flattenAttachmentIndex } from './lib/js/attachmentCache.js'
   import { applyTheme, loadSavedTheme } from './lib/js/theme.js'
   import { questMatchesQuery } from './lib/js/search.js'
+  import { parseFlagQuery, passesFlags } from './lib/js/searchFlags.js'
+  import { QUEST_FLAGS, QUEST_KEYS, asksClosedStatus } from './lib/js/questFlags.js'
   import { OPEN_STATUSES } from './lib/js/questFormat.js'
   import { groupQuestsByCategory } from './lib/js/questGroups.js'
   import { copyText } from './lib/js/clipboard.js'
@@ -369,11 +371,16 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     return []
   })
 
+  let parsedQuestSearch = $derived(parseFlagQuery(searchQuery, QUEST_FLAGS, QUEST_KEYS))
   let matchedQuests = $derived(
-    quests.filter((q) => questMatchesQuery(q, searchQuery)),
+    quests.filter(
+      (q) =>
+        questMatchesQuery(q, parsedQuestSearch.text) &&
+        passesFlags(parsedQuestSearch, QUEST_FLAGS, q, QUEST_KEYS),
+    ),
   )
   let listedQuests = $derived(
-    showAllQuests
+    showAllQuests || asksClosedStatus(parsedQuestSearch)
       ? matchedQuests
       : matchedQuests.filter((q) => OPEN_STATUSES.has(q.status)),
   )

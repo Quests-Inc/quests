@@ -1,6 +1,8 @@
 <script>
   import { tick, untrack } from 'svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
+  import FlagHints from '../ui/FlagHints.svelte'
+  import { ENTITY_FLAGS, findEntities } from '../js/entityFlags.js'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'
@@ -1460,15 +1462,9 @@
   // Root picker: quests and notes by title.
   let rootQuery = $state('')
   let pickOpen = $state(false)
-  let matches = $derived.by(() => {
-    const q = rootQuery.trim().toLowerCase()
-    if (!q) return []
-    const out = []
-    for (const x of questlines) if ((x.title || '').toLowerCase().includes(q)) out.push({ type: 'questline', id: x.id, title: x.title })
-    for (const x of quests) if ((x.title || '').toLowerCase().includes(q)) out.push({ type: 'quest', id: x.id, title: x.title })
-    for (const x of notes) if ((x.title || '').toLowerCase().includes(q)) out.push({ type: 'note', id: x.id, title: x.title })
-    return out.slice(0, 12)
-  })
+  let found = $derived(findEntities(rootQuery, { questlines, quests, notes, limit: 12 }))
+  let matches = $derived(found.items)
+  let rootParsed = $derived(found.parsed)
   function chooseRoot(m) {
     rootQuery = ''
     pickOpen = false
@@ -2108,7 +2104,9 @@
         onfocus={() => (pickOpen = true)}
         onblur={() => setTimeout(() => (pickOpen = false), 150)}
         aria-label="Выбрать центр карты"
+        title="Фильтры: flag:quest, flag:note, flag:questline, flag:outdated, flag:pinned, flag:active, flag:done"
       />
+      <FlagHints value={rootQuery} flags={ENTITY_FLAGS} parsed={rootParsed} onPick={(v) => (rootQuery = v)} />
       {#if pickOpen && matches.length}
         <ul class="graph__matches" role="listbox">
           {#each matches as m (m.type + m.id)}

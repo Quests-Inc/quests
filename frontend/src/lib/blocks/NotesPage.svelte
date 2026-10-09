@@ -11,7 +11,8 @@
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
   import NoteCheck from '../ui/NoteCheck.svelte'
   import NoteFind from '../ui/NoteFind.svelte'
-  import { parseFlagQuery, passesFlags, flagSuggestions, completeFlag } from '../js/searchFlags.js'
+  import { parseFlagQuery, passesFlags } from '../js/searchFlags.js'
+  import FlagHints from '../ui/FlagHints.svelte'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.js'
   import {
@@ -144,7 +145,6 @@
   }
   let parsedSearch = $derived(parseFlagQuery(search, NOTE_FLAGS))
   let searchText = $derived(parsedSearch.text)
-  let flagHints = $derived(flagSuggestions(search, NOTE_FLAGS))
   const flagOk = (n) => passesFlags(parsedSearch, NOTE_FLAGS, n)
 
   let filtered = $derived.by(() => {
@@ -1334,19 +1334,7 @@
         +
       </button>
     </div>
-    {#if flagHints || parsedSearch.unknown.length}
-      <div class="notes__flaghints" role="listbox" aria-label="Флаги">
-        {#if flagHints}
-          {#each flagHints.items as f (f.id)}
-            <button type="button" class="notes__flagchip" onclick={() => (search = completeFlag(search, f.id, flagHints.neg))}>
-              {flagHints.neg ? '-' : ''}flag:{f.id}<span>{f.label}</span>
-            </button>
-          {/each}
-        {:else}
-          <span class="notes__flagwarn">Неизвестный флаг: {parsedSearch.unknown.join(', ')}</span>
-        {/if}
-      </div>
-    {/if}
+    <div class="notes__flaghints"><FlagHints value={search} flags={NOTE_FLAGS} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
     <div
       class="notes__list"
       data-nav-root
@@ -1834,38 +1822,10 @@
     border-bottom: 1px solid var(--color-border, #333);
   }
 
-  .notes__flaghints {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    padding: 0.4rem 0.6rem;
-    border-bottom: 1px solid var(--color-border, #333);
+  .notes__flaghints:empty {
+    display: none;
   }
-  .notes__flagchip {
-    display: inline-flex;
-    gap: 0.4rem;
-    align-items: baseline;
-    padding: 0.1rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 999px;
-    background: transparent;
-    color: inherit;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.72rem;
-    cursor: pointer;
-  }
-  .notes__flagchip span {
-    font-family: var(--font-ui, sans-serif);
-    font-size: 0.68rem;
-    color: var(--color-fg-subtle, #6e6e6e);
-  }
-  .notes__flagchip:hover {
-    border-color: var(--color-fg-muted, #9a9a9a);
-  }
-  .notes__flagwarn {
-    font-size: 0.72rem;
-    color: var(--color-danger, #b54a3a);
-  }
+
   .hits {
     list-style: none;
     margin: 0;
