@@ -93,20 +93,33 @@ func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int
 	return expired, nil
 }
 
-// WindowNotifier fires quest_started once when the urgent window opens.
+// WindowNotifier fires quest_started once when the urgent window opens. It
+// remembers what it has already announced per workspace: the maintenance pass
+// visits every workspace in turn, and one shared set would be wiped by the next
+// workspace's pass, re-announcing everything on the following tick.
 type WindowNotifier struct {
+	spaces map[int64]*windowSpace
+}
+
+type windowSpace struct {
 	notified map[int64]struct{}
 	seeded   bool
 }
 
 func NewWindowNotifier() *WindowNotifier {
-	return &WindowNotifier{notified: map[int64]struct{}{}}
+	return &WindowNotifier{spaces: map[int64]*windowSpace{}}
 }
 
 func (w *WindowNotifier) Notify(ctx context.Context, st *store.Store, hub *events.Hub) ([]int64, error) {
 	quests, err := st.ListQuests(ctx, store.ListFilter{})
 	if err != nil {
 		return nil, err
+	}
+	ws := wsctx.From(ctx)
+	sp := w.spaces[ws]
+	if sp == nil {
+		sp = &windowSpace{notified: map[int64]struct{}{}}
+		w.spaces[ws] = sp
 	}
 	now := timeutil.NowUTC()
 	inWindow := make([]domain.Quest, 0)
@@ -124,26 +137,26 @@ func (w *WindowNotifier) Notify(ctx context.Context, st *store.Store, hub *event
 			live[q.ID] = struct{}{}
 		}
 	}
-	for id := range w.notified {
+	for id := range sp.notified {
 		if _, ok := live[id]; !ok {
-			delete(w.notified, id)
+			delete(sp.notified, id)
 		}
 	}
-	if !w.seeded {
+	if !sp.seeded {
 		for id := range live {
-			w.notified[id] = struct{}{}
+			sp.notified[id] = struct{}{}
 		}
-		w.seeded = true
+		sp.seeded = true
 		return nil, nil
 	}
 	fired := make([]int64, 0)
 	for _, q := range inWindow {
-		if _, ok := w.notified[q.ID]; ok {
+		if _, ok := sp.notified[q.ID]; ok {
 			continue
 		}
 		// Always remember we've seen this window occupancy so a postponed
 		// quest does not fire on a later tick while still inside the window.
-		w.notified[q.ID] = struct{}{}
+		sp.notified[q.ID] = struct{}{}
 		if deadlineSetWithOpenWindow(q) {
 			continue
 		}

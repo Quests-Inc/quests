@@ -9,6 +9,7 @@ import (
 	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 func TestDeadlineSetWithOpenWindow(t *testing.T) {
@@ -166,5 +167,26 @@ func TestWindowNotifier_NaturalCrossingFires(t *testing.T) {
 	}
 	if countStarted(hub) != 1 {
 		t.Fatalf("hub quest_started count=%d", countStarted(hub))
+	}
+}
+
+// The maintenance pass visits workspaces one after another with one notifier;
+// each workspace must keep its own "already announced" memory.
+func TestWindowNotifier_PerWorkspaceMemory(t *testing.T) {
+	st := openChecksDB(t)
+	hub := events.New()
+	w := NewWindowNotifier()
+	now := timeutil.NowUTC()
+	seedWindowQuest(t, st, now.Add(30*time.Minute), 1800, now.Add(-24*time.Hour))
+
+	for tick := 0; tick < 3; tick++ {
+		for _, ws := range []int64{1, 2} {
+			if _, err := w.Notify(wsctx.With(context.Background(), ws), st, hub); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if n := countStarted(hub); n != 0 {
+		t.Fatalf("quests already open at first sight must stay silent, got %d quest_started", n)
 	}
 }
