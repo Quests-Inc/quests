@@ -67,11 +67,38 @@ type Server struct {
 }
 
 func (s *Server) Handler() http.Handler {
-	h := s.cors(s.requireAuth(s.withWorkspace(s.routes())))
+	h := s.secure(s.cors(s.requireAuth(s.withWorkspace(s.routes()))))
 	if s.Metrics != nil {
 		h = s.Metrics.Middleware(h)
 	}
 	return h
+}
+
+// maxJSONBody caps a JSON request body; uploads (multipart) and PDF export carry their own limits.
+const maxJSONBody = 8 << 20
+
+// contentSecurityPolicy is the shell's: scripts only from this origin (the build has no
+// inline script), so markup that slips past sanitisation still cannot run code.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; " +
+	"img-src 'self' data: blob:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; " +
+	"frame-ancestors 'none'; form-action 'self'"
+
+// secure sets browser hardening headers on every response and bounds JSON bodies.
+func (s *Server) secure(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		// Invitation links carry their secret in the URL: never hand it to another site.
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		if r.Body != nil && r.Body != http.NoBody && r.URL.Path != "/api/export/pdf" &&
+			strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+			r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // routes builds the API routes without the cors/auth wrappers; the draft
@@ -145,14 +172,38 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeErr(w http.ResponseWriter, status int, detail string) {
 	// A store refusal (command on the server in an untrusted workspace) is a 403, wherever it surfaced.
-	if status >= 500 && strings.Contains(detail, store.ErrServerExec.Error()) {
+	if status >= 500 && (strings.Contains(detail, store.ErrServerExec.Error()) || strings.Contains(detail, store.ErrCommandOwner.Error())) {
 		status = http.StatusForbidden
 	}
 	writeJSON(w, status, map[string]string{"detail": detail})
 }
 
+// isOperator reports whether the caller runs this server: an owner of a trusted workspace
+// (the one allowed to run commands on the host), or no accounts at all. Server-wide facts
+// (backup file names, schema version) and health heartbeats are theirs, not an invited member's.
+func (s *Server) isOperator(r *http.Request) bool {
+	p, ok := PrincipalFrom(r.Context())
+	if !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+		return true
+	}
+	ctx := r.Context()
+	if !s.Store.ServerExecAllowed(ctx) {
+		return false
+	}
+	role, err := s.Store.MemberRole(ctx, wsctx.From(ctx), p.User.ID)
+	return err == nil && role == store.RoleOwner
+}
+
 func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {
 	comps := s.Health.Snapshot()
+	if !s.isOperator(r) {
+		for name, c := range comps {
+			if m, ok := c.(map[string]any); ok {
+				m["detail"] = ""
+				comps[name] = m
+			}
+		}
+	}
 	overall := "ok"
 	for _, c := range comps {
 		m, _ := c.(map[string]any)
@@ -172,6 +223,10 @@ func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if !s.isOperator(r) {
+		writeErr(w, http.StatusForbidden, "heartbeats are for the server's operator")
+		return
+	}
 	var body struct {
 		Component string `json:"component"`
 		Detail    string `json:"detail"`

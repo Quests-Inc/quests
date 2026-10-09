@@ -44,6 +44,12 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 
 		ws := int64(store.DefaultWorkspaceID)
 		p, hasUser := PrincipalFrom(r.Context())
+		if p.TokenName == "internal" && strings.TrimSpace(r.Header.Get(WorkspaceHeader)) == "" {
+			// The loopback token is not a person: falling back to the default workspace would
+			// let whoever triggered the call act on someone else's data.
+			writeErr(w, http.StatusBadRequest, "internal calls must name a workspace ("+WorkspaceHeader+")")
+			return
+		}
 		hasUser = hasUser && p.User.ID != 0
 		if hasUser {
 			ws = p.User.WorkspaceID
@@ -77,8 +83,34 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 			writeErr(w, http.StatusForbidden, "no workspace")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(wsctx.With(r.Context(), ws)))
+		ctx := wsctx.With(r.Context(), ws)
+		switch {
+		case hasUser:
+			ctx = wsctx.WithUser(ctx, p.User.ID)
+		case p.TokenName == "internal":
+			ctx = wsctx.WithUser(ctx, wsctx.ActorAutomation)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// requireOwner lets only an owner of the caller's current workspace through. Callers
+// without an account (auth off, the in-process token) pass: there is nobody to tell apart.
+func (s *Server) requireOwner(w http.ResponseWriter, r *http.Request, what string) bool {
+	p, ok := PrincipalFrom(r.Context())
+	if !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+		return true
+	}
+	role, err := s.Store.MemberRole(r.Context(), wsctx.From(r.Context()), p.User.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return false
+	}
+	if role != store.RoleOwner {
+		writeErr(w, http.StatusForbidden, "only an owner can "+what)
+		return false
+	}
+	return true
 }
 
 func (s *Server) registerWorkspaces(mux *http.ServeMux) {
@@ -168,6 +200,10 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	secret, exp, err := s.Store.CreateInvite(r.Context(), id, me.ID)
+	if errors.Is(err, store.ErrTrustedInvite) {
+		writeErr(w, http.StatusConflict, err.Error())
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -321,6 +357,10 @@ func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
 	ws, err := s.Store.CreateWorkspace(r.Context(), p.User.ID, body.Name, wsctx.From(r.Context()))
 	if errors.Is(err, store.ErrWorkspaceName) {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if errors.Is(err, store.ErrWorkspaceLimit) {
+		writeErr(w, http.StatusConflict, err.Error())
 		return
 	}
 	if err != nil {

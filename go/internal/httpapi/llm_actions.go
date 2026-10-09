@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/llmassist"
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // registerLLMActions wires the web-form path for the LLM action-batch
@@ -72,7 +73,7 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	executor := llmassist.NewExecutor(s.SelfBase, s.InternalToken)
+	executor := llmassist.NewExecutor(s.SelfBase, s.InternalToken, wsctx.From(r.Context()))
 	preview, err := executor.Run(batch, true)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
@@ -96,7 +97,7 @@ func (s *Server) postLLMActionsApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	executor := llmassist.NewExecutor(s.SelfBase, s.InternalToken)
+	executor := llmassist.NewExecutor(s.SelfBase, s.InternalToken, wsctx.From(r.Context()))
 	results, err := executor.Run(body.Batch, false)
 	if err != nil {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "detail": err.Error(), "results": results})

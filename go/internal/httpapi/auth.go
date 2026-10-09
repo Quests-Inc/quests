@@ -196,9 +196,24 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
+	user := strings.ToLower(strings.TrimSpace(body.Username))
+	if len(user) > 64 || len(body.Password) > 1024 {
+		writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
+		return
+	}
+	if d := s.limiter().userPenalty(user); d > 0 {
+		time.Sleep(d)
+	}
+	if !s.limiter().acquire() {
+		w.Header().Set("Retry-After", "2")
+		writeErr(w, http.StatusTooManyRequests, "сервер занят проверкой паролей, повторите")
+		return
+	}
 	u, err := s.Auth.Authenticate(body.Username, body.Password)
+	s.limiter().release()
 	if err != nil {
 		s.limiter().recordFailure(key)
+		s.limiter().recordUserFailure(user)
 		if errors.Is(err, auth.ErrBadPassword) {
 			writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
 			return

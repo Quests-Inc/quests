@@ -3,11 +3,13 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +18,35 @@ import (
 // maxPDFHTMLBytes caps the HTML payload accepted for rendering — generous
 // for a note/quest export, small enough to bound weasyprint's memory/time.
 const maxPDFHTMLBytes = 20 << 20 // 20MB
+
+// pdfRenderScript renders with every external fetch refused (see render.py): the HTML
+// is user-supplied, and WeasyPrint would otherwise embed local files and internal
+// URLs it finds in it into the PDF it hands back.
+//
+//go:embed pdfrender/render.py
+var pdfRenderScript []byte
+
+// pdfSlots bounds concurrent renders: each is a CPU- and memory-heavy process.
+var pdfSlots = make(chan struct{}, 2)
+
+// pdfPython is the interpreter that has WeasyPrint: QUESTS_PDF_PYTHON, else the
+// project venv, else python3 on PATH (the container puts the venv first).
+func (s *Server) pdfPython() string {
+	if v := strings.TrimSpace(os.Getenv("QUESTS_PDF_PYTHON")); v != "" {
+		return v
+	}
+	if s.Root != "" {
+		if p := filepath.Join(s.Root, ".venv", "bin", "python"); fileExists(p) {
+			return p
+		}
+	}
+	return "python3"
+}
+
+func fileExists(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && !st.IsDir()
+}
 
 func (s *Server) registerPDF(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/export/pdf", s.postRenderPDF)
@@ -49,8 +80,22 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.RemoveAll(workDir)
 
+	select {
+	case pdfSlots <- struct{}{}:
+		defer func() { <-pdfSlots }()
+	default:
+		w.Header().Set("Retry-After", "5")
+		writeErr(w, http.StatusTooManyRequests, "рендер PDF занят, повторите через несколько секунд")
+		return
+	}
+
 	inPath := filepath.Join(workDir, "in.html")
 	outPath := filepath.Join(workDir, "out.pdf")
+	scriptPath := filepath.Join(workDir, "render.py")
+	if err := os.WriteFile(scriptPath, pdfRenderScript, 0o644); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	if err := os.WriteFile(inPath, []byte(req.HTML), 0o644); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -58,11 +103,18 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "weasyprint", inPath, outPath)
+	cmd := exec.CommandContext(ctx, s.pdfPython(), scriptPath, inPath, outPath)
+	// The renderer needs nothing from the server's environment (database URL, tokens…).
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + workDir, "XDG_CACHE_HOME=" + workDir, "LANG=C.UTF-8"}
+	cmd.Dir = workDir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		writeErr(w, http.StatusInternalServerError, "pdf render failed: "+stderr.String())
+		msg := strings.TrimSpace(stderr.String())
+		if i := strings.LastIndex(msg, "\n"); i >= 0 {
+			msg = msg[i+1:]
+		}
+		writeErr(w, http.StatusInternalServerError, "pdf render failed: "+msg)
 		return
 	}
 

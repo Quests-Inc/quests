@@ -213,6 +213,9 @@ func (s *Store) ResolveSecrets(ctx context.Context, o SecretOwner) (map[string]s
 			return nil, err
 		}
 		for k, v := range vals {
+			if ReservedSecretName(k) {
+				continue // rows that predate the rule (or came from an import) are never exported to a process
+			}
 			out[k] = v
 		}
 	}
@@ -293,4 +296,24 @@ func copyTemplateSecretsToLiveQuests(ctx context.Context, tx *sql.Tx, templateID
 		ON CONFLICT DO NOTHING`,
 		templateID, templateID)
 	return err
+}
+
+// ReservedSecretName reports names that change how a process starts rather than carry a
+// credential. Secrets become environment variables of commands (on the server or a
+// runner), so e.g. PATH, LD_PRELOAD or BASH_ENV would let whoever can set a secret
+// bend a command someone else wrote.
+func ReservedSecretName(key string) bool {
+	k := strings.ToUpper(key)
+	for _, prefix := range []string{"LD_", "DYLD_", "QUESTS_", "PYTHON", "NODE_", "BASH_", "GIT_", "SSH_", "XDG_", "LC_"} {
+		if strings.HasPrefix(k, prefix) {
+			return true
+		}
+	}
+	switch k {
+	case "PATH", "HOME", "SHELL", "IFS", "ENV", "SHELLOPTS", "BASHOPTS", "PS1", "PS2", "PS4", "PROMPT_COMMAND",
+		"CDPATH", "GLOBIGNORE", "LANG", "TMPDIR", "USER", "LOGNAME", "PWD", "OLDPWD", "TERM", "EDITOR", "VISUAL",
+		"PAGER", "BROWSER", "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "CLASSPATH":
+		return true
+	}
+	return false
 }

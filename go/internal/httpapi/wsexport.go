@@ -249,6 +249,10 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	// Create the workspace, import into it; if anything fails the new workspace is dropped again.
 	ws, err := s.Store.CreateWorkspace(r.Context(), p.User.ID, name, 0)
+	if errors.Is(err, store.ErrWorkspaceLimit) {
+		writeErr(w, http.StatusConflict, err.Error())
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

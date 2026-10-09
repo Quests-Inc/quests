@@ -86,15 +86,23 @@ func (s *Server) listSecrets(segment string) http.HandlerFunc {
 // echoed back and no GET returns it.
 func (s *Server) putSecret(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Secrets feed the environment of the owner's commands: only owners write them.
+		if !s.requireOwner(w, r, "set secrets") {
+			return
+		}
 		key := r.PathValue("key")
 		if !secretKeyPattern.MatchString(key) {
 			writeErr(w, 422, "key must look like an env var name: [A-Za-z_][A-Za-z0-9_]*")
 			return
 		}
+		if store.ReservedSecretName(key) {
+			writeErr(w, 422, "this name is reserved: it would change how commands start, not carry a credential")
+			return
+		}
 		var body struct {
 			Value string `json:"value"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil {
 			writeErr(w, 400, "invalid JSON")
 			return
 		}
@@ -116,6 +124,9 @@ func (s *Server) putSecret(segment string) http.HandlerFunc {
 
 func (s *Server) deleteSecret(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.requireOwner(w, r, "remove secrets") {
+			return
+		}
 		o, ok := s.secretOwner(w, r, segment)
 		if !ok {
 			return

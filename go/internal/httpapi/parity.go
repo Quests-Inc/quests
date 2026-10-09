@@ -169,6 +169,16 @@ func (s *Server) getQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := filepath.Join(s.DataDir, "questline-icons", custom)
+	serveIcon(w, r, path)
+}
+
+// serveIcon serves a user-uploaded icon file. Icons may be SVG, which runs scripts when
+// opened as a page, so the response is sandboxed: it can only ever be drawn as an image.
+func serveIcon(w http.ResponseWriter, r *http.Request, path string) {
+	h := w.Header()
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	h.Set("Content-Disposition", "inline")
 	http.ServeFile(w, r, path)
 }
 

@@ -3,6 +3,7 @@ package llmassist
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/valirum/quests/go/internal/cli"
 )
@@ -39,11 +40,16 @@ type Executor struct {
 	Client *cli.Client
 }
 
-func NewExecutor(apiBase, token string) *Executor {
+// NewExecutor acts in workspace ws (the caller's): the loopback token is not a
+// user, so without an explicit workspace it would land in the default one.
+func NewExecutor(apiBase, token string, ws int64) *Executor {
 	c := cli.NewClient(apiBase, true)
 	// Loopback calls to our own API must carry credentials once accounts are on.
 	c.Token = token
 	c.Source = "assistant"
+	if ws > 0 {
+		c.Workspace = strconv.FormatInt(ws, 10)
+	}
 	return &Executor{Client: c}
 }
 

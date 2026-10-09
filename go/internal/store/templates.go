@@ -183,12 +183,15 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 		return nil, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
 	}
 
+	if err := s.guardAuthor(ctx, asStringPtr(body["emit_pool_command"]), nil); err != nil {
+		return nil, err
+	}
 	if err := s.guardExec(ctx, asStringPtr(body["emit_pool_command"]), emitRunOn); err != nil {
 		return nil, err
 	}
 	if raw, ok := body["steps"]; ok {
 		if steps, ok := raw.([]any); ok {
-			if err := s.guardTemplateSteps(ctx, steps); err != nil {
+			if err := s.guardTemplateSteps(ctx, 0, steps); err != nil {
 				return nil, err
 			}
 		}
@@ -251,6 +254,9 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	emitRunOn := NormalizeRunOn(asStringPtr(merged["emit_run_on"]))
 	if !ValidRunOn(emitRunOn) {
 		return nil, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+	}
+	if err := s.guardAuthor(ctx, asStringPtr(merged["emit_pool_command"]), asStringPtr(cur["emit_pool_command"])); err != nil {
+		return nil, err
 	}
 	if err := s.guardExec(ctx, asStringPtr(merged["emit_pool_command"]), emitRunOn); err != nil {
 		return nil, err
@@ -400,14 +406,38 @@ func coerceInt64Slice(raw any) ([]int64, error) {
 	return out, nil
 }
 
-func (s *Store) guardTemplateSteps(ctx context.Context, steps []any) error {
+// guardTemplateSteps checks the commands of a template's incoming steps; tid is the
+// template being edited (0 = new): commands it already has stay allowed for anyone.
+func (s *Store) guardTemplateSteps(ctx context.Context, tid int64, steps []any) error {
+	existing := map[string]bool{}
+	if tid > 0 {
+		rows, err := s.DB.QueryContext(ctx, `SELECT check_command FROM questtemplatestep WHERE template_id = ? AND check_command IS NOT NULL`, tid)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var c string
+			if err := rows.Scan(&c); err == nil {
+				existing[strings.TrimSpace(c)] = true
+			}
+		}
+		rows.Close()
+	}
 	for _, item := range steps {
 		m, _ := item.(map[string]any)
 		if m == nil {
 			b, _ := json.Marshal(item)
 			_ = json.Unmarshal(b, &m)
 		}
-		if err := s.guardExec(ctx, asStringPtr(m["check_command"]), NormalizeRunOn(asStringPtr(m["run_on"]))); err != nil {
+		cmd := asStringPtr(m["check_command"])
+		var old *string
+		if cmd != nil && existing[strings.TrimSpace(*cmd)] {
+			old = cmd
+		}
+		if err := s.guardAuthor(ctx, cmd, old); err != nil {
+			return err
+		}
+		if err := s.guardExec(ctx, cmd, NormalizeRunOn(asStringPtr(m["run_on"]))); err != nil {
 			return err
 		}
 	}
@@ -422,7 +452,7 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 		_ = json.Unmarshal(b, &steps)
 	}
 	// Refuse server-side commands before touching the existing steps.
-	if err := s.guardTemplateSteps(ctx, steps); err != nil {
+	if err := s.guardTemplateSteps(ctx, tid, steps); err != nil {
 		return err
 	}
 	_, _ = s.DB.ExecContext(ctx, `DELETE FROM questtemplatestep WHERE template_id=?`, tid)

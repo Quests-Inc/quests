@@ -16,6 +16,9 @@ const InviteTTL = 7 * 24 * time.Hour
 var (
 	ErrInviteInvalid = errors.New("invitation is invalid, used or expired")
 	ErrLastOwner     = errors.New("a workspace needs at least one owner")
+	// A trusted workspace may run commands on the server itself, which is the whole host:
+	// letting anyone else in would hand them that.
+	ErrTrustedInvite = errors.New("в доверенное пространство (команды на сервере) приглашать нельзя: участник получил бы доступ к серверу")
 )
 
 // Workspace roles.
@@ -86,6 +89,13 @@ func (s *Store) RemoveWorkspaceMember(ctx context.Context, workspaceID, userID i
 
 // CreateInvite mints a one-time invitation; the secret is returned once, only its hash is stored.
 func (s *Store) CreateInvite(ctx context.Context, workspaceID, createdBy int64) (string, time.Time, error) {
+	var trusted int
+	if err := s.DB.QueryRowContext(ctx, `SELECT trusted FROM workspace WHERE id = ? AND deleted_at IS NULL`, workspaceID).Scan(&trusted); err != nil {
+		return "", time.Time{}, err
+	}
+	if trusted != 0 {
+		return "", time.Time{}, ErrTrustedInvite
+	}
 	secret, hash, err := auth.NewToken()
 	if err != nil {
 		return "", time.Time{}, err
@@ -108,7 +118,7 @@ func (s *Store) InviteInfo(ctx context.Context, secret string) (name string, exp
 	err = s.DB.QueryRowContext(ctx, `
 		SELECT w.name, i.expires_at
 		FROM workspace_invite i JOIN workspace w ON w.id = i.workspace_id
-		WHERE i.token_hash = ? AND i.used_at IS NULL AND i.expires_at > ? AND w.deleted_at IS NULL`,
+		WHERE i.token_hash = ? AND i.used_at IS NULL AND i.expires_at > ? AND w.deleted_at IS NULL AND w.trusted = 0`,
 		auth.HashToken(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&name, &exp)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", time.Time{}, ErrInviteInvalid
@@ -128,7 +138,7 @@ func (s *Store) ClaimInvite(ctx context.Context, secret string, userID int64) (i
 	err := s.DB.QueryRowContext(ctx, `
 		UPDATE workspace_invite SET used_at = ?, used_by = ?
 		WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
-		  AND workspace_id IN (SELECT id FROM workspace WHERE deleted_at IS NULL)
+		  AND workspace_id IN (SELECT id FROM workspace WHERE deleted_at IS NULL AND trusted = 0)
 		RETURNING workspace_id, role`,
 		timeutil.ToDBUTC(timeutil.NowUTC()), userID, auth.HashToken(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&wsID, &role)
 	if errors.Is(err, sql.ErrNoRows) {

@@ -108,7 +108,21 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspaceID, userID int6
 
 // CreateWorkspace makes a new workspace owned by userID. Its category set is
 // copied from copyFrom (0 = start empty) so the new space is usable at once.
+// MaxOwnedWorkspaces bounds how many live workspaces one account may own, so an account
+// (invited ones included) cannot fill the database with workspaces and imports.
+const MaxOwnedWorkspaces = 10
+
+var ErrWorkspaceLimit = errors.New("достигнут предел числа пространств у одного аккаунта")
+
 func (s *Store) CreateWorkspace(ctx context.Context, userID int64, name string, copyFrom int64) (Workspace, error) {
+	var owned int
+	if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM workspace_member m JOIN workspace w ON w.id = m.workspace_id
+		 WHERE m.user_id = ? AND m.role = 'owner' AND w.deleted_at IS NULL`, userID).Scan(&owned); err != nil {
+		return Workspace{}, err
+	}
+	if owned >= MaxOwnedWorkspaces {
+		return Workspace{}, ErrWorkspaceLimit
+	}
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Workspace{}, ErrWorkspaceName
@@ -268,6 +282,38 @@ func (s *Store) SetWorkspaceTrusted(ctx context.Context, id int64, trusted bool)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
+	}
+	return nil
+}
+
+// ErrCommandOwner is returned when a member (not an owner) sets a command.
+var ErrCommandOwner = errors.New("команды проверок и источников могут задавать только владельцы пространства")
+
+// guardAuthor refuses a command written by someone who is not an owner of the
+// workspace. A command runs with the authority of the machine that executes it
+// (the server, or a runner the owner registered), so authoring one is an owner's
+// right. old is the command already stored (nil for a new one): leaving it
+// unchanged is fine, so a member can still edit the rest of a step or template.
+func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
+	if command == nil || strings.TrimSpace(*command) == "" {
+		return nil
+	}
+	if old != nil && strings.TrimSpace(*old) == strings.TrimSpace(*command) {
+		return nil
+	}
+	uid := wsctx.UserFrom(ctx)
+	if uid == 0 || !s.WorkspacesEnabled() {
+		return nil // background work, auth off
+	}
+	if uid == wsctx.ActorAutomation {
+		return ErrCommandOwner
+	}
+	role, err := s.MemberRole(ctx, wsctx.From(ctx), uid)
+	if err != nil {
+		return err
+	}
+	if role != RoleOwner {
+		return ErrCommandOwner
 	}
 	return nil
 }

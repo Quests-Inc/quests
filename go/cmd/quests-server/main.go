@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/valirum/quests/go/internal/auth"
 	"github.com/valirum/quests/go/internal/clamav"
@@ -111,6 +112,7 @@ func main() {
 	}, srv.Health)
 
 	hub.Publish("startup", events.PublishOpts{
+		System: true,
 		Title:  "Quests",
 		Detail: "server ready",
 		Toast:  false,
@@ -119,7 +121,13 @@ func main() {
 	})
 
 	addr := cfg.Addr()
-	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
+	httpSrv := &http.Server{
+		Addr: addr, Handler: srv.Handler(),
+		// No Read/WriteTimeout: archives and attachments stream for minutes, and the event socket is long-lived.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    64 << 10,
+	}
 	go func() {
 		<-ctx.Done()
 		_ = httpSrv.Shutdown(context.Background())

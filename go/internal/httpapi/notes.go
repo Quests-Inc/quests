@@ -326,7 +326,7 @@ func (s *Server) getNoteIcon(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := filepath.Join(s.DataDir, "note-icons", custom)
-	http.ServeFile(w, r, path)
+	serveIcon(w, r, path)
 }
 
 func (s *Server) postNoteIcon(w http.ResponseWriter, r *http.Request) {

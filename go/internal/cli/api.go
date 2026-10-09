@@ -22,6 +22,8 @@ type Client struct {
 	// Source is sent as X-Quests-Source (how the quests this client creates are
 	// labelled); "cli" by default.
 	Source string
+	// Workspace is sent as X-Quests-Workspace; empty falls back to $QUESTS_WORKSPACE.
+	Workspace string
 }
 
 func NewClient(base string, asJSON bool) *Client {
@@ -93,7 +95,11 @@ func (c *Client) Do(method, path string, query map[string]string, body any) (jso
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 	// Pick a workspace explicitly (tokens are pinned, this only narrows/switches within membership).
-	if ws := strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE")); ws != "" {
+	ws := strings.TrimSpace(c.Workspace)
+	if ws == "" {
+		ws = strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE"))
+	}
+	if ws != "" {
 		req.Header.Set("X-Quests-Workspace", ws)
 	}
 	if body != nil {

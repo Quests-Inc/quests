@@ -280,6 +280,10 @@ func (s *Server) listRunners(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createRunner(w http.ResponseWriter, r *http.Request) {
+	// A runner executes the workspace's commands (and receives their secrets).
+	if !s.requireOwner(w, r, "add a runner") {
+		return
+	}
 	var in struct {
 		Label string `json:"label"`
 	}
@@ -301,6 +305,9 @@ func (s *Server) createRunner(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteRunner(w http.ResponseWriter, r *http.Request) {
+	if !s.requireOwner(w, r, "remove a runner") {
+		return
+	}
 	err := s.Store.RevokeRunner(r.Context(), r.PathValue("label"))
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "runner not found")

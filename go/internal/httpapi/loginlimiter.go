@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -17,6 +18,11 @@ type loginLimiter struct {
 	mu       sync.Mutex
 	attempts map[string]*loginAttempts
 	invites  map[string][]time.Time
+	// byUser counts recent failures per login name, from anywhere: the per-IP throttle
+	// does not stop a guesser who rotates addresses (or a header).
+	byUser map[string][]time.Time
+	// slots bounds concurrent password hashing: every attempt costs ~100ms of CPU.
+	slots chan struct{}
 }
 
 type loginAttempts struct {
@@ -31,7 +37,59 @@ const (
 )
 
 func newLoginLimiter() *loginLimiter {
-	return &loginLimiter{attempts: make(map[string]*loginAttempts), invites: make(map[string][]time.Time)}
+	return &loginLimiter{
+		attempts: make(map[string]*loginAttempts),
+		invites:  make(map[string][]time.Time),
+		byUser:   make(map[string][]time.Time),
+		slots:    make(chan struct{}, 4),
+	}
+}
+
+const (
+	userWindow     = 15 * time.Minute
+	userFreeFails  = 10
+	userMaxPenalty = 5 * time.Second
+)
+
+// acquire takes a hashing slot; false means the server is busy hashing already.
+func (l *loginLimiter) acquire() bool {
+	select {
+	case l.slots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (l *loginLimiter) release() { <-l.slots }
+
+// userPenalty is how long to stall an attempt on this login after many recent
+// failures. A stall, not a lockout: whoever guesses cannot lock the owner out.
+func (l *loginLimiter) userPenalty(user string) time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	recent := l.byUser[user][:0]
+	for _, t := range l.byUser[user] {
+		if now.Sub(t) < userWindow {
+			recent = append(recent, t)
+		}
+	}
+	l.byUser[user] = recent
+	if len(recent) <= userFreeFails {
+		return 0
+	}
+	d := 250 * time.Millisecond << uint(min(len(recent)-userFreeFails, 5))
+	return min(d, userMaxPenalty)
+}
+
+func (l *loginLimiter) recordUserFailure(user string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.byUser) > 10000 { // names are attacker-chosen: keep the map bounded
+		l.byUser = make(map[string][]time.Time)
+	}
+	l.byUser[user] = append(l.byUser[user], time.Now())
 }
 
 const (
@@ -108,9 +166,14 @@ func (l *loginLimiter) recordSuccess(key string) {
 func loginClientKey(r *http.Request) string {
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 		parts := strings.Split(fwd, ",")
-		if ip := strings.TrimSpace(parts[0]); ip != "" {
-			return ip
+		if ip := net.ParseIP(strings.TrimSpace(parts[0])); ip != nil {
+			return ip.String()
 		}
+	}
+	// RemoteAddr carries the ephemeral port: keyed on it, every new connection
+	// would be a new client and the throttle would never engage.
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
 	}
 	return r.RemoteAddr
 }

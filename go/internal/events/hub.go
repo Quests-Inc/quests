@@ -25,8 +25,15 @@ type Client struct {
 	mu        sync.Mutex
 }
 
-// visible reports whether an event of workspace ws (0 = system-wide) is for this peer.
-func (c *Client) visible(ws int64) bool { return ws == 0 || c.Workspace == 0 || c.Workspace == ws }
+// systemWide marks an event meant for every peer (server start). An event with no workspace
+// that is NOT system-wide is a caller's omission: it reaches only peers that listen to
+// everything (no workspaces), never another workspace's.
+const systemWide int64 = -1
+
+// visible reports whether an event of workspace ws is for this peer.
+func (c *Client) visible(ws int64) bool {
+	return ws == systemWide || c.Workspace == 0 || c.Workspace == ws
+}
 
 func (c *Client) WriteJSON(v any) error {
 	c.mu.Lock()
@@ -130,7 +137,8 @@ func (h *Hub) EventsSince(since int, ws int64) []Payload {
 	out := make([]Payload, 0)
 	for _, e := range h.recent {
 		rev := asInt(e["revision"])
-		if rev > since && (ws == 0 || int64(asInt(e["workspace"])) == 0 || int64(asInt(e["workspace"])) == ws) {
+		ew := int64(asInt(e["workspace"]))
+		if rev > since && (ws == 0 || ew == systemWide || ew == ws) {
 			out = append(out, e)
 		}
 	}
@@ -223,8 +231,12 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 	if opts.Automated {
 		payload["automated"] = true
 	}
-	if opts.Workspace > 0 {
-		payload["workspace"] = opts.Workspace
+	target := opts.Workspace
+	if opts.System {
+		target = systemWide
+	}
+	if target != 0 {
+		payload["workspace"] = target
 	}
 	for k, v := range opts.Extra {
 		payload[k] = v
@@ -235,7 +247,7 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 	}
 	raw, _ := json.Marshal(payload)
 	h.mu.Unlock()
-	h.send(raw, opts.Workspace)
+	h.send(raw, target)
 	// Fire-and-forget user hooks (script/webhook/socket).
 	go func(p Payload) {
 		ev := map[string]any{}
@@ -249,7 +261,9 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 
 type PublishOpts struct {
 	// Workspace routes the event to that workspace's peers (0 = everyone).
-	Workspace    int64
+	Workspace int64
+	// System sends the event to every peer whatever its workspace (no private data!).
+	System       bool
 	QuestID      *int64
 	Title        string
 	Detail       string

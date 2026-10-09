@@ -379,6 +379,9 @@ func (s *Store) createQuest(ctx context.Context, q domain.Quest, changeKind, cha
 		st := q.Steps[i]
 		NormalizeStepCheck(&st)
 		domain.ClampStep(&st)
+		if err := s.guardAuthor(ctx, st.CheckCommand, nil); err != nil {
+			return domain.Quest{}, err
+		}
 		if err := s.guardExec(ctx, st.CheckCommand, st.RunOn); err != nil {
 			return domain.Quest{}, err
 		}
@@ -467,6 +470,9 @@ func (s *Store) AddStep(ctx context.Context, questID int64, st domain.Step, q do
 	defer func() { _ = tx.Rollback() }()
 	NormalizeStepCheck(&st)
 	domain.ClampStep(&st)
+	if err := s.guardAuthor(ctx, st.CheckCommand, nil); err != nil {
+		return domain.Quest{}, err
+	}
 	if err := s.guardExec(ctx, st.CheckCommand, st.RunOn); err != nil {
 		return domain.Quest{}, err
 	}
@@ -503,6 +509,15 @@ func (s *Store) UpdateStep(ctx context.Context, st domain.Step, q domain.Quest, 
 	defer func() { _ = tx.Rollback() }()
 	NormalizeStepCheck(&st)
 	domain.ClampStep(&st)
+	var oldCmd sql.NullString
+	_ = tx.QueryRowContext(ctx, `SELECT check_command FROM queststep WHERE id = ? AND quest_id = ?`, st.ID, st.QuestID).Scan(&oldCmd)
+	var oldPtr *string
+	if oldCmd.Valid {
+		oldPtr = &oldCmd.String
+	}
+	if err := s.guardAuthor(ctx, st.CheckCommand, oldPtr); err != nil {
+		return domain.Quest{}, err
+	}
 	if err := s.guardExec(ctx, st.CheckCommand, st.RunOn); err != nil {
 		return domain.Quest{}, err
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/valirum/quests/go/internal/db"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/valirum/quests/go/internal/timeutil"
@@ -111,6 +112,43 @@ type Principal struct {
 
 func normUsername(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
+// ErrBadUsername is returned for a login that is not 2–32 plain characters.
+var ErrBadUsername = errors.New("логин: 2–32 символа, латиница, цифры, точка, дефис, подчёркивание")
+
+// validUsername keeps logins to a plain, unambiguous alphabet: no look-alike letters,
+// no control or direction-override characters, nothing that renders as markup.
+func validUsername(u string) bool {
+	if len(u) < 2 || len(u) > 32 {
+		return false
+	}
+	for i := 0; i < len(u); i++ {
+		c := u[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		case c == '.' || c == '-' || c == '_':
+			if i == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// dummyHash is verified against when the login does not exist, so a missing user costs
+// the same as a wrong password. Computed once: hashing per attempt would make the
+// missing-user path twice as slow, which is itself an oracle.
+var (
+	dummyHashOnce sync.Once
+	dummyHash     string
+)
+
+func timingDummy() string {
+	dummyHashOnce.Do(func() { dummyHash, _ = HashPassword("quests-timing-equalizer") })
+	return dummyHash
+}
+
 // CountUsers reports how many accounts exist. Zero means the instance has never
 // been bootstrapped, which the server treats as "unconfigured".
 func (s *Store) CountUsers() (int, error) {
@@ -121,10 +159,10 @@ func (s *Store) CountUsers() (int, error) {
 
 func (s *Store) CreateUser(username, password string) (User, error) {
 	username = normUsername(username)
-	if username == "" {
-		return User{}, errors.New("username must not be empty")
+	if !validUsername(username) {
+		return User{}, ErrBadUsername
 	}
-	if len([]rune(password)) < 8 {
+	if len([]rune(password)) < 8 || len(password) > 1024 {
 		return User{}, ErrWeakPassword
 	}
 	hash, err := HashPassword(password)
@@ -163,7 +201,9 @@ func (s *Store) SetPassword(username, password string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNoUser
 	}
-	return nil
+	// A new password ends every session that was opened with the old one.
+	_, err = s.DB.Exec(`DELETE FROM usersession WHERE user_id = (SELECT id FROM appuser WHERE username = ?)`, normUsername(username))
+	return err
 }
 
 func (s *Store) ListUsers() ([]User, error) {
@@ -196,8 +236,7 @@ func (s *Store) Authenticate(username, password string) (User, error) {
 	).Scan(&u.ID, &u.Username, &hash, &u.IsActive)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Burn comparable time against a dummy hash to avoid a user-enumeration oracle.
-		dummy, _ := HashPassword("quests-timing-equalizer")
-		VerifyPassword(password, dummy)
+		VerifyPassword(password, timingDummy())
 		return User{}, ErrBadPassword
 	}
 	if err != nil {
