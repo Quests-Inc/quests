@@ -17,7 +17,12 @@ Run it against a scratch instance (it creates quests, workspaces and an account)
 from __future__ import annotations
 
 import argparse
+import base64
 import getpass
+import hashlib
+import hmac
+import struct
+import time
 import http.cookiejar
 import io
 import json
@@ -64,6 +69,13 @@ class Client:
         except ValueError:
             parsed = raw
         return code, parsed, hd
+
+
+def totp(secret: str, step_offset: int = 0) -> str:
+    key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))
+    h = hmac.new(key, struct.pack(">Q", int(time.time() // 30) + step_offset), hashlib.sha1).digest()
+    o = h[-1] & 15
+    return "%06d" % ((struct.unpack(">I", h[o:o + 4])[0] & 0x7FFFFFFF) % 10**6)
 
 
 def main() -> int:
@@ -162,7 +174,27 @@ def main() -> int:
     c, r, _ = evil.req("GET", "/api/me/llm")
     check("assistant key is never returned", c == 200 and "api_key" not in json.dumps(r))
 
-    # 8. Hostile archive.
+    # 8. Two-factor sign-in of an account (the attacker account stands in for any user).
+    c, st, _ = evil.req("POST", "/api/me/2fa/setup")
+    secret = st.get("secret", "") if c == 200 else ""
+    c, en, _ = evil.req("POST", "/api/me/2fa/enable", {"code": totp(secret)}) if secret else (0, {}, None)
+    check("2FA can be switched on with a correct code", c == 200 and len(en.get("recovery_codes", [])) == 10, str(c))
+    step1 = Client(a.base)
+    c, r, _ = step1.req("POST", "/api/auth/login", {"username": user, "password": "attacker-pass-1"})
+    check("password alone no longer opens a session", c == 200 and r.get("mfa_required") and not list(step1.jar), str(r)[:80])
+    c, _, _ = step1.req("GET", "/api/quests")
+    check("no API access before the second factor", c == 401, str(c))
+    ticket = r.get("mfa_token", "")
+    c, _, _ = step1.req("POST", "/api/auth/login/mfa", {"mfa_token": ticket, "code": "000000"})
+    check("a wrong code is refused", c == 401, str(c))
+    c, _, _ = step1.req("POST", "/api/auth/login/mfa", {"mfa_token": ticket, "code": totp(secret)})
+    check("the code accepted at enrolment cannot be replayed", c == 401, str(c))
+    c, _, _ = Client(a.base).req("POST", "/api/auth/login/mfa", {"mfa_token": "forged-ticket", "code": totp(secret)})
+    check("a forged ticket is refused", c == 401, str(c))
+    c, _, _ = Client(a.base, token=None).req("GET", "/api/me/2fa")
+    check("2FA state needs a session", c == 401, str(c))
+
+    # 9. Hostile archive.
     import zipfile
     bio = io.BytesIO()
     with zipfile.ZipFile(bio, "w") as z:

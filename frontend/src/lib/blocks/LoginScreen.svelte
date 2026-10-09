@@ -1,7 +1,7 @@
 <script>
   // Sign-in gate. Rendered instead of the journal whenever the instance
   // requires accounts and no valid session cookie is present.
-  import { login } from '../js/api.js'
+  import { login, loginMfa } from '../js/api.js'
 
   /** @type {{ onAuthenticated: (username: string) => void }} */
   let { onAuthenticated } = $props()
@@ -10,6 +10,9 @@
   let password = $state('')
   let busy = $state(false)
   let error = $state('')
+  /** Set once the password was right and the account wants a second factor. */
+  let mfaToken = $state('')
+  let code = $state('')
 
   async function submit(event) {
     event.preventDefault()
@@ -17,12 +20,21 @@
     error = ''
     busy = true
     try {
-      const res = await login(username.trim(), password)
+      const res = mfaToken ? await loginMfa(mfaToken, code.trim()) : await login(username.trim(), password)
       password = ''
+      if (res?.mfa_required) {
+        mfaToken = res.mfa_token
+        return
+      }
+      code = ''
       onAuthenticated(res?.username ?? username.trim())
     } catch (err) {
       error = err instanceof Error ? err.message : String(err)
       password = ''
+      code = ''
+      // The ticket is single-purpose and short-lived: a wrong code stays on this step, anything
+      // else (expired, out of attempts) sends the person back to the password.
+      if (mfaToken && !/код/i.test(error) || /истекла|кончились/.test(error)) mfaToken = ''
     } finally {
       busy = false
     }
@@ -34,6 +46,23 @@
     <h1>Quests</h1>
     <p class="hint">Журнал закрыт — войдите в аккаунт.</p>
 
+    {#if mfaToken}
+      <p class="hint">Введите код из приложения-аутентификатора или один из кодов восстановления.</p>
+      <label>
+        <span>Код</span>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          autocapitalize="none"
+          spellcheck="false"
+          autofocus
+          bind:value={code}
+          disabled={busy}
+        />
+      </label>
+    {:else}
     <label>
       <span>Логин</span>
       <!-- svelte-ignore a11y_autofocus -->
@@ -59,13 +88,20 @@
       />
     </label>
 
+    {/if}
+
     {#if error}
       <p class="error" role="alert">{error}</p>
     {/if}
 
-    <button type="submit" disabled={busy || !username.trim() || !password}>
-      {busy ? 'Проверяем…' : 'Войти'}
+    <button type="submit" disabled={busy || (mfaToken ? !code.trim() : !username.trim() || !password)}>
+      {busy ? 'Проверяем…' : mfaToken ? 'Подтвердить' : 'Войти'}
     </button>
+    {#if mfaToken}
+      <button type="button" class="link" disabled={busy} onclick={() => { mfaToken = ''; code = ''; error = '' }}>
+        ← другой аккаунт
+      </button>
+    {/if}
   </form>
 </div>
 
@@ -137,6 +173,14 @@
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
+  }
+
+  button.link {
+    margin-top: 0;
+    padding: 4px;
+    color: var(--color-fg-muted);
+    background: transparent;
+    font-size: 0.8rem;
   }
 
   button:disabled {

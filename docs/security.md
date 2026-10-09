@@ -28,7 +28,7 @@ you add from the host (`quests-server workspace trust`), and **no invitations**:
   (the HTML is user-supplied; WeasyPrint would embed `file://` targets into the PDF).
 - **Browser** — CSP, `X-Frame-Options`, `Referrer-Policy: no-referrer` (invitation secrets sit in URLs),
   `nosniff`; uploaded SVG icons and attachment images are served sandboxed.
-- **Logins** — PBKDF2-SHA256 600k, equal cost for unknown logins, per-IP throttle (port stripped), per-login stall
+- **Logins** — optional TOTP second factor (`docs/auth.md`), PBKDF2-SHA256 600k, equal cost for unknown logins, per-IP throttle (port stripped), per-login stall
   after 10 recent failures (a stall, not a lockout), at most 4 concurrent hashes; logins are `[a-z0-9._-]{2,32}`;
   a password change ends all sessions.
 
@@ -59,6 +59,6 @@ Run it against a **scratch** instance: it creates a workspace, an attacker accou
 - Tables without row-level security (`appuser`, `usersession`, `apitoken`, `workspace*`, `backuplog`) are readable by the
   API role: only an SQL injection could reach them. No injection is known; every dynamic identifier is validated.
 - Secrets are stored as plain text in PostgreSQL and in backups (and in an export made with `secrets=1`).
-- No per-account storage quota for attachments; no second factor for accounts; Grafana/Kuma have their own logins only.
+- No per-account storage quota for attachments; two-factor sign-in is optional (an operator policy that requires it for owners of a trusted workspace is not built); Grafana/Kuma have their own logins only.
 - `X-Forwarded-For` is trusted for throttling (the gateway rewrites it; a client on the LAN could forge it — the
   per-login stall covers that).

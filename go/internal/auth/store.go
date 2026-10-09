@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/valirum/quests/go/internal/db"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,8 @@ type Store struct {
 	// Workspaces enables workspace resolution (PostgreSQL with the workspaces
 	// migration). Off, every caller is in workspace 1 and no workspace table is read.
 	Workspaces bool
+	// Box seals the second-factor secrets (nil = two-factor sign-in is not offered).
+	Box *secretbox.Box
 }
 
 type User struct {
@@ -509,4 +512,11 @@ func (s *Store) RevokeUserToken(userID, tokenID int64) error {
 		return errors.New("no such active token")
 	}
 	return nil
+}
+
+// DeleteOtherSessions ends every session of the account except the one holding keepSecret
+// (a fresh second factor should not leave an older, possibly stolen, session logged in).
+func (s *Store) DeleteOtherSessions(userID int64, keepSecret string) error {
+	_, err := s.DB.Exec(`DELETE FROM usersession WHERE user_id = ? AND token_hash <> ?`, userID, HashToken(keepSecret))
+	return err
 }

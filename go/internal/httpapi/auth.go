@@ -35,7 +35,7 @@ func isPublicAPI(path string) bool {
 		return true
 	}
 	switch path {
-	case "/api/auth/login", "/api/auth/state", "/api/ping":
+	case "/api/auth/login", "/api/auth/login/mfa", "/api/auth/state", "/api/ping":
 		return true
 	}
 	return false
@@ -219,6 +219,20 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if on, merr := s.Auth.HasMFA(u.ID); merr != nil {
+		writeErr(w, http.StatusInternalServerError, merr.Error())
+		return
+	} else if on {
+		// Password right, second factor still owed: a ticket, not a session. The failure counters
+		// stay until the code is accepted, so a guesser gains nothing by stopping here.
+		ticket, terr := s.mfa.issue(u.ID, u.Username)
+		if terr != nil {
+			writeErr(w, http.StatusInternalServerError, terr.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": ticket})
 		return
 	}
 	s.limiter().recordSuccess(key)

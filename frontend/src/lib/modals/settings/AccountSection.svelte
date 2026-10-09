@@ -1,5 +1,6 @@
 <script>
   import SettingsBlock from './SettingsBlock.svelte'
+  import MfaBlock from './MfaBlock.svelte'
 
   /** @type {{ username?: string, onLogout: () => void }} */
   let { username = '', onLogout } = $props()
@@ -11,6 +12,8 @@
     <button type="button" class="btn btn--danger-solid" onclick={onLogout}>Выйти</button>
   </div>
 </SettingsBlock>
+
+<MfaBlock />
 
 <style>
   .row {

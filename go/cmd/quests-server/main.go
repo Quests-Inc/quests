@@ -41,7 +41,11 @@ func main() {
 		log.Printf("db: warning: %s", schema.Detail)
 	}
 
-	authStore := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != ""}
+	secrets, err := secretbox.Load(cfg.DataDir)
+	if err != nil {
+		log.Fatalf("secrets: %v", err)
+	}
+	authStore := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != "", Box: secrets}
 	userCount, err := authStore.CountUsers()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
@@ -68,11 +72,6 @@ func main() {
 	internalToken, _, err := auth.NewToken()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
-	}
-
-	secrets, err := secretbox.Load(cfg.DataDir)
-	if err != nil {
-		log.Fatalf("secrets: %v", err)
 	}
 
 	hub := events.New()

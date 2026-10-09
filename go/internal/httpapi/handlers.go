@@ -67,6 +67,8 @@ type Server struct {
 	MaxUploadBytes int64
 	// Secrets seals what is stored for an account (its LLM key). Nil = nothing can be stored.
 	Secrets *secretbox.Box
+
+	mfa mfaTickets
 }
 
 func (s *Server) Handler() http.Handler {
@@ -134,6 +136,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
+	s.registerMFA(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
 	s.registerWorkspaces(mux)

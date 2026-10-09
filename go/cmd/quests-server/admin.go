@@ -19,6 +19,7 @@ import (
 	"github.com/valirum/quests/go/internal/db"
 	"github.com/valirum/quests/go/internal/health"
 	"github.com/valirum/quests/go/internal/schedule"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
 	"github.com/valirum/quests/go/internal/wsctx"
@@ -28,7 +29,8 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
 
   quests-server useradd <username>       create an account (prompts for a password)
   quests-server passwd <username>        change an account's password
-  quests-server users                    list accounts
+  quests-server users                    list accounts (with their two-factor state)
+  quests-server 2fa-reset <username>     drop an account's two-factor sign-in and end its sessions (lost phone and recovery codes)
   quests-server token add <name> [user] [--workspace <id>]
                                          mint an API token for a headless client (PostgreSQL: bound to a workspace)
   quests-server workspace ls             list workspaces and their members
@@ -55,7 +57,7 @@ func runAdmin(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "useradd", "passwd", "users", "token", "runner", "backup-now", "workspace":
+	case "useradd", "passwd", "users", "2fa-reset", "token", "runner", "backup-now", "workspace":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -81,7 +83,11 @@ func runAdmin(args []string) bool {
 		return true
 	}
 
-	st := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != ""}
+	box, berr := secretbox.Load(cfg.DataDir)
+	if berr != nil {
+		fatal("secrets: %v", berr)
+	}
+	st := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != "", Box: box}
 	wst := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
 
 	switch args[0] {
@@ -129,8 +135,19 @@ func runAdmin(args []string) bool {
 			if !u.IsActive {
 				state = "disabled"
 			}
+			if on, _ := st.HasMFA(u.ID); on {
+				state += "\t2fa"
+			}
 			fmt.Printf("%d\t%s\t%s\n", u.ID, u.Username, state)
 		}
+	case "2fa-reset":
+		if len(args) < 2 {
+			fatal("usage: quests-server 2fa-reset <username>")
+		}
+		if err := st.ResetMFA(args[1]); err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("two-factor sign-in removed for %q; its sessions are closed\n", args[1])
 	case "token":
 		runTokenCmd(st, args[1:])
 	case "workspace":

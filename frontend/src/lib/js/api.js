@@ -455,11 +455,20 @@ export function fetchAuthState() {
  * password", not "session expired", so it must not trip the global handler.
  */
 export async function login(username, password) {
-  const res = await fetch(`${BASE}/api/auth/login`, {
+  return postSignIn('/api/auth/login', { username, password })
+}
+
+/** Second step of a sign-in: the ticket from login() plus an authenticator or recovery code. */
+export function loginMfa(mfaToken, code) {
+  return postSignIn('/api/auth/login/mfa', { mfa_token: mfaToken, code })
+}
+
+async function postSignIn(path, payload) {
+  const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify(payload),
   })
   const text = await res.text()
   let data = null
@@ -832,4 +841,29 @@ export function deleteMyLLM() {
 /** Does this provider/key answer? Uses the typed key, else the stored one. */
 export function testMyLLM(form) {
   return request('/api/me/llm/test', { method: 'POST', body: JSON.stringify(form) })
+}
+
+// --- two-factor sign-in (the account's own, session only) ---
+
+export function getMyMfa() {
+  return request('/api/me/2fa')
+}
+
+/** New secret + otpauth:// link to scan; nothing is on until enableMyMfa() confirms a code. */
+export function setupMyMfa() {
+  return request('/api/me/2fa/setup', { method: 'POST' })
+}
+
+/** Confirms the secret with a code; returns { recovery_codes } — shown once. */
+export function enableMyMfa(code) {
+  return request('/api/me/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) })
+}
+
+export function disableMyMfa(code) {
+  return request('/api/me/2fa/disable', { method: 'POST', body: JSON.stringify({ code }) })
+}
+
+/** Replaces the recovery codes (needs a valid code); returns { recovery_codes }. */
+export function regenerateRecoveryCodes(code) {
+  return request('/api/me/2fa/recovery', { method: 'POST', body: JSON.stringify({ code }) })
 }
