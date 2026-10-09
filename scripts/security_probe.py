@@ -13,6 +13,7 @@ from $QUESTS_PROBE_PASSWORD; it is deliberately not a command-line argument (she
 history, `ps`).
 
 Run it against a scratch instance (it creates quests, workspaces and an account).
+An owner with two-factor sign-in is asked for a code too (or $QUESTS_PROBE_CODE).
 """
 from __future__ import annotations
 
@@ -86,13 +87,23 @@ def main() -> int:
     a.password = os.environ.get("QUESTS_PROBE_PASSWORD") or getpass.getpass(f"Password for {a.owner}: ")
 
     owner = Client(a.base)
-    c, _, _ = owner.req("POST", "/api/auth/login", {"username": a.owner, "password": a.password})
+    c, r, _ = owner.req("POST", "/api/auth/login", {"username": a.owner, "password": a.password})
+    if c == 200 and isinstance(r, dict) and r.get("mfa_required"):
+        # An account with two-factor sign-in: the password step only hands out a ticket.
+        code = os.environ.get("QUESTS_PROBE_CODE") or getpass.getpass("Authenticator (or recovery) code: ")
+        c, r, _ = owner.req("POST", "/api/auth/login/mfa", {"mfa_token": r.get("mfa_token", ""), "code": code.strip()})
     if c != 200:
-        print("cannot log in as the owner:", c)
+        print("cannot log in as the owner:", c, r if isinstance(r, dict) else "")
         return 2
     tag = secrets.token_hex(3)
     c, ws, _ = owner.req("POST", "/api/workspaces", {"name": f"probe-{tag}"})
+    if c != 201 or not isinstance(ws, dict) or "id" not in ws:
+        print("cannot create the probe workspace:", c, ws)
+        return 2
     c, inv, _ = owner.req("POST", f"/api/workspaces/{ws['id']}/invites")
+    if c != 201 or "token" not in inv:
+        print("cannot invite the attacker:", c, inv)
+        return 2
     evil = Client(a.base)
     user = f"evil-{tag}"
     c, r, _ = evil.req("POST", f"/api/invites/{inv['token']}/accept", {"username": user, "password": "attacker-pass-1"})
@@ -208,7 +219,7 @@ def main() -> int:
 
     # cleanup of the probe's own traces in the owner's workspace
     owner.req("DELETE", f"/api/quests/{vid}")
-    owner.req("DELETE", f"/api/workspaces/{ws['id']}")
+    owner.req("DELETE", f"/api/workspaces/{ws['id']}", {"confirm": ws["name"]})
     print("\n%d failed" % len(FAILS) if FAILS else "\nall checks passed")
     return 1 if FAILS else 0
 
