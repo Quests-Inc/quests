@@ -24,8 +24,23 @@ if grep -q '^MONITORING=1' .env 2>/dev/null; then
   COMPOSE="$COMPOSE -f deploy/docker/docker-compose.monitoring.yml"
 fi
 
+# Our own images (built by this CI run) must arrive: retry a flaky registry a few times.
+# Third-party images (postgres, grafana, nginx…) only refresh in passing: a Docker Hub
+# timeout on one of them must not stop a deploy whose images are already pulled — the
+# running ones stay, and the next deploy tries again.
+pull_retry() {
+  local n
+  for n in 1 2 3; do
+    # shellcheck disable=SC2086
+    if $COMPOSE pull "$@"; then return 0; fi
+    echo "pull failed (attempt $n/3): $*" >&2
+    sleep $((n * 10))
+  done
+  return 1
+}
+pull_retry api bot stt
 # shellcheck disable=SC2086
-$COMPOSE pull
+$COMPOSE pull --ignore-buildable || echo "warning: third-party image refresh failed; keeping the images already present" >&2
 # shellcheck disable=SC2086
 $COMPOSE up -d --remove-orphans
 
