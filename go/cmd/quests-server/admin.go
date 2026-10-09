@@ -36,7 +36,8 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
                                          mint an API token for a headless client (PostgreSQL: bound to a workspace)
   quests-server workspace ls             list workspaces and their members
   quests-server workspace add <name> <user>   create a workspace owned by <user>
-  quests-server workspace member <id> <user>  add <user> to workspace <id>
+  quests-server workspace member <id> <user> [owner|member]
+                                         add <user> to workspace <id> (default role: member; an existing member gets the new role)
   quests-server workspace restore <id>   undo a deletion within 7 days (ls shows pending purges)
   quests-server workspace trust|untrust <id>  allow/forbid running check and emit commands on the server
                                          (host-only on purpose: never reachable from the web UI or API)
@@ -496,18 +497,37 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			fmt.Printf("workspace %d is untrusted: server-side commands are refused, runners only\n", id)
 		}
 	case "member":
-		if len(args) < 3 {
-			fatal("usage: quests-server workspace member <id> <user>")
+		if len(args) < 3 || len(args) > 4 {
+			fatal("usage: quests-server workspace member <id> <user> [owner|member]   (default: member)")
 		}
 		id, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil {
 			fatal("workspace id must be a number")
 		}
+		role := store.RoleMember
+		if len(args) == 4 {
+			role = args[3]
+		}
+		if role != store.RoleOwner && role != store.RoleMember {
+			fatal("role must be owner or member, got %q", role)
+		}
 		u := userByName(args[2])
-		if err := wst.AddWorkspaceMember(ctx, id, u.ID, "owner"); err != nil {
+		was, err := wst.MemberRole(ctx, id, u.ID)
+		if err != nil {
 			fatal("%v", err)
 		}
-		fmt.Printf("%s is now a member of workspace %d\n", u.Username, id)
+		if was == role {
+			fmt.Printf("%s is already %s of workspace %d\n", u.Username, role, id)
+			return
+		}
+		if err := wst.AddWorkspaceMember(ctx, id, u.ID, role); err != nil {
+			fatal("%v", err)
+		}
+		if was == "" {
+			fmt.Printf("%s is now %s of workspace %d\n", u.Username, role, id)
+		} else {
+			fmt.Printf("%s: role in workspace %d changed from %s to %s\n", u.Username, id, was, role)
+		}
 	default:
 		fatal("unknown workspace command %q", args[0])
 	}
