@@ -341,6 +341,7 @@ def _quest_summary(q: dict[str, Any]) -> dict[str, Any]:
         "status": q.get("status"),
         "significance": q.get("significance"),
         "pinned": q.get("pinned"),
+        "overlay_hidden": q.get("overlay_hidden"),
         "progress_label": q.get("progress_label"),
         "steps_done": q.get("steps_done"),
         "steps_total": q.get("steps_total"),
@@ -386,6 +387,7 @@ def _quest_mutation_result(q: dict[str, Any]) -> dict[str, Any]:
         "title": q.get("title"),
         "status": q.get("status"),
         "pinned": q.get("pinned"),
+        "overlay_hidden": q.get("overlay_hidden"),
         "significance": q.get("significance"),
         "progress_label": q.get("progress_label"),
         "questline_id": q.get("questline_id"),
@@ -503,6 +505,8 @@ def get_base_context(
             "status": q.get("status"),
             "significance": q.get("significance"),
             "pinned": q.get("pinned"),
+            "overlay_hidden": q.get("overlay_hidden"),
+        "overlay_hidden": q.get("overlay_hidden"),
             "category_id": q.get("category_id"),
             "category_slug": q.get("category_slug"),
             "category_label": q.get("category_label"),
@@ -595,6 +599,9 @@ def _quests_by_status_context(
                 "status": q.get("status"),
                 "significance": q.get("significance"),
                 "pinned": q.get("pinned"),
+                "overlay_hidden": q.get("overlay_hidden"),
+            "overlay_hidden": q.get("overlay_hidden"),
+        "overlay_hidden": q.get("overlay_hidden"),
                 "deadline_at": q.get("deadline_at"),
                 "questline_id": q.get("questline_id"),
                 "questline_title": q.get("questline_title"),
@@ -972,6 +979,7 @@ def create_template(
     questline: str | int | None = None,
     significance: str | None = None,
     pinned: bool | None = None,
+    overlay_hidden: bool | None = None,
     enabled: bool | None = None,
     automated: bool | None = None,
     steps: list[dict[str, Any]] | None = None,
@@ -1009,6 +1017,8 @@ def create_template(
         body["significance"] = _check_significance(significance)
     if pinned is not None:
         body["pinned"] = bool(pinned)
+    if overlay_hidden is not None:
+        body["overlay_hidden"] = bool(overlay_hidden)
     if enabled is not None:
         body["enabled"] = bool(enabled)
     if automated is not None:
@@ -1048,6 +1058,7 @@ def update_template(
     questline: str | int | None = None,
     significance: str | None = None,
     pinned: bool | None = None,
+    overlay_hidden: bool | None = None,
     enabled: bool | None = None,
     automated: bool | None = None,
     steps: list[dict[str, Any]] | None = None,
@@ -1093,6 +1104,8 @@ def update_template(
         body["significance"] = _check_significance(significance)
     if pinned is not None:
         body["pinned"] = bool(pinned)
+    if overlay_hidden is not None:
+        body["overlay_hidden"] = bool(overlay_hidden)
     if enabled is not None:
         body["enabled"] = bool(enabled)
     if automated is not None:
@@ -1724,7 +1737,9 @@ def delete_note(note_id: int) -> dict[str, Any]:
         "Passing questline "
         "makes the quest inherit that questline's category. "
         "tag_ids: optional list of existing tag ids (max 5); use list_tags / "
-        "create_tag first. quiet=true skips overlay toasts."
+        "create_tag first. quiet=true skips overlay toasts. "
+        "overlay_hidden=true keeps the quest out of the HUD entirely (pinned=true is the opposite: always shown; "
+        "turning one on turns the other off)."
     )
 )
 def create_quest(
@@ -1733,6 +1748,7 @@ def create_quest(
     status: str | None = None,
     significance: str | None = None,
     pinned: bool | None = None,
+    overlay_hidden: bool | None = None,
     sort_order: int | None = None,
     deadline_at: str | None = None,
     duration_seconds: int | None = None,
@@ -1755,6 +1771,8 @@ def create_quest(
         body["significance"] = _check_significance(significance)
     if pinned is not None:
         body["pinned"] = bool(pinned)
+    if overlay_hidden is not None:
+        body["overlay_hidden"] = bool(overlay_hidden)
     if automated is not None:
         body["automated"] = bool(automated)
     if sort_order is not None:
@@ -1926,7 +1944,8 @@ def add_step(
         "Use for lifecycle: status=active|expired|frozen|completed|failed|archived "
         "(e.g. archive when blocked / needs clarification). Also title, description "
         "(markdown in the journal), "
-        "pinned, significance, sort_order, deadline_at, duration_seconds, "
+        "pinned, overlay_hidden (never shown in the HUD; exclusive with pinned), "
+        "significance, sort_order, deadline_at, duration_seconds, "
         "category_id, questline_id (null to detach), automated, tag_ids (replace all, max 5). "
         "quiet=true skips overlay toasts."
     )
@@ -1938,6 +1957,7 @@ def update_quest(
     status: str | None = None,
     significance: str | None = None,
     pinned: bool | None = None,
+    overlay_hidden: bool | None = None,
     sort_order: int | None = None,
     deadline_at: str | None = None,
     duration_seconds: int | None = None,
@@ -1964,6 +1984,8 @@ def update_quest(
         body["significance"] = _check_significance(significance)
     if pinned is not None:
         body["pinned"] = bool(pinned)
+    if overlay_hidden is not None:
+        body["overlay_hidden"] = bool(overlay_hidden)
     if sort_order is not None:
         body["sort_order"] = int(sort_order)
     if deadline_at is not None:

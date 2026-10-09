@@ -13,6 +13,7 @@ type QuestRead struct {
 	Status           QuestStatus  `json:"status"`
 	Significance     Significance `json:"significance"`
 	Pinned           bool         `json:"pinned"`
+	OverlayHidden    bool         `json:"overlay_hidden"`
 	SortOrder        int          `json:"sort_order"`
 	DeadlineAt       *string      `json:"deadline_at"`
 	DurationSeconds  *int         `json:"duration_seconds"`
@@ -98,6 +99,7 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 		Status:           q.Status,
 		Significance:     q.Significance,
 		Pinned:           q.Pinned,
+		OverlayHidden:    q.OverlayHidden,
 		SortOrder:        q.SortOrder,
 		DeadlineAt:       toISO(q.DeadlineAt),
 		DurationSeconds:  q.DurationSeconds,

@@ -59,7 +59,13 @@
   let description = $state('')
   let status = $state('active')
   let significance = $state('common')
-  let pinned = $state(false)
+  /** HUD presence: 'default' | 'always' (pinned) | 'never' (overlay_hidden). */
+  let overlayMode = $state('default')
+  const OVERLAY_OPTIONS = [
+    { id: 'default', label: 'По умолчанию' },
+    { id: 'always', label: 'Всегда' },
+    { id: 'never', label: 'Никогда' },
+  ]
   let automated = $state(false)
   let sortOrder = $state(0)
   /** Empty string = no category. */
@@ -122,7 +128,8 @@
     [
       QUEST_STATUS_LABELS[status] ?? status,
       QUEST_SIGNIFICANCES.find((s) => s.id === significance)?.label,
-      pinned && 'закреплён',
+      overlayMode === 'always' && 'закреплён',
+      overlayMode === 'never' && 'не в оверлее',
       automated && 'автоквест',
     ]
       .filter(Boolean)
@@ -169,7 +176,7 @@
     description = q?.description ?? defaults?.description ?? ''
     status = q?.status ?? 'active'
     significance = q?.significance ?? 'common'
-    pinned = Boolean(q?.pinned)
+    overlayMode = q?.pinned ? 'always' : q?.overlay_hidden ? 'never' : 'default'
     automated = Boolean(q?.automated)
     sortOrder = q?.sort_order ?? 0
     const cat = q ? q.category_id : defaults?.category_id
@@ -268,7 +275,8 @@
         description: description.trim(),
         status,
         significance,
-        pinned,
+        pinned: overlayMode === 'always',
+        overlay_hidden: overlayMode === 'never',
         automated,
         sort_order: Number(sortOrder) || 0,
         category_id: categoryId === '' ? null : Number(categoryId),
@@ -435,10 +443,13 @@
         <span class="label">Значимость</span>
         <OptionPills options={SIG_OPTIONS} bind:value={significance} label="Значимость" wrap />
       </div>
-      <label class="check">
-        <input type="checkbox" bind:checked={pinned} />
-        Закрепить — показывать в оверлее
-      </label>
+      <div class="check-line">
+        <span class="hint">В оверлее</span>
+        <OptionPills options={OVERLAY_OPTIONS} bind:value={overlayMode} label="Показ в оверлее" compact />
+        <HelpTip label="Что такое показ в оверлее">
+          По умолчанию — срочные и по категориям. Всегда — закреплён в HUD. Никогда — квест не попадает в HUD вообще (тосты это не меняет).
+        </HelpTip>
+      </div>
       <div class="check-line">
         <label class="check">
           <input type="checkbox" bind:checked={automated} />

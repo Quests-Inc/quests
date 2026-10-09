@@ -60,7 +60,13 @@
   let tagCatalog = $state([])
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let selectedTags = $state([])
-  let pinned = $state(false)
+  /** HUD presence of created quests: 'default' | 'always' | 'never'. */
+  let overlayMode = $state('default')
+  const OVERLAY_OPTIONS = [
+    { id: 'default', label: 'По умолчанию' },
+    { id: 'always', label: 'Всегда' },
+    { id: 'never', label: 'Никогда' },
+  ]
   let significance = $state('common')
   let enabled = $state(true)
   let automated = $state(false)
@@ -186,7 +192,8 @@
     [
       QUEST_SIGNIFICANCES.find((s) => s.id === significance)?.label,
       enabled ? 'включён' : 'выключен',
-      pinned && 'закреплён',
+      overlayMode === 'always' && 'закреплён',
+      overlayMode === 'never' && 'не в оверлее',
       automated && 'автоквест',
     ]
       .filter(Boolean)
@@ -233,7 +240,7 @@
     formError = ''
     title = t?.title ?? ''
     description = t?.description ?? ''
-    pinned = Boolean(t?.pinned)
+    overlayMode = t?.pinned ? 'always' : t?.overlay_hidden ? 'never' : 'default'
     significance = t?.significance ?? 'common'
     enabled = t ? t.enabled !== false : true
     automated = Boolean(t?.automated)
@@ -371,7 +378,8 @@
     const common = {
       title: title.trim(),
       description: description.trim(),
-      pinned,
+      pinned: overlayMode === 'always',
+      overlay_hidden: overlayMode === 'never',
       enabled,
       automated,
       significance,
@@ -575,6 +583,7 @@
       t.category_label,
       QUEST_SIGNIFICANCES.find((x) => x.id === t.significance)?.label || 'обычное',
       t.pinned && 'закреплён',
+      t.overlay_hidden && 'не в оверлее',
       streakLabel(t.id),
       `${t.steps?.length ?? 0} ${plural(t.steps?.length ?? 0, ['шаг', 'шага', 'шагов'])}`,
     ]
@@ -816,10 +825,10 @@
           <input type="checkbox" bind:checked={enabled} />
           Включён — создавать квесты по расписанию
         </label>
-        <label class="check">
-          <input type="checkbox" bind:checked={pinned} />
-          Закреплять созданные квесты в оверлее
-        </label>
+        <div class="check-line">
+          <span class="hint">Созданные квесты в оверлее</span>
+          <OptionPills options={OVERLAY_OPTIONS} bind:value={overlayMode} label="Показ созданных квестов в оверлее" compact />
+        </div>
         <label class="check">
           <input type="checkbox" bind:checked={automated} />
           Автоквест — тихий тост вместо оповещения

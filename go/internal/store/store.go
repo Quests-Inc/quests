@@ -82,11 +82,11 @@ func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]domain.Quest, e
 		args = append(args, string(*f.Status))
 	}
 	if f.Pinned != nil {
-		q += ` AND q.pinned = ?`
+		// "not pinned" includes quests hidden from the HUD (pinned = -1).
 		if *f.Pinned {
-			args = append(args, 1)
+			q += ` AND q.pinned = 1`
 		} else {
-			args = append(args, 0)
+			q += ` AND q.pinned <= 0`
 		}
 	}
 	if f.QuestlineID != nil {
@@ -183,7 +183,7 @@ func scanQuest(row rowScanner) (domain.Quest, error) {
 	if err != nil {
 		return q, err
 	}
-	q.Pinned = pinned != 0
+	q.Pinned, q.OverlayHidden = domain.SplitPinState(pinned)
 	q.Automated = automated != 0
 	if source.Valid {
 		v := source.String
@@ -364,7 +364,7 @@ func (s *Store) createQuest(ctx context.Context, q domain.Quest, changeKind, cha
 			deadline_at, duration_seconds, category_id, questline_id,
 			created_at, updated_at, completed_at, template_id, period_key, automated, source
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		q.Title, q.Description, string(q.Status), string(q.Significance), boolInt(q.Pinned), q.SortOrder,
+		q.Title, q.Description, string(q.Status), string(q.Significance), domain.PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
 		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.CreatedAt), timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), nullI64(q.TemplateID), nullStr(q.PeriodKey), boolInt(q.Automated), nullStr(q.Source),
 	)
@@ -418,7 +418,7 @@ func (s *Store) UpdateQuest(ctx context.Context, q domain.Quest, changeKind, cha
 			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
 			updated_at=?, completed_at=?, automated=?
 		WHERE id=?`,
-		q.Title, q.Description, string(q.Status), string(q.Significance), boolInt(q.Pinned), q.SortOrder,
+		q.Title, q.Description, string(q.Status), string(q.Significance), domain.PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
 		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated), q.ID,
 	)
@@ -785,7 +785,7 @@ func (s *Store) UpdateQuestComment(ctx context.Context, q domain.Quest, changeKi
 			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
 			updated_at=?, completed_at=?, automated=?
 		WHERE id=?`,
-		q.Title, q.Description, string(q.Status), string(q.Significance), boolInt(q.Pinned), q.SortOrder,
+		q.Title, q.Description, string(q.Status), string(q.Significance), domain.PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
 		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated), q.ID,
 	)

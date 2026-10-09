@@ -99,6 +99,8 @@ def split_hud_quests(
     category: list[HudQuest] = []
     taken: set[int] = set()
     slug = (category_slug or "").strip().lower() or None
+    # "Never in the HUD" (the crossed-out pin) beats every lane below.
+    items = [q for q in items if not q.get("overlay_hidden")]
 
     for q in items:
         if q.get("status") in {"completed", "failed", "archived", "frozen"}:

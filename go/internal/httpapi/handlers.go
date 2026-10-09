@@ -328,7 +328,8 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 		Description:     body.Description,
 		Status:          body.Status,
 		Significance:    body.Significance,
-		Pinned:          body.Pinned,
+		Pinned:          body.Pinned && !body.OverlayHidden,
+		OverlayHidden:   body.OverlayHidden && !body.Pinned,
 		SortOrder:       body.SortOrder,
 		DeadlineAt:      d,
 		DurationSeconds: dur,
@@ -450,8 +451,18 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 		}
 		q.Significance = sg
 	}
+	// pinned and overlay_hidden share one column, so turning one on turns the other off.
 	if v, ok := raw["pinned"]; ok {
 		_ = json.Unmarshal(v, &q.Pinned)
+		if q.Pinned {
+			q.OverlayHidden = false
+		}
+	}
+	if v, ok := raw["overlay_hidden"]; ok {
+		_ = json.Unmarshal(v, &q.OverlayHidden)
+		if q.OverlayHidden {
+			q.Pinned = false
+		}
 	}
 	if v, ok := raw["sort_order"]; ok {
 		_ = json.Unmarshal(v, &q.SortOrder)

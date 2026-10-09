@@ -918,7 +918,13 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     pinBusyId = quest.id
     error = ''
     try {
-      const saved = await updateQuest(quest.id, { pinned: !quest.pinned })
+      // default → always in the HUD → never in the HUD → default
+      const patch = quest.pinned
+        ? { overlay_hidden: true }
+        : quest.overlay_hidden
+          ? { overlay_hidden: false }
+          : { pinned: true }
+      const saved = await updateQuest(quest.id, patch)
       applyQuest(saved, { select: false })
       selectQuestFromUi(saved.id, { pushUrl: false })
     } catch (e) {

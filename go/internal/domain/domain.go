@@ -125,12 +125,15 @@ type Step struct {
 }
 
 type Quest struct {
-	ID              int64
-	Title           string
-	Description     string
-	Status          QuestStatus
-	Significance    Significance
-	Pinned          bool
+	ID           int64
+	Title        string
+	Description  string
+	Status       QuestStatus
+	Significance Significance
+	Pinned       bool
+	// OverlayHidden: never shown in the HUD. Stored in the same column as Pinned
+	// (1 always, 0 default, -1 never), so the two are mutually exclusive.
+	OverlayHidden   bool
 	SortOrder       int
 	DeadlineAt      *time.Time
 	DurationSeconds *int
@@ -189,6 +192,7 @@ type QuestCreate struct {
 	Status          QuestStatus  `json:"status"`
 	Significance    Significance `json:"significance"`
 	Pinned          bool         `json:"pinned"`
+	OverlayHidden   bool         `json:"overlay_hidden"`
 	SortOrder       int          `json:"sort_order"`
 	DeadlineAt      *string      `json:"deadline_at"`
 	DurationSeconds *int         `json:"duration_seconds"`
@@ -279,3 +283,17 @@ func itoa(n int) string {
 	}
 	return string(b[i:])
 }
+
+// PinState is the value of the pinned column: 1 always in the HUD, -1 never, 0 default.
+func PinState(pinned, overlayHidden bool) int {
+	switch {
+	case pinned:
+		return 1
+	case overlayHidden:
+		return -1
+	}
+	return 0
+}
+
+// SplitPinState is PinState's inverse.
+func SplitPinState(v int) (pinned, overlayHidden bool) { return v > 0, v < 0 }

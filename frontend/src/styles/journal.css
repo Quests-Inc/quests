@@ -842,7 +842,8 @@
 
   .quest-row__top {
     display: flex;
-    align-items: center;
+    /* The pin sits in the top corner, not centred on a multi-line title. */
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-2, 0.5rem);
   }
@@ -915,8 +916,14 @@
 
   .quest-row:hover .pin-btn,
   .pin-btn--on,
+  .pin-btn--off,
   .pin-btn:focus-visible {
     opacity: 1;
+  }
+
+  /* Crossed-out pin: never in the HUD — muted, so it reads as "off", not as "pinned". */
+  .pin-btn--off {
+    color: var(--color-fg-subtle, #6e6e6e);
   }
 
   .pin-btn:hover {

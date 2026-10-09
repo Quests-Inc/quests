@@ -160,7 +160,7 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 		return nil, errBad("title required")
 	}
 	desc, _ := asString(body["description"])
-	pinned := asBool(body["pinned"], false)
+	pinned := domain.PinState(asBool(body["pinned"], false), asBool(body["overlay_hidden"], false))
 	sortOrder := asInt(body["sort_order"], 0)
 	freq := asStringDef(body["freq"], "daily")
 	weekdays := asStringDef(body["weekdays"], "0,1,2,3,4,5,6")
@@ -200,7 +200,7 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 			emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, created_at, updated_at, automated
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		title, desc, boolInt(pinned), sortOrder, nullInt(asIntPtr(body["duration_seconds"])), freq, weekdays, boolInt(enabled), tz,
+		title, desc, pinned, sortOrder, nullInt(asIntPtr(body["duration_seconds"])), freq, weekdays, boolInt(enabled), tz,
 		nullStr(asStringPtr(body["deadline_time"])), sig, emitMode, emitChance,
 		nullStr(asStringPtr(body["emit_window_start"])), nullStr(asStringPtr(body["emit_window_end"])),
 		nullStr(asStringPtr(body["emit_pool_command"])), emitLimits, nullStr(emitRunOn),
@@ -237,6 +237,12 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	for k, v := range body {
 		merged[k] = v
 	}
+	// pinned and overlay_hidden share a column: the one just switched on wins.
+	if asBool(body["overlay_hidden"], false) {
+		merged["pinned"] = false
+	} else if asBool(body["pinned"], false) {
+		merged["overlay_hidden"] = false
+	}
 	now := timeutil.NowUTC()
 	emitLimits, lerr := emitLimitsColumn(merged["emit_limits"])
 	if lerr != nil {
@@ -258,7 +264,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 			updated_at=?, automated=?
 		WHERE id=?`,
 		asStringDef(merged["title"], ""), asStringDef(merged["description"], ""),
-		boolInt(asBool(merged["pinned"], false)), asInt(merged["sort_order"], 0),
+		domain.PinState(asBool(merged["pinned"], false), asBool(merged["overlay_hidden"], false)), asInt(merged["sort_order"], 0),
 		nullInt(asIntPtr(merged["duration_seconds"])), asStringDef(merged["freq"], "daily"),
 		asStringDef(merged["weekdays"], "0,1,2,3,4,5,6"), boolInt(asBool(merged["enabled"], true)),
 		asStringDef(merged["timezone"], "Europe/Moscow"), nullStr(asStringPtr(merged["deadline_time"])),
@@ -534,7 +540,7 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 		return nil, err
 	}
 	tr := TemplateRead{
-		"id": id, "title": title, "description": desc, "pinned": pinned != 0, "sort_order": sortOrder,
+		"id": id, "title": title, "description": desc, "pinned": pinned > 0, "overlay_hidden": pinned < 0, "sort_order": sortOrder,
 		"freq": freq, "weekdays": weekdays, "enabled": enabled != 0, "timezone": tz,
 		"significance": sig, "emit_mode": emitMode, "emit_chance": emitChance,
 		"emit_limits":      nil,

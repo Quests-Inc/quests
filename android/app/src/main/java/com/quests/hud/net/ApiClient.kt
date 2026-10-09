@@ -26,7 +26,9 @@ class ApiClient(private val base: String, private val token: String?) {
     suspend fun activeQuests(): List<JSONObject> {
         val body = request("GET", "/api/quests?status=active&status=frozen", auth = true)
         val arr = JSONArray(body)
+        // overlay_hidden = the crossed-out pin: never shown in the HUD, the ongoing list included.
         return (0 until arr.length()).map { arr.getJSONObject(it) }
+            .filterNot { it.optBoolean("overlay_hidden", false) }
     }
 
     /**

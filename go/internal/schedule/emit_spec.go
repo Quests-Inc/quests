@@ -352,6 +352,9 @@ func applyResolvedSpec(ctx context.Context, st *store.Store, q *domain.Quest, tm
 	}
 	if rs.Pinned != nil {
 		q.Pinned = *rs.Pinned
+		if q.Pinned {
+			q.OverlayHidden = false
+		}
 	}
 	if rs.Automated != nil {
 		q.Automated = *rs.Automated

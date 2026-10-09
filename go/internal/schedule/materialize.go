@@ -45,6 +45,7 @@ type templateRow struct {
 	Title           string
 	Description     string
 	Pinned          bool
+	OverlayHidden   bool
 	SortOrder       int
 	DurationSeconds sql.NullInt64
 	Freq            string
@@ -114,7 +115,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		); err != nil {
 			return nil, err
 		}
-		t.Pinned = pinned != 0
+		t.Pinned, t.OverlayHidden = domain.SplitPinState(pinned)
 		t.Enabled = enabled != 0
 		t.Automated = automated != 0
 		templates = append(templates, t)
@@ -244,6 +245,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			Status:          domain.StatusActive,
 			Significance:    domain.Significance(tmpl.Significance),
 			Pinned:          tmpl.Pinned,
+			OverlayHidden:   tmpl.OverlayHidden,
 			SortOrder:       tmpl.SortOrder,
 			DeadlineAt:      deadline,
 			DurationSeconds: duration,
@@ -936,7 +938,7 @@ func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRo
 	if err != nil {
 		return templateRow{}, err
 	}
-	t.Pinned = pinned != 0
+	t.Pinned, t.OverlayHidden = domain.SplitPinState(pinned)
 	t.Enabled = enabled != 0
 	t.Automated = automated != 0
 	return t, nil

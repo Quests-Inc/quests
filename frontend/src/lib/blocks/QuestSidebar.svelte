@@ -185,16 +185,17 @@
         <span
           class="pin-btn"
           class:pin-btn--on={q.pinned}
+          class:pin-btn--off={q.overlay_hidden}
           role="button"
           tabindex="0"
-          title={q.pinned ? 'Открепить' : 'В избранное'}
-          aria-label={q.pinned ? 'Открепить' : 'В избранное'}
+          title={q.pinned ? 'Всегда в оверлее — клик: никогда' : q.overlay_hidden ? 'Никогда в оверлее — клик: по умолчанию' : 'Оверлей по умолчанию — клик: всегда'}
+          aria-label={q.pinned ? 'Всегда в оверлее' : q.overlay_hidden ? 'Никогда в оверлее' : 'Оверлей по умолчанию'}
           onclick={(e) => onTogglePin(q, e)}
           onkeydown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') onTogglePin(q, e)
           }}
         >
-          <Icon name={q.pinned ? 'pin-filled' : 'pin'} size={14} />
+          <Icon name={q.pinned ? 'pin-filled' : q.overlay_hidden ? 'pin-off' : 'pin'} size={14} />
         </span>
       </span>
       {#if q.tags?.length}
