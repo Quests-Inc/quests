@@ -29,8 +29,8 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   import { seedAttachmentIndex, invalidateAttachmentLiveFlags, flattenAttachmentIndex } from './lib/js/attachmentCache.js'
   import { applyTheme, loadSavedTheme } from './lib/js/theme.js'
   import { questMatchesQuery } from './lib/js/search.js'
-  import { parseFlagQuery, passesFlags } from './lib/js/searchFlags.js'
-  import { QUEST_FLAGS, QUEST_KEYS, asksClosedStatus } from './lib/js/questFlags.js'
+  import { parseQuery, passes, tokenValues, setToken } from './lib/js/searchFlags.js'
+  import { questSpec } from './lib/js/questFlags.js'
   import { OPEN_STATUSES } from './lib/js/questFormat.js'
   import { groupQuestsByCategory } from './lib/js/questGroups.js'
   import { copyText } from './lib/js/clipboard.js'
@@ -227,19 +227,36 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let stepModalStep = $state(/** @type {any | null} */ (null))
   /** Prefer this id across in-flight load() (URL / HUD focus). */
   let pendingSelectId = $state(/** @type {number | null} */ (null))
+  // The sidebar's search text is the single source of truth for its filters: «показывать завершённые»
+  // is `status:all`, the category / questline scope are `cat:slug` / `line:id` (searchFlags.js).
+  let questQuerySpec = $derived(questSpec({ categories }))
+  let parsedQuestSearch = $derived(parseQuery(searchQuery, questQuerySpec))
   /** When false — only active/expired; when true — all statuses. */
-  let showAllQuests = $state(false)
+  let showAllQuests = $derived(tokenValues(parsedQuestSearch, 'status').includes('all'))
   /** Sidebar scope narrowing: null = all, else a category, optionally further narrowed to one of its questlines. */
-  let scopeCategoryId = $state(/** @type {number | null} */ (null))
-  let scopeQuestlineId = $state(/** @type {number | null} */ (null))
+  let scopeCategoryId = $derived.by(() => {
+    const slug = tokenValues(parsedQuestSearch, 'cat')[0]
+    return slug ? (categories.find((c) => c.slug === slug)?.id ?? null) : null
+  })
+  let scopeQuestlineId = $derived.by(() => {
+    const v = tokenValues(parsedQuestSearch, 'line')[0]
+    if (!v) return null
+    const byId = questlines.find((l) => String(l.id) === v)
+    if (byId) return byId.id
+    return questlines.find((l) => (l.title || '').replace(/\s+/g, '_').toLowerCase() === v.toLowerCase())?.id ?? null
+  })
   let nowMs = $state(Date.now())
 
+  function setShowAll(on) {
+    const rest = tokenValues(parsedQuestSearch, 'status').filter((v) => v !== 'all')
+    searchQuery = setToken(searchQuery, 'status', on ? [...rest, 'all'] : rest)
+  }
   function setScopeCategory(id) {
-    scopeCategoryId = id
-    scopeQuestlineId = null
+    const slug = id == null ? null : categories.find((c) => c.id === id)?.slug
+    searchQuery = setToken(setToken(searchQuery, 'line', []), 'cat', slug ? [slug] : [])
   }
   function setScopeQuestline(id) {
-    scopeQuestlineId = id
+    searchQuery = setToken(searchQuery, 'line', id == null ? [] : [String(id)])
   }
   /** Questlines to narrow to under the current scope category: those whose own
    * category matches, plus any that hold quests of that category (a questline
@@ -371,16 +388,13 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     return []
   })
 
-  let parsedQuestSearch = $derived(parseFlagQuery(searchQuery, QUEST_FLAGS, QUEST_KEYS))
   let matchedQuests = $derived(
     quests.filter(
-      (q) =>
-        questMatchesQuery(q, parsedQuestSearch.text) &&
-        passesFlags(parsedQuestSearch, QUEST_FLAGS, q, QUEST_KEYS),
+      (q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q),
     ),
   )
   let listedQuests = $derived(
-    showAllQuests || asksClosedStatus(parsedQuestSearch)
+    showAllQuests || tokenValues(parsedQuestSearch, 'status').length > 0
       ? matchedQuests
       : matchedQuests.filter((q) => OPEN_STATUSES.has(q.status)),
   )
@@ -1807,7 +1821,10 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
         onScopeCategory={setScopeCategory}
         onScopeQuestline={setScopeQuestline}
         bind:searchQuery
-        bind:showAllQuests
+        {showAllQuests}
+        onShowAll={setShowAll}
+        querySpec={questQuerySpec}
+        parsedSearch={parsedQuestSearch}
         {selectedId}
         {categoryOpen}
         {lineOpen}

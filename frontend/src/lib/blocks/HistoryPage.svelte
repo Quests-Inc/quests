@@ -1,5 +1,5 @@
 <script>
-  import { parseFlagQuery } from '../js/searchFlags.js'
+  import { parseQuery, tokenValues, setToken, helpLine } from '../js/searchFlags.js'
   import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
   import DateInput from '../ui/DateInput.svelte'
@@ -18,19 +18,6 @@
 
   const PAGE = 100
 
-  /** `flag:…` in the search box set the same filters as the selectors (a flag wins over its selector). */
-  const HIST_FLAGS = {
-    quest: { label: 'квесты', test: () => true },
-    note: { label: 'заметки', test: () => true },
-    attachment: { label: 'вложения', test: () => true },
-    done: { label: 'выполнено', test: () => true },
-    created: { label: 'создано', test: () => true, aliases: ['new'] },
-    edited: { label: 'правки', test: () => true, aliases: ['edit', 'updated'] },
-    missed: { label: 'провалы и отсрочки', test: () => true, aliases: ['miss', 'failed'] },
-    deleted: { label: 'удаления', test: () => true, aliases: ['del'] },
-    today: { label: 'сегодня', test: () => true },
-  }
-  const HIST_KIND_OF = { done: 'done', created: 'new', edited: 'edit', missed: 'miss', deleted: 'del' }
 
   const ENTITIES = [
     { id: '', label: 'Всё' },
@@ -82,20 +69,47 @@
     }
   }
 
-  let search = $state(param('q'))
-  let parsedSearch = $derived(parseFlagQuery(search, HIST_FLAGS))
-  let effEntity = $derived(parsedSearch.include.find((f) => ['quest', 'note', 'attachment'].includes(f)) ?? entity)
-  let effKindGroup = $derived(HIST_KIND_OF[parsedSearch.include.find((f) => HIST_KIND_OF[f]) ?? ''] ?? kindGroup)
-  let effPeriod = $derived(parsedSearch.include.includes('today') ? 'today' : period)
-  let entity = $state(param('et'))
-  let kindGroup = $state(param('kg'))
-  let questlineId = $state(param('ql'))
-  let categoryId = $state(param('cat'))
-  let tagId = $state(param('tag'))
-  let period = $state(param('per'))
-  let day = $state(param('day'))
-
+  /** The query line is the single source of truth: every selector below reads its value from a token and
+   * writes it back (`type:note act:edit line:3 cat:work tag:infra when:7 day:2026-10-09`). Links from before
+   * (?et=…&kg=…) are turned into tokens once. */
+  function initialQuery() {
+    let q = param('q')
+    const old = { type: param('et'), act: param('kg'), line: param('ql'), cat: param('cat'), tag: param('tag'), when: param('per'), day: param('day') }
+    for (const [k, v] of Object.entries(old)) if (v && !new RegExp(`(^|\\s)${k}:`).test(q)) q = `${q} ${k}:${v}`.trim()
+    return q
+  }
+  let search = $state(initialQuery())
   let tags = $state(/** @type {any[]} */ ([]))
+  const histSpec = $derived({
+    type: { label: 'что менялось', values: ENTITIES.filter((e) => e.id).map((e) => ({ id: e.id, label: e.label })), test: () => true },
+    act: {
+      label: 'вид события',
+      values: [
+        { id: 'done', label: 'выполнено' },
+        { id: 'new', label: 'создано', aliases: ['create', 'created'] },
+        { id: 'edit', label: 'правки', aliases: ['update', 'updated', 'edited'] },
+        { id: 'miss', label: 'провалы и отсрочки', aliases: ['fail', 'failed', 'missed'] },
+        { id: 'del', label: 'удаления', aliases: ['delete', 'deleted'] },
+      ],
+      test: () => true,
+    },
+    line: { label: 'квестлайн', hint: 'id', test: () => true },
+    cat: { label: 'категория', values: categories.map((c) => ({ id: c.slug, label: c.label, aliases: [String(c.id)] })), test: () => true },
+    tag: { label: 'тег', hint: 'infra', test: () => true },
+    when: { label: 'период', values: [{ id: 'today', label: 'сегодня' }, { id: '7', label: '7 дней' }, { id: '30', label: '30 дней' }], test: () => true },
+    day: { label: 'день', hint: 'ГГГГ-ММ-ДД', test: () => true },
+  })
+  let parsedSearch = $derived(parseQuery(search, histSpec))
+  const first = (key) => tokenValues(parsedSearch, key)[0] ?? ''
+  const put = (key, v) => (search = setToken(search, key, v ? [v] : []))
+  let entity = $derived(first('type'))
+  let kindGroup = $derived(first('act'))
+  let questlineId = $derived(first('line'))
+  let categoryId = $derived(String(categories.find((c) => c.slug === first('cat'))?.id ?? ''))
+  let tagId = $derived(String(tags.find((t) => t.slug === first('tag') || String(t.id) === first('tag'))?.id ?? ''))
+  let period = $derived(first('when'))
+  let day = $derived(first('day'))
+
   let rows = $state(/** @type {any[]} */ ([]))
   let loading = $state(false)
   let more = $state(false)
@@ -103,7 +117,7 @@
   let seq = 0
 
   let filtersOn = $derived(
-    !!(search || entity || kindGroup || questlineId || categoryId || tagId || period || day),
+    !!search.trim(),
   )
 
   /** Keep the filters in the address bar (tab=history stays) so a view can be linked. */
@@ -112,13 +126,6 @@
       const qs = new URLSearchParams({ tab: 'history' })
       const set = (k, v) => v && qs.set(k, v)
       set('q', search.trim())
-      set('et', entity)
-      set('kg', kindGroup)
-      set('ql', questlineId)
-      set('cat', categoryId)
-      set('tag', tagId)
-      set('per', period)
-      set('day', day)
       const next = `${location.pathname}?${qs}`
       if (next !== `${location.pathname}${location.search}`) history.replaceState(null, '', next)
     } catch {
@@ -136,10 +143,10 @@
       const from = dayStart(day)
       return { from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1) }
     }
-    if (effPeriod) {
+    if (period) {
       const now = new Date()
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const back = effPeriod === 'today' ? 0 : Number(effPeriod) - 1
+      const back = period === 'today' ? 0 : Number(period) - 1
       return { from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - back), to: null }
     }
     return { from: null, to: null }
@@ -153,10 +160,10 @@
     try {
       const { from, to } = range()
       const last = append ? rows[rows.length - 1] : null
-      const kinds = KIND_GROUPS.find((g) => g.id === effKindGroup)?.kinds ?? []
+      const kinds = KIND_GROUPS.find((g) => g.id === kindGroup)?.kinds ?? []
       const data = await getQuestLog({
         limit: PAGE,
-        entity_type: effEntity || 'all',
+        entity_type: entity || 'all',
         kind: kinds.join(','),
         questline_id: questlineId,
         category_id: categoryId,
@@ -180,7 +187,7 @@
 
   $effect(() => {
     if (!active) return
-    void [parsedSearch.text, effEntity, effKindGroup, effPeriod, entity, kindGroup, questlineId, categoryId, tagId, period, day, nonce]
+    void [parsedSearch.text, entity, kindGroup, questlineId, categoryId, tagId, period, day, nonce]
     syncUrl()
     // Typing in the search box shouldn't fire a request per keystroke.
     const t = setTimeout(() => load(false), search ? 250 : 0)
@@ -196,13 +203,6 @@
 
   function reset() {
     search = ''
-    entity = ''
-    kindGroup = ''
-    questlineId = ''
-    categoryId = ''
-    tagId = ''
-    period = ''
-    day = ''
   }
 
   /** @param {string} iso */
@@ -282,21 +282,21 @@
         placeholder="Поиск по названию и описанию события…"
         bind:value={search}
         aria-label="Поиск по истории"
-        title="Фильтры: flag:quest, flag:note, flag:attachment, flag:done, flag:created, flag:edited, flag:missed, flag:deleted, flag:today"
+        title={`Фильтры: ${helpLine(histSpec)}`}
       />
-      <select class="hist__select" bind:value={period} aria-label="Период">
+      <select class="hist__select" bind:value={() => period, (v) => put('when', v)} aria-label="Период">
         {#each PERIODS as p (p.id)}
           <option value={p.id}>{p.label}</option>
         {/each}
       </select>
-      <DateInput bind:value={day} label="Конкретный день" clearable />
+      <DateInput bind:value={() => day, (v) => put('day', v)} label="Конкретный день" clearable />
       {#if filtersOn}
         <button type="button" class="hist__reset" onclick={reset}>
           <Icon name="close" size={12} /> Сбросить
         </button>
       {/if}
     </div>
-    <FlagHints value={search} flags={HIST_FLAGS} parsed={parsedSearch} onPick={(v) => (search = v)} />
+    <FlagHints value={search} spec={histSpec} parsed={parsedSearch} onPick={(v) => (search = v)} />
     <div class="hist__row">
       <div class="hist__seg" role="group" aria-label="Что менялось">
         {#each ENTITIES as e (e.id)}
@@ -304,29 +304,29 @@
             type="button"
             class="hist__pill"
             class:hist__pill--on={entity === e.id}
-            onclick={() => (entity = e.id)}>{e.label}</button
+            onclick={() => put('type', e.id)}>{e.label}</button
           >
         {/each}
       </div>
-      <select class="hist__select" bind:value={kindGroup} aria-label="Вид события">
+      <select class="hist__select" bind:value={() => kindGroup, (v) => put('act', v)} aria-label="Вид события">
         {#each KIND_GROUPS as g (g.id)}
           <option value={g.id}>{g.label}</option>
         {/each}
       </select>
-      <select class="hist__select" bind:value={questlineId} aria-label="Квестлайн">
+      <select class="hist__select" bind:value={() => questlineId, (v) => put('line', v)} aria-label="Квестлайн">
         <option value="">Все квестлайны</option>
         {#each questlines as l (l.id)}
           <option value={String(l.id)}>{l.title}</option>
         {/each}
       </select>
-      <select class="hist__select" bind:value={categoryId} aria-label="Категория">
+      <select class="hist__select" bind:value={() => categoryId, (v) => put('cat', categories.find((c) => String(c.id) === v)?.slug ?? '')} aria-label="Категория">
         <option value="">Все категории</option>
         {#each categories as c (c.id)}
           <option value={String(c.id)}>{c.label}</option>
         {/each}
       </select>
       {#if tags.length}
-        <select class="hist__select" bind:value={tagId} aria-label="Тег">
+        <select class="hist__select" bind:value={() => tagId, (v) => put('tag', tags.find((t) => String(t.id) === v)?.slug ?? '')} aria-label="Тег">
           <option value="">Все теги</option>
           {#each tags as t (t.id)}
             <option value={String(t.id)}>{t.label || t.slug}</option>

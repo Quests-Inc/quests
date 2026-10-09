@@ -3,7 +3,7 @@
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { ENTITY_FLAGS, findEntities } from '../js/entityFlags.js'
+  import { ENTITY_SPEC, findEntities } from '../js/entityFlags.js'
 
   /** Search box over quests and notes; picks one existing entity.
    * @type {{
@@ -62,7 +62,7 @@
         if (e.key === 'Enter' && matches.length) pick(matches[0])
       }}
     />
-    <FlagHints value={query} flags={ENTITY_FLAGS} parsed={parsed} onPick={(v) => (query = v)} />
+    <FlagHints value={query} spec={ENTITY_SPEC} parsed={parsed} onPick={(v) => (query = v)} />
     <ul class="find__list">
       {#each matches as m (m.type + m.id)}
         <li>

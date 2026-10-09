@@ -2,7 +2,8 @@
   import { tick, untrack } from 'svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { ENTITY_FLAGS, findEntities } from '../js/entityFlags.js'
+  import { helpLine } from '../js/searchFlags.js'
+  import { ENTITY_SPEC, findEntities } from '../js/entityFlags.js'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'
@@ -2104,9 +2105,9 @@
         onfocus={() => (pickOpen = true)}
         onblur={() => setTimeout(() => (pickOpen = false), 150)}
         aria-label="Выбрать центр карты"
-        title="Фильтры: flag:quest, flag:note, flag:questline, flag:outdated, flag:pinned, flag:active, flag:done"
+        title={`Фильтры: ${helpLine(ENTITY_SPEC)}`}
       />
-      <FlagHints value={rootQuery} flags={ENTITY_FLAGS} parsed={rootParsed} onPick={(v) => (rootQuery = v)} />
+      <FlagHints value={rootQuery} spec={ENTITY_SPEC} parsed={rootParsed} onPick={(v) => (rootQuery = v)} />
       {#if pickOpen && matches.length}
         <ul class="graph__matches" role="listbox">
           {#each matches as m (m.type + m.id)}

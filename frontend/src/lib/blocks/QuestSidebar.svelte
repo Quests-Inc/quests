@@ -4,8 +4,7 @@
   import RefText from '../ui/RefText.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { parseFlagQuery } from '../js/searchFlags.js'
-  import { QUEST_FLAGS, QUEST_KEYS } from '../js/questFlags.js'
+  import { helpLine } from '../js/searchFlags.js'
   import {
     isQuestInactive,
     periodBadge,
@@ -26,6 +25,9 @@
    *   selectedId: number | null,
    *   searchQuery: string,
    *   showAllQuests: boolean,
+   *   onShowAll?: (on: boolean) => void,
+   *   querySpec: any,
+   *   parsedSearch: any,
    *   categoryOpen: Record<string, boolean>,
    *   lineOpen: Record<string, boolean>,
    *   nowMs: number,
@@ -55,7 +57,10 @@
     frozenOpen,
     selectedId,
     searchQuery = $bindable(''),
-    showAllQuests = $bindable(false),
+    showAllQuests = false,
+    onShowAll,
+    querySpec,
+    parsedSearch,
     categoryOpen,
     lineOpen,
     nowMs,
@@ -120,8 +125,6 @@
     })
   })
 
-  let parsedSearch = $derived(parseFlagQuery(searchQuery, QUEST_FLAGS, QUEST_KEYS))
-
   function isCategoryOpen(key) {
     return categoryOpen[key] !== false
   }
@@ -139,11 +142,11 @@
       placeholder="Поиск…"
       bind:value={searchQuery}
       aria-label="Поиск по названию, разделу, квестлайну, описанию, шагам"
-      title="Фильтры: flag:done, flag:overdue, flag:pinned, flag:automated, flag:deadline, flag:steps, flag:check, flag:overlay-hidden, sig:epic, tag:infra; -flag:… — без флага"
+      title={`Фильтры: ${helpLine(querySpec)}; -key:value — исключить`}
     />
-    <FlagHints value={searchQuery} flags={QUEST_FLAGS} parsed={parsedSearch} onPick={(v) => (searchQuery = v)} />
+    <FlagHints value={searchQuery} spec={querySpec} parsed={parsedSearch} onPick={(v) => (searchQuery = v)} />
     <label class="sidebar__filter">
-      <input type="checkbox" bind:checked={showAllQuests} />
+      <input type="checkbox" checked={showAllQuests} onchange={(e) => onShowAll?.(e.currentTarget.checked)} />
       <span>Показывать завершённые</span>
     </label>
     <div class="sidebar__scope">

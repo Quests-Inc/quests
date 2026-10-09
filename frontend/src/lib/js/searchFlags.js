@@ -1,65 +1,114 @@
-/** `flag:name` / `-flag:name` (and `key:value`) tokens in a search box: filters typed next to the words.
- *  parseFlagQuery('деплой flag:outdated -flag:private sig:epic', FLAGS, { sig: { test(item, v) {…} } })
- *    → { text: 'деплой', include: ['outdated'], exclude: ['private'], values: [{key:'sig', value:'epic', neg:false}], unknown: [] }
- *  A flag set is { name: { label, test(item) → boolean, aliases?: string[] } } — each widget brings its own.
- *  `keys` are value filters ({ test(item, value) → boolean, label }); a token with another key stays in the text. */
+/** Filters typed into a search box next to the words: `key:value` tokens, `-key:value` for "not".
+ *
+ *  A widget describes its vocabulary once (a spec) and uses the same query string as the single source of
+ *  truth: its selectors read their value from the query (`tokenValues`) and write back into it (`setToken`),
+ *  so a selector and the typed text never disagree.
+ *
+ *  spec = { key: { label, values?: [{ id, label, aliases? }], test(item, valueId) → boolean, all?: boolean } }
+ *   - `values` closes the vocabulary (an unknown value is reported); without it any value is accepted.
+ *   - several positive tokens of one key are alternatives (status:done status:failed), unless `all: true`
+ *     (flag:pinned flag:hidden need both). Negative tokens each exclude.
+ *   - a token whose key is not in the spec stays in the text (it may just be a word, "http:foo").
+ */
 
 const TOKEN = /(^|\s)(-?)([\p{L}]+):([^\s]*)/giu
 
-function resolve(flags, name) {
+function resolve(def, name) {
+  if (!def.values) return name
   const key = name.toLowerCase()
-  for (const [id, def] of Object.entries(flags)) {
-    if (id === key || def.aliases?.includes(key)) return id
+  for (const v of def.values) {
+    if (v.id.toLowerCase() === key || v.aliases?.includes(key)) return v.id
   }
   return null
 }
 
-export function parseFlagQuery(raw, flags, keys = {}) {
-  const include = []
-  const exclude = []
+/** → { text, terms: [{key, value, neg}], unknown: ['key:value'…], active } */
+export function parseQuery(raw, spec) {
+  const terms = []
   const unknown = []
-  const values = []
   const text = String(raw ?? '')
     .replace(TOKEN, (m, lead, neg, key, name) => {
       const k = key.toLowerCase()
-      if (k === 'flag' || k === 'f') {
-        const id = name ? resolve(flags, name) : null
-        if (id) (neg ? exclude : include).push(id)
-        else if (name) unknown.push(name)
-        return lead
-      }
-      if (keys[k] && name) {
-        values.push({ key: k, value: name, neg: !!neg })
-        return lead
-      }
-      return m
+      const def = spec[k]
+      if (!def) return m
+      if (!name) return m // `status:` being typed: keep it, it is not a filter yet
+      const id = resolve(def, name)
+      if (id == null) unknown.push(`${k}:${name}`)
+      else terms.push({ key: k, value: id, neg: !!neg })
+      return lead
     })
     .replace(/\s+/g, ' ')
     .trim()
-  return { text, include, exclude, values, unknown, active: include.length + exclude.length + values.length > 0 }
+  return { text, terms, unknown, active: terms.length > 0 }
+}
+
+/** The positive values of one key, in the order typed. */
+export function tokenValues(parsed, key) {
+  return parsed.terms.filter((t) => t.key === key && !t.neg).map((t) => t.value)
+}
+
+export function hasToken(parsed, key, value) {
+  return parsed.terms.some((t) => t.key === key && !t.neg && t.value === value)
 }
 
 /** Does the item pass every filter of the parsed query? */
-export function passesFlags(parsed, flags, item, keys = {}) {
-  if (!parsed.active) return true
-  for (const id of parsed.include) if (!flags[id].test(item)) return false
-  for (const id of parsed.exclude) if (flags[id].test(item)) return false
-  for (const v of parsed.values) if (keys[v.key].test(item, v.value) === v.neg) return false
+export function passes(parsed, spec, item) {
+  if (!parsed.terms.length) return true
+  const byKey = new Map()
+  for (const t of parsed.terms) {
+    const def = spec[t.key]
+    if (t.neg) {
+      if (def.test(item, t.value)) return false
+    } else {
+      if (!byKey.has(t.key)) byKey.set(t.key, [])
+      byKey.get(t.key).push(t.value)
+    }
+  }
+  for (const [key, vals] of byKey) {
+    const def = spec[key]
+    const ok = def.all ? vals.every((v) => def.test(item, v)) : vals.some((v) => def.test(item, v))
+    if (!ok) return false
+  }
   return true
 }
 
-/** The flag names to offer while the caret sits in an unfinished `flag:…` token (null = nothing to offer). */
-export function flagSuggestions(raw, flags) {
-  const m = /(^|\s)(-?)(?:flag|f):([^\s]*)$/iu.exec(String(raw ?? ''))
-  if (!m) return null
-  const part = m[3].toLowerCase()
-  const out = Object.entries(flags)
-    .filter(([id, d]) => !part || id.startsWith(part) || d.aliases?.some((a) => a.startsWith(part)))
-    .map(([id, d]) => ({ id, label: d.label }))
-  return out.length ? { neg: m[2] === '-', part: m[3], items: out } : null
+/** Rewrite the query so that `key` has exactly these positive values (none removes the key's tokens).
+ *  Negative tokens of the key are kept. Free text and other tokens are untouched. */
+export function setToken(raw, key, values) {
+  const list = (values ?? []).filter((v) => v !== '' && v != null)
+  const kept = String(raw ?? '')
+    .replace(TOKEN, (m, lead, neg, k, name) => (!neg && k.toLowerCase() === key && name ? lead : m))
+    .replace(/\s+/g, ' ')
+    .trim()
+  const add = list.map((v) => `${key}:${v}`).join(' ')
+  return [kept, add].filter(Boolean).join(' ') + (add ? ' ' : '')
 }
 
-/** The query with its unfinished flag token completed to `name`. */
-export function completeFlag(raw, name, neg) {
-  return String(raw ?? '').replace(/(^|\s)(-?)(?:flag|f):([^\s]*)$/iu, `$1${neg ? '-' : ''}flag:${name} `)
+/** Toggle one value of a key on/off in the query. */
+export function toggleToken(raw, parsed, key, value) {
+  const cur = tokenValues(parsed, key)
+  return setToken(raw, key, cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value])
+}
+
+/** Values to offer while the caret sits in an unfinished `key:part` token (null = nothing to offer). */
+export function suggestions(raw, spec) {
+  const m = /(^|\s)(-?)([\p{L}]+):([^\s]*)$/iu.exec(String(raw ?? ''))
+  if (!m) return null
+  const def = spec[m[3].toLowerCase()]
+  if (!def?.values) return null
+  const part = m[4].toLowerCase()
+  const items = def.values.filter((v) => !part || v.id.toLowerCase().startsWith(part) || v.aliases?.some((a) => a.startsWith(part)))
+  return items.length ? { key: m[3].toLowerCase(), neg: m[2] === '-', items } : null
+}
+
+/** The query with its unfinished token completed to `value`. */
+export function completeToken(raw, key, value, neg) {
+  return String(raw ?? '').replace(/(^|\s)(-?)([\p{L}]+):([^\s]*)$/iu, `$1${neg ? '-' : ''}${key}:${value} `)
+}
+
+/** "key:a|b" help line for a title attribute. */
+export function helpLine(spec) {
+  return Object.entries(spec)
+    .map(([k, d]) => `${k}:${d.values ? d.values.map((v) => v.id).join('|') : d.hint || '…'}`)
+    .join('  ')
 }

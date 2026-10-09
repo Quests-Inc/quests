@@ -11,7 +11,7 @@
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
   import NoteCheck from '../ui/NoteCheck.svelte'
   import NoteFind from '../ui/NoteFind.svelte'
-  import { parseFlagQuery, passesFlags } from '../js/searchFlags.js'
+  import { parseQuery, passes, helpLine } from '../js/searchFlags.js'
   import FlagHints from '../ui/FlagHints.svelte'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.js'
@@ -134,18 +134,26 @@
       isCategory !== saved.isCategory,
   )
 
-  /** Filters typed into the search box as `flag:name` (`-flag:name` = without it). */
-  const NOTE_FLAGS = {
-    outdated: { label: 'устарела', test: (n) => !!n.outdated, aliases: ['stale'] },
-    readme: { label: 'README', test: (n) => !!n.is_readme },
-    private: { label: 'PRIVATE', test: (n) => !!n.is_private },
-    category: { label: 'CATEGORY', test: (n) => !!n.is_category },
-    pinned: { label: 'закреплена', test: (n) => !!n.pinned, aliases: ['pin'] },
-    check: { label: 'есть проверка актуальности', test: (n) => !!n.has_check },
+  /** Filters typed into the search box: `flag:name` (`-flag:name` = without it). */
+  const NOTE_SPEC = {
+    flag: {
+      label: 'флаг',
+      all: true,
+      values: [
+        { id: 'outdated', label: 'устарела', aliases: ['stale'] },
+        { id: 'readme', label: 'README' },
+        { id: 'private', label: 'PRIVATE' },
+        { id: 'category', label: 'CATEGORY' },
+        { id: 'pinned', label: 'закреплена', aliases: ['pin'] },
+        { id: 'check', label: 'есть проверка актуальности' },
+      ],
+      test: (n, v) =>
+        ({ outdated: !!n.outdated, readme: !!n.is_readme, private: !!n.is_private, category: !!n.is_category, pinned: !!n.pinned, check: !!n.has_check })[v],
+    },
   }
-  let parsedSearch = $derived(parseFlagQuery(search, NOTE_FLAGS))
+  let parsedSearch = $derived(parseQuery(search, NOTE_SPEC))
   let searchText = $derived(parsedSearch.text)
-  const flagOk = (n) => passesFlags(parsedSearch, NOTE_FLAGS, n)
+  const flagOk = (n) => passes(parsedSearch, NOTE_SPEC, n)
 
   let filtered = $derived.by(() => {
     const q = searchText.toLowerCase()
@@ -1322,7 +1330,7 @@
         class="search"
         type="search"
         placeholder="Поиск…"
-        title="Фильтры по флагам: flag:outdated, flag:readme, flag:private, flag:category, flag:pinned, flag:check; -flag:… — без флага"
+        title={`Фильтры: ${helpLine(NOTE_SPEC)}; -flag:… — без флага`}
         bind:value={search}
       />
       <button
@@ -1334,7 +1342,7 @@
         +
       </button>
     </div>
-    <div class="notes__flaghints"><FlagHints value={search} flags={NOTE_FLAGS} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
+    <div class="notes__flaghints"><FlagHints value={search} spec={NOTE_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
     <div
       class="notes__list"
       data-nav-root

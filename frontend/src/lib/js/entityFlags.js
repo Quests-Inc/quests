@@ -1,20 +1,41 @@
-import { parseFlagQuery, passesFlags } from './searchFlags.js'
+import { parseQuery, passes } from './searchFlags.js'
 
-/** Flags for pickers that search quests, notes and questlines together (map centre, «insert a link»).
+/** What pickers that search quests, notes and questlines together understand (map centre, «insert a link»).
  *  An item is { type: 'quest' | 'note' | 'questline', x: <the entity> }. */
-export const ENTITY_FLAGS = {
-  quest: { label: 'квесты', test: (i) => i.type === 'quest' },
-  note: { label: 'заметки', test: (i) => i.type === 'note' },
-  questline: { label: 'квестлайны', test: (i) => i.type === 'questline' },
-  outdated: { label: 'заметка устарела', test: (i) => i.type === 'note' && !!i.x.outdated, aliases: ['stale'] },
-  pinned: { label: 'закреплено', test: (i) => !!i.x.pinned, aliases: ['pin'] },
-  active: { label: 'квест в работе', test: (i) => i.type === 'quest' && i.x.status === 'active' },
-  done: { label: 'квест выполнен', test: (i) => i.type === 'quest' && i.x.status === 'completed', aliases: ['completed'] },
+export const ENTITY_SPEC = {
+  type: {
+    label: 'вид',
+    values: [
+      { id: 'quest', label: 'квесты' },
+      { id: 'note', label: 'заметки' },
+      { id: 'questline', label: 'квестлайны' },
+    ],
+    test: (i, v) => i.type === v,
+  },
+  flag: {
+    label: 'флаг',
+    all: true,
+    values: [
+      { id: 'outdated', label: 'заметка устарела', aliases: ['stale'] },
+      { id: 'pinned', label: 'закреплено', aliases: ['pin'] },
+    ],
+    test: (i, v) => (v === 'outdated' ? i.type === 'note' && !!i.x.outdated : !!i.x.pinned),
+  },
+  status: {
+    label: 'статус квеста',
+    values: [
+      { id: 'active', label: 'в работе' },
+      { id: 'done', label: 'выполнен', aliases: ['completed'] },
+      { id: 'failed', label: 'провален' },
+      { id: 'frozen', label: 'заморожен' },
+    ],
+    test: (i, v) => i.type === 'quest' && i.x.status === (v === 'done' ? 'completed' : v),
+  },
 }
 
-/** Quests, notes and questlines matching the words and `flag:` filters of `raw` (title or `type=id`). */
+/** Quests, notes and questlines matching the words and filters of `raw` (title or `type=id`). */
 export function findEntities(raw, { questlines = [], quests = [], notes = [], types = ['questline', 'quest', 'note'], limit = 50 }) {
-  const parsed = parseFlagQuery(raw, ENTITY_FLAGS)
+  const parsed = parseQuery(raw, ENTITY_SPEC)
   const q = parsed.text.toLowerCase()
   if (!q && !parsed.active) return { parsed, items: [] }
   const items = []
@@ -22,7 +43,7 @@ export function findEntities(raw, { questlines = [], quests = [], notes = [], ty
     if (!types.includes(type)) return
     for (const x of list) {
       const item = { type, x }
-      if (!passesFlags(parsed, ENTITY_FLAGS, item)) continue
+      if (!passes(parsed, ENTITY_SPEC, item)) continue
       if (q && !((x.title || '').toLowerCase().includes(q) || `${type}=${x.id}` === q)) continue
       items.push({ type, id: x.id, title: x.title })
       if (items.length >= limit) return

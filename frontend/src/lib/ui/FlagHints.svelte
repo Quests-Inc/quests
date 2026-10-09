@@ -1,22 +1,22 @@
 <script>
-  import { flagSuggestions, completeFlag } from '../js/searchFlags.js'
+  import { suggestions, completeToken } from '../js/searchFlags.js'
 
-  /** Chips under a search box while a `flag:…` token is being typed, and a warning for an unknown flag.
-   * @type {{ value: string, flags: Record<string, any>, parsed: { unknown: string[] }, onPick: (next: string) => void }} */
-  let { value, flags, parsed, onPick } = $props()
-  let hints = $derived(flagSuggestions(value, flags))
+  /** Chips under a search box while a `key:…` token is being typed, and a warning for an unknown value.
+   * @type {{ value: string, spec: Record<string, any>, parsed: { unknown: string[] }, onPick: (next: string) => void }} */
+  let { value, spec, parsed, onPick } = $props()
+  let hints = $derived(suggestions(value, spec))
 </script>
 
 {#if hints || parsed.unknown.length}
-  <div class="fh" role="listbox" aria-label="Флаги">
+  <div class="fh" role="listbox" aria-label="Фильтры">
     {#if hints}
       {#each hints.items as f (f.id)}
-        <button type="button" class="fh__chip" onclick={() => onPick(completeFlag(value, f.id, hints.neg))}>
-          {hints.neg ? '-' : ''}flag:{f.id}<span>{f.label}</span>
+        <button type="button" class="fh__chip" onclick={() => onPick(completeToken(value, hints.key, f.id, hints.neg))}>
+          {hints.neg ? '-' : ''}{hints.key}:{f.id}<span>{f.label}</span>
         </button>
       {/each}
     {:else}
-      <span class="fh__warn">Неизвестный флаг: {parsed.unknown.join(', ')}</span>
+      <span class="fh__warn">Не понимаю: {parsed.unknown.join(', ')}</span>
     {/if}
   </div>
 {/if}
