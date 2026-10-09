@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -22,6 +21,24 @@ type Settings struct {
 	Timeout     time.Duration
 	Temperature float64
 	Proxy       string
+	// Untrusted marks settings an account owner typed in: their endpoint is held to the
+	// public internet (see clientFor). The operator's own environment is trusted.
+	Untrusted bool
+}
+
+// WithUser returns the settings for one account's provider choice: the preset (or custom)
+// endpoint with the operator's timeout/proxy defaults and the account's key.
+func (s Settings) WithUser(provider, baseURL, model, apiKey string) Settings {
+	out := s
+	out.Provider, out.APIKey, out.Untrusted = provider, apiKey, true
+	if p, ok := ProviderByID(provider); ok {
+		out.BaseURL = p.BaseURL
+		if p.EditableBase {
+			out.BaseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+		}
+		out.Model = firstNonEmpty(model, p.DefaultModel)
+	}
+	return out
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -77,11 +94,11 @@ func llmErrf(format string, a ...any) error {
 // parses the result into an ActionBatch. No agentic tool-calling loop —
 // one request, one structured answer, same as the quest-draft path.
 func ExtractActionBatch(ctx context.Context, settings Settings, text string, pc PromptContext) (ActionBatch, error) {
-	if settings.Provider != "groq" {
-		return ActionBatch{}, llmErrf("action-batch извлечение поддерживается только через Groq (provider=%q)", settings.Provider)
-	}
 	if settings.APIKey == "" {
-		return ActionBatch{}, llmErrf("нужен GROQ_API_KEY или QUESTS_GROQ_API_KEY (console.groq.com → API Keys)")
+		return ActionBatch{}, llmErrf("нужен ключ LLM: задайте провайдера и ключ в «Настройки → Ассистент»")
+	}
+	if settings.BaseURL == "" || settings.Model == "" {
+		return ActionBatch{}, llmErrf("не задан адрес или модель провайдера")
 	}
 
 	payload := map[string]any{
@@ -91,6 +108,7 @@ func ExtractActionBatch(ctx context.Context, settings Settings, text string, pc 
 			{"role": "user", "content": strings.TrimSpace(text)},
 		},
 		"temperature": settings.Temperature,
+		"max_tokens":  8000,
 		"response_format": map[string]any{
 			"type": "json_schema",
 			"json_schema": map[string]any{
@@ -115,29 +133,23 @@ func ExtractActionBatch(ctx context.Context, settings Settings, text string, pc 
 	// some regions, same reason the old Python client set this.
 	req.Header.Set("User-Agent", "quests-bot/1.0")
 
-	client := &http.Client{Timeout: settings.Timeout}
-	if settings.Proxy != "" {
-		proxyURL, perr := url.Parse(settings.Proxy)
-		if perr == nil {
-			client.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
-		}
-	}
-
-	resp, err := client.Do(req)
+	resp, err := clientFor(settings).Do(req)
 	if err != nil {
-		return ActionBatch{}, llmErrf("не удалось связаться с Groq: %v", err)
+		return ActionBatch{}, llmErrf("не удалось связаться с провайдером: %v", err)
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
 		return ActionBatch{}, err
 	}
 	if resp.StatusCode >= 400 {
 		detail := string(raw)
-		if len(detail) > 400 {
+		if settings.Untrusted {
+			detail = "" // a user-chosen endpoint's body is not echoed back
+		} else if len(detail) > 400 {
 			detail = detail[:400]
 		}
-		return ActionBatch{}, llmErrf("Groq HTTP %d: %s", resp.StatusCode, detail)
+		return ActionBatch{}, llmErrf("провайдер ответил HTTP %d %s", resp.StatusCode, detail)
 	}
 
 	var parsed struct {
@@ -148,7 +160,7 @@ func ExtractActionBatch(ctx context.Context, settings Settings, text string, pc 
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(raw, &parsed); err != nil || len(parsed.Choices) == 0 {
-		return ActionBatch{}, llmErrf("пустой ответ Groq: %s", truncate(string(raw), 300))
+		return ActionBatch{}, llmErrf("пустой ответ провайдера: %s", truncate(string(raw), 300))
 	}
 	return parseActionBatch(parsed.Choices[0].Message.Content)
 }

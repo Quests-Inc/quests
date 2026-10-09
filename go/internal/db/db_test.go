@@ -18,7 +18,14 @@ func TestCheckAlembicVersionMatch(t *testing.T) {
 }
 
 func TestCheckAlembicVersionOlderFails(t *testing.T) {
-	older := alembicOrder[len(alembicOrder)-6]
+	// The revision just before the SQLite head: every new PostgreSQL revision is appended after
+	// it, so counting from the end of alembicOrder would break with each migration.
+	older := ""
+	for i, id := range alembicOrder {
+		if id == expectedAlembicSQLite {
+			older = alembicOrder[i-1]
+		}
+	}
 	_, err := checkAlembicVersion(older)
 	if err == nil {
 		t.Fatal("expected error for older alembic")
@@ -99,7 +106,14 @@ func TestOpenAcceptsCurrentAndRejectsOlder(t *testing.T) {
 		t.Fatalf("ahead state=%q", st.State)
 	}
 
-	older := alembicOrder[len(alembicOrder)-6]
+	// The revision just before the SQLite head: every new PostgreSQL revision is appended after
+	// it, so counting from the end of alembicOrder would break with each migration.
+	older := ""
+	for i, id := range alembicOrder {
+		if id == expectedAlembicSQLite {
+			older = alembicOrder[i-1]
+		}
+	}
 	seed(older)
 	if _, _, err := Open(path); err == nil {
 		t.Fatal("older db must fail open")

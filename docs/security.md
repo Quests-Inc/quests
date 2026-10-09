@@ -32,6 +32,20 @@ you add from the host (`quests-server workspace trust`), and **no invitations**:
   after 10 recent failures (a stall, not a lockout), at most 4 concurrent hashes; logins are `[a-z0-9._-]{2,32}`;
   a password change ends all sessions.
 
+## The assistant's LLM key (quest=356)
+
+The text → quests assistant runs on the **account's own provider and key** (Settings → Ассистент): Groq, OpenAI,
+OpenRouter or any OpenAI-compatible HTTPS endpoint. The key is stored sealed (AES-256-GCM, `go/internal/secretbox`;
+key from `QUESTS_SECRET_KEY` or generated once into `data/secret.key`, mode 0600 — **keep that file with the data
+volume; without it saved keys cannot be opened and are simply re-entered**), shown back only as a hint (`…a1b2`),
+and changed only from a browser session (not with an API token).
+
+- A user-typed endpoint must be `https` and resolve to public addresses only (no loopback, LAN, link-local/metadata,
+  CGNAT); the connection itself refuses internal addresses and redirects are not followed, and the provider's reply
+  body is not echoed back. Otherwise the field would be a server-side request forgery.
+- Accounts without a key get the server's key (`QUESTS_GROQ_API_KEY`) only if they are the operator, or the operator set
+  `QUESTS_LLM_SHARED=1`; everyone else is told to add their own. 20 requests / 10 min and 8000 characters per request.
+
 ## Re-check after changes
 
 ```bash

@@ -19,6 +19,7 @@ import (
 	"github.com/valirum/quests/go/internal/health"
 	"github.com/valirum/quests/go/internal/metrics"
 	"github.com/valirum/quests/go/internal/refs"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
 	"github.com/valirum/quests/go/internal/webdav"
@@ -64,6 +65,8 @@ type Server struct {
 	ClamAV *clamav.Client
 	// MaxUploadBytes caps a single attachment.
 	MaxUploadBytes int64
+	// Secrets seals what is stored for an account (its LLM key). Nil = nothing can be stored.
+	Secrets *secretbox.Box
 }
 
 func (s *Server) Handler() http.Handler {
@@ -130,6 +133,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerParity(mux)
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
+	s.registerLLMSettings(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
 	s.registerWorkspaces(mux)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,19 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "text is required")
 		return
 	}
+	if len([]rune(text)) > maxAssistantText {
+		writeErr(w, http.StatusRequestEntityTooLarge, "текст длиннее "+strconv.Itoa(maxAssistantText)+" символов")
+		return
+	}
+	settings, _, serr := s.llmSettingsFor(r.Context(), r)
+	if serr != nil {
+		writeErr(w, http.StatusConflict, serr.Error())
+		return
+	}
+	if p, ok := PrincipalFrom(r.Context()); ok && !s.limiter().tryLLM(strconv.FormatInt(p.User.ID, 10)+p.TokenName) {
+		writeErr(w, http.StatusTooManyRequests, "слишком много запросов к ассистенту, повторите позже")
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
 	defer cancel()
@@ -52,7 +66,6 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 	pc := llmassist.DefaultPromptContext(hints)
 	pc.NoClarify = body.NoClarify
 
-	settings := llmassist.LoadSettings()
 	batch, err := llmassist.ExtractActionBatch(ctx, settings, text, pc)
 	if err != nil {
 		// "detail" (not "error") — that's the key api.js's request() reads

@@ -21,6 +21,8 @@ type loginLimiter struct {
 	// byUser counts recent failures per login name, from anywhere: the per-IP throttle
 	// does not stop a guesser who rotates addresses (or a header).
 	byUser map[string][]time.Time
+	// llm counts assistant requests per account (each one is a paid call somewhere).
+	llm map[string][]time.Time
 	// slots bounds concurrent password hashing: every attempt costs ~100ms of CPU.
 	slots chan struct{}
 }
@@ -41,6 +43,7 @@ func newLoginLimiter() *loginLimiter {
 		attempts: make(map[string]*loginAttempts),
 		invites:  make(map[string][]time.Time),
 		byUser:   make(map[string][]time.Time),
+		llm:      make(map[string][]time.Time),
 		slots:    make(chan struct{}, 4),
 	}
 }
@@ -50,6 +53,30 @@ const (
 	userFreeFails  = 10
 	userMaxPenalty = 5 * time.Second
 )
+
+const (
+	llmWindow = 10 * time.Minute
+	llmMax    = 20
+)
+
+// tryLLM counts one assistant request from key and reports whether it is within budget.
+func (l *loginLimiter) tryLLM(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	recent := l.llm[key][:0]
+	for _, t := range l.llm[key] {
+		if now.Sub(t) < llmWindow {
+			recent = append(recent, t)
+		}
+	}
+	if len(recent) >= llmMax {
+		l.llm[key] = recent
+		return false
+	}
+	l.llm[key] = append(recent, now)
+	return true
+}
 
 // acquire takes a hashing slot; false means the server is busy hashing already.
 func (l *loginLimiter) acquire() bool {

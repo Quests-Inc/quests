@@ -15,7 +15,7 @@ import (
 // expectedAlembic is the PostgreSQL schema revision this binary was built
 // against (head of alembic/versions_pg). Append new ids to alembicOrder when
 // adding migrations. The SQLite chain is frozen at expectedAlembicSQLite.
-const expectedAlembic = "f1b4d6c8e2a5"
+const expectedAlembic = "a4c6e8b0d2f1"
 
 // expectedAlembicSQLite is the head of the legacy SQLite chain (alembic/versions).
 const expectedAlembicSQLite = "1a2b3c4d5e6f"
@@ -67,6 +67,7 @@ var alembicOrder = []string{
 	"d8f2b4a6c1e3",
 	"e9a3c5b7d1f4",
 	"f1b4d6c8e2a5",
+	"a4c6e8b0d2f1",
 }
 
 // SchemaStatus is the alembic check outcome for health probes / logs.

@@ -19,6 +19,7 @@ import (
 	"github.com/valirum/quests/go/internal/httpapi"
 	"github.com/valirum/quests/go/internal/metrics"
 	"github.com/valirum/quests/go/internal/schedule"
+	"github.com/valirum/quests/go/internal/secretbox"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
 )
@@ -69,6 +70,11 @@ func main() {
 		log.Fatalf("auth: %v", err)
 	}
 
+	secrets, err := secretbox.Load(cfg.DataDir)
+	if err != nil {
+		log.Fatalf("secrets: %v", err)
+	}
+
 	hub := events.New()
 	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
 	reg := health.New()
@@ -91,6 +97,7 @@ func main() {
 		WebDAV:         webdav.New(cfg.WebDAVURL, cfg.WebDAVUser, cfg.WebDAVPass),
 		ClamAV:         clamav.New(cfg.ClamAVAddr),
 		MaxUploadBytes: cfg.MaxUploadBytes,
+		Secrets:        secrets,
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

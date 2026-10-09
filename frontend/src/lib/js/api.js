@@ -814,3 +814,22 @@ export function getRunnerJobs(f = {}) {
 export function cancelRunnerJob(id) {
   return request(`/api/runner-jobs/${id}/cancel`, { method: 'POST' })
 }
+
+/** The account's assistant provider/key state (the key itself never comes back, only a hint). */
+export function getMyLLM() {
+  return request('/api/me/llm')
+}
+
+/** Save provider, address, model and (when typed) the key. An empty `api_key` keeps the stored one. */
+export function saveMyLLM(form) {
+  return request('/api/me/llm', { method: 'PUT', body: JSON.stringify(form) })
+}
+
+export function deleteMyLLM() {
+  return request('/api/me/llm', { method: 'DELETE' })
+}
+
+/** Does this provider/key answer? Uses the typed key, else the stored one. */
+export function testMyLLM(form) {
+  return request('/api/me/llm/test', { method: 'POST', body: JSON.stringify(form) })
+}

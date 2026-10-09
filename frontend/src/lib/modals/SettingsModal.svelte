@@ -8,6 +8,7 @@
   import ArchiveSection from './settings/ArchiveSection.svelte'
   import AccountSection from './settings/AccountSection.svelte'
   import ConnectionsSection from './settings/ConnectionsSection.svelte'
+  import AssistantSection from './settings/AssistantSection.svelte'
   import { wsx, loadWorkspaceState } from './settings/workspaceState.svelte.js'
 
   /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
@@ -32,7 +33,7 @@
           { id: 'archive', label: 'Архив' },
         ]
       : []),
-    ...(onLogout ? [{ id: 'connections', label: 'Подключения' }, { id: 'account', label: 'Аккаунт' }] : []),
+    ...(onLogout ? [{ id: 'assistant', label: 'Ассистент' }, { id: 'connections', label: 'Подключения' }, { id: 'account', label: 'Аккаунт' }] : []),
   ])
 
   let active = $state('services')
@@ -86,6 +87,8 @@
           <WorkspaceSection {username} />
         {:else if active === 'archive'}
           <ArchiveSection />
+        {:else if active === 'assistant' && onLogout}
+          <AssistantSection />
         {:else if active === 'connections' && onLogout}
           <ConnectionsSection />
         {:else if active === 'account' && onLogout}
