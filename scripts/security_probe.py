@@ -164,6 +164,20 @@ def main() -> int:
     c, r, _ = owner.req("PUT", f"/api/quests/{vid}/secrets/LD_PRELOAD", {"value": "x"})
     check("reserved secret names are refused", c == 422, str(c))
 
+    # 5b. A note's freshness check is a command like a step's: same rules.
+    c, enote, _ = evil.req("POST", "/api/notes", {"title": "probe note"})
+    nid = enote["id"] if c == 201 else 0
+    c, r, _ = evil.req("PUT", f"/api/notes/{nid}/check", {"command": "echo 1", "run_on": "lab"})
+    check("member cannot set a note's check command", c == 403, str(c))
+    c, r, _ = evil.req("PUT", f"/api/notes/{nid}/secrets/API_KEY", {"value": "x" * 8})
+    check("member cannot set a note's secret", c == 403, str(c))
+    owner.req("POST", f"/api/workspaces/{ws['id']}/switch")
+    c, r, _ = owner.req("PUT", f"/api/notes/{nid}/check", {"command": "echo 1"})
+    check("a note's check cannot run on the server of an untrusted workspace", c == 403, str(c))
+    c, r, _ = owner.req("PUT", f"/api/notes/{nid}/check", {"command": "echo 0", "run_on": "lab"})
+    check("a note's check on a runner is accepted for an owner", c == 200, str(c))
+    owner.req("POST", "/api/workspaces/1/switch")
+
     # 6. Accounts and sessions.
     c, inv2, _ = owner.req("POST", f"/api/workspaces/{ws['id']}/invites")
     c, r, _ = Client(a.base).req("POST", f"/api/invites/{inv2['token']}/accept",

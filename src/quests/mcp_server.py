@@ -1173,6 +1173,7 @@ _SECRET_OWNERS = {
     "template": "templates",
     "quest": "quests",
     "step": "steps",
+    "note": "notes",
 }
 
 
@@ -1189,7 +1190,7 @@ def _secret_owner_path(owner: str) -> str:
 @server.tool(
     description=(
         "Secret *names* for an owner, never values (GET /api/{kind}s/{id}/secrets). "
-        "owner is 'questline=N' | 'template=N' | 'quest=N' | 'step=N'. Returns "
+        "owner is 'questline=N' | 'template=N' | 'quest=N' | 'step=N' | 'note=N' (a note's secrets are its own, not inherited). Returns "
         "{keys: set directly on the owner, inherited: [{key, from, id}] coming from "
         "a more general owner}. Secrets are inherited step > quest > template > "
         "questline: a step's check_command and a template's emit_pool_command get them "
@@ -1203,7 +1204,7 @@ def list_secrets(owner: str) -> dict[str, Any]:
 @server.tool(
     description=(
         "Set (or overwrite) one secret on an owner (PUT /api/{kind}s/{id}/secrets/{key}); "
-        "owner is 'questline=N' | 'template=N' | 'quest=N' | 'step=N'. Write-only: the "
+        "owner is 'questline=N' | 'template=N' | 'quest=N' | 'step=N' | 'note=N' (a note's secrets are its own, not inherited). Write-only: the "
         "value is never readable again. key must be an env var name "
         "([A-Za-z_][A-Za-z0-9_]*). Everything below the owner inherits it (questline → "
         "its quests and templates → their steps); a more specific owner overrides a "
@@ -1218,7 +1219,7 @@ def set_secret(owner: str, key: str, value: str) -> dict[str, Any]:
 
 
 @server.tool(
-    description="Remove one secret from an owner ('questline=N' | 'template=N' | 'quest=N' | 'step=N')."
+    description="Remove one secret from an owner ('questline=N' | 'template=N' | 'quest=N' | 'step=N' | 'note=N')."
 )
 def delete_secret(owner: str, key: str) -> dict[str, Any]:
     _api("DELETE", f"{_secret_owner_path(owner)}/{urllib.parse.quote(key, safe='')}")
@@ -1530,6 +1531,42 @@ def list_notes(
         under = {n["id"] for n in _note_descendants(everything, int(category_id))}
         rows = [n for n in rows if n["id"] in under]
     return [_note_brief(n) for n in rows] if brief else rows
+
+
+@server.tool(
+    description=(
+        "Give a note a freshness check, or remove it (empty command). The command runs like a step's "
+        "check: on the server in a trusted workspace, or on a runner (run_on = runner label), with the "
+        "note's own secrets in its environment, every interval_seconds (default 3600, minimum 15). It must "
+        "print 0 or 1 on its last line (1 = the note is out of date) or JSON {\"outdated\": 0|1, "
+        "\"reason\": \"…\"}. A broken run is recorded as an error and leaves the verdict alone. The command "
+        "keeps its own baseline: typically a marker in the note's text (`<!-- verified: abc1234 -->`) "
+        "compared with `git log -1 --format=%h -- <path>`; $QUESTS_NOTE_ID is set. Only workspace owners "
+        "may set a command. After you update a note, bring the marker up to date and call check_note_now."
+    )
+)
+def set_note_check(
+    note_id: int,
+    command: str | None = None,
+    interval_seconds: int | None = None,
+    run_on: str | None = None,
+) -> dict[str, Any]:
+    return _api(
+        "PUT",
+        f"/api/notes/{int(note_id)}/check",
+        body={"command": command, "interval_seconds": interval_seconds, "run_on": run_on},
+    )
+
+
+@server.tool(
+    description=(
+        "Run a note's freshness check at the next scheduler tick (within ~15 s) instead of waiting for "
+        "its interval. The verdict shows in get_note_context / list_notes (`outdated`, `outdated_reason`, "
+        "`check.error`)."
+    )
+)
+def check_note_now(note_id: int) -> dict[str, Any]:
+    return _api("POST", f"/api/notes/{int(note_id)}/check/run")
 
 
 @server.tool(

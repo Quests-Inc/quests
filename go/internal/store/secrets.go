@@ -25,6 +25,8 @@ const (
 	SecretOwnerTemplate  = "template"
 	SecretOwnerQuest     = "quest"
 	SecretOwnerStep      = "step"
+	// A note's secrets are its own: no chain to a parent (it may refer to things, it does not depend on them).
+	SecretOwnerNote = "note"
 )
 
 // SecretOwner identifies what a secret is attached to.
@@ -51,6 +53,8 @@ func (o SecretOwner) column() (string, error) {
 		return "quest_id", nil
 	case SecretOwnerStep:
 		return "step_id", nil
+	case SecretOwnerNote:
+		return "note_id", nil
 	}
 	return "", fmt.Errorf("%w: %q", errBadSecretOwner, o.Kind)
 }
@@ -67,6 +71,8 @@ func (s *Store) SecretOwnerExists(ctx context.Context, o SecretOwner) (bool, err
 		table = "quest"
 	case SecretOwnerStep:
 		table = "queststep"
+	case SecretOwnerNote:
+		table = "note"
 	default:
 		return false, fmt.Errorf("%w: %q", errBadSecretOwner, o.Kind)
 	}
@@ -209,7 +215,7 @@ func (s *Store) DeleteSecret(ctx context.Context, o SecretOwner, key string) err
 func (s *Store) secretChain(ctx context.Context, o SecretOwner) ([]SecretOwner, error) {
 	var questlineID, templateID, questID sql.NullInt64
 	switch o.Kind {
-	case SecretOwnerQuestline:
+	case SecretOwnerQuestline, SecretOwnerNote:
 		return []SecretOwner{o}, nil
 	case SecretOwnerTemplate:
 		err := s.DB.QueryRowContext(ctx, `SELECT questline_id FROM questtemplate WHERE id = ?`, o.ID).Scan(&questlineID)

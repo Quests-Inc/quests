@@ -83,7 +83,7 @@ func runAdmin(args []string) bool {
 	}
 
 	if args[0] == "runner" {
-		runRunnerCmd(&store.Store{DB: sqlDB}, args[1:])
+		runRunnerCmd(&store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}, args[1:])
 		return true
 	}
 

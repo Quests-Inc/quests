@@ -41,6 +41,7 @@ type job struct {
 	QuestID        *int64            `json:"quest_id"`
 	StepID         *int64            `json:"step_id"`
 	TemplateID     *int64            `json:"template_id"`
+	NoteID         *int64            `json:"note_id"`
 	Env            map[string]string `json:"env"`
 }
 

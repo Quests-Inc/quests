@@ -105,6 +105,9 @@ func (a *agent) execute(ctx context.Context, j *job) {
 	if j.StepID != nil {
 		env["QUESTS_STEP_ID"] = fmt.Sprint(*j.StepID)
 	}
+	if j.NoteID != nil {
+		env["QUESTS_NOTE_ID"] = fmt.Sprint(*j.NoteID)
+	}
 	if a.cfg.Server != "" {
 		env["QUESTS_API"] = a.cfg.Server
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -752,4 +753,10 @@ func emitLimitsColumn(v any) (any, error) {
 		return nil, err
 	}
 	return raw, nil
+}
+
+// IsBadInput reports whether err is a validation message meant for the caller (HTTP 422).
+func IsBadInput(err error) bool {
+	var b badInput
+	return errors.As(err, &b)
 }

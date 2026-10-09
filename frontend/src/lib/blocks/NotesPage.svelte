@@ -8,6 +8,7 @@
     searchNotes,
   } from '../js/api.js'
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
+  import NoteCheck from '../ui/NoteCheck.svelte'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.js'
   import {
@@ -41,6 +42,7 @@
    *   onSelect: (id: number | null) => void,
    *   onChanged: () => void,
    *   onRef?: (kind: string, id: number) => void,
+   *   onOpenSecrets?: (id: number) => void,
    * }} */
   let {
     notes = [],
@@ -53,6 +55,7 @@
     onSelect,
     onChanged,
     onRef,
+    onOpenSecrets,
   } = $props()
 
   let search = $state('')
@@ -127,9 +130,15 @@
       isCategory !== saved.isCategory,
   )
 
+  /** Notes whose own check says they are out of date (quest=370). */
+  let anyOutdated = $derived(notes.some((n) => n.outdated))
+  let onlyOutdated = $state(false)
+
   let filtered = $derived.by(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return notes
+    if (!q && !onlyOutdated) return notes
+    if (!q) return withAncestors(notes.filter((n) => n.outdated))
+    if (onlyOutdated) return withAncestors(notes.filter((n) => n.outdated && `${n.title || ''} ${n.description || ''}`.toLowerCase().includes(q)))
     const byId = new Map(notes.map((n) => [n.id, n]))
     /** @type {Set<number>} */
     const visible = new Set()
@@ -146,6 +155,23 @@
     }
     return notes.filter((n) => visible.has(n.id))
   })
+
+  /** The given notes and the chain of their parents, in the original order. */
+  function withAncestors(list) {
+    const byId = new Map(notes.map((n) => [n.id, n]))
+    const keep = new Set()
+    for (const n of list) {
+      let cur = n
+      keep.add(cur.id)
+      while (cur.parent_id != null) {
+        const parent = byId.get(cur.parent_id)
+        if (!parent) break
+        keep.add(parent.id)
+        cur = parent
+      }
+    }
+    return notes.filter((n) => keep.has(n.id))
+  }
 
   let searchActive = $derived(search.trim().length > 0)
 
@@ -1266,6 +1292,18 @@
   <aside class="notes__tree">
     <div class="notes__tools">
       <input class="search" type="search" placeholder="Поиск…" bind:value={search} />
+      {#if anyOutdated || onlyOutdated}
+        <button
+          type="button"
+          class="btn notes__outdated-filter"
+          class:notes__outdated-filter--on={onlyOutdated}
+          aria-pressed={onlyOutdated}
+          title="Только заметки, помеченные проверкой как устаревшие"
+          onclick={() => (onlyOutdated = !onlyOutdated)}
+        >
+          устар.
+        </button>
+      {/if}
       <button
         type="button"
         class="btn btn--accent notes__add"
@@ -1291,7 +1329,7 @@
             {#each searchHits as h (h.id)}
               <li>
                 <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)}>
-                  <span class="hit__title">{h.title || 'Без названия'}</span>
+                  <span class="hit__title">{h.title || 'Без названия'}{#if h.outdated}<span class="notes__outdated" title={h.outdated_reason || 'Устарела по проверке актуальности'}>устарела</span>{/if}</span>
                   <span class="hit__where">{WHERE_LABEL[h.where] ?? ''}</span>
                   {#if h.snippet}<span class="hit__snippet">{@html snippetHtml(h.snippet)}</span>{/if}
                 </button>
@@ -1358,7 +1396,9 @@
                       onblur={commitRename}
                     />
                   {:else}
-                    <RefText class="notes__row-title" source={rowTitle(n)} {labels} {onRef} />{#if rowDirty(n)}<span
+                    <RefText class="notes__row-title" source={rowTitle(n)} {labels} {onRef} />{#if n.outdated}<span
+                        class="notes__outdated"
+                        title={n.outdated_reason || 'Устарела по проверке актуальности'}>устарела</span>{/if}{#if rowDirty(n)}<span
                         class="notes__unsaved"
                         title="Несохранено">*</span>{/if}
                   {/if}
@@ -1645,6 +1685,9 @@
       {/if}
       {#if selectedId}
         <div class="block notes__attach">
+          <NoteCheck noteId={selectedId} onChanged={onChanged} onOpenSecrets={() => onOpenSecrets?.(selectedId)} />
+        </div>
+        <div class="block notes__attach">
           <AttachmentsBlock ownerType="note" ownerId={selectedId} onOpenOwner={onRef} />
         </div>
         <div class="block notes__attach">
@@ -1743,6 +1786,25 @@
     border-bottom: 1px solid var(--color-border, #333);
   }
 
+  .notes__outdated {
+    margin-left: 0.4rem;
+    padding: 0 0.35rem;
+    border: 1px solid color-mix(in srgb, var(--color-danger, #b54a3a) 55%, var(--color-border, #333));
+    border-radius: 999px;
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+    color: var(--color-danger, #b54a3a);
+    vertical-align: middle;
+  }
+  .notes__outdated-filter {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.72rem;
+  }
+  .notes__outdated-filter--on {
+    color: var(--color-danger, #b54a3a);
+    border-color: var(--color-danger, #b54a3a);
+  }
   .hits {
     list-style: none;
     margin: 0;

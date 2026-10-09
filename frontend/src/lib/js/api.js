@@ -155,6 +155,7 @@ const SECRET_OWNER_PATH = {
   template: 'templates',
   quest: 'quests',
   step: 'steps',
+  note: 'notes',
 }
 
 /** Kinds that can own secrets (a secret is inherited step > quest > template > questline). */
@@ -187,6 +188,16 @@ export function setSecret(kind, id, key, value) {
 
 export function deleteSecret(kind, id, key) {
   return request(`${secretsPath(kind, id)}/${encodeURIComponent(key)}`, { method: 'DELETE' })
+}
+
+/** Set (or, with a null command, remove) a note's freshness check. `body`: { command, interval_seconds, run_on }. */
+export function setNoteCheck(id, body) {
+  return request(`/api/notes/${id}/check`, { method: 'PUT', body: JSON.stringify(body) })
+}
+
+/** Ask for a run at the scheduler's next tick. */
+export function runNoteCheck(id) {
+  return request(`/api/notes/${id}/check/run`, { method: 'POST' })
 }
 
 /** Streaks and close rate of a recurring template. */

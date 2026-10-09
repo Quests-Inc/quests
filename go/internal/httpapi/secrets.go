@@ -21,6 +21,7 @@ var secretOwnerKinds = map[string]string{
 	"templates":  store.SecretOwnerTemplate,
 	"quests":     store.SecretOwnerQuest,
 	"steps":      store.SecretOwnerStep,
+	"notes":      store.SecretOwnerNote,
 }
 
 var secretOwnerLabels = map[string]string{
@@ -28,6 +29,7 @@ var secretOwnerLabels = map[string]string{
 	store.SecretOwnerTemplate:  "Template",
 	store.SecretOwnerQuest:     "Quest",
 	store.SecretOwnerStep:      "Step",
+	store.SecretOwnerNote:      "Note",
 }
 
 // secretOwner resolves {id} for the route's owner kind and 404s when the

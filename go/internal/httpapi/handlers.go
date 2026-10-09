@@ -139,6 +139,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
 	s.registerMFA(mux)
+	s.registerNoteCheck(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
 	s.registerWorkspaces(mux)

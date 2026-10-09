@@ -1768,6 +1768,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
         onSelect={(id) => selectNoteFromUi(id)}
         onChanged={() => load({ silent: true })}
         onRef={onJournalRef}
+        onOpenSecrets={(id) => openSecrets({ kind: 'note', id })}
       />
     </div>
   {:else if view === 'graph'}

@@ -54,10 +54,12 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	checks, _ := s.Store.NoteChecks(r.Context())
 	out := make([]store.NoteRead, 0, len(rows))
 	for _, n := range rows {
 		read := store.NoteToRead(n)
 		redactPrivateNote(r, n, read)
+		withCheck(read, checks[n.ID], false)
 		out = append(out, read)
 	}
 	if r.URL.Query().Get("sort") == "popular" {
@@ -459,6 +461,8 @@ func (s *Server) notePayload(r *http.Request, n store.Note) map[string]any {
 	out["children"] = childReads
 	out["refs"] = s.resolveRefs(r, refs.Parse(n.Title+"\n"+n.Description))
 	out["backlinks"] = s.backlinksTo(r, "note", n.ID)
+	c, _ := s.Store.GetNoteCheck(r.Context(), n.ID)
+	withCheck(out, c, true)
 	return out
 }
 

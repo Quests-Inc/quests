@@ -12,7 +12,7 @@
    * quest or step) and is inherited step > quest > template > questline, so
    * the field below takes `@name` (resolved to `quest=12`) or a pasted ref.
    * `owner` pre-fills it (context menu → «Секреты»); only entities that can
-   * own secrets are offered (no notes or files).
+   * own secrets are offered (a note owns its own, which nothing inherits).
    * @type {{
    *   open: boolean,
    *   onClose: () => void,
@@ -23,7 +23,7 @@
    * }} */
   let { open = false, onClose, owner = null, quests = [], questlines = [], labels = {} } = $props()
 
-  const KIND_LABEL = { questline: 'квестлайн', template: 'шаблон', quest: 'квест', step: 'шаг' }
+  const KIND_LABEL = { questline: 'квестлайн', template: 'шаблон', quest: 'квест', step: 'шаг', note: 'заметка' }
 
   let ownerText = $state('')
   /** the entity the field resolves to: the first owner-capable ref in the text */

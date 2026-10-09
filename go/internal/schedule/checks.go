@@ -114,6 +114,7 @@ func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 const watchDoneInterval = 60
 
 func (r *CheckRunner) Tick(ctx context.Context) {
+	defer r.TickNotes(ctx) // note checks follow the step checks
 	active := domain.StatusActive
 	quests, err := r.Store.ListQuests(ctx, store.ListFilter{Status: &active})
 	if err != nil {
@@ -524,6 +525,10 @@ func (r *CheckRunner) dispatch(ctx context.Context, q domain.Quest, st domain.St
 // remote counterpart of exec+apply: a delivered result goes through the same
 // apply/applyOnce; an unreachable device is not a failed command.
 func (r *CheckRunner) JobFinished(ctx context.Context, j store.RunnerJob) {
+	if j.NoteID != nil {
+		r.noteJobFinished(ctx, j)
+		return
+	}
 	if j.StepID == nil || j.QuestID == nil {
 		return
 	}

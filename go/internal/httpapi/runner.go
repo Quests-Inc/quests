@@ -99,6 +99,7 @@ type jobPayload struct {
 	QuestID        *int64            `json:"quest_id,omitempty"`
 	StepID         *int64            `json:"step_id,omitempty"`
 	TemplateID     *int64            `json:"template_id,omitempty"`
+	NoteID         *int64            `json:"note_id,omitempty"`
 	Env            map[string]string `json:"env"`
 }
 
@@ -110,6 +111,8 @@ func (s *Server) jobSecrets(ctx context.Context, j store.RunnerJob) map[string]s
 		owner = store.SecretOwner{Kind: store.SecretOwnerStep, ID: *j.StepID}
 	case j.TemplateID != nil:
 		owner = store.SecretOwner{Kind: store.SecretOwnerTemplate, ID: *j.TemplateID}
+	case j.NoteID != nil:
+		owner = store.SecretOwner{Kind: store.SecretOwnerNote, ID: *j.NoteID}
 	default:
 		return map[string]string{}
 	}
@@ -143,7 +146,7 @@ func (s *Server) runnerPoll(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, jobPayload{
 				ID: job.ID, LeaseID: job.LeaseID, LeaseSeconds: int(runnerLease / time.Second),
 				Kind: job.Kind, Title: job.Title, Command: job.Command, TimeoutSeconds: job.TimeoutSeconds,
-				AttemptNo: job.AttemptNo, QuestID: job.QuestID, StepID: job.StepID, TemplateID: job.TemplateID,
+				AttemptNo: job.AttemptNo, QuestID: job.QuestID, StepID: job.StepID, TemplateID: job.TemplateID, NoteID: job.NoteID,
 				Env: s.jobSecrets(r.Context(), *job),
 			})
 			return

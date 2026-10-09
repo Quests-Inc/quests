@@ -36,6 +36,9 @@ type SearchHit struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	CreatedAt time.Time `json:"created_at"`
 	Private   bool      `json:"is_private"`
+	// Outdated: the note's own check says it has drifted from its source (quest=370); Reason says how.
+	Outdated       bool   `json:"outdated"`
+	OutdatedReason string `json:"outdated_reason,omitempty"`
 	// Popularity says why reading history moved this hit up or down (see notestats.go).
 	Popularity *NotePopularity `json:"popularity,omitempty"`
 }
@@ -48,6 +51,9 @@ type SearchOpts struct {
 	// Agent marks a search made for an agent: the hits count as "shown" (an impression, never interest).
 	Agent bool
 }
+
+// outdatedDemotion: a note whose own check says it is stale ranks below a fresh one of the same relevance.
+const outdatedDemotion = 0.8
 
 const (
 	defaultSearchLimit = 20
@@ -100,6 +106,13 @@ func (s *Store) rankByReading(ctx context.Context, hits []SearchHit, o SearchOpt
 	for _, h := range hits {
 		born[h.ID] = h.CreatedAt
 	}
+	if checks, err := s.NoteChecks(ctx); err == nil {
+		for i := range hits {
+			if c, ok := checks[hits[i].ID]; ok && c.Outdated {
+				hits[i].Outdated, hits[i].OutdatedReason = true, c.Reason
+			}
+		}
+	}
 	pop, err := s.Popularity(ctx, born)
 	if err != nil {
 		log.Printf("search: reading history unavailable: %v", err)
@@ -110,6 +123,9 @@ func (s *Store) rankByReading(ctx context.Context, hits []SearchHit, o SearchOpt
 		hits[i].Popularity = &p
 		if hits[i].Where != "fuzzy" {
 			hits[i].Score *= 1 + p.Boost
+			if hits[i].Outdated {
+				hits[i].Score *= outdatedDemotion // still found, just not first
+			}
 		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool {

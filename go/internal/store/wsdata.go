@@ -66,7 +66,7 @@ var ExportTables = []TableSpec{
 	{Name: "attachment_revision", HasID: true, FK: map[string]string{"attachment_id": "attachment"}, Text: []string{"comment"}},
 	{Name: "templateemitroll", HasID: true, FK: map[string]string{"template_id": "questtemplate"}, Text: []string{"picked_refs"}},
 	{Name: "questchangelog", HasID: true, FK: map[string]string{"quest_id": "quest"}, Poly: []polyFK{{"entity_type", "entity_id"}, {"parent_type", "parent_id"}}, Text: []string{"title", "detail", "comment"}},
-	{Name: "secret", HasID: true, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep"}, Secret: true},
+	{Name: "secret", HasID: true, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note"}, Secret: true},
 }
 
 var identRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
@@ -310,6 +310,11 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 						vals["emit_pool_command"] = nil
 						rep.StrippedCommand++
 					}
+				case "note":
+					if c, _ := vals["check_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["run_on"]) {
+						vals["check_command"], vals["check_interval_seconds"] = nil, nil
+						rep.StrippedCommand++
+					}
 				}
 			}
 			// Attachments: bring the bytes along and point the row at the new path.
@@ -526,7 +531,7 @@ var nullableFK = map[string]struct{}{
 	"questline.category_id": {}, "questtemplate.category_id": {}, "questtemplate.questline_id": {},
 	"quest.category_id": {}, "quest.questline_id": {}, "quest.template_id": {},
 	"questchangelog.quest_id": {}, "secret.questline_id": {}, "secret.template_id": {},
-	"secret.quest_id": {}, "secret.step_id": {},
+	"secret.quest_id": {}, "secret.step_id": {}, "secret.note_id": {},
 }
 
 func isEmptyStr(v any) bool {
