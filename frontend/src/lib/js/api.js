@@ -888,3 +888,8 @@ export function regenerateRecoveryCodes(code) {
 export function searchInNote(id, q) {
   return request(`/api/notes/${id}/search?q=${encodeURIComponent(q)}`)
 }
+
+/** Hand-set OUTDATED flag of a note; a later check gives its own verdict. */
+export function setNoteOutdated(id, outdated, reason = '') {
+  return request(`/api/notes/${id}/outdated`, { method: 'PUT', body: JSON.stringify({ outdated, reason }) })
+}

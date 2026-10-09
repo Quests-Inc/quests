@@ -255,3 +255,29 @@ func (s *Store) RecordNoteCheckError(ctx context.Context, id int64, msg string, 
 	_, err := s.DB.ExecContext(ctx, `UPDATE note SET check_error = ?, check_error_at = ?, check_last_run_at = ? WHERE id = ?`, trimTo(msg, maxErrorLen), now, now, id)
 	return err
 }
+
+// ErrNoteCheckPG: the freshness flag lives in the PostgreSQL schema only.
+var ErrNoteCheckPG = errors.New("пометка «устарела» работает только с PostgreSQL")
+
+// SetNoteOutdated is the hand-set flag, the same one a check's verdict writes: a person (or an agent)
+// who knows the note is stale says so, with an optional reason. A check that runs later gives its own verdict.
+func (s *Store) SetNoteOutdated(ctx context.Context, id int64, outdated bool, reason string, at time.Time) error {
+	if !s.WorkspacesEnabled() {
+		return ErrNoteCheckPG
+	}
+	now := timeutil.ToDBUTC(at)
+	var res sql.Result
+	var err error
+	if outdated {
+		res, err = s.DB.ExecContext(ctx, `UPDATE note SET outdated = 1, outdated_at = CASE WHEN outdated = 0 THEN ? ELSE outdated_at END, check_reason = ? WHERE id = ?`, now, trimTo(reason, maxReasonLen), id)
+	} else {
+		res, err = s.DB.ExecContext(ctx, `UPDATE note SET outdated = 0, outdated_at = NULL, check_reason = '' WHERE id = ?`, id)
+	}
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

@@ -14,6 +14,13 @@ The command prints either `0` / `1` (`1` = outdated) or JSON:
 `outdated: null` or other output is an error. **Errors never change the verdict** — only the error text
 is stored, the previous status stays.
 
+## Hand-set flag
+
+OUTDATED is a flag like README / PRIVATE / CATEGORY: a red clock-with-exclamation icon in the note's header, in the
+«Флаги» submenu of the context menu and next to the note in the tree and in search results.
+`PUT /api/notes/{id}/outdated {"outdated": true, "reason": "…"}` (reason defaults to «Отмечена вручную»). It is the
+same state a check writes: a note that has a check gets the check's verdict at its next run.
+
 ## Where it runs
 
 Like a step's check: on the server (only in a *trusted* workspace) or on a runner. The interval has the same

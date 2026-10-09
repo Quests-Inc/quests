@@ -6,6 +6,7 @@
     getNote,
     updateNote,
     searchNotes,
+    setNoteOutdated,
   } from '../js/api.js'
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
   import NoteCheck from '../ui/NoteCheck.svelte'
@@ -627,6 +628,7 @@
   let editEl = $state(/** @type {HTMLTextAreaElement | null} */ (null))
   let titleEl = $state(/** @type {HTMLInputElement | null} */ (null))
   let findOpen = $state(false)
+  let noteIsOutdated = $derived(selectedId != null && !!(detail?.id === selectedId ? detail.outdated : noteById(selectedId)?.outdated))
   function onFindKey(e) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && selectedId) {
       e.preventDefault()
@@ -1015,6 +1017,7 @@
           { id: 'readme', label: ctxNote?.is_readme ? 'Снять README' : 'Пометить README' },
           { id: 'private', label: ctxNote?.is_private ? 'Снять PRIVATE' : 'Пометить PRIVATE' },
           { id: 'category', label: ctxNote?.is_category ? 'Снять CATEGORY' : 'Пометить CATEGORY' },
+          { id: 'outdated', label: ctxNote?.outdated ? 'Снять «устарела»' : 'Пометить «устарела»' },
         ],
       },
       { id: 'add-child', label: 'Добавить дочернюю' },
@@ -1120,6 +1123,19 @@
         const draft = getNoteDraft(id)
         if (draft) putNoteDraft(id, { ...draft, [stateVar]: next })
       }
+      onChanged()
+    } catch (e) {
+      error = e.message || String(e)
+    }
+  }
+
+  async function toggleOutdatedNote(id) {
+    const n = noteById(id)
+    if (!n) return
+    error = ''
+    try {
+      await setNoteOutdated(id, !n.outdated)
+      if (id === selectedId) detail = await getNote(id)
       onChanged()
     } catch (e) {
       error = e.message || String(e)
@@ -1249,6 +1265,10 @@
       await toggleCategoryNote(id)
       return
     }
+    if (action === 'outdated') {
+      await toggleOutdatedNote(id)
+      return
+    }
     if (action === 'add-child') {
       await addNote(id)
       return
@@ -1339,7 +1359,7 @@
             {#each searchHits as h (h.id)}
               <li>
                 <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)} oncontextmenu={(e) => openNoteMenu(e, h)}>
-                  <span class="hit__title">{h.title || 'Без названия'}{#if h.outdated}<span class="notes__outdated" title={h.outdated_reason || 'Устарела по проверке актуальности'}>устарела</span>{/if}</span>
+                  <span class="hit__title">{h.title || 'Без названия'}{#if h.outdated}<span class="notes__status-dot notes__status-dot--outdated notes__hit-flag" title={h.outdated_reason || 'Устарела'}><Icon name="clock-alert" size={12} /></span>{/if}</span>
                   <span class="hit__where">{WHERE_LABEL[h.where] ?? ''}</span>
                   {#if h.snippet}<span class="hit__snippet">{@html snippetHtml(h.snippet)}</span>{/if}
                 </button>
@@ -1406,18 +1426,17 @@
                       onblur={commitRename}
                     />
                   {:else}
-                    <RefText class="notes__row-title" source={rowTitle(n)} {labels} {onRef} />{#if n.outdated}<span
-                        class="notes__outdated"
-                        title={n.outdated_reason || 'Устарела по проверке актуальности'}>устарела</span>{/if}{#if rowDirty(n)}<span
+                    <RefText class="notes__row-title" source={rowTitle(n)} {labels} {onRef} />{#if rowDirty(n)}<span
                         class="notes__unsaved"
                         title="Несохранено">*</span>{/if}
                   {/if}
                 </span>
-                {#if n.is_readme || n.is_private || n.is_category || readmeBubbleIds.has(n.id)}
+                {#if n.is_readme || n.is_private || n.is_category || n.outdated || readmeBubbleIds.has(n.id)}
                   <span class="notes__row-status" aria-hidden="true">
                     {#if n.is_readme}<span class="notes__status-dot notes__status-dot--readme"><Icon name="alert" size={12} /></span>{:else if readmeBubbleIds.has(n.id)}<span class="notes__status-dot notes__status-dot--readme-bubble" title="Ниже есть README"><Icon name="alert" size={12} /></span>{/if}
                     {#if n.is_private}<span class="notes__status-dot notes__status-dot--private"><Icon name="lock" size={12} /></span>{/if}
                     {#if n.is_category}<span class="notes__status-dot notes__status-dot--category"><Icon name="folder" size={12} /></span>{/if}
+                    {#if n.outdated}<span class="notes__status-dot notes__status-dot--outdated" title={n.outdated_reason || 'Устарела'}><Icon name="clock-alert" size={12} /></span>{/if}
                   </span>
                 {/if}
               </button>
@@ -1520,6 +1539,17 @@
               aria-pressed={isCategory}
             >
               <Icon name="folder" />
+            </button>
+            <button
+              type="button"
+              class="btn btn--icon notes__status-btn notes__status-btn--outdated"
+              class:notes__status-btn--on={noteIsOutdated}
+              onclick={() => selectedId != null && toggleOutdatedNote(selectedId)}
+              title={noteIsOutdated ? `Снять «устарела»${detail?.outdated_reason ? ': ' + detail.outdated_reason : ''}` : 'Пометить «устарела» (содержимое расходится с действительностью)'}
+              aria-label={noteIsOutdated ? 'Снять «устарела»' : 'Пометить «устарела»'}
+              aria-pressed={noteIsOutdated}
+            >
+              <Icon name="clock-alert" />
             </button>
             {#if dirty}
               <button
@@ -1800,16 +1830,6 @@
     border-bottom: 1px solid var(--color-border, #333);
   }
 
-  .notes__outdated {
-    margin-left: 0.4rem;
-    padding: 0 0.35rem;
-    border: 1px solid color-mix(in srgb, var(--color-danger, #b54a3a) 55%, var(--color-border, #333));
-    border-radius: 999px;
-    font-size: 0.62rem;
-    letter-spacing: 0.03em;
-    color: var(--color-danger, #b54a3a);
-    vertical-align: middle;
-  }
   .notes__outdated-filter {
     flex: 0 0 auto;
     padding: 0.25rem 0.5rem;
@@ -2025,6 +2045,16 @@
   .notes__status-btn--category.notes__status-btn--on,
   .notes__status-dot--category {
     color: #b5651d;
+  }
+
+  .notes__status-btn--outdated.notes__status-btn--on,
+  .notes__status-dot--outdated {
+    color: #d14343;
+  }
+
+  .notes__hit-flag {
+    margin-left: 0.35rem;
+    vertical-align: middle;
   }
 
   .notes__status-dot {

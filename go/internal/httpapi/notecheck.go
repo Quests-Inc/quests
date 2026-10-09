@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
@@ -14,6 +15,7 @@ import (
 func (s *Server) registerNoteCheck(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/notes/{id}/check", s.putNoteCheck)
 	mux.HandleFunc("POST /api/notes/{id}/check/run", s.runNoteCheck)
+	mux.HandleFunc("PUT /api/notes/{id}/outdated", s.putNoteOutdated)
 }
 
 // checkView is a note's check as the API shows it.
@@ -94,4 +96,38 @@ func (s *Server) runNoteCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"queued": true})
+}
+
+// putNoteOutdated sets or clears the OUTDATED flag by hand: {"outdated": true|false, "reason": "…"}.
+func (s *Server) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := s.noteForStats(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Outdated *bool  `json:"outdated"`
+		Reason   string `json:"reason"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&body); err != nil || body.Outdated == nil {
+		writeErr(w, http.StatusBadRequest, `body: {"outdated": true|false, "reason": "…"}`)
+		return
+	}
+	reason := body.Reason
+	if *body.Outdated && reason == "" {
+		reason = "Отмечена вручную"
+	}
+	if err := s.Store.SetNoteOutdated(r.Context(), id, *body.Outdated, reason, time.Now().UTC()); err != nil {
+		if errors.Is(err, store.ErrNoteCheckPG) {
+			writeErr(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	detail := "заметка помечена устаревшей"
+	if !*body.Outdated {
+		detail = "пометка «устарела» снята"
+	}
+	s.logNote(r.Context(), "note_updated", n, detail, 0)
+	writeJSON(w, http.StatusOK, map[string]any{"outdated": *body.Outdated, "reason": reason})
 }

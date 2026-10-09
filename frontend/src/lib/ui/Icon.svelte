@@ -8,6 +8,7 @@
   import checkmark from '../../assets/icons/checkmark.svg?raw'
   import chevronDown from '../../assets/icons/chevron-down.svg?raw'
   import chevronRight from '../../assets/icons/chevron-right.svg?raw'
+  import clockAlert from '../../assets/icons/clock-alert.svg?raw'
   import close from '../../assets/icons/close.svg?raw'
   import copy from '../../assets/icons/copy.svg?raw'
   import deleteIcon from '../../assets/icons/delete.svg?raw'
@@ -58,6 +59,7 @@
     'chevron-down': chevronDown,
     'chevron-right': chevronRight,
     clear: clearIcon,
+    'clock-alert': clockAlert,
     close,
     copy,
     delete: deleteIcon,
