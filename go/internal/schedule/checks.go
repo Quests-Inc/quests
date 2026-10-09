@@ -226,7 +226,12 @@ func (r *CheckRunner) exec(parent context.Context, questID, stepID int64, comman
 	if serr != nil {
 		log.Printf("checks: secrets for step %d: %v", stepID, serr)
 	}
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd, cleanup, cerr := commandCmd(ctx, command)
+	if cerr != nil {
+		r.apply(parent, questID, stepID, once, -1, "", cerr.Error(), false)
+		return
+	}
+	defer cleanup()
 	cmd.Env = append(CommandEnv(), r.Env...)
 	if ws := wsctx.From(parent); ws > 0 {
 		// Commands that call the CLI back act in the workspace of their quest.

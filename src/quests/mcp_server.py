@@ -105,7 +105,7 @@ server = MCPServer(
         "duration_seconds before deadline_at, automated=true to demote create/start "
         "overlay toasts, category/questline by id or by name — e.g. "
         "category='health', questline='Сайт Рефкул'). "
-        "Steps may include check_command, run_mode=poll|once|watch, wait_previous. "
+        "Steps may include check_command (one line, several lines, or a script starting with #!/usr/bin/env …), run_mode=poll|once|watch, wait_previous. "
         "To create a new questline (project/theme container) use create_questline. "
         "Tags (work-surface labels like frontend/api/mcp): list_tags first; "
         "create_tag only if nothing suitable exists; set_quest_tags / tag_ids on "
@@ -429,7 +429,10 @@ def _step_body(s: dict[str, Any]) -> dict[str, Any]:
         "description replaced by a placeholder — that's deliberate (see "
         "note=82), not an error; don't retry, and don't fetch it another way "
         "(e.g. curl) to work around it — if the content is actually needed, "
-        "ask the user to paste it or read it themselves."
+        "ask the user to paste it or read it themselves. The note also carries `outdated` / "
+        "`outdated_reason` (a stale note may be inaccurate — verify it against the code before relying "
+        "on it, and mark it with set_note_outdated if it is wrong) and `check` (its freshness-check "
+        "command, interval, last run and error)."
     )
 )
 def get_note_context(note_id: int) -> dict[str, Any]:
@@ -1503,6 +1506,10 @@ def _category_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "sort='popular' orders by reading history (recently read first, decayed over ~30 days, "
         "new notes get a small head start) and adds a `popularity` block per note with the reason; "
         "it is a hint for what to look at first, not a verdict — relevance to your task wins. "
+        "Each row has `outdated` / `outdated_reason` (the OUTDATED flag) and `has_check`. "
+        "flags narrows by note flags, comma-separated, a minus means \"without\": "
+        "flags=\"outdated\" lists the stale notes, flags=\"-outdated,-private\" skips them "
+        "(known: outdated, readme, private, category, pinned, check)."
     )
 )
 def list_notes(
@@ -1510,6 +1517,7 @@ def list_notes(
     category_id: int | None = None,
     brief: bool = False,
     sort: str | None = None,
+    flags: str = "",
 ) -> list[dict[str, Any]]:
     query: dict[str, Any] = {}
     if parent_id is not None:
@@ -1530,19 +1538,51 @@ def list_notes(
             )
         under = {n["id"] for n in _note_descendants(everything, int(category_id))}
         rows = [n for n in rows if n["id"] in under]
+    rows = _filter_note_flags(rows, flags)
     return [_note_brief(n) for n in rows] if brief else rows
+
+
+_NOTE_FLAG_FIELDS = {
+    "outdated": "outdated",
+    "stale": "outdated",
+    "readme": "is_readme",
+    "private": "is_private",
+    "category": "is_category",
+    "pinned": "pinned",
+    "pin": "pinned",
+    "check": "has_check",
+}
+
+
+def _filter_note_flags(rows: list[dict[str, Any]], flags: str) -> list[dict[str, Any]]:
+    """Keep the notes that have every flag of `flags` and none of the `-flag`s."""
+    want: list[tuple[str, bool]] = []
+    for part in str(flags or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        neg = part.startswith("-")
+        field = _NOTE_FLAG_FIELDS.get(part.lstrip("-").lower())
+        if field is None:
+            raise ValueError(f"unknown flag {part!r}; known: {', '.join(sorted(_NOTE_FLAG_FIELDS))}")
+        want.append((field, neg))
+    return [n for n in rows if all(bool(n.get(f)) != neg for f, neg in want)]
 
 
 @server.tool(
     description=(
         "Give a note a freshness check, or remove it (empty command). The command runs like a step's "
         "check: on the server in a trusted workspace, or on a runner (run_on = runner label), with the "
-        "note's own secrets in its environment, every interval_seconds (default 3600, minimum 15). It must "
+        "note's own secrets in its environment, every interval_seconds (default 3600, minimum 15). It may be "
+        "several lines, or a script with its own interpreter (starts with #!/usr/bin/env python3 …). It must "
         "print 0 or 1 on its last line (1 = the note is out of date) or JSON {\"outdated\": 0|1, "
-        "\"reason\": \"…\"}. A broken run is recorded as an error and leaves the verdict alone. The command "
-        "keeps its own baseline: typically a marker in the note's text (`<!-- verified: abc1234 -->`) "
-        "compared with `git log -1 --format=%h -- <path>`; $QUESTS_NOTE_ID is set. Only workspace owners "
-        "may set a command. After you update a note, bring the marker up to date and call check_note_now."
+        "\"reason\": \"…\"}. A broken run (bad output, failure, empty output) is recorded as an error and "
+        "leaves the verdict alone. The command keeps its own baseline — the platform stores none: the "
+        "reference lives in the command itself (e.g. REF=<commit> at its top) and is re-pinned by hand when "
+        "the note is rewritten. Typical form for a note about files in a public GitHub repo: curl "
+        "https://api.github.com/repos/OWNER/REPO/compare/$REF...main and look at .files[].filename with jq "
+        "(see docs/note-check.md in the Quests repo). $QUESTS_NOTE_ID is set. Only workspace owners may "
+        "set a command. After you rewrite a note, re-pin REF with set_note_check and call check_note_now."
     )
 )
 def set_note_check(
@@ -1567,6 +1607,25 @@ def set_note_check(
 )
 def check_note_now(note_id: int) -> dict[str, Any]:
     return _api("POST", f"/api/notes/{int(note_id)}/check/run")
+
+
+@server.tool(
+    description=(
+        "Set or clear the OUTDATED flag of a note by hand: the note's content no longer matches reality "
+        "(outdated=true, with a short reason saying what drifted) or it has been rewritten and is fresh "
+        "again (outdated=false). It is the same flag a freshness check writes, shown as a red clock-with-"
+        "exclamation icon, filterable with flag:outdated, and such notes rank lower in search_notes. "
+        "If the note has a check command, its next run gives its own verdict over yours — to keep a hand-"
+        "set flag, leave the check alone or remove it. Use it when you notice a note is wrong; do not "
+        "silently rewrite and forget: mark it, or fix it and clear the flag."
+    )
+)
+def set_note_outdated(note_id: int, outdated: bool = True, reason: str = "") -> dict[str, Any]:
+    return _api(
+        "PUT",
+        f"/api/notes/{int(note_id)}/outdated",
+        body={"outdated": bool(outdated), "reason": reason},
+    )
 
 
 @server.tool(
@@ -1797,7 +1856,8 @@ def delete_note(note_id: int) -> dict[str, Any]:
         "`steps`: a list of {title, description?, progress_total?, progress_current?, "
         "sort_order?, check_command?, check_interval_seconds?, wait_previous?, "
         "run_mode?, run_on?} — if omitted, a single default step named after the quest is "
-        "created. run_mode is poll (stdout: a number, or JSON {progress?, total?, "
+        "created. check_command may be several lines or a script with its own interpreter "
+        "(starts with #!/usr/bin/env python3 …). run_mode is poll (stdout: a number, or JSON {progress?, total?, "
         "description?} — total re-sizes the step) or once (exit 0). A step can mirror "
         "another quest: put quest=N in its title/description, run_mode=watch (poll that "
         "also keeps going after the step is closed, active quests only) and check_command "

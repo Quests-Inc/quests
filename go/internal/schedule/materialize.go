@@ -10,7 +10,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -840,29 +839,11 @@ func execEmitPoolCommand(parent context.Context, st *store.Store, templateID int
 		secrets = sec
 	}
 
-	var cmd *exec.Cmd
-	if strings.HasPrefix(strings.TrimLeft(command, " \t\r\n"), "#!") {
-		f, ferr := os.CreateTemp("", "quests-emit-pool-*")
-		if ferr != nil {
-			return emitOutput{}, info, ferr
-		}
-		scriptPath := f.Name()
-		defer os.Remove(scriptPath)
-		_, writeErr := f.WriteString(command)
-		closeErr := f.Close()
-		if writeErr != nil {
-			return emitOutput{}, info, writeErr
-		}
-		if closeErr != nil {
-			return emitOutput{}, info, closeErr
-		}
-		if cerr := os.Chmod(scriptPath, 0o700); cerr != nil {
-			return emitOutput{}, info, cerr
-		}
-		cmd = exec.CommandContext(ctx, scriptPath)
-	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", command)
+	cmd, cleanup, cerr := commandCmd(ctx, command)
+	if cerr != nil {
+		return emitOutput{}, info, cerr
 	}
+	defer cleanup()
 
 	killTree(cmd)
 	cmd.Env = CommandEnv()

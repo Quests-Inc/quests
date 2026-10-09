@@ -21,6 +21,12 @@ OUTDATED is a flag like README / PRIVATE / CATEGORY: a red clock-with-exclamatio
 `PUT /api/notes/{id}/outdated {"outdated": true, "reason": "…"}` (reason defaults to «Отмечена вручную»). It is the
 same state a check writes: a note that has a check gets the check's verdict at its next run.
 
+## The command field
+
+In the note's check and in a step's check the command is a multi-line, resizable field. It may be several
+lines (`sh -c`) or a script with its own interpreter: a command that starts with `#!` is written to a private
+temp file and executed as is (on the server and on a runner alike), like a template's pool command.
+
 ## Where it runs
 
 Like a step's check: on the server (only in a *trusted* workspace) or on a runner. The interval has the same
@@ -33,7 +39,7 @@ workspace, `QUESTS_WORKSPACE`.
 - A note has **its own secrets** (SecretsModal, kind `note`), exported to the command as environment variables.
   They are not inherited from a quest, a step or a questline, and are sealed at rest like all secrets
   (see [security.md](security.md)).
-- MCP: `set_note_check`, `check_note_now`.
+- MCP: `set_note_check`, `check_note_now`, `set_note_outdated` (hand-set flag); `list_notes(flags=…)` and `search_notes(flags=…)` filter by `outdated`, `-outdated`, …
 
 ## Example: a note about files in a public GitHub repo
 

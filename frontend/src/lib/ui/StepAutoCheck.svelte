@@ -48,14 +48,14 @@
 
 <div class="autocheck">
   <div class="autocheck__row">
-    <input
-      type="text"
+    <textarea
       class="mono autocheck__cmd"
-      placeholder="команда автопроверки (необязательно)"
+      rows="1"
+      placeholder={'команда автопроверки (необязательно); можно несколько строк или скрипт: #!/usr/bin/env python3 …'}
       aria-label="Команда автопроверки"
       bind:value={command}
       spellcheck="false"
-    />
+    ></textarea>
     {#if hasCommand && runMode !== 'once'}
       <input
         type="number"
@@ -128,6 +128,9 @@
   .autocheck__row .autocheck__cmd {
     flex: 1 1 auto;
     font-size: var(--text-xs, 0.75rem);
+    resize: vertical;
+    min-height: 2.1rem;
+    line-height: 1.4;
   }
 
   .autocheck__row .autocheck__interval {

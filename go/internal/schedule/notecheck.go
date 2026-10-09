@@ -135,7 +135,12 @@ func (r *CheckRunner) execNote(parent context.Context, d store.DueNote) {
 	if serr != nil {
 		log.Printf("checks: secrets for note %d: %v", d.ID, serr)
 	}
-	cmd := exec.CommandContext(ctx, "sh", "-c", d.Command)
+	cmd, cleanup, cerr := commandCmd(ctx, d.Command)
+	if cerr != nil {
+		r.applyNote(parent, d.ID, -1, "", cerr.Error(), false)
+		return
+	}
+	defer cleanup()
 	cmd.Env = append(CommandEnv(), r.Env...)
 	cmd.Env = append(cmd.Env, "QUESTS_NOTE_ID="+strconv.FormatInt(d.ID, 10))
 	if ws := wsctx.From(parent); ws > 0 {

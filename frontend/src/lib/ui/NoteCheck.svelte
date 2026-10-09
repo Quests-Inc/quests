@@ -114,15 +114,15 @@
 
   {#if open}
     <div class="nc__body">
-      <input
-        type="text"
+      <textarea
         class="mono nc__cmd"
-        placeholder="команда: напечатает 0 или 1 (1 — устарела) либо JSON"
+        rows="3"
+        placeholder={'команда: напечатает 0 или 1 (1 — устарела) либо JSON {"outdated": 1, "reason": "…"}\nможно несколько строк или скрипт: #!/usr/bin/env python3 …'}
         aria-label="Команда проверки актуальности"
         spellcheck="false"
         bind:value={command}
         oninput={() => (dirty = true)}
-      />
+      ></textarea>
       <div class="nc__opts">
         <input
           type="number"
@@ -233,6 +233,9 @@
   .nc__cmd {
     width: 100%;
     font-size: var(--text-xs, 0.75rem);
+    resize: vertical;
+    min-height: 3.2rem;
+    line-height: 1.4;
   }
   .nc__opts {
     display: flex;
