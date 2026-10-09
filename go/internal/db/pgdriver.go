@@ -38,6 +38,7 @@ var noIDTables = map[string]bool{
 	"workspace_member": true,
 	"user_llm":         true,
 	"user_totp":        true,
+	"note_stat":        true,
 }
 
 var insertRe = regexp.MustCompile(`(?is)^\s*INSERT\s+INTO\s+"?([a-z_][a-z0-9_]*)"?`)

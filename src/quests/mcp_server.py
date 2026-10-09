@@ -1499,16 +1499,24 @@ def _category_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "is_readme/is_private/is_category. A PRIVATE note's description is "
         "replaced by a placeholder in this list too — same rule as "
         "get_note_context, don't work around it."
+        "sort='popular' orders by reading history (recently read first, decayed over ~30 days, "
+        "new notes get a small head start) and adds a `popularity` block per note with the reason; "
+        "it is a hint for what to look at first, not a verdict — relevance to your task wins. "
     )
 )
 def list_notes(
     parent_id: int | None = None,
     category_id: int | None = None,
     brief: bool = False,
+    sort: str | None = None,
 ) -> list[dict[str, Any]]:
     query: dict[str, Any] = {}
     if parent_id is not None:
         query["parent_id"] = parent_id
+    if sort == "popular":
+        query["sort"] = "popular"
+    elif sort not in (None, "", "tree"):
+        raise ValueError("sort must be 'popular' or omitted (tree order)")
     rows = _api_get("/api/notes", query or None) or []
     if category_id is not None:
         everything = _api_get("/api/notes") or []
@@ -1522,6 +1530,19 @@ def list_notes(
         under = {n["id"] for n in _note_descendants(everything, int(category_id))}
         rows = [n for n in rows if n["id"] in under]
     return [_note_brief(n) for n in rows] if brief else rows
+
+
+@server.tool(
+    description=(
+        "Tell the vault whether a note helped (useful=true) or misled you (useful=false). Cheap, "
+        "and the one signal that is worth more than a read: it moves the note up or down in "
+        "search_notes / list_notes(sort='popular') for everyone. Call it after you actually used "
+        "(or were misled by) a note, not for every note you glanced at. Returns the note's "
+        "popularity block (score, opens, ratings, why)."
+    )
+)
+def rate_note(note_id: int, useful: bool) -> dict[str, Any]:
+    return _api("POST", f"/api/notes/{int(note_id)}/feedback", body={"useful": bool(useful)})
 
 
 @server.tool(

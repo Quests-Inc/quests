@@ -34,7 +34,10 @@ type SearchHit struct {
 	Snippet   string    `json:"snippet"`
 	ParentID  *int64    `json:"parent_id"`
 	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
 	Private   bool      `json:"is_private"`
+	// Popularity says why reading history moved this hit up or down (see notestats.go).
+	Popularity *NotePopularity `json:"popularity,omitempty"`
 }
 
 // SearchOpts narrows a search.
@@ -42,6 +45,8 @@ type SearchOpts struct {
 	Limit int
 	// ExcludePrivate leaves PRIVATE notes out (what an agent must never be shown).
 	ExcludePrivate bool
+	// Agent marks a search made for an agent: the hits count as "shown" (an impression, never interest).
+	Agent bool
 }
 
 const (
@@ -68,14 +73,61 @@ func (s *Store) SearchNotes(ctx context.Context, q string, o SearchOpts) ([]Sear
 		o.Limit = maxSearchLimit
 	}
 	variants := SearchVariants(q)
+	var hits []SearchHit
+	var err error
 	if s.WorkspacesEnabled() {
-		hits, err := s.searchNotesPG(ctx, q, variants, o)
-		if err == nil {
-			return hits, nil
+		hits, err = s.searchNotesPG(ctx, q, variants, o)
+		if err != nil {
+			log.Printf("search: postgres search failed, falling back to the plain scorer: %v", err)
+			hits, err = s.searchNotesPlain(ctx, variants, o)
 		}
-		log.Printf("search: postgres search failed, falling back to the plain scorer: %v", err)
+	} else {
+		hits, err = s.searchNotesPlain(ctx, variants, o)
 	}
-	return s.searchNotesPlain(ctx, variants, o)
+	if err != nil {
+		return nil, err
+	}
+	return s.rankByReading(ctx, hits, o), nil
+}
+
+// rankByReading nudges relevance by reading history (bounded, see notestats.go) and re-sorts.
+// Typo-only matches stay behind the real ones whatever their history.
+func (s *Store) rankByReading(ctx context.Context, hits []SearchHit, o SearchOpts) []SearchHit {
+	if len(hits) == 0 {
+		return hits
+	}
+	born := make(map[int64]time.Time, len(hits))
+	for _, h := range hits {
+		born[h.ID] = h.CreatedAt
+	}
+	pop, err := s.Popularity(ctx, born)
+	if err != nil {
+		log.Printf("search: reading history unavailable: %v", err)
+		return hits
+	}
+	for i := range hits {
+		p := pop[hits[i].ID]
+		hits[i].Popularity = &p
+		if hits[i].Where != "fuzzy" {
+			hits[i].Score *= 1 + p.Boost
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if (hits[i].Where == "fuzzy") != (hits[j].Where == "fuzzy") {
+			return hits[j].Where == "fuzzy"
+		}
+		return hits[i].Score > hits[j].Score
+	})
+	if o.Agent {
+		ids := make([]int64, len(hits))
+		for i, h := range hits {
+			ids[i] = h.ID
+		}
+		if err := s.RecordShown(ctx, ids); err != nil {
+			log.Printf("search: recording impressions: %v", err)
+		}
+	}
+	return hits
 }
 
 // SearchVariants is the query itself plus, when it is typed in one script, the same keys read in
@@ -170,7 +222,7 @@ func (s *Store) searchNotesPG(ctx context.Context, q string, variants []string, 
 	query := `
 	WITH q AS (SELECT (` + strings.Join(tsParts, ` || `) + `) AS ts, (` + prefExpr + `) AS pq),
 	hit AS (
-		SELECT n.id, n.title, n.description, n.parent_id, n.updated_at, n.is_private,
+		SELECT n.id, n.title, n.description, n.parent_id, n.updated_at, n.created_at, n.is_private,
 		       ts_rank_cd(n.search_tsv, q.ts) + 0.3 * ts_rank_cd(n.search_tsv, q.pq) AS rank,
 		       ((to_tsvector('russian', n.title) || to_tsvector('english', n.title)) @@ (q.ts || q.pq)) AS in_title,
 		       (q.ts || q.pq) AS tq
@@ -179,7 +231,7 @@ func (s *Store) searchNotesPG(ctx context.Context, q string, variants []string, 
 		ORDER BY rank DESC, n.updated_at DESC
 		LIMIT ?
 	)
-	SELECT id, title, parent_id, updated_at, is_private, rank, in_title,
+	SELECT id, title, parent_id, updated_at, created_at, is_private, rank, in_title,
 	       ts_headline('russian', left(description, 20000), tq, 'StartSel=` + MarkOpen + `, StopSel=` + MarkClose + `, MaxWords=26, MinWords=8, MaxFragments=2, FragmentDelimiter= … '),
 	       ts_headline('english', left(description, 20000), tq, 'StartSel=` + MarkOpen + `, StopSel=` + MarkClose + `, MaxWords=26, MinWords=8, MaxFragments=2, FragmentDelimiter= … '),
 	       left(description, 200)
@@ -195,15 +247,16 @@ func (s *Store) searchNotesPG(ctx context.Context, q string, variants []string, 
 	for rows.Next() {
 		var h SearchHit
 		var parent *int64
-		var updated string
+		var updated, created string
 		var priv2 int
 		var inTitle bool
 		var hRu, hEn, head string
-		if err := rows.Scan(&h.ID, &h.Title, &parent, &updated, &priv2, &h.Score, &inTitle, &hRu, &hEn, &head); err != nil {
+		if err := rows.Scan(&h.ID, &h.Title, &parent, &updated, &created, &priv2, &h.Score, &inTitle, &hRu, &hEn, &head); err != nil {
 			return nil, err
 		}
 		h.ParentID, h.Private = parent, priv2 != 0
 		h.UpdatedAt, _ = timeutil.ParseFlexible(updated)
+		h.CreatedAt, _ = timeutil.ParseFlexible(created)
 		h.Where = "body"
 		if inTitle {
 			h.Where = "title"
@@ -244,7 +297,7 @@ func (s *Store) fuzzyTitles(ctx context.Context, q string, o SearchOpts, have []
 		priv = ` AND is_private = 0`
 	}
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, title, parent_id, updated_at, is_private, left(description, 200),
+		SELECT id, title, parent_id, updated_at, created_at, is_private, left(description, 200),
 		       word_similarity(lower(?), lower(title)) AS sim
 		FROM note
 		WHERE word_similarity(lower(?), lower(title)) > 0.45`+priv+`
@@ -261,10 +314,10 @@ func (s *Store) fuzzyTitles(ctx context.Context, q string, o SearchOpts, have []
 	for rows.Next() {
 		var h SearchHit
 		var parent *int64
-		var updated string
+		var updated, created string
 		var priv2 int
 		var sim float64
-		if err := rows.Scan(&h.ID, &h.Title, &parent, &updated, &priv2, &h.Snippet, &sim); err != nil {
+		if err := rows.Scan(&h.ID, &h.Title, &parent, &updated, &created, &priv2, &h.Snippet, &sim); err != nil {
 			return nil, err
 		}
 		if seen[h.ID] {
@@ -272,6 +325,7 @@ func (s *Store) fuzzyTitles(ctx context.Context, q string, o SearchOpts, have []
 		}
 		h.ParentID, h.Private, h.Where, h.Score = parent, priv2 != 0, "fuzzy", sim*0.05
 		h.UpdatedAt, _ = timeutil.ParseFlexible(updated)
+		h.CreatedAt, _ = timeutil.ParseFlexible(created)
 		out = append(out, h)
 	}
 	return out, rows.Err()
@@ -312,7 +366,7 @@ func (s *Store) searchNotesPlain(ctx context.Context, variants []string, o Searc
 		if score == 0 {
 			continue
 		}
-		h := SearchHit{ID: n.ID, Title: n.Title, Score: score, Where: "body", ParentID: n.ParentID, UpdatedAt: n.UpdatedAt, Private: n.IsPrivate}
+		h := SearchHit{ID: n.ID, Title: n.Title, Score: score, Where: "body", ParentID: n.ParentID, UpdatedAt: n.UpdatedAt, CreatedAt: n.CreatedAt, Private: n.IsPrivate}
 		if inTitle {
 			h.Where = "title"
 		}

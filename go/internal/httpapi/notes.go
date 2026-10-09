@@ -6,9 +6,11 @@ import (
 	"errors"
 	"github.com/valirum/quests/go/internal/wsctx"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +25,9 @@ func (s *Server) registerNotes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes", s.listNotes)
 	mux.HandleFunc("POST /api/notes", s.createNote)
 	mux.HandleFunc("GET /api/notes/search", s.searchNotes)
+	mux.HandleFunc("POST /api/notes/{id}/feedback", s.noteFeedback)
+	mux.HandleFunc("PUT /api/notes/{id}/weight", s.noteWeight)
+	mux.HandleFunc("DELETE /api/notes/{id}/stats", s.resetNoteStats)
 	mux.HandleFunc("GET /api/notes/{id}", s.getNote)
 	mux.HandleFunc("PATCH /api/notes/{id}", s.patchNote)
 	mux.HandleFunc("DELETE /api/notes/{id}", s.deleteNote)
@@ -55,6 +60,30 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 		redactPrivateNote(r, n, read)
 		out = append(out, read)
 	}
+	if r.URL.Query().Get("sort") == "popular" {
+		// Reading history: decayed score first, then the boost (newness, manual weight); explained per note.
+		born := make(map[int64]time.Time, len(rows))
+		for _, n := range rows {
+			born[n.ID] = n.CreatedAt
+		}
+		pop, perr := s.Store.Popularity(r.Context(), born)
+		if perr != nil {
+			writeErr(w, 500, perr.Error())
+			return
+		}
+		for _, read := range out {
+			id, _ := read["id"].(int64)
+			p := pop[id]
+			read["popularity"] = p
+		}
+		sort.SliceStable(out, func(i, j int) bool {
+			pi, pj := out[i]["popularity"].(store.NotePopularity), out[j]["popularity"].(store.NotePopularity)
+			if pi.Score != pj.Score {
+				return pi.Score > pj.Score
+			}
+			return pi.Boost > pj.Boost
+		})
+	}
 	writeJSON(w, 200, out)
 }
 
@@ -83,7 +112,25 @@ func (s *Server) getNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	s.countRead(r, n)
 	writeJSON(w, 200, s.notePayloadFiltered(r, n))
+}
+
+// countRead feeds the reading signal (quest=353): only the web UI (a person) and MCP (an agent)
+// report reads — the CLI, bots, exports and other background clients do not — and an agent
+// reading a PRIVATE note, which it only sees as a placeholder, is not interest either.
+func (s *Server) countRead(r *http.Request, n store.Note) {
+	src := requestSource(r)
+	if src == nil || (*src != "web" && *src != "mcp") {
+		return
+	}
+	agent := *src == "mcp"
+	if agent && n.IsPrivate {
+		return
+	}
+	if _, err := s.Store.RecordNoteOpen(r.Context(), n.ID, agent); err != nil {
+		log.Printf("notes: counting a read of note %d: %v", n.ID, err)
+	}
 }
 
 func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
@@ -594,6 +641,7 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 	opts := store.SearchOpts{Limit: limit}
 	if src := requestSource(r); src != nil && *src == "mcp" {
 		opts.ExcludePrivate = true
+		opts.Agent = true
 	}
 	hits, err := s.Store.SearchNotes(r.Context(), q.Get("q"), opts)
 	if err != nil {
@@ -601,4 +649,80 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"q": strings.TrimSpace(q.Get("q")), "hits": hits, "marks": []string{store.MarkOpen, store.MarkClose}})
+}
+
+// noteFeedback is the cheap explicit signal: this note was useful (or misleading) for the task at hand.
+func (s *Server) noteFeedback(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := s.noteForStats(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Useful *bool `json:"useful"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&body); err != nil || body.Useful == nil {
+		writeErr(w, http.StatusBadRequest, `body: {"useful": true|false}`)
+		return
+	}
+	if err := s.Store.RateNote(r.Context(), id, *body.Useful); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writePopularity(w, r, n)
+}
+
+// noteWeight sets the manual lever: −2 (misleading) … +2 (always worth a look).
+func (s *Server) noteWeight(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := s.noteForStats(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Weight *int `json:"weight"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&body); err != nil || body.Weight == nil || *body.Weight < -2 || *body.Weight > 2 {
+		writeErr(w, http.StatusBadRequest, `body: {"weight": -2..2}`)
+		return
+	}
+	if err := s.Store.SetNoteWeight(r.Context(), id, *body.Weight); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writePopularity(w, r, n)
+}
+
+// resetNoteStats forgets what was counted for the note (a mistaken streak of opens, a stale favourite).
+func (s *Server) resetNoteStats(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := s.noteForStats(w, r)
+	if !ok {
+		return
+	}
+	if err := s.Store.ResetNoteStats(r.Context(), id); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writePopularity(w, r, n)
+}
+
+func (s *Server) noteForStats(w http.ResponseWriter, r *http.Request) (int64, store.Note, bool) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	n, err := s.Store.GetNote(r.Context(), id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "Note not found")
+		return 0, n, false
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return 0, n, false
+	}
+	return id, n, true
+}
+
+func (s *Server) writePopularity(w http.ResponseWriter, r *http.Request, n store.Note) {
+	pop, err := s.Store.Popularity(r.Context(), map[int64]time.Time{n.ID: n.CreatedAt})
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, pop[n.ID])
 }
