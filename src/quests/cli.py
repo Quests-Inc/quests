@@ -208,7 +208,7 @@ def _exec_go_cli(argv_list: list[str]) -> int:
             subprocess.check_call([str(build)], env=env)
         if not binary.is_file():
             print(
-                f"error: Go CLI binary not found at {binary}; run ./scripts/build-cli.sh",
+                f"error: Go CLI binary not found at {binary}; run `just build-cli`",
                 file=sys.stderr,
             )
             return 1

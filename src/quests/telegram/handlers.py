@@ -584,10 +584,11 @@ def build_router(
                 prompt, no_clarify=any(r == "assistant" for r, _ in (history or []))
             )
         except ApiError as e:
+            reason = str(e)
             await tg_soft(lambda: wait.delete(), label="llm-wait-del")
             await _purge_dialog(message.bot, state, chat_id)
             await tg_retry(
-                lambda: message.answer(f"LLM: {e}", reply_markup=reply_kb),
+                lambda: message.answer(f"LLM: {reason}", reply_markup=reply_kb),
                 label="llm-err",
             )
             return

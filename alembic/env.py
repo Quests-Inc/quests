@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
+from alembic import context
+
 # Import models so metadata is populated.
 from quests import models as _models  # noqa: F401
-from quests.config import DATABASE_URL_SYNC, DATA_DIR
+from quests.config import DATA_DIR, DATABASE_URL_SYNC
 
 config = context.config
 if config.config_file_name is not None:

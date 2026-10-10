@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from gi.repository import Gdk, Gtk, Gtk4LayerShell as LayerShell, Pango
+from gi.repository import Gdk, Gtk, Pango
+from gi.repository import Gtk4LayerShell as LayerShell
 
 from ..stylepacks import active_pack, build_minor_log_css
 from .minor import MINOR_CHANGE

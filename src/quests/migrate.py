@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
-from quests.config import DATABASE_URL_SYNC, DATA_DIR, DB_PATH, IS_POSTGRES, ROOT
+from alembic import command
+from quests.config import DATA_DIR, DATABASE_URL_SYNC, DB_PATH, IS_POSTGRES, ROOT
 
 ALEMBIC_INI = ROOT / "alembic.ini"
 

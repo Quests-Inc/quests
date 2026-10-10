@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from gi.repository import Gtk, Gtk4LayerShell as LayerShell
+from gi.repository import Gtk
+from gi.repository import Gtk4LayerShell as LayerShell
 
 from .monitors import list_monitors
 

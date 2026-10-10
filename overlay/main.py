@@ -29,7 +29,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk4LayerShell", "1.0")
 
-from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell as LayerShell
+from gi.repository import Gdk, GLib, Gtk
+from gi.repository import Gtk4LayerShell as LayerShell
 
 from . import config as overlay_config
 from .hud import (

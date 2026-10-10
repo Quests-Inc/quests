@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import cairo
-from gi.repository import Gtk, Gtk4LayerShell as LayerShell
+from gi.repository import Gtk
+from gi.repository import Gtk4LayerShell as LayerShell
 
 
 def _surface_size(window: Gtk.Window) -> tuple[int, int] | None:

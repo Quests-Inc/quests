@@ -5,7 +5,8 @@ from __future__ import annotations
 import math
 from collections import deque
 
-from gi.repository import GLib, Gtk, Gtk4LayerShell as LayerShell, Pango
+from gi.repository import GLib, Gtk, Pango
+from gi.repository import Gtk4LayerShell as LayerShell
 
 from ..hud.monitors import list_monitors
 from ..services.idle_notify import get_idle_monitor

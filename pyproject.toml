@@ -62,3 +62,30 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.8",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# alembic/versions is history: never reformat applied migrations.
+extend-exclude = ["overlay/_vendor", "alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# Formatting is not enforced (yet) — long lines are tolerated.
+ignore = [
+    "E501",
+    "UP042", # (str, Enum) → StrEnum would change str()/format() of the DB enums
+    "UP047", # PEP 695 generics: not worth rewriting working helpers
+]
+
+[tool.ruff.lint.per-file-ignores]
+# sys.path / env tweaks have to run before the GTK imports.
+"overlay/**" = ["E402"]
+# the closure runs synchronously inside the iteration that defines it.
+"overlay/services/ipc.py" = ["B023"]
+"scripts/pipelines/**" = ["B023"]
+# `%` formatting keeps the probe output templates readable.
+"scripts/security_probe.py" = ["UP031"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["quests", "overlay"]

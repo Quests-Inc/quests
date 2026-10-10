@@ -5,7 +5,8 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from gi.repository import Gdk, Gtk, Gtk4LayerShell as LayerShell
+from gi.repository import Gdk, Gtk
+from gi.repository import Gtk4LayerShell as LayerShell
 
 
 def list_monitors(display: Gdk.Display | None = None) -> list[Gdk.Monitor]:

@@ -34,10 +34,10 @@ import os
 import subprocess
 import sys
 import tempfile
-import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -250,12 +250,12 @@ def _api_upload_file(
             f"--{boundary}\r\n"
             f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
             f"{value}\r\n"
-        ).encode("utf-8")
+        ).encode()
     parts += (
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
         f"Content-Type: {content_type}\r\n\r\n"
-    ).encode("utf-8") + raw + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    ).encode() + raw + f"\r\n--{boundary}--\r\n".encode()
     body = bytes(parts)
     url = f"{API_BASE}{path}"
     headers = {
@@ -509,7 +509,6 @@ def get_base_context(
             "significance": q.get("significance"),
             "pinned": q.get("pinned"),
             "overlay_hidden": q.get("overlay_hidden"),
-        "overlay_hidden": q.get("overlay_hidden"),
             "category_id": q.get("category_id"),
             "category_slug": q.get("category_slug"),
             "category_label": q.get("category_label"),
@@ -603,8 +602,6 @@ def _quests_by_status_context(
                 "significance": q.get("significance"),
                 "pinned": q.get("pinned"),
                 "overlay_hidden": q.get("overlay_hidden"),
-            "overlay_hidden": q.get("overlay_hidden"),
-        "overlay_hidden": q.get("overlay_hidden"),
                 "deadline_at": q.get("deadline_at"),
                 "questline_id": q.get("questline_id"),
                 "questline_title": q.get("questline_title"),

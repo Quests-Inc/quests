@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 def _parse_utc(value) -> datetime | None:
@@ -19,15 +19,15 @@ def _parse_utc(value) -> datetime | None:
         except ValueError:
             return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def remaining_seconds(deadline_at, *, now: datetime | None = None) -> int | None:
     deadline = _parse_utc(deadline_at)
     if deadline is None:
         return None
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     return int((deadline - now).total_seconds())
 
 
@@ -39,7 +39,7 @@ def is_urgent(deadline_at, duration_seconds, *, now: datetime | None = None) -> 
     deadline = _parse_utc(deadline_at)
     if deadline is None or not duration_seconds:
         return False
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     start = deadline - timedelta(seconds=max(1, int(duration_seconds)))
     return start < now
 

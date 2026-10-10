@@ -22,15 +22,15 @@ import base64
 import getpass
 import hashlib
 import hmac
-import struct
-import time
 import http.cookiejar
 import io
 import json
 import os
 import re
 import secrets
+import struct
 import sys
+import time
 import urllib.error
 import urllib.request
 import zlib

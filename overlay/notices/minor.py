@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 
-from gi.repository import GLib, Gtk, Gtk4LayerShell as LayerShell
+from gi.repository import GLib, Gtk
+from gi.repository import Gtk4LayerShell as LayerShell
 
 from .shared import animate_opacity, clear_box, clickthrough, pack_timing
 

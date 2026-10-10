@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-UTC = timezone.utc
+UTC = UTC
 
 
 def ensure_utc(dt: datetime | None) -> datetime | None:

@@ -2,7 +2,6 @@ import pytest
 
 from quests import mcp_server as m
 
-
 ROWS = [
     {"id": 1, "outdated": True, "is_private": False, "pinned": False},
     {"id": 2, "outdated": False, "is_private": True, "pinned": True},
