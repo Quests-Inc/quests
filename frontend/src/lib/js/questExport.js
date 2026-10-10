@@ -1,7 +1,7 @@
 import { listAttachments } from './api.js'
 import { downloadPdf } from './pdfExport.js'
-import { buildQuestPdfDocument } from './questPdfDocument.js'
 import { significanceLabel, periodBadge, quantifiedProgress } from './questFormat.js'
+import { buildQuestPdfDocument } from './questPdfDocument.js'
 
 /**
  * @param {{ id?: number | null, title?: string }} quest
@@ -65,5 +65,8 @@ export async function downloadQuestPdf(quest, opts = {}) {
   } catch {
     // attachments are a nice-to-have in the export; don't block on them
   }
-  await downloadPdf(buildQuestPdfDocument(quest, { ...opts, attachments }, { significanceLabel, periodBadge, quantifiedProgress }), questExportFilename(quest))
+  await downloadPdf(
+    buildQuestPdfDocument(quest, { ...opts, attachments }, { significanceLabel, periodBadge, quantifiedProgress }),
+    questExportFilename(quest)
+  )
 }

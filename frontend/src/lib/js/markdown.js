@@ -1,4 +1,3 @@
-import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
@@ -15,6 +14,8 @@ import sql from 'highlight.js/lib/languages/sql'
 import typescript from 'highlight.js/lib/languages/typescript'
 import xml from 'highlight.js/lib/languages/xml'
 import yaml from 'highlight.js/lib/languages/yaml'
+import { marked } from 'marked'
+
 import { REF_RE, refHref } from './refs.js'
 
 hljs.registerLanguage('bash', bash)
@@ -76,9 +77,7 @@ marked.use({
       const canon = LANG_CANON[rawLang] || rawLang
       const highlighted = highlightFence(text, canon || rawLang)
       const langAttr = canon ? ` data-lang="${escapeAttr(canon)}"` : ''
-      const classAttr = canon
-        ? ` class="hljs language-${escapeAttr(canon)}"`
-        : ' class="hljs"'
+      const classAttr = canon ? ` class="hljs language-${escapeAttr(canon)}"` : ' class="hljs"'
       return `<div class="md-codeblock"${langAttr}><pre><code${classAttr}>${highlighted}</code></pre></div>\n`
     },
   },
@@ -101,11 +100,7 @@ function highlightFence(code, lang) {
 }
 
 function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 function escapeAttr(s) {
@@ -209,9 +204,9 @@ function linkifyRefs(source, opts = {}) {
       const chunk = part
         .replace(ATTACHMENT_IMG_RE, (_, alt, id) => `![${alt}](${attachmentImageSrc(id)})`)
         .replace(REF_RE, (full, kind, id) => {
-        const label = labels[`${kind}:${id}`] || full
-        return `[${label}](${refHref(kind, id)})`
-      })
+          const label = labels[`${kind}:${id}`] || full
+          return `[${label}](${refHref(kind, id)})`
+        })
       return chunk
     })
     .join('')

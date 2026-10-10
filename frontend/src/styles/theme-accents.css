@@ -93,11 +93,7 @@
 /* Picked: the option's own colour, or the accent when it has none. */
 .opt-slider .opt-slider__opt.opt-slider__opt--on {
   color: var(--opt-color-on, var(--opt-color, var(--color-accent, #c9a227)));
-  background: color-mix(
-    in srgb,
-    var(--opt-color, var(--color-accent, #c9a227)) 30%,
-    var(--color-bg, #121212)
-  );
+  background: color-mix(in srgb, var(--opt-color, var(--color-accent, #c9a227)) 30%, var(--color-bg, #121212));
   /* Ring is an inset shadow and the weight stays put: bolding the picked
      option widened its min-content, and with flex:1 1 0 siblings it made the
      row twitch on every toggle. Colour and fill carry the state already. */

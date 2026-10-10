@@ -48,7 +48,13 @@ export function applyDraft(graph, ops) {
   // Tokens typed into a new thing's own text are real links once saved.
   const textRefs = (from, text) => {
     for (const r of parseRefs(text || '')) {
-      if (r.kind === 'quest' || r.kind === 'note' || r.kind === 'step' || r.kind === 'attachment' || r.kind === 'questline') {
+      if (
+        r.kind === 'quest' ||
+        r.kind === 'note' ||
+        r.kind === 'step' ||
+        r.kind === 'attachment' ||
+        r.kind === 'questline'
+      ) {
         addEdge(from, `${r.kind}:${r.id}`, 'reference', 'add', null)
       }
     }
@@ -63,7 +69,13 @@ export function applyDraft(graph, ops) {
         textRefs(tmpKey('quest', op.id), f.description)
         // A quest made inside a questline hangs off it.
         if (f.questline_id != null && byKey.has(`questline:${f.questline_id}`)) {
-          edges.push({ from: `questline:${f.questline_id}`, to: tmpKey('quest', op.id), kind: 'structure', draft: 'add', op: op.id })
+          edges.push({
+            from: `questline:${f.questline_id}`,
+            to: tmpKey('quest', op.id),
+            kind: 'structure',
+            draft: 'add',
+            op: op.id,
+          })
         }
         break
       }
@@ -81,7 +93,12 @@ export function applyDraft(graph, ops) {
       }
       case 'create_step': {
         const f = p.fields || {}
-        const n = stub('step', op.id, f.title, { desc: f.description || '', progress: '0/1', status: 'open', pos: p.pos })
+        const n = stub('step', op.id, f.title, {
+          desc: f.description || '',
+          progress: '0/1',
+          status: 'open',
+          pos: p.pos,
+        })
         textRefs(n.key, f.description)
         if (p.quest) ownerOf.set(n.key, p.quest)
         break
@@ -114,7 +131,13 @@ export function applyDraft(graph, ops) {
         // Taken out of its questline: the ownership line is struck out.
         if ('questline_id' in f) {
           for (const e of edges) {
-            if (e.kind === 'structure' && e.to === p.id && e.from.startsWith('questline:') && e.draft !== 'add' && e.draft !== 'remove') {
+            if (
+              e.kind === 'structure' &&
+              e.to === p.id &&
+              e.from.startsWith('questline:') &&
+              e.draft !== 'add' &&
+              e.draft !== 'remove'
+            ) {
               e.draft = 'remove'
               e.op = op.id
             }
@@ -169,7 +192,9 @@ export function applyDraft(graph, ops) {
           if (f.title != null) n.title = f.title
           if (f.description != null) n.desc = f.description
           if (f.progress_current != null || f.progress_total != null) {
-            const [c0, t0] = String(n.progress || '0/1').split('/').map(Number)
+            const [c0, t0] = String(n.progress || '0/1')
+              .split('/')
+              .map(Number)
             const c = f.progress_current ?? c0
             const t = f.progress_total ?? t0
             n.progress = `${c}/${t}`
@@ -283,17 +308,25 @@ export function describeOp(op, title) {
     case 'attach':
       return `Прикрепить «${title(p.item)}» к «${title(p.owner)}»`
     case 'edit_quest':
-      if (p.fields && Object.keys(p.fields).length === 1 && 'questline_id' in p.fields && p.fields.questline_id == null) {
+      if (
+        p.fields &&
+        Object.keys(p.fields).length === 1 &&
+        'questline_id' in p.fields &&
+        p.fields.questline_id == null
+      ) {
         return `Вывести квест «${title(p.id)}» из квестлайна`
       }
       return `Изменить квест «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'edit_note':
       return `Изменить заметку «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'edit_step':
-      if (p.fields?.wait_previous === false && Object.keys(p.fields).length === 1) return `Шаг «${title(p.id)}» больше не ждёт предыдущий`
+      if (p.fields?.wait_previous === false && Object.keys(p.fields).length === 1)
+        return `Шаг «${title(p.id)}» больше не ждёт предыдущий`
       return `Изменить шаг «${title(p.id)}»: ${Object.keys(p.fields || {}).join(', ')}`
     case 'set_parent':
-      return p.parent ? `Заметка «${title(p.id)}» → под «${title(p.parent)}»` : `Заметка «${title(p.id)}» — открепить${p.was ? ` от «${title(p.was)}»` : ''}`
+      return p.parent
+        ? `Заметка «${title(p.id)}» → под «${title(p.parent)}»`
+        : `Заметка «${title(p.id)}» — открепить${p.was ? ` от «${title(p.was)}»` : ''}`
     case 'copy':
       return `Копия «${title(p.source)}»`
     default:

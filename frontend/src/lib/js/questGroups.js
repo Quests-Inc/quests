@@ -13,9 +13,7 @@ export function groupQuestsByCategory(list, categories, questlines) {
     buckets.get(key).push(q)
   }
   const ordered = []
-  const sortedCats = [...categories].sort(
-    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id,
-  )
+  const sortedCats = [...categories].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id)
   for (const c of sortedCats) {
     const key = `c${c.id}`
     if (!buckets.has(key)) continue

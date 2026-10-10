@@ -36,14 +36,7 @@ function clearTimer(id) {
 export function toast(message, opts = {}) {
   const id = opts.id ?? `t${++seq}`
   const kind = opts.kind ?? 'info'
-  const ttl =
-    opts.ttl !== undefined
-      ? opts.ttl
-      : kind === 'progress'
-        ? null
-        : kind === 'error'
-          ? 5200
-          : 2200
+  const ttl = opts.ttl !== undefined ? opts.ttl : kind === 'progress' ? null : kind === 'error' ? 5200 : 2200
 
   const entry = { id, kind, message: String(message || '').trim() || '…' }
   const idx = toasts.findIndex((t) => t.id === id)
@@ -58,7 +51,7 @@ export function toast(message, opts = {}) {
   if (ttl != null && ttl > 0) {
     timers.set(
       id,
-      setTimeout(() => dismissToast(id), ttl),
+      setTimeout(() => dismissToast(id), ttl)
     )
   }
   return id

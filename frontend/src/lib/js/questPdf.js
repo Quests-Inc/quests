@@ -53,7 +53,9 @@ function pdfFilename(quest) {
  */
 function wrapLines(ctx, text, maxWidth, font) {
   ctx.font = font
-  const words = String(text || '').split(/\s+/).filter(Boolean)
+  const words = String(text || '')
+    .split(/\s+/)
+    .filter(Boolean)
   if (!words.length) return ['']
   const lines = []
   let cur = words[0]
@@ -138,15 +140,8 @@ export async function downloadQuestPdfSimple(quest) {
     }
     if (!first) doc.addPage()
     first = false
-    const imgH = (h / pxPerMm)
-    doc.addImage(
-      canvas.toDataURL('image/png'),
-      'PNG',
-      MARGIN,
-      MARGIN,
-      CONTENT_W,
-      Math.min(imgH, PAGE_H - MARGIN * 2),
-    )
+    const imgH = h / pxPerMm
+    doc.addImage(canvas.toDataURL('image/png'), 'PNG', MARGIN, MARGIN, CONTENT_W, Math.min(imgH, PAGE_H - MARGIN * 2))
     pageBlocks = []
     used = 0
   }

@@ -218,7 +218,7 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
         (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
         // Steps keep the order they are worked in; the rest sort by title.
         (a.type === 'step' && b.type === 'step' ? (a.sort ?? 0) - (b.sort ?? 0) : 0) ||
-        String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru'),
+        String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru')
     )
   for (const list of kids.values()) sortKids(list)
 
@@ -230,7 +230,7 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
       if (loose?.has(owner.key)) continue
       const list = kids.get(owner.key) ?? []
       for (const type of BALL_TYPES) {
-        const leaves = list.filter((c) => c.type === type && !(kids.get(c.key)?.length))
+        const leaves = list.filter((c) => c.type === type && !kids.get(c.key)?.length)
         if (leaves.length < BALL_MIN) continue
         const pack = packBall(leaves)
         const g = {
@@ -250,7 +250,7 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
         const drop = new Set(leaves)
         kids.set(
           owner.key,
-          list.filter((c) => !drop.has(c)),
+          list.filter((c) => !drop.has(c))
         )
         kids.get(owner.key).push(g)
         kids.set(g.key, [])
@@ -389,7 +389,11 @@ export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
     kids.get(parentOf.get(n.key)?.p ?? roots[0].key)?.push(n)
   }
   for (const list of kids.values()) {
-    list.sort((a, b) => (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) || String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru'))
+    list.sort(
+      (a, b) =>
+        (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
+        String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru')
+    )
   }
   const weight = new Map()
   const wOf = (n) => {

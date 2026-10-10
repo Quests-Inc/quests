@@ -25,8 +25,17 @@ export const KINDS = {
 
 /** Details that only repeat what the kind label already says. */
 const GENERIC = new Set([
-  'создано задание', 'изменено', 'удалено', 'удалена', 'изменена', 'создана',
-  'загружено', 'просрочено', 'провалено', 'завершено', 'создано',
+  'создано задание',
+  'изменено',
+  'удалено',
+  'удалена',
+  'изменена',
+  'создана',
+  'загружено',
+  'просрочено',
+  'провалено',
+  'завершено',
+  'создано',
 ])
 
 /** @param {any} r */
@@ -35,4 +44,3 @@ export function detailOf(r) {
   if (!d || d === r.title || GENERIC.has(d.toLowerCase())) return ''
   return d
 }
-

@@ -21,9 +21,7 @@ export function downloadNoteMarkdown(note) {
   if (!note) return
   const title = String(note.title || '').trim() || `note=${note.id ?? ''}`
   const body = String(note.description || '')
-  const text = body.trimStart().startsWith('#')
-    ? body
-    : `# ${title}\n\n${body}`
+  const text = body.trimStart().startsWith('#') ? body : `# ${title}\n\n${body}`
   const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -51,6 +49,6 @@ export async function downloadNotePdf(note, opts = {}) {
       labels: opts.labels || {},
       blocks: [{ type: 'markdown', markdown: String(note.description || ''), empty: '(пусто)' }],
     },
-    noteExportFilename(note, 'pdf'),
+    noteExportFilename(note, 'pdf')
   )
 }

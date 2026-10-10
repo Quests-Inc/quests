@@ -3,7 +3,7 @@
  * Apply with <html data-theme="gruvbox-yellow">.
  */
 
-[data-theme="gruvbox-yellow"] {
+[data-theme='gruvbox-yellow'] {
   --color-bg: #1d2021;
   --color-bg-raised: #282828;
   --color-bg-muted: #3c3836;
@@ -44,10 +44,10 @@
   --color-timer-warn: #fabd2f;
   --color-timer-urgent: #fb4934;
 
-  --font-display: "Literata", "Iowan Old Style", Palatino, serif;
-  --font-body: "Source Serif 4", Georgia, serif;
-  --font-ui: "IBM Plex Sans", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: 'Literata', 'Iowan Old Style', Palatino, serif;
+  --font-body: 'Source Serif 4', Georgia, serif;
+  --font-ui: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   --radius-sm: 2px;
   --radius-md: 3px;

@@ -7,7 +7,7 @@
  * Example: [data-theme="my-parchment"] { --color-bg: #…; }
  */
 
-[data-theme="custom-example"] {
+[data-theme='custom-example'] {
   --color-bg: #0f1419;
   --color-bg-raised: #151b22;
   --color-bg-muted: #1c2430;

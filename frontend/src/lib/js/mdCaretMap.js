@@ -143,10 +143,7 @@ export function scrollRootToTextOffset(root, renderedOffset, opts = {}) {
   const range = rangeFromTextOffset(root, renderedOffset)
   if (!range) return
   const node = range.startContainer
-  const el =
-    node.nodeType === Node.ELEMENT_NODE
-      ? /** @type {Element} */ (node)
-      : node.parentElement
+  const el = node.nodeType === Node.ELEMENT_NODE ? /** @type {Element} */ (node) : node.parentElement
   el?.scrollIntoView({ block: opts.block ?? 'center', inline: 'nearest' })
 }
 

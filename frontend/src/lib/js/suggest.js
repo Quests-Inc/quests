@@ -23,10 +23,11 @@ const KEEP = { share: 0.55, minSim: 0.07 }
 const TITLE_WEIGHT = 2
 
 function tokens(text) {
-  const words = String(text || '')
-    .toLowerCase()
-    .replaceAll('ё', 'е')
-    .match(/[a-zа-я0-9]+/g) || []
+  const words =
+    String(text || '')
+      .toLowerCase()
+      .replaceAll('ё', 'е')
+      .match(/[a-zа-я0-9]+/g) || []
   const out = [...words]
   for (const w of words) {
     const p = ` ${w} `
@@ -118,7 +119,11 @@ export function nearestVote(index, query, target, k = SUGGEST_DEFAULTS.k) {
  * Rank tags from k nearest quests. Returns [{tag, score}] above minSim, excluding
  * already-selected slugs. Score = sum of neighbour similarities carrying that tag.
  */
-export function suggestTags(index, query, { excludeSlugs = [], k = SUGGEST_DEFAULTS.k, minSim = SUGGEST_DEFAULTS.minSim, limit = 5 } = {}) {
+export function suggestTags(
+  index,
+  query,
+  { excludeSlugs = [], k = SUGGEST_DEFAULTS.k, minSim = SUGGEST_DEFAULTS.minSim, limit = 5 } = {}
+) {
   if (!index?.n) return []
   const q = vectorize(termCounts(query.title, query.description), index.df, index.n)
   if (!q.size) return []
@@ -139,9 +144,7 @@ export function suggestTags(index, query, { excludeSlugs = [], k = SUGGEST_DEFAU
       else votes.set(tag.id, { tag, score: s })
     }
   }
-  return [...votes.values()]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+  return [...votes.values()].sort((a, b) => b.score - a.score).slice(0, limit)
 }
 
 /**

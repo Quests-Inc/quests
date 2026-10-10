@@ -17,11 +17,7 @@ export function parseApiDate(value) {
   let s = String(value).trim()
   if (!s) return null
   // "...T12:00:00" / "...T12:00:00.123456" without zone → UTC
-  if (
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) &&
-    !/[zZ]$/.test(s) &&
-    !/[+-]\d{2}:?\d{2}$/.test(s)
-  ) {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && !/[zZ]$/.test(s) && !/[+-]\d{2}:?\d{2}$/.test(s)) {
     s += 'Z'
   }
   const d = new Date(s)

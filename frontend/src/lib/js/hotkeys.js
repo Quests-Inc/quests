@@ -19,8 +19,18 @@
  */
 
 const TEXT_INPUT_TYPES = new Set([
-  'text', 'search', 'url', 'tel', 'email', 'password', 'number', 'date', 'time',
-  'datetime-local', 'month', 'week',
+  'text',
+  'search',
+  'url',
+  'tel',
+  'email',
+  'password',
+  'number',
+  'date',
+  'time',
+  'datetime-local',
+  'month',
+  'week',
 ])
 
 /** @type {Map<string, any>} */

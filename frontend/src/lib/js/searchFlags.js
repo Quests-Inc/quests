@@ -97,7 +97,9 @@ export function suggestions(raw, spec) {
   const def = spec[m[3].toLowerCase()]
   if (!def?.values) return null
   const part = m[4].toLowerCase()
-  const items = def.values.filter((v) => !part || v.id.toLowerCase().startsWith(part) || v.aliases?.some((a) => a.startsWith(part)))
+  const items = def.values.filter(
+    (v) => !part || v.id.toLowerCase().startsWith(part) || v.aliases?.some((a) => a.startsWith(part))
+  )
   return items.length ? { key: m[3].toLowerCase(), neg: m[2] === '-', items } : null
 }
 

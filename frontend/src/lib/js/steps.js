@@ -72,7 +72,11 @@ export function checkPayload(s) {
     wait_previous: cmd ? Boolean(s.wait_previous) : false,
     run_mode: cmd ? normalizeRunMode(s.run_mode) : 'poll',
     // '' tells the server to clear it; no command, no device.
-    run_on: cmd ? String(s.run_on || '').trim().toLowerCase() : '',
+    run_on: cmd
+      ? String(s.run_on || '')
+          .trim()
+          .toLowerCase()
+      : '',
   }
 }
 

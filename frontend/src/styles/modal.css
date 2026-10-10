@@ -136,7 +136,16 @@
   color: var(--color-fg-muted, #9a9a9a);
 }
 
-.modal :is(input[type='text'], input[type='number'], input[type='date'], input[type='password'], input[type='search'], textarea, select) {
+.modal
+  :is(
+    input[type='text'],
+    input[type='number'],
+    input[type='date'],
+    input[type='password'],
+    input[type='search'],
+    textarea,
+    select
+  ) {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;

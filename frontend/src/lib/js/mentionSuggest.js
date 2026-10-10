@@ -16,7 +16,7 @@ const KIND_LABEL = {
 export function matchMentions(
   query,
   { quests = [], questlines = [], notes = [], attachments = [], templates = [] } = {},
-  limit = 8,
+  limit = 8
 ) {
   const q = query.trim().toLowerCase()
   if (!q) return []

@@ -34,7 +34,10 @@ export const ENTITY_SPEC = {
 }
 
 /** Quests, notes and questlines matching the words and filters of `raw` (title or `type=id`). */
-export function findEntities(raw, { questlines = [], quests = [], notes = [], types = ['questline', 'quest', 'note'], limit = 50 }) {
+export function findEntities(
+  raw,
+  { questlines = [], quests = [], notes = [], types = ['questline', 'quest', 'note'], limit = 50 }
+) {
   const parsed = parseQuery(raw, ENTITY_SPEC)
   const q = parsed.text.toLowerCase()
   if (!q && !parsed.active) return { parsed, items: [] }

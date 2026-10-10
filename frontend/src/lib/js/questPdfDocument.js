@@ -79,4 +79,3 @@ export function buildQuestPdfDocument(quest, opts, fmt) {
     ],
   }
 }
-

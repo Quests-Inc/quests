@@ -39,9 +39,7 @@ async function request(path, options = {}) {
     try {
       data = JSON.parse(text)
     } catch {
-      const msg = res.ok
-        ? `Ответ не JSON: ${text.slice(0, 120)}`
-        : `HTTP ${res.status}: ${text.slice(0, 200)}`
+      const msg = res.ok ? `Ответ не JSON: ${text.slice(0, 120)}` : `HTTP ${res.status}: ${text.slice(0, 200)}`
       toast(msg, { kind: 'error' })
       throw new Error(msg)
     }
@@ -391,16 +389,7 @@ export function clearNoteIcon(id) {
 
 export const QUESTLINE_ICONS = ['document', 'flag', 'map', 'layers', 'target', 'scroll']
 
-export const QUESTLINE_COLORS = [
-  '#5a8a9a',
-  '#8a8578',
-  '#7a9e3a',
-  '#6a7ab8',
-  '#c47a20',
-  '#c9a227',
-  '#b54a3a',
-  '#9a9a9a',
-]
+export const QUESTLINE_COLORS = ['#5a8a9a', '#8a8578', '#7a9e3a', '#6a7ab8', '#c47a20', '#c9a227', '#b54a3a', '#9a9a9a']
 
 export const TEMPLATE_FREQS = ['daily', 'weekly']
 
@@ -419,14 +408,7 @@ export const WEEKDAY_LABELS = [
   { id: 6, label: 'Вс' },
 ]
 
-export const QUEST_STATUSES = [
-  'active',
-  'expired',
-  'frozen',
-  'completed',
-  'failed',
-  'archived',
-]
+export const QUEST_STATUSES = ['active', 'expired', 'frozen', 'completed', 'failed', 'archived']
 
 /** @type {Record<string, string>} */
 export const QUEST_STATUS_LABELS = {
@@ -452,7 +434,6 @@ export const QUEST_SIGNIFICANCES = [
   { id: 'epic', label: 'эпическое' },
   { id: 'legendary', label: 'легендарное' },
 ]
-
 
 // --- auth ---
 
@@ -581,8 +562,7 @@ export function switchWorkspace(id) {
 // --- attachments (bytes live on WebDAV; we only ever talk to the API proxy) ---
 
 function ownerAttachmentsPath(ownerType, ownerId, attachmentId) {
-  const seg =
-    ownerType === 'questline' ? 'questlines' : ownerType === 'note' ? 'notes' : 'quests'
+  const seg = ownerType === 'questline' ? 'questlines' : ownerType === 'note' ? 'notes' : 'quests'
   const base = `/api/${seg}/${ownerId}/attachments`
   return attachmentId == null ? base : `${base}/${attachmentId}`
 }
@@ -638,10 +618,11 @@ export async function uploadAttachmentRevision(ownerType, ownerId, attachmentId,
   const body = new FormData()
   body.append('file', file)
   if (comment) body.append('comment', comment)
-  const res = await fetch(
-    `${BASE}${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`,
-    { method: 'POST', credentials: 'same-origin', body },
-  )
+  const res = await fetch(`${BASE}${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    body,
+  })
   if (res.status === 401) {
     if (onUnauthorized) onUnauthorized()
     throw new UnauthorizedError()
@@ -694,10 +675,9 @@ export function deleteAttachment(ownerType, ownerId, attachmentId) {
 }
 
 export function deleteAttachmentRevision(ownerType, ownerId, attachmentId, revision) {
-  return request(
-    `${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions/${revision}`,
-    { method: 'DELETE' },
-  )
+  return request(`${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions/${revision}`, {
+    method: 'DELETE',
+  })
 }
 
 /**
@@ -725,7 +705,7 @@ export function getGraph(type, id, depth = 2, extra = [], expand = []) {
   const more = extra.map((r) => `${r.type}:${r.id}`).join(',')
   const open = expand.map((r) => `${r.type}:${r.id}${r.only ? `>${r.only}` : ''}`).join(',')
   return request(
-    `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}${open ? `&expand=${encodeURIComponent(open)}` : ''}`,
+    `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}${open ? `&expand=${encodeURIComponent(open)}` : ''}`
   )
 }
 
@@ -802,7 +782,6 @@ export function getQuestFull(id) {
 export function putGraphDraftOp(id, payload) {
   return request(`/api/graph-draft/ops/${id}`, { method: 'PUT', body: JSON.stringify({ payload }) })
 }
-
 
 // --- Runners: devices that execute checks (quests-runner), and their job queue.
 

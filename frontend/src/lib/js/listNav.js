@@ -13,7 +13,7 @@ function visibleRows() {
   // under the notes tab, hidden): take the one that is actually on screen.
   for (const root of document.querySelectorAll('[data-nav-root]')) {
     const rows = [...root.querySelectorAll('[data-nav]')].filter(
-      (el) => el instanceof HTMLElement && el.getClientRects().length > 0,
+      (el) => el instanceof HTMLElement && el.getClientRects().length > 0
     )
     if (rows.length) return rows
   }
@@ -22,7 +22,9 @@ function visibleRows() {
 
 /** The row to start from when focus is not in the list: the selected one, else null. */
 function selectedRow(rows) {
-  return rows.find((el) => el.classList.contains('quest-row--active') || el.classList.contains('notes__row--on')) ?? null
+  return (
+    rows.find((el) => el.classList.contains('quest-row--active') || el.classList.contains('notes__row--on')) ?? null
+  )
 }
 
 /**

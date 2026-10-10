@@ -37,9 +37,7 @@ const EN_TO_RU = {
   '`': 'ё',
 }
 
-const RU_TO_EN = Object.fromEntries(
-  Object.entries(EN_TO_RU).map(([en, ru]) => [ru, en]),
-)
+const RU_TO_EN = Object.fromEntries(Object.entries(EN_TO_RU).map(([en, ru]) => [ru, en]))
 
 /** Fuzzy kicks in only for longer queries; span must stay close to the needle. */
 const FUZZY_MIN_LEN = 6
@@ -102,9 +100,7 @@ export function textMatches(haystack, needle) {
 }
 
 export function questSearchBlob(quest) {
-  const steps = (quest.steps || [])
-    .map((s) => `${s.title || ''} ${s.description || ''}`)
-    .join(' ')
+  const steps = (quest.steps || []).map((s) => `${s.title || ''} ${s.description || ''}`).join(' ')
   return [
     quest.title,
     quest.description,

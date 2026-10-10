@@ -59,10 +59,10 @@
   --color-timer-urgent: #fb4934;
 
   /* Type */
-  --font-display: "Literata", "Iowan Old Style", "Palatino Linotype", serif;
-  --font-body: "Source Serif 4", "Literata", Georgia, serif;
-  --font-ui: "IBM Plex Sans", "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: 'Literata', 'Iowan Old Style', 'Palatino Linotype', serif;
+  --font-body: 'Source Serif 4', 'Literata', Georgia, serif;
+  --font-ui: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;

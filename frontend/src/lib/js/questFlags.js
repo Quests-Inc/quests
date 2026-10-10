@@ -43,7 +43,10 @@ export function questSpec({ categories = [] } = {}) {
     tag: {
       label: 'тег',
       hint: 'infra',
-      test: (q, v) => (q.tags || []).some((t) => (t.slug || '').toLowerCase() === v.toLowerCase() || (t.label || '').toLowerCase() === v.toLowerCase()),
+      test: (q, v) =>
+        (q.tags || []).some(
+          (t) => (t.slug || '').toLowerCase() === v.toLowerCase() || (t.label || '').toLowerCase() === v.toLowerCase()
+        ),
     },
     cat: {
       label: 'раздел',
@@ -53,7 +56,9 @@ export function questSpec({ categories = [] } = {}) {
     line: {
       label: 'квестлайн',
       hint: 'id',
-      test: (q, v) => String(q.questline_id) === v || (q.questline_title || '').replace(/\s+/g, '_').toLowerCase() === v.toLowerCase(),
+      test: (q, v) =>
+        String(q.questline_id) === v ||
+        (q.questline_title || '').replace(/\s+/g, '_').toLowerCase() === v.toLowerCase(),
     },
   }
 }
