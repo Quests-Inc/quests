@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -41,7 +40,7 @@ func freshDatabase(t *testing.T) string {
 
 func versionOf(t *testing.T, dbURL string) string {
 	t.Helper()
-	v, err := CurrentRevision("", dbURL)
+	v, err := CurrentRevision(dbURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,32 +156,5 @@ func TestMigratePostgresRollsBackBrokenMigration(t *testing.T) {
 	_ = raw.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'half_done'`).Scan(&n)
 	if n != 0 || versionOf(t, dbURL) != expectedAlembic {
 		t.Fatalf("a failed migration left traces: tables=%d version=%s", n, versionOf(t, dbURL))
-	}
-}
-
-func TestMigrateSQLiteCreatesFreshAndOpens(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sub", "quests.db")
-	applied, err := MigrateSQLite(path, nil)
-	if err != nil || len(applied) != 1 {
-		t.Fatalf("applied=%v err=%v", applied, err)
-	}
-	if v, _ := CurrentRevision(path, ""); v != expectedAlembicSQLite {
-		t.Fatalf("version %q", v)
-	}
-	sqlDB, st, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sqlDB.Close()
-	if st.State != "ok" {
-		t.Fatalf("state %q", st.State)
-	}
-	var cats int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM questcategory`).Scan(&cats); err != nil || cats == 0 {
-		t.Fatalf("baseline must seed categories: %d %v", cats, err)
-	}
-	again, err := MigrateSQLite(path, nil)
-	if err != nil || len(again) != 0 {
-		t.Fatalf("second run: %v %v", again, err)
 	}
 }

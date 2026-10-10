@@ -16,7 +16,7 @@ import (
 // Search over notes (quest=354). On PostgreSQL: the generated tsvector (Russian and English
 // stemming, title above body), ts_rank_cd for the order, ts_headline for the snippet, prefix
 // matching on the last word, keyboard-layout variants and pg_trgm for typos in titles.
-// Elsewhere (SQLite): a plain scorer over the loaded notes, same result shape.
+// When that fails (an extension missing, a schema mid-migration): a plain scorer over the loaded notes, same result shape.
 
 // Snippet marks around a matched word (private-use-like brackets that do not occur in prose);
 // the client escapes the text first and only then turns the marks into highlighting.
@@ -81,15 +81,12 @@ func (s *Store) SearchNotes(ctx context.Context, q string, o SearchOpts) ([]Sear
 	variants := SearchVariants(q)
 	var hits []SearchHit
 	var err error
-	if s.WorkspacesEnabled() {
-		hits, err = s.searchNotesPG(ctx, q, variants, o)
-		if err != nil {
-			log.Printf("search: postgres search failed, falling back to the plain scorer: %v", err)
-			hits, err = s.searchNotesPlain(ctx, variants, o)
-		}
-	} else {
+	hits, err = s.searchNotesPG(ctx, q, variants, o)
+	if err != nil {
+		log.Printf("search: postgres search failed, falling back to the plain scorer: %v", err)
 		hits, err = s.searchNotesPlain(ctx, variants, o)
 	}
+
 	if err != nil {
 		return nil, err
 	}

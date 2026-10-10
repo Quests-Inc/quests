@@ -78,9 +78,6 @@ func clampInt(v, lo, hi int) int {
 	return v
 }
 
-// statsReady is false where the table does not exist (SQLite, or a schema older than this code).
-func (s *Store) statsReady() bool { return s.WorkspacesEnabled() }
-
 type statRow struct {
 	score               float64
 	scoreAt, human, ag  sql.NullString
@@ -109,9 +106,6 @@ func parseTime(n sql.NullString) time.Time {
 // RecordNoteOpen counts a read: agent=false for a person in the web UI, true for an agent.
 // A second read of the same kind inside ReadDedupe changes nothing. Returns whether it counted.
 func (s *Store) RecordNoteOpen(ctx context.Context, noteID int64, agent bool) (bool, error) {
-	if !s.statsReady() {
-		return false, nil
-	}
 	now := timeutil.NowUTC()
 	r, _, err := s.loadStat(ctx, noteID)
 	if err != nil {
@@ -140,9 +134,6 @@ func (s *Store) RecordNoteOpen(ctx context.Context, noteID int64, agent bool) (b
 
 // RecordShown counts that notes were put in front of an agent (never as interest).
 func (s *Store) RecordShown(ctx context.Context, ids []int64) error {
-	if !s.statsReady() {
-		return nil
-	}
 	for _, id := range ids {
 		if _, err := s.DB.ExecContext(ctx, `INSERT INTO note_stat (note_id, shown) VALUES (?, 1)
 			ON CONFLICT (note_id) DO UPDATE SET shown = note_stat.shown + 1`, id); err != nil {
@@ -154,9 +145,6 @@ func (s *Store) RecordShown(ctx context.Context, ids []int64) error {
 
 // RateNote records an explicit judgement of a note.
 func (s *Store) RateNote(ctx context.Context, noteID int64, useful bool) error {
-	if !s.statsReady() {
-		return nil
-	}
 	now := timeutil.NowUTC()
 	r, _, err := s.loadStat(ctx, noteID)
 	if err != nil {
@@ -176,9 +164,6 @@ func (s *Store) RateNote(ctx context.Context, noteID int64, useful bool) error {
 
 // SetNoteWeight is the manual lever (−2 … +2): a note you know matters, or one that misleads.
 func (s *Store) SetNoteWeight(ctx context.Context, noteID int64, weight int) error {
-	if !s.statsReady() {
-		return nil
-	}
 	_, err := s.DB.ExecContext(ctx, `INSERT INTO note_stat (note_id, manual) VALUES (?, ?)
 		ON CONFLICT (note_id) DO UPDATE SET manual = excluded.manual`, noteID, clampInt(weight, -2, 2))
 	return err
@@ -186,9 +171,6 @@ func (s *Store) SetNoteWeight(ctx context.Context, noteID int64, weight int) err
 
 // ResetNoteStats forgets everything counted for a note (a mistaken streak of opens, a stale favourite).
 func (s *Store) ResetNoteStats(ctx context.Context, noteID int64) error {
-	if !s.statsReady() {
-		return nil
-	}
 	_, err := s.DB.ExecContext(ctx, `DELETE FROM note_stat WHERE note_id = ?`, noteID)
 	return err
 }
@@ -199,24 +181,23 @@ func (s *Store) Popularity(ctx context.Context, created map[int64]time.Time) (ma
 	now := timeutil.NowUTC()
 	for id, born := range created {
 		p := NotePopularity{}
-		if s.statsReady() {
-			r, ok, err := s.loadStat(ctx, id)
-			if err != nil {
-				return nil, err
+		r, ok, err := s.loadStat(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			p.Score = Decay(r.score, parseTime(r.scoreAt), now)
+			p.OpensHuman, p.OpensAgent, p.Shown = r.opensH, r.opensA, r.shn
+			p.RatedUp, p.RatedDown, p.Manual = r.up, r.down, r.manual
+			last := parseTime(r.human)
+			if a := parseTime(r.ag); a.After(last) {
+				last = a
 			}
-			if ok {
-				p.Score = Decay(r.score, parseTime(r.scoreAt), now)
-				p.OpensHuman, p.OpensAgent, p.Shown = r.opensH, r.opensA, r.shn
-				p.RatedUp, p.RatedDown, p.Manual = r.up, r.down, r.manual
-				last := parseTime(r.human)
-				if a := parseTime(r.ag); a.After(last) {
-					last = a
-				}
-				if !last.IsZero() {
-					p.LastReadAt = &last
-				}
+			if !last.IsZero() {
+				p.LastReadAt = &last
 			}
 		}
+
 		p.Boost = Boost(p.Score, born, now, p.Manual)
 		p.Explanation = explainBoost(p, born, now)
 		out[id] = p

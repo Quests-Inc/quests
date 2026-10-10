@@ -2,7 +2,7 @@ package schedule
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,9 +12,8 @@ import (
 	"sync"
 	"testing"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/health"
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
 )
@@ -53,54 +52,6 @@ func newFakeDAV(t *testing.T) (*httptest.Server, *sync.Map) {
 	t.Cleanup(srv.Close)
 	return srv, files
 }
-
-const backupTestSchema = `
-CREATE TABLE quest (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL
-);
-CREATE TABLE attachment (
-	id INTEGER PRIMARY KEY,
-	owner_type TEXT NOT NULL,
-	owner_id INTEGER NOT NULL,
-	filename TEXT NOT NULL,
-	webdav_path TEXT NOT NULL,
-	size_bytes INTEGER NOT NULL DEFAULT 0,
-	content_type_declared TEXT,
-	content_type_detected TEXT,
-	comment TEXT,
-	uploaded_at DATETIME,
-	scan_status TEXT,
-	scanned_at DATETIME,
-	current_revision INTEGER NOT NULL DEFAULT 1,
-	hidden INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE attachment_revision (
-	id INTEGER PRIMARY KEY,
-	attachment_id INTEGER NOT NULL,
-	revision INTEGER NOT NULL,
-	filename TEXT NOT NULL,
-	webdav_path TEXT NOT NULL,
-	size_bytes INTEGER NOT NULL DEFAULT 0,
-	content_type_declared TEXT,
-	content_type_detected TEXT,
-	comment TEXT,
-	uploaded_at DATETIME,
-	scan_status TEXT,
-	scanned_at DATETIME
-);
-CREATE TABLE backuplog (
-	id INTEGER PRIMARY KEY,
-	filename TEXT NOT NULL,
-	size_bytes INTEGER NOT NULL,
-	created_at DATETIME NOT NULL,
-	webdav_uploaded INTEGER NOT NULL DEFAULT 0,
-	remote_uploaded INTEGER NOT NULL DEFAULT 0,
-	attachments_filename TEXT,
-	attachments_size_bytes INTEGER,
-	error TEXT
-);
-`
 
 type memRemote struct {
 	mu    sync.Mutex
@@ -148,21 +99,20 @@ func (m *memRemote) len() int {
 	return len(m.files)
 }
 
+// openBackupDB is a real database; pg_dump itself is replaced by a stub that writes a
+// small file (the dump is exercised by hand/CI against a real server, not here).
 func openBackupDB(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:backup_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
-		t.Fatal(err)
+	orig := dumpDatabase
+	dumpDatabase = func(_ context.Context, url, outPath string) error {
+		if url == "" {
+			return errors.New("no database url")
+		}
+		return os.WriteFile(outPath, []byte("-- dump of "+url), 0o600)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(backupTestSchema); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`INSERT INTO quest (title) VALUES ('seed')`); err != nil {
-		t.Fatal(err)
-	}
-	return &store.Store{DB: db}
+	t.Cleanup(func() { dumpDatabase = orig })
+	pool, url := pgtest.NewWithURL(t)
+	return &store.Store{DB: pool, DatabaseURL: url}
 }
 
 func TestRunBackupOnceSnapshotsAndRecords(t *testing.T) {
@@ -272,7 +222,7 @@ func TestRunBackupOnceArchivesAttachmentsAndRemote(t *testing.T) {
 	files.Store("attachments/quest-1/a.txt", []byte("hello-attach"))
 	if _, err := st.DB.Exec(`
 		INSERT INTO attachment (owner_type, owner_id, filename, webdav_path, size_bytes, uploaded_at, scan_status, current_revision)
-		VALUES ('quest', 1, 'a.txt', 'attachments/quest-1/a.txt', 12, datetime('now'), 'clean', 1)`); err != nil {
+		VALUES ('quest', 1, 'a.txt', 'attachments/quest-1/a.txt', 12, now(), 'clean', 1)`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -345,7 +295,7 @@ func TestRunBackupOnceFlushesPendingRemote(t *testing.T) {
 }
 
 func TestAttachmentsArchiveName(t *testing.T) {
-	got := attachmentsArchiveName("quests-20260930-120000-123456789.db")
+	got := attachmentsArchiveName("quests-20260930-120000-123456789.dump")
 	want := "quests-20260930-120000-123456789-attachments.tar.zst"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)

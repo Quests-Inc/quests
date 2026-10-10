@@ -55,7 +55,7 @@ INSERT INTO note (id, title, workspace_id, created_at, updated_at) VALUES (2, 'e
 	pgtest.FixSequences(t, url)
 	t.Setenv("QUESTS_SECRET_KEY", "")
 	box, _ := secretbox.Load(t.TempDir())
-	st := &store.Store{DB: pool, PGURL: url, Box: box}
+	st := &store.Store{DB: pool, DatabaseURL: url, Box: box}
 	r := NewCheckRunner(st, events.New())
 	return r, wsctx.With(context.Background(), 1)
 }

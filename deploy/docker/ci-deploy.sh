@@ -12,10 +12,6 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE="docker compose --env-file .env -f deploy/docker/docker-compose.yml"
 
 cd "$REPO_DIR"
-# PostgreSQL overlay is switched on by POSTGRES_PASSWORD in .env (docs/postgres.md).
-if grep -q '^POSTGRES_PASSWORD=.' .env 2>/dev/null; then
-  COMPOSE="$COMPOSE -f deploy/docker/docker-compose.pg.yml"
-fi
 git fetch origin main
 git reset --hard origin/main
 

@@ -2,11 +2,12 @@
 
 Менеджер задач в духе игрового журнала: веб-UI, API и Wayland-оверлей (HUD + тосты) для niri / CachyOS.
 
-Стек: **Go (API + CLI) · SQLite · Svelte (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
+Стек: **Go (API + CLI) · PostgreSQL · Svelte (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
 
 ## Требования
 
 - Go ≥ 1.26 (сборка API/CLI)
+- Docker (локальный PostgreSQL: `just dev-db`)
 - Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (миграции, MCP, Telegram)
 - Node.js / npm (фронт)
 - Для оверлея: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
@@ -34,7 +35,7 @@ just bootstrap
 | Сборка API | `just build-server` | → `go/bin/quests-server` |
 | Фронт (HMR) | `just run-frontend` | http://127.0.0.1:5173 (нужен запущенный API) |
 | Сборка SPA | `just build-frontend` | в `frontend/dist` |
-| Миграции | `just migrate` | `quests-server migrate` (PG, если задан `QUESTS_DATABASE_URL`, иначе SQLite) |
+| Миграции | `just migrate` | `quests-server migrate` (нужен `QUESTS_DATABASE_URL`; локально — `just dev-db`) |
 | CLI | `./scripts/quests` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
 | Оверлей | `just run-overlay` | или `python -m overlay` |
 | Telegram | `just run-telegram` | HTTP-клиент к API |
@@ -78,7 +79,7 @@ quests-server token add overlay    # bearer-токен для HUD / бота / C
 Наружу инстанс без аккаунтов не поднимется — сервер откажется биндиться не на
 loopback. Подробности: [`docs/auth.md`](docs/auth.md).
 
-SQLite: `data/quests.db`.
+База — PostgreSQL (`QUESTS_DATABASE_URL`); локально `just dev-db` поднимает её в Docker, схему накатывает `quests-server migrate` (см. [`docs/postgres.md`](docs/postgres.md)).
 
 User systemd units: [`deploy/systemd/`](deploy/systemd/).  
 Деплой на сервер после клона: [`deploy/SERVER.md`](deploy/SERVER.md).  

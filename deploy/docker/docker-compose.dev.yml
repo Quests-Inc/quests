@@ -9,6 +9,25 @@
 name: quests-dev
 
 services:
+  # Local PostgreSQL for the dev API (and for `just run-server` etc.): 127.0.0.1:55433, user/password/db quests.
+  postgres:
+    image: postgres:17-bookworm
+    container_name: quests-pg-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quests
+      POSTGRES_PASSWORD: quests
+      POSTGRES_DB: quests
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - quests-dev-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quests -d quests"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   api:
     build:
       context: ../..
@@ -27,8 +46,12 @@ services:
       QUESTS_SECURE_COOKIES: "0"
       QUESTS_CLAMAV_ADDR: ""
       QUESTS_WEBDAV_URL: ""
+      QUESTS_DATABASE_URL: postgresql://quests:quests@127.0.0.1:55433/quests?sslmode=disable
       TZ: Europe/Moscow
       QUESTS_TZ: Europe/Moscow
+    depends_on:
+      postgres:
+        condition: service_healthy
     env_file:
       - .env.dev
     volumes:
@@ -40,3 +63,6 @@ services:
       timeout: 3s
       retries: 12
       start_period: 25s
+
+volumes:
+  quests-dev-pg:

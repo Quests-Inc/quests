@@ -23,7 +23,7 @@ const WorkspaceHeader = "X-Quests-Workspace"
 // PostgreSQL it is a no-op (a single implicit workspace).
 func (s *Server) withWorkspace(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.Store == nil || !s.Store.WorkspacesEnabled() {
+		if s.Store == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -99,7 +99,7 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 // without an account (auth off, the in-process token) pass: there is nobody to tell apart.
 func (s *Server) requireOwner(w http.ResponseWriter, r *http.Request, what string) bool {
 	p, ok := PrincipalFrom(r.Context())
-	if !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+	if !ok || p.User.ID == 0 {
 		return true
 	}
 	role, err := s.Store.MemberRole(r.Context(), wsctx.From(r.Context()), p.User.ID)
@@ -133,7 +133,7 @@ func (s *Server) registerWorkspaces(mux *http.ServeMux) {
 func (s *Server) memberOf(w http.ResponseWriter, r *http.Request) (int64, string, auth.User, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	p, ok := PrincipalFrom(r.Context())
-	if err != nil || id <= 0 || !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+	if err != nil || id <= 0 || !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "needs an account and a workspace id")
 		return 0, "", auth.User{}, false
 	}
@@ -242,7 +242,7 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 // otherwise username+password create a new account that joins (the only way to
 // sign up on this instance besides the admin CLI).
 func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
-	if !s.AuthRequired || !s.Store.WorkspacesEnabled() {
+	if !s.AuthRequired {
 		writeErr(w, http.StatusBadRequest, "invitations need accounts and workspaces")
 		return
 	}
@@ -332,17 +332,13 @@ func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, mergeMaps(map[string]any{"current": cur, "workspaces": list, "enabled": s.Store.WorkspacesEnabled(),
+	writeJSON(w, http.StatusOK, mergeMaps(map[string]any{"current": cur, "workspaces": list, "enabled": true,
 		// Whether this workspace may run check/emit commands on the server (else: runners only).
 		"server_exec": s.Store.ServerExecAllowed(r.Context()),
 	}, s.attachmentUsage(r.Context())))
 }
 
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
-	if !s.Store.WorkspacesEnabled() {
-		writeErr(w, http.StatusBadRequest, "workspaces need PostgreSQL")
-		return
-	}
 	p, ok := PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "creating a workspace needs an account")

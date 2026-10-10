@@ -13,6 +13,9 @@ import (
 	"github.com/valirum/quests/go/internal/webdav"
 )
 
+// dumpDatabase writes the snapshot of the database at url to outPath (pg_dump; tests replace it).
+var dumpDatabase = pgDump
+
 // backupSubdir is where local snapshots live, under the data dir — sibling
 // to the DB itself, not the OS temp dir, so it survives on the same volume
 // that gets backed up/restored as a unit.
@@ -22,7 +25,7 @@ const backupSubdir = "backups"
 // separate from the "attachments" tree that already lives there.
 const webdavBackupDir = "backups"
 
-// RunBackupLoop periodically snapshots the DB (VACUUM INTO — WAL-safe — or pg_dump on PostgreSQL), builds
+// RunBackupLoop periodically snapshots the DB (pg_dump), builds
 // an attachments archive from that snapshot, uploads to WebDAV / remote PC when
 // configured, and prunes old pairs. interval<=0 disables it entirely.
 func RunBackupLoop(ctx context.Context, st *store.Store, wd *webdav.Client, dataDir string, interval time.Duration, keep int, remote BackupRemote, reg *health.Registry) {
@@ -60,20 +63,11 @@ func RunBackupOnce(ctx context.Context, st *store.Store, wd *webdav.Client, data
 	}
 
 	now := time.Now().UTC()
-	ext, mime := ".db", "application/x-sqlite3"
-	if st.PGURL != "" {
-		ext, mime = ".dump", "application/octet-stream"
-	}
-	filename := fmt.Sprintf("quests-%s-%09d%s", now.Format("20060102-150405"), now.Nanosecond(), ext)
+	const mime = "application/octet-stream"
+	filename := fmt.Sprintf("quests-%s-%09d.dump", now.Format("20060102-150405"), now.Nanosecond())
 	localPath := filepath.Join(dir, filename)
 
-	var snapErr error
-	if st.PGURL != "" {
-		snapErr = pgDump(ctx, st.PGURL, localPath)
-	} else {
-		_, snapErr = st.DB.ExecContext(ctx, `VACUUM INTO ?`, localPath)
-	}
-	if snapErr != nil {
+	if snapErr := dumpDatabase(ctx, st.DatabaseURL, localPath); snapErr != nil {
 		reg.SetProbe("backup", "offline", snapErr.Error())
 		_, _ = st.InsertBackupLog(ctx, store.BackupInsert{Filename: filename, Error: snapErr.Error()})
 		return fmt.Errorf("snapshot: %w", snapErr)
@@ -91,14 +85,8 @@ func RunBackupOnce(ctx context.Context, st *store.Store, wd *webdav.Client, data
 	if wd != nil && wd.Configured() {
 		attName = attachmentsArchiveName(filename)
 		attPath := filepath.Join(dir, attName)
-		var paths []string
-		var archErr error
-		if st.PGURL != "" {
-			paths, archErr = listAllWebDAVPaths(ctx, st)
-		} else {
-			paths, archErr = listSnapshotWebDAVPaths(localPath)
-		}
 		var sz int64
+		paths, archErr := listAllWebDAVPaths(ctx, st)
 		if archErr == nil {
 			sz, archErr = buildAttachmentsArchive(ctx, wd, paths, attPath)
 		}

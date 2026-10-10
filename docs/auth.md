@@ -22,8 +22,8 @@ loopback, а аккаунтов нет. Забыть закрыть инстан
 
 ## Создание аккаунта
 
-Команды идут напрямую к SQLite, без HTTP — их надо выполнять на той машине, где
-лежит `quests.db`.
+Команды идут напрямую в базу (`QUESTS_DATABASE_URL`), без HTTP — их надо выполнять там,
+откуда база доступна (в Docker: `docker compose exec api quests-server …`).
 
 ```bash
 quests-server useradd <username>
@@ -57,7 +57,7 @@ quests-server token ls
 quests-server token rm <id>
 ```
 
-В БД лежит только SHA-256 хеш токена — утёкшая `quests.db` не даёт рабочих
+В БД лежит только SHA-256 хеш токена — утёкшая копия базы не даёт рабочих
 токенов. Секрет отдаётся клиенту через env:
 
 ```bash

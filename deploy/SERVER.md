@@ -224,13 +224,13 @@ systemctl --user restart quests-telegram.service   # если включён
 ## 7. Бэкапы БД / вложений и восстановление
 
 Сервер сам раз в `QUESTS_BACKUP_INTERVAL_HOURS` часов (по умолчанию 24) снимает
-консистентный снепшот `quests.db` (`VACUUM INTO`, WAL-safe) в `<data>/backups/`,
+консистентный дамп PostgreSQL (`pg_dump --format=custom`, файл `quests-….dump`) в `<data>/backups/`,
 собирает рядом `quests-…-attachments.tar.zst` по путям из **этого** снимка
 (GET с WebDAV), и:
 
-1. если настроен WebDAV — заливает `.db` в `/backups/` на том же WebDAV;
+1. если настроен WebDAV — заливает `.dump` в `/backups/` на том же WebDAV;
 2. если заданы `QUESTS_BACKUP_REMOTE_HOST` + `QUESTS_BACKUP_REMOTE_DIR` — пушит
-   пару (`.db` + `.tar.zst`) по SFTP на ПК (ключ `QUESTS_BACKUP_REMOTE_KEY`,
+   пару (`.dump` + `.tar.zst`) по SFTP на ПК (ключ `QUESTS_BACKUP_REMOTE_KEY`,
    порт `QUESTS_BACKUP_REMOTE_PORT`, по умолчанию 22).
 
 Ротация — `QUESTS_BACKUP_KEEP` последних пар (по умолчанию 14), список в
@@ -238,27 +238,30 @@ systemctl --user restart quests-telegram.service   # если включён
 `data/backups/`, `remote_uploaded=0`, следующий тик сначала дожимает pending.
 Статус — чип **backup** в `GET /api/health` (`webdav=` / `remote=`).
 
-### Восстановление БД (как раньше)
+### Восстановление БД
 
 ```bash
 # список на WebDAV
 curl -s -u "$QUESTS_WEBDAV_USER:$QUESTS_WEBDAV_PASS" \
   -X PROPFIND -H "Depth: 1" "$QUESTS_WEBDAV_URL/backups/" | grep -o '<D:href>[^<]*'
 
-# скачать снепшот
+# скачать дамп
 curl -s -u "$QUESTS_WEBDAV_USER:$QUESTS_WEBDAV_PASS" \
-  -o quests-restore.db "$QUESTS_WEBDAV_URL/backups/quests-20260927-030000-123456789.db"
+  -o quests-restore.dump "$QUESTS_WEBDAV_URL/backups/quests-20260927-030000-123456789.dump"
 
-systemctl --user stop quests-server.service    # или: docker compose stop quests-api
-cp quests-restore.db ~/Quests/data/quests.db
-systemctl --user start quests-server.service
+# восстановить в чистую БД (см. docs/postgres.md → Backups)
+docker compose stop api
+docker compose exec -T postgres createdb -U quests quests_restored
+docker compose exec -T postgres pg_restore -U quests --no-owner -d quests_restored < quests-restore.dump
+# затем переключить api на quests_restored или перенести данные; не поверх живой БД
+docker compose start api
 ```
 
 Локальная копия последнего бэкапа лежит и на самом сервере в `data/backups/`.
 
 ### Восстановление вложений с ПК
 
-Пара на ПК: `{REMOTE_DIR}/quests-…​.db` + `{REMOTE_DIR}/quests-…​-attachments.tar.zst`.
+Пара на ПК: `{REMOTE_DIR}/quests-…​.dump` + `{REMOTE_DIR}/quests-…​-attachments.tar.zst`.
 После подмены БД распаковать архив в корень WebDAV с сохранением путей
 (`attachments/quest-N/…`):
 

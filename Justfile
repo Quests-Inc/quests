@@ -2,18 +2,25 @@
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# The database every local recipe uses unless QUESTS_DATABASE_URL is set (`just dev-db` starts it).
+export QUESTS_DATABASE_URL := env("QUESTS_DATABASE_URL", "postgresql://quests:quests@127.0.0.1:55433/quests?sslmode=disable")
+
 default:
     @just --list
 
 # --- setup -----------------------------------------------------------------
 
-# Python deps (all extras), frontend deps, data dir, migrations, Go binaries.
-bootstrap:
+# Python deps (all extras), frontend deps, data dir, local PostgreSQL, Go binaries, migrations.
+bootstrap: dev-db
     uv sync --group dev --all-extras
     cd frontend && npm install
     mkdir -p data
     just build-cli build-server
     ./go/bin/quests-server migrate
+
+# Local PostgreSQL in Docker (127.0.0.1:55433, quests/quests); data survives restarts in a volume.
+dev-db:
+    docker compose -f deploy/docker/docker-compose.dev.yml up -d --wait postgres
 
 # --- build -----------------------------------------------------------------
 
@@ -37,7 +44,7 @@ build-frontend:
 
 # --- run -------------------------------------------------------------------
 
-run-server:
+run-server: dev-db
     ./scripts/run-server.sh
 
 run-frontend:
@@ -56,7 +63,7 @@ run-overlay:
 dev-api *args:
     ./scripts/dev-api-docker.sh {{ args }}
 
-# Apply schema migrations (uses QUESTS_DATABASE_URL, else data/quests.db); `just migrate current` prints the revision.
+# Apply schema migrations to QUESTS_DATABASE_URL; `just migrate current` prints the revision.
 migrate *args: build-server
     ./go/bin/quests-server migrate {{ args }}
 

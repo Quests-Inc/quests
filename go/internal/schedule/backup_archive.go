@@ -13,14 +13,13 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	_ "modernc.org/sqlite"
 
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/webdav"
 )
 
 // attachmentsArchiveName derives the sidecar archive name from the DB snapshot
-// filename (quests-….db → quests-…-attachments.tar.zst).
+// filename (quests-….dump → quests-…-attachments.tar.zst).
 func attachmentsArchiveName(dbFilename string) string {
 	base := strings.TrimSuffix(strings.TrimSuffix(dbFilename, ".db"), ".dump")
 	if base == dbFilename || base == "" {
@@ -29,27 +28,8 @@ func attachmentsArchiveName(dbFilename string) string {
 	return base + "-attachments.tar.zst"
 }
 
-// listSnapshotWebDAVPaths opens the VACUUM INTO file read-only and returns
-// every webdav_path referenced by attachment metadata in that snapshot.
-func listSnapshotWebDAVPaths(snapshotPath string) ([]string, error) {
-	dsn := "file:" + snapshotPath + "?mode=ro"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	db.SetMaxOpenConns(1)
-
-	// Tables may be absent on ancient snapshots — treat as no attachments.
-	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='attachment'`).Scan(&n); err != nil || n == 0 {
-		return nil, nil
-	}
-	return listWebDAVPaths(context.Background(), db)
-}
-
-// listAllWebDAVPaths collects attachment paths from every workspace of a live
-// PostgreSQL database (row-level security shows one workspace at a time).
+// listAllWebDAVPaths collects attachment paths from every workspace of the live
+// database (row-level security shows one workspace at a time).
 func listAllWebDAVPaths(ctx context.Context, st *store.Store) ([]string, error) {
 	var out []string
 	var firstErr error

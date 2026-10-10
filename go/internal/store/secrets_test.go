@@ -23,7 +23,7 @@ func openSecretsDB(t *testing.T) *Store {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
 	pgtest.Seed(t, pool, secretsTestSeed)
-	return &Store{DB: pool, PGURL: url}
+	return &Store{DB: pool, DatabaseURL: url}
 }
 
 var (

@@ -1,17 +1,13 @@
 # PostgreSQL
 
-The API runs on PostgreSQL when `QUESTS_DATABASE_URL` (`postgresql://user:pw@host:port/db`) is set,
-and on the SQLite file in `QUESTS_DATA_DIR` otherwise. `quests-server migrate` (run by the api image's entrypoint before the server starts) and `quests-server` both read it.
+Quests runs on PostgreSQL: `QUESTS_DATABASE_URL` (`postgresql://user:pw@host:port/db`) is required.
+`quests-server migrate` (run by the api image's entrypoint before the server starts) brings the schema up to
+date; `quests-server` itself refuses to start on an older one.
 
 ## Schema migrations
 
 Migrations are plain SQL files embedded in the binary and applied by `quests-server migrate`
-(`go/internal/db/migrate.go`):
-
-| DB | Files | Notes |
-|---|---|---|
-| PostgreSQL | `go/internal/db/sql/pg/NNNN_*.sql` | the chain that grows; each file runs in its own transaction under an advisory lock |
-| SQLite | `go/internal/db/sql/sqlite/` | a single baseline (frozen chain head `1a2b3c4d5e6f`); SQLite is for local development |
+(`go/internal/db/migrate.go`): `go/internal/db/sql/pg/NNNN_*.sql`, each in its own transaction under an advisory lock.
 
 The applied revision is kept in `alembic_version` (same table and format Alembic used), so databases
 migrated by Alembic continue from where they are. Files `0001`–`0011` carry their Alembic revision id
@@ -24,23 +20,22 @@ schema and warns on a newer one; run `quests-server migrate current` to see the 
 The table is still called `alembic_version` (and files `0001`–`0011` carry Alembic ids) because the production
 database was created by Alembic; the Alembic chain itself has been removed from the repository (see git history).
 
-Baseline conventions (kept so the Go store works unchanged on both):
+Baseline conventions:
 boolean-ish columns are `INTEGER` 0/1, timestamps are naive-UTC `TIMESTAMP`, `VARCHAR(n)` is `TEXT`
 (prod data already exceeds the declared lengths).
 
 ## Local
 
 ```bash
-export QUESTS_DATABASE_URL=postgresql://quests@127.0.0.1:5432/quests
-quests-server migrate
-./scripts/run-server.sh
+just dev-db                 # PostgreSQL in Docker: 127.0.0.1:55433, quests/quests (the Justfile exports the URL)
+just migrate                # quests-server migrate
+just run-server
 ```
 
-Go tests that need a real PG (`go/internal/db`, applies the baseline into a throwaway schema):
-
-```bash
-QUESTS_TEST_PG_URL=postgresql://quests@127.0.0.1:5432/quests go test ./go/internal/db
-```
+Go tests need a server too (`QUESTS_TEST_PG_URL`; the role must be able to CREATE DATABASE and CREATE ROLE).
+`just test-go` starts a throwaway one (`quests-pg-test`) when the variable is unset. Each test gets its own
+database, cloned from a template migrated once (`qt_tpl_<revision>`, see `go/internal/pgtest`); old templates
+and crashed runs' `qt_*` databases can be dropped freely.
 
 ## Backups
 

@@ -70,7 +70,7 @@ INSERT INTO tag (id, slug, label, created_at) VALUES (1, 'infra', 'infra', now()
 		t.Fatal(err)
 	}
 	pgtest.FixSequences(t, url)
-	return &store.Store{DB: pool, PGURL: url}
+	return &store.Store{DB: pool, DatabaseURL: url}
 }
 
 func resolveJSON(t *testing.T, st *store.Store, js string, lim store.EmitLimits) (*resolvedSpec, error) {

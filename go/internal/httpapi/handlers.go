@@ -193,7 +193,7 @@ func writeErr(w http.ResponseWriter, status int, detail string) {
 // (backup file names, schema version) and health heartbeats are theirs, not an invited member's.
 func (s *Server) isOperator(r *http.Request) bool {
 	p, ok := PrincipalFrom(r.Context())
-	if !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+	if !ok || p.User.ID == 0 {
 		return true
 	}
 	ctx := r.Context()

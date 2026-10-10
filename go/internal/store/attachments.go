@@ -499,7 +499,7 @@ func (s *Store) DeleteAttachmentRevision(ctx context.Context, attachmentID int64
 }
 
 func (s *Store) DeleteAttachment(ctx context.Context, id int64) error {
-	// CASCADE on attachment_revision when FK is present; also explicit for sqlite test schemas.
+	// CASCADE on attachment_revision when FK is present; also explicit so the rows go even where a constraint was dropped.
 	_, _ = s.DB.ExecContext(ctx, `DELETE FROM attachment_revision WHERE attachment_id = ?`, id)
 	res, err := s.DB.ExecContext(ctx, `DELETE FROM attachment WHERE id = ?`, id)
 	if err != nil {

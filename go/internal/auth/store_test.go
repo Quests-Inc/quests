@@ -11,7 +11,7 @@ import (
 // as production runs it (workspaces on).
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	return &Store{DB: pgtest.New(t), Workspaces: true}
+	return &Store{DB: pgtest.New(t)}
 }
 
 func TestCreateUser(t *testing.T) {
@@ -73,7 +73,7 @@ func TestAuthenticate(t *testing.T) {
 func newOwnerStore(t *testing.T) *Store {
 	t.Helper()
 	_, url := pgtest.NewWithURL(t)
-	return &Store{DB: pgtest.Owner(t, url), Workspaces: true}
+	return &Store{DB: pgtest.Owner(t, url)}
 }
 
 func TestAuthenticateInactiveUser(t *testing.T) {

@@ -41,7 +41,7 @@ var errNoLLM = errors.New("ассистент не настроен: задай�
 // when it has them, else the server's key if this caller may use it. source is "own" or "server".
 func (s *Server) llmSettingsFor(ctx context.Context, r *http.Request) (llmassist.Settings, string, error) {
 	base := llmassist.LoadSettings()
-	if p, ok := PrincipalFrom(ctx); ok && p.User.ID != 0 && s.Store.WorkspacesEnabled() && s.Secrets != nil {
+	if p, ok := PrincipalFrom(ctx); ok && p.User.ID != 0 && s.Secrets != nil {
 		row, err := s.Store.GetUserLLM(ctx, p.User.ID)
 		switch {
 		case err == nil && row.KeySealed != "":
@@ -75,7 +75,7 @@ type llmView struct {
 
 func (s *Server) llmView(r *http.Request) (llmView, error) {
 	v := llmView{Providers: llmassist.Providers, Provider: "groq", TextLimit: maxAssistantText}
-	if p, ok := PrincipalFrom(r.Context()); ok && p.User.ID != 0 && s.Store.WorkspacesEnabled() && s.Secrets != nil {
+	if p, ok := PrincipalFrom(r.Context()); ok && p.User.ID != 0 && s.Secrets != nil {
 		v.Storage = true
 		row, err := s.Store.GetUserLLM(r.Context(), p.User.ID)
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
@@ -114,7 +114,7 @@ func (s *Server) llmSessionUser(w http.ResponseWriter, r *http.Request) (int64, 
 		writeErr(w, http.StatusForbidden, "the assistant key is managed from the web interface, not with a token")
 		return 0, false
 	}
-	if !s.Store.WorkspacesEnabled() || s.Secrets == nil {
+	if s.Secrets == nil {
 		writeErr(w, http.StatusConflict, "личный ключ хранится только при PostgreSQL; на этом сервере ассистент берёт ключ из окружения")
 		return 0, false
 	}

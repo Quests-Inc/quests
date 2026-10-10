@@ -18,7 +18,7 @@ import (
 // never touch them.
 func newTestServer(t *testing.T, authRequired bool) (*Server, *auth.Store) {
 	t.Helper()
-	authStore := &auth.Store{DB: pgtest.New(t), Workspaces: true}
+	authStore := &auth.Store{DB: pgtest.New(t)}
 	s := &Server{Auth: authStore, AuthRequired: authRequired}
 	return s, authStore
 }

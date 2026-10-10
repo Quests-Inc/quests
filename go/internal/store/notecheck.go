@@ -69,12 +69,9 @@ func scanNoteCheck(sc interface{ Scan(...any) error }) (int64, NoteCheck, error)
 }
 
 // NoteChecks returns the check state of every note that has a check or is marked outdated, keyed by
-// note id (notes without either are absent). Without PostgreSQL there are no checks.
+// note id (notes without either are absent).
 func (s *Store) NoteChecks(ctx context.Context) (map[int64]NoteCheck, error) {
 	out := map[int64]NoteCheck{}
-	if !s.WorkspacesEnabled() {
-		return out, nil
-	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCheckCols+` FROM note WHERE check_command IS NOT NULL OR outdated <> 0 OR check_error <> ''`)
 	if err != nil {
 		return nil, err
@@ -92,9 +89,6 @@ func (s *Store) NoteChecks(ctx context.Context) (map[int64]NoteCheck, error) {
 
 // GetNoteCheck returns one note's check state.
 func (s *Store) GetNoteCheck(ctx context.Context, id int64) (NoteCheck, error) {
-	if !s.WorkspacesEnabled() {
-		return NoteCheck{}, nil
-	}
 	_, c, err := scanNoteCheck(s.DB.QueryRowContext(ctx, `SELECT `+noteCheckCols+` FROM note WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return NoteCheck{}, ErrNotFound
@@ -106,9 +100,6 @@ func (s *Store) GetNoteCheck(ctx context.Context, id int64) (NoteCheck, error) {
 // workspace sets a command (as for steps), and a command that would run on the server needs a
 // trusted workspace. Removing the check clears its result too: a verdict nobody renews is stale.
 func (s *Store) SetNoteCheck(ctx context.Context, id int64, command *string, interval *int, runOn *string) (NoteCheck, error) {
-	if !s.WorkspacesEnabled() {
-		return NoteCheck{}, errors.New("проверка актуальности заметок работает только с PostgreSQL")
-	}
 	cur, err := s.GetNoteCheck(ctx, id)
 	if err != nil {
 		return NoteCheck{}, err
@@ -152,9 +143,6 @@ func (s *Store) SetNoteCheck(ctx context.Context, id int64, command *string, int
 
 // RequestNoteCheckNow makes the next scheduler tick run the check (the "check now" button).
 func (s *Store) RequestNoteCheckNow(ctx context.Context, id int64) error {
-	if !s.WorkspacesEnabled() {
-		return nil
-	}
 	res, err := s.DB.ExecContext(ctx, `UPDATE note SET check_last_run_at = NULL WHERE id = ? AND check_command IS NOT NULL`, id)
 	if err != nil {
 		return err
@@ -167,9 +155,6 @@ func (s *Store) RequestNoteCheckNow(ctx context.Context, id int64) error {
 
 // DueNoteChecks lists the notes whose check should run now, in the context's workspace.
 func (s *Store) DueNoteChecks(ctx context.Context, now time.Time) ([]DueNote, error) {
-	if !s.WorkspacesEnabled() {
-		return nil, nil
-	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCheckCols+`, title FROM note WHERE check_command IS NOT NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -256,15 +241,9 @@ func (s *Store) RecordNoteCheckError(ctx context.Context, id int64, msg string, 
 	return err
 }
 
-// ErrNoteCheckPG: the freshness flag lives in the PostgreSQL schema only.
-var ErrNoteCheckPG = errors.New("пометка «устарела» работает только с PostgreSQL")
-
 // SetNoteOutdated is the hand-set flag, the same one a check's verdict writes: a person (or an agent)
 // who knows the note is stale says so, with an optional reason. A check that runs later gives its own verdict.
 func (s *Store) SetNoteOutdated(ctx context.Context, id int64, outdated bool, reason string, at time.Time) error {
-	if !s.WorkspacesEnabled() {
-		return ErrNoteCheckPG
-	}
 	now := timeutil.ToDBUTC(at)
 	var res sql.Result
 	var err error

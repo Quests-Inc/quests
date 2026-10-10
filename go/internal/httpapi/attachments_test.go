@@ -141,7 +141,7 @@ func fakeClamd(t *testing.T, reply string) string {
 func newAttachmentServer(t *testing.T, davURL, clamAddr string, maxUpload int64) *Server {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
-	st := &store.Store{DB: pool, PGURL: url}
+	st := &store.Store{DB: pool, DatabaseURL: url}
 	if maxUpload <= 0 {
 		maxUpload = 25 << 20
 	}

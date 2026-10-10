@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -15,18 +15,14 @@ import (
 
 // Migrations are plain SQL files, one per revision, applied in file order.
 //
-//	sql/pg/NNNN_<revision>_<name>.sql   PostgreSQL chain (the one that grows)
-//	sql/sqlite/...                      baseline of the frozen SQLite chain
+//	sql/pg/NNNN_<revision>_<name>.sql
 //
-// The first PostgreSQL files carry their Alembic revision id (12 hex digits) so
+// The first files carry their Alembic revision id (12 hex digits) so
 // databases migrated by Alembic carry on seamlessly; new files are named
 // NNNN_<name>.sql and their revision is the number, NNNN.
 //
 //go:embed sql/pg/*.sql
 var pgFS embed.FS
-
-//go:embed sql/sqlite/*.sql
-var sqliteFS embed.FS
 
 type Migration struct {
 	Seq      int
@@ -37,12 +33,9 @@ type Migration struct {
 
 var fileRe = regexp.MustCompile(`^(\d{4})_(?:([0-9a-f]{12})_)?([a-z0-9_]+)\.sql$`)
 
-// pgMigrations / sqliteMigrations are parsed from the embedded files; a malformed
-// set is a build defect, so it panics at start (TestEmbeddedMigrations covers it).
-var (
-	pgMigrations     = mustLoad(pgFS, "sql/pg")
-	sqliteMigrations = mustLoad(sqliteFS, "sql/sqlite")
-)
+// pgMigrations is parsed from the embedded files; a malformed set is a build defect,
+// so it panics at start (TestEmbeddedMigrations covers it).
+var pgMigrations = mustLoad(pgFS, "sql/pg")
 
 func mustLoad(fsys fs.FS, dir string) []Migration {
 	ms, err := loadMigrations(fsys, dir)
@@ -191,86 +184,20 @@ func applyPG(ctx context.Context, conn *sql.Conn, m Migration, haveRow bool) err
 	return tx.Commit()
 }
 
-// MigrateSQLite creates a fresh SQLite database at path from the baseline. An
-// existing file is only checked: its chain is frozen, an older one has to be brought
-// to the baseline with the archived Alembic chain.
-func MigrateSQLite(path string, logf func(string, ...any)) ([]string, error) {
-	if logf == nil {
-		logf = func(string, ...any) {}
-	}
-	sqlDB, st, err := openSQLite(path)
-	if err != nil {
-		return nil, err
-	}
-	defer sqlDB.Close()
-	if st != nil {
-		logf("%s", st.Detail)
-		return nil, nil
-	}
-	tx, err := sqlDB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	base := sqliteMigrations[0]
-	if _, err := tx.Exec(base.SQL); err != nil {
-		return nil, fmt.Errorf("baseline: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	logf("created %s at %s", path, base.Revision)
-	return []string{base.Revision}, nil
-}
-
-// openSQLite opens path and, when it already holds a schema, validates its revision
-// (st != nil). A nil status means an empty database that needs the baseline.
-func openSQLite(path string) (*sql.DB, *SchemaStatus, error) {
-	if err := ensureDir(path); err != nil {
-		return nil, nil, err
-	}
-	sqlDB, err := sql.Open("sqlite", fmt.Sprintf("file:%s?_pragma=busy_timeout(30000)&_pragma=foreign_keys(ON)", path))
-	if err != nil {
-		return nil, nil, err
-	}
-	var n int
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table'`).Scan(&n); err != nil {
-		_ = sqlDB.Close()
-		return nil, nil, err
-	}
-	if n == 0 {
-		return sqlDB, nil, nil
-	}
-	st, err := assertMigrated(sqlDB, expectedAlembicSQLite)
-	if err != nil {
-		_ = sqlDB.Close()
-		return nil, nil, err
-	}
-	return sqlDB, &st, nil
-}
-
-// CurrentRevision reports the revision a database is at ("" when empty).
-func CurrentRevision(path, databaseURL string) (string, error) {
-	var sqlDB *sql.DB
-	var err error
-	if databaseURL != "" {
-		sqlDB, err = sql.Open("pgx", databaseURL)
-	} else {
-		if _, statErr := os.Stat(path); statErr != nil {
-			return "", nil
-		}
-		sqlDB, err = sql.Open("sqlite", "file:"+path+"?mode=ro")
-	}
+// CurrentRevision reports the revision a database is at ("" when it has none yet).
+func CurrentRevision(databaseURL string) (string, error) {
+	sqlDB, err := sql.Open("pgx", databaseURL)
 	if err != nil {
 		return "", err
 	}
 	defer sqlDB.Close()
 	var v string
-	switch err := sqlDB.QueryRow(`SELECT version_num FROM alembic_version LIMIT 1`).Scan(&v); {
-	case err == sql.ErrNoRows:
+	err = sqlDB.QueryRow(`SELECT version_num FROM alembic_version LIMIT 1`).Scan(&v)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
 		return "", nil
 	case err != nil && strings.Contains(err.Error(), "alembic_version"):
-		return "", nil
+		return "", nil // no such table yet
 	case err != nil:
 		return "", err
 	}

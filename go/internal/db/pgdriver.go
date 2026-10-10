@@ -16,14 +16,13 @@ import (
 	"github.com/valirum/quests/go/internal/wsctx"
 )
 
-// The store layer is written in SQLite dialect (`?` placeholders,
-// Result.LastInsertId). Rather than touch ~150 call sites, the PostgreSQL
-// connection is wrapped so that
+// The store layer writes `?` placeholders and relies on Result.LastInsertId. Rather
+// than touch ~150 call sites, the PostgreSQL connection is wrapped so that
 //   - `?` placeholders become `$1, $2, …` (quotes respected), and
 //   - a plain `INSERT INTO t …` gets `RETURNING id` appended and its
 //     LastInsertId is served from the returned row.
 //
-// Everything else must be portable SQL (ON CONFLICT, LIKE, …).
+// Everything else is plain PostgreSQL.
 //
 // Workspaces: the workspace on the statement's context (wsctx) is written to
 // the session setting app.workspace_id before the statement runs, which is what
@@ -217,7 +216,7 @@ func (c *pgConn) IsValid() bool {
 }
 
 func (c *pgConn) CheckNamedValue(nv *driver.NamedValue) error {
-	// Boolean-ish columns are INTEGER 0/1 in the PG schema (as they are in SQLite), so a
+	// Boolean-ish columns are INTEGER 0/1 in the schema (production data predates PostgreSQL), so a
 	// Go bool argument is sent as that integer.
 	if b, ok := nv.Value.(bool); ok {
 		if b {

@@ -30,7 +30,7 @@ func openChecksDB(t *testing.T) *store.Store {
 		}
 	}
 	pgtest.FixSequences(t, url)
-	return &store.Store{DB: pool, PGURL: url}
+	return &store.Store{DB: pool, DatabaseURL: url}
 }
 
 func TestParseCheckStdout(t *testing.T) {

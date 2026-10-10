@@ -24,9 +24,6 @@ var (
 
 type Store struct {
 	DB *sql.DB
-	// Workspaces enables workspace resolution (PostgreSQL with the workspaces
-	// migration). Off, every caller is in workspace 1 and no workspace table is read.
-	Workspaces bool
 	// Box seals the second-factor secrets (nil = two-factor sign-in is not offered).
 	Box *secretbox.Box
 }
@@ -47,9 +44,6 @@ var ErrNotMember = errors.New("not a member of that workspace")
 // resolveWorkspace picks the workspace for a session/token: the one it is
 // pinned to if the user is still a member, else the user's first membership.
 func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64, strict bool) (int64, error) {
-	if !s.Workspaces {
-		return DefaultWorkspaceID, nil
-	}
 	if pinned.Valid {
 		ok, err := s.IsMember(userID, pinned.Int64)
 		if err != nil {
@@ -76,9 +70,6 @@ func (s *Store) resolveWorkspace(userID int64, pinned sql.NullInt64, strict bool
 }
 
 func (s *Store) IsMember(userID, workspaceID int64) (bool, error) {
-	if !s.Workspaces {
-		return workspaceID == DefaultWorkspaceID, nil
-	}
 	var n int
 	err := s.DB.QueryRow(`SELECT 1 FROM workspace_member m JOIN workspace w ON w.id = m.workspace_id
 		 WHERE m.user_id = ? AND m.workspace_id = ? AND w.deleted_at IS NULL`, userID, workspaceID).Scan(&n)
@@ -90,9 +81,6 @@ func (s *Store) IsMember(userID, workspaceID int64) (bool, error) {
 
 // SetSessionWorkspace pins a login session to a workspace the user belongs to.
 func (s *Store) SetSessionWorkspace(secret string, userID, workspaceID int64) error {
-	if !s.Workspaces {
-		return errors.New("workspaces are not enabled")
-	}
 	ok, err := s.IsMember(userID, workspaceID)
 	if err != nil {
 		return err
@@ -284,12 +272,8 @@ func (s *Store) LookupSession(secret string) (User, error) {
 		expiresAt string
 		pinned    sql.NullInt64
 	)
-	wsCol := "NULL"
-	if s.Workspaces {
-		wsCol = "s.workspace_id"
-	}
 	err := s.DB.QueryRow(
-		`SELECT u.id, u.username, u.is_active, s.expires_at, `+wsCol+`
+		`SELECT u.id, u.username, u.is_active, s.expires_at, s.workspace_id
 		   FROM usersession s JOIN appuser u ON u.id = s.user_id
 		  WHERE s.token_hash = ?`,
 		HashToken(secret),
@@ -355,16 +339,15 @@ func (s *Store) CreateAPIToken(userID int64, name string, workspaceID int64) (st
 		if !ok {
 			return "", ErrNotMember
 		}
-		if s.Workspaces {
-			_, err = s.DB.Exec(
-				`INSERT INTO apitoken (user_id, name, token_hash, created_at, workspace_id) VALUES (?, ?, ?, ?, ?)`,
-				userID, name, hash, timeutil.ToDBUTC(timeutil.NowUTC()), workspaceID,
-			)
-			if err != nil {
-				return "", err
-			}
-			return secret, nil
+		_, err = s.DB.Exec(
+			`INSERT INTO apitoken (user_id, name, token_hash, created_at, workspace_id) VALUES (?, ?, ?, ?, ?)`,
+			userID, name, hash, timeutil.ToDBUTC(timeutil.NowUTC()), workspaceID,
+		)
+		if err != nil {
+			return "", err
 		}
+		return secret, nil
+
 	}
 	_, err = s.DB.Exec(
 		`INSERT INTO apitoken (user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?)`,
@@ -383,12 +366,8 @@ func (s *Store) LookupAPIToken(secret string) (User, string, error) {
 		pinned sql.NullInt64
 	)
 	hash := HashToken(secret)
-	wsCol := "NULL"
-	if s.Workspaces {
-		wsCol = "t.workspace_id"
-	}
 	err := s.DB.QueryRow(
-		`SELECT u.id, u.username, u.is_active, t.name, `+wsCol+`
+		`SELECT u.id, u.username, u.is_active, t.name, t.workspace_id
 		   FROM apitoken t JOIN appuser u ON u.id = t.user_id
 		  WHERE t.token_hash = ? AND t.revoked_at IS NULL`,
 		hash,
@@ -465,19 +444,18 @@ type UserToken struct {
 func (s *Store) ListUserTokens(userID, workspaceID int64) ([]UserToken, error) {
 	q := `SELECT id, name, created_at, last_used_at FROM apitoken WHERE user_id = ? AND revoked_at IS NULL`
 	args := []any{userID}
-	if s.Workspaces {
-		def, err := s.resolveWorkspace(userID, sql.NullInt64{}, false)
-		if err != nil {
-			return nil, err
-		}
-		// Parameters of an untyped "? = ?" cannot be inferred by PostgreSQL: decide in Go.
-		if workspaceID == def {
-			q += ` AND (workspace_id = ? OR workspace_id IS NULL)`
-		} else {
-			q += ` AND workspace_id = ?`
-		}
-		args = append(args, workspaceID)
+	def, err := s.resolveWorkspace(userID, sql.NullInt64{}, false)
+	if err != nil {
+		return nil, err
 	}
+	// Parameters of an untyped "? = ?" cannot be inferred by PostgreSQL: decide in Go.
+	if workspaceID == def {
+		q += ` AND (workspace_id = ? OR workspace_id IS NULL)`
+	} else {
+		q += ` AND workspace_id = ?`
+	}
+	args = append(args, workspaceID)
+
 	rows, err := s.DB.Query(q+` ORDER BY id`, args...)
 	if err != nil {
 		return nil, err

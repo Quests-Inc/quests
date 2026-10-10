@@ -4,86 +4,31 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
-	_ "modernc.org/sqlite"
 )
 
-// The PostgreSQL schema chain is embedded (sql/pg, applied by MigratePostgres);
-// its head is expectedAlembic and needs no manual bump. The version table keeps
-// Alembic's name and format so the archived Alembic chain and this binary read the
-// same database (a leftover of the Alembic era, kept so existing databases carry on).
-//
-// The SQLite chain is frozen at expectedAlembicSQLite; a fresh file gets sql/sqlite.
-const expectedAlembicSQLite = "1a2b3c4d5e6f"
+// The schema chain is embedded (sql/pg, applied by MigratePostgres); its head is
+// expectedAlembic and needs no manual bump. The version table keeps the name and
+// format of the Alembic era (production was created by Alembic), so existing
+// databases carry on from where they are.
 
-// legacySQLiteOrder is the frozen SQLite chain, oldest→newest, ending with the
-// baseline that the PostgreSQL chain starts from.
-var legacySQLiteOrder = []string{
-	"df501a4accdb",
-	"7d093d52e81e",
-	"a1b2c3d4e5f6",
-	"b2c3d4e5f6a7",
-	"c3d4e5f6a7b8",
-	"d4e5f6a7b8c9",
-	"e5f6a7b8c9d0",
-	"f6a7b8c9d0e1",
-	"a7b8c9d0e1f2",
-	"b8c9d0e1f2a3",
-	"c9d0e1f2a3b4",
-	"d0e1f2a3b4c5",
-	"e1f2a3b4c5d6",
-	"f7a8b9c0d1e2",
-	"a1c2e3f4b5d6",
-	"a2b3c4d5e6f7",
-	"b3c4d5e6f7a8",
-	"c4d5e6f7a8b9",
-	"c5d6e7f8a9b0",
-	"d6e7f8a9b0c1",
-	"e7f8a9b0c1d2",
-	"f8a9b0c1d2e3",
-	"a3b4c5d6e7f8",
-	"b4c5d6e7f8a9",
-	"2aa2bb8ef734",
-	"580461765b15",
-	"c1d2e3f4a5b6",
-	"d2e3f4a5b6c7",
-	"e3f4a5b6c7d8",
-	"a9b0c1d2e3f4",
-	"b0c1d2e3f4a5",
-	"c2d3e4f5a6b7",
-	"d3e4f5a6b7c8",
-	"e4f5a6b7c8d9",
-	"f1a2b3c4d5e6",
-	"a0b1c2d3e4f5",
-	"b1c2d3e4f5a6",
-	"d5e6f7a8b9c0",
-	"e6f7a8b9c0d1",
-	"1a2b3c4d5e6f",
-}
-
-// alembicOrder is oldest→newest: the legacy chain, then every PostgreSQL revision
-// after the shared baseline. Unknown DB revisions are treated as ahead of this
+// alembicOrder is oldest→newest. Unknown DB revisions are treated as ahead of this
 // binary (deploy race: migrate applied before the new image lands).
 var alembicOrder = buildOrder()
 
-// expectedAlembic is the PostgreSQL schema revision this binary was built against.
+// expectedAlembic is the schema revision this binary was built against.
 var expectedAlembic = pgMigrations[len(pgMigrations)-1].Revision
 
 func buildOrder() []string {
-	order := append([]string(nil), legacySQLiteOrder...)
+	order := make([]string, 0, len(pgMigrations))
 	for _, m := range pgMigrations {
-		if m.Revision != expectedAlembicSQLite {
-			order = append(order, m.Revision)
-		}
+		order = append(order, m.Revision)
 	}
 	return order
 }
 
-// SchemaStatus is the alembic check outcome for health probes / logs.
+// SchemaStatus is the schema revision check outcome for health probes / logs.
 // State is "ok" (match) or "warn" (DB ahead of this binary).
 type SchemaStatus struct {
 	Version  string
@@ -92,55 +37,11 @@ type SchemaStatus struct {
 	Detail   string
 }
 
-// OpenConfigured opens PostgreSQL when databaseURL is set, else the SQLite file.
-func OpenConfigured(path, databaseURL string) (*sql.DB, SchemaStatus, error) {
-	if databaseURL != "" {
-		return OpenPostgres(databaseURL)
-	}
-	return Open(path)
-}
-
-func Open(path string) (*sql.DB, SchemaStatus, error) {
-	var zero SchemaStatus
-	if err := ensureDir(path); err != nil {
-		return nil, zero, err
-	}
-	// WAL + busy timeout — match Python db.py
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)", path)
-	sqlDB, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, zero, err
-	}
-	sqlDB.SetMaxOpenConns(1) // SQLite: single writer
-	sqlDB.SetMaxIdleConns(1)
-	if err := sqlDB.Ping(); err != nil {
-		_ = sqlDB.Close()
-		return nil, zero, err
-	}
-	st, err := assertMigrated(sqlDB, expectedAlembicSQLite)
-	if err != nil {
-		_ = sqlDB.Close()
-		return nil, zero, err
-	}
-	return sqlDB, st, nil
-}
-
-func ensureDir(path string) error { return os.MkdirAll(dirOf(path), 0o755) }
-
-func dirOf(path string) string {
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' {
-			return path[:i]
-		}
-	}
-	return "."
-}
-
 func assertMigrated(db *sql.DB, expected string) (SchemaStatus, error) {
 	var ver string
 	err := db.QueryRow(`SELECT version_num FROM alembic_version LIMIT 1`).Scan(&ver)
 	if err == sql.ErrNoRows {
-		return SchemaStatus{}, fmt.Errorf("quests.db has no alembic_version; run: quests-server migrate")
+		return SchemaStatus{}, fmt.Errorf("the database has no alembic_version; run: quests-server migrate")
 	}
 	if err != nil {
 		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (run: quests-server migrate)", err)
@@ -186,14 +87,11 @@ func indexOf(xs []string, want string) int {
 	return -1
 }
 
-// IsUniqueViolation reports a UNIQUE / primary-key conflict on either backend.
+// IsUniqueViolation reports a UNIQUE / primary-key conflict.
 func IsUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return strings.Contains(err.Error(), "UNIQUE")
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

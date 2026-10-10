@@ -12,11 +12,8 @@ import (
 
 // RunWorkspacePurgeLoop removes workspaces whose deletion grace period is over:
 // their attachment files on WebDAV first, then the database rows (every table's
-// workspace_id cascades). Hourly; a no-op without PostgreSQL.
+// workspace_id cascades). Hourly.
 func RunWorkspacePurgeLoop(ctx context.Context, st *store.Store, wd *webdav.Client) {
-	if !st.WorkspacesEnabled() {
-		return
-	}
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
 	for {

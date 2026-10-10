@@ -18,8 +18,8 @@ var ErrConflict = errors.New("conflict")
 
 type Store struct {
 	DB *sql.DB
-	// PGURL is set when DB is PostgreSQL; backups then use pg_dump instead of VACUUM INTO.
-	PGURL string
+	// DatabaseURL is the connection URL of DB: backups hand it to pg_dump.
+	DatabaseURL string
 	// Box seals secret values at rest (nil = stored as given, e.g. in tests).
 	Box *secretbox.Box
 }

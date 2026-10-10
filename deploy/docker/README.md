@@ -110,7 +110,7 @@ export QUESTS_API=http://SERVER_IP:8765
 
 ## Данные
 
-SQLite — volume `quests-data` (`/app/data`); PostgreSQL via `docker-compose.pg.yml`, see `docs/postgres.md`.
+PostgreSQL — volume `quests-pg` (сервис `postgres` в основном compose, нужен `POSTGRES_PASSWORD`), см. `docs/postgres.md`; файлы приложения — volume `quests-data` (`/app/data`).
 
 ## Переменные
 

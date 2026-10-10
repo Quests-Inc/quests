@@ -30,7 +30,7 @@ func EnsureUTC(t time.Time) time.Time {
 	return t.UTC()
 }
 
-// ToDBUTC formats for SQLite naive UTC storage (matches SQLAlchemy DateTime).
+// ToDBUTC formats for the database: naive UTC (TIMESTAMP columns hold no zone).
 func ToDBUTC(t time.Time) string {
 	t = EnsureUTC(t)
 	return t.Format("2006-01-02 15:04:05.000000")

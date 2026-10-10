@@ -121,7 +121,7 @@ func (s *Server) listAttachments(w http.ResponseWriter, r *http.Request, ownerTy
 	writeJSON(w, 200, out)
 }
 
-// listAllAttachments is the journal cache seed: one SQLite round-trip, grouped
+// listAllAttachments is the journal cache seed: one database round-trip, grouped
 // by owner. ?stat=1 opts into WebDAV probes (expensive with many files).
 func (s *Server) listAllAttachments(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.Store.ListAllAttachments(r.Context())

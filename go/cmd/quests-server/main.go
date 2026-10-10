@@ -32,7 +32,11 @@ func main() {
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
 
-	sqlDB, schema, err := db.OpenConfigured(cfg.DBPath, cfg.DatabaseURL)
+	dbURL, err := cfg.RequireDatabaseURL()
+	if err != nil {
+		log.Fatalf("db: %v", err)
+	}
+	sqlDB, schema, err := db.OpenPostgres(dbURL)
 	if err != nil {
 		log.Fatalf("db: %v", err)
 	}
@@ -45,7 +49,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("secrets: %v", err)
 	}
-	authStore := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != "", Box: secrets}
+	authStore := &auth.Store{DB: sqlDB, Box: secrets}
 	userCount, err := authStore.CountUsers()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
@@ -75,7 +79,7 @@ func main() {
 	}
 
 	hub := events.New()
-	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL, Box: secrets}
+	st := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL, Box: secrets}
 	if n, err := st.SealLegacySecrets(context.Background()); err != nil {
 		log.Printf("secrets: sealing existing values: %v", err)
 	} else if n > 0 {
@@ -159,7 +163,7 @@ func main() {
 	if !authRequired {
 		authNote = "auth=OFF (loopback only)"
 	}
-	log.Printf("quests-server (go) listening on http://%s  db=%s  %s", addr, cfg.DBPath, authNote)
+	log.Printf("quests-server (go) listening on http://%s  %s", addr, authNote)
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}

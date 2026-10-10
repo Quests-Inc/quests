@@ -1,7 +1,7 @@
 # Quests — Docker Compose (server: api + bot + stt + frontend)
 #
 #   cd /path/to/Quests
-#   cp .env.example .env   # fill TG_* ; QUESTS_*_IMAGE for GHCR
+#   cp .env.example .env   # POSTGRES_PASSWORD (required), TG_* ; QUESTS_*_IMAGE for GHCR
 #
 # Важно: -f deploy/docker/... сам по себе НЕ читает корневой .env для
 # подстановки ${QUESTS_API_IMAGE}. Всегда передавай --env-file:
@@ -51,6 +51,8 @@ services:
       QUESTS_WEBDAV_USER: ${QUESTS_WEBDAV_USER:-}
       QUESTS_WEBDAV_PASS: ${QUESTS_WEBDAV_PASS:-}
       QUESTS_CLAMAV_ADDR: ${QUESTS_CLAMAV_ADDR:-clamav:3310}
+      # PostgreSQL below; the entrypoint migrates the schema before the server starts.
+      QUESTS_DATABASE_URL: postgresql://quests:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/quests
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -66,7 +68,27 @@ services:
       retries: 5
       start_period: 20s
     depends_on:
-      - clamav
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_started
+
+  postgres:
+    image: postgres:17-bookworm
+    container_name: quests-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quests
+      POSTGRES_DB: quests
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - quests-pg:/var/lib/postgresql/data
+    # No published port: api reaches it on the compose network as postgres:5432.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quests -d quests"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   # clamd INSTREAM sidecar. Signatures live in a volume so freshclam does not
   # re-download the full database on every restart. First boot takes a while;
@@ -160,4 +182,5 @@ services:
 
 volumes:
   quests-data:
+  quests-pg:
   clamav-sigs:

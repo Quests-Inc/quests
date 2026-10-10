@@ -3,11 +3,9 @@ package db
 import "testing"
 
 func TestEmbeddedMigrations(t *testing.T) {
-	if len(sqliteMigrations) != 1 || sqliteMigrations[0].Revision != expectedAlembicSQLite {
-		t.Fatalf("sqlite chain must be the single baseline %s", expectedAlembicSQLite)
-	}
-	if pgMigrations[0].Revision != expectedAlembicSQLite {
-		t.Fatalf("pg chain must start at the shared baseline, got %s", pgMigrations[0].Revision)
+	// Existing databases were created by Alembic at this baseline: the chain must keep it as its root.
+	if pgMigrations[0].Revision != "1a2b3c4d5e6f" {
+		t.Fatalf("chain must start at the baseline 1a2b3c4d5e6f, got %s", pgMigrations[0].Revision)
 	}
 	if alembicOrder[len(alembicOrder)-1] != expectedAlembic {
 		t.Fatalf("alembicOrder must end with expectedAlembic")

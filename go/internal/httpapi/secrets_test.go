@@ -17,7 +17,7 @@ func secretsServer(t *testing.T) (http.Handler, *Server) {
 	pgtest.Seed(t, s.Store.DB, `
 		INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', now(), now());
 		INSERT INTO questtemplate (id, title, questline_id, created_at, updated_at) VALUES (5, 'tmpl', 7, now(), now())`)
-	pgtest.FixSequences(t, s.Store.PGURL)
+	pgtest.FixSequences(t, s.Store.DatabaseURL)
 	return s.Handler(), s
 }
 

@@ -26,7 +26,7 @@ func testMetrics(t *testing.T) *Metrics {
 			t.Fatal(err)
 		}
 	}
-	return New(pool, &store.Store{DB: pool, PGURL: url}, events.New(), health.New())
+	return New(pool, &store.Store{DB: pool, DatabaseURL: url}, events.New(), health.New())
 }
 
 func get(h http.Handler, token string) (int, string) {

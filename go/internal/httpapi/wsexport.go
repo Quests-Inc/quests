@@ -179,7 +179,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 // importWorkspace creates a new workspace from an uploaded archive.
 func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 	p, ok := PrincipalFrom(r.Context())
-	if !ok || p.User.ID == 0 || !s.Store.WorkspacesEnabled() {
+	if !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "import needs an account")
 		return
 	}

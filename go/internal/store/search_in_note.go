@@ -54,12 +54,11 @@ func (s *Store) SearchInNote(ctx context.Context, body, q string) (InNoteResult,
 	}
 	passages := notePassages(body)
 	variants := SearchVariants(q)
-	if s.WorkspacesEnabled() {
-		r, err := s.searchInNotePG(ctx, passages, q, variants)
-		if err == nil {
-			return r, nil
-		}
+	r, err := s.searchInNotePG(ctx, passages, q, variants)
+	if err == nil {
+		return r, nil
 	}
+
 	return searchInNotePlain(passages, variants), nil
 }
 

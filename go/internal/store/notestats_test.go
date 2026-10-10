@@ -51,7 +51,7 @@ func openStatDB(t *testing.T) *Store {
  (1, 'a', '2026-01-01', '2026-01-01'), (2, 'b', '2026-01-01', '2026-01-01')`); err != nil {
 		t.Fatal(err)
 	}
-	return &Store{DB: pool, PGURL: url}
+	return &Store{DB: pool, DatabaseURL: url}
 }
 
 func TestReadSignalsDedupeAndWeigh(t *testing.T) {
@@ -109,17 +109,5 @@ func TestReadSignalsDedupeAndWeigh(t *testing.T) {
 	}
 	if p := pop(1); p.Score != 0 || p.OpensHuman != 0 || p.Manual != 0 || p.LastReadAt != nil {
 		t.Fatalf("reset left traces: %+v", p)
-	}
-}
-
-// Without the feature (no PostgreSQL) every call is a harmless no-op.
-func TestReadSignalsOffWithoutPostgres(t *testing.T) {
-	st := &Store{}
-	ctx := context.Background()
-	if c, err := st.RecordNoteOpen(ctx, 1, false); c || err != nil {
-		t.Fatalf("%v %v", c, err)
-	}
-	if st.RateNote(ctx, 1, true) != nil || st.SetNoteWeight(ctx, 1, 1) != nil || st.ResetNoteStats(ctx, 1) != nil || st.RecordShown(ctx, []int64{1}) != nil {
-		t.Fatal("no-ops must not fail")
 	}
 }

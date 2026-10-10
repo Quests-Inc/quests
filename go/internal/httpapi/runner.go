@@ -66,14 +66,13 @@ func (s *Server) runnerRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	if s.Store.WorkspacesEnabled() {
-		ws, werr := s.Store.RunnerWorkspaceByReg(ctx, strings.TrimSpace(in.Token))
-		if werr != nil {
-			writeErr(w, http.StatusUnauthorized, werr.Error())
-			return
-		}
-		ctx = wsctx.With(ctx, ws)
+	ws, werr := s.Store.RunnerWorkspaceByReg(ctx, strings.TrimSpace(in.Token))
+	if werr != nil {
+		writeErr(w, http.StatusUnauthorized, werr.Error())
+		return
 	}
+	ctx = wsctx.With(ctx, ws)
+
 	token, run, err := s.Store.RegisterRunner(ctx, strings.TrimSpace(in.Token), in.Hostname, in.Version)
 	if errors.Is(err, store.ErrRunnerToken) {
 		writeErr(w, http.StatusUnauthorized, err.Error())

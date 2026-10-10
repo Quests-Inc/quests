@@ -16,12 +16,10 @@ htmlcov/
 .tox/
 .cache/
 
-# App data (SQLite lives here). Anchored: a bare `data/` also swallowed the
+# App data (icons, keys). Anchored: a bare `data/` also swallowed the
 # Android app's `com/quests/hud/data/` package, so PrefsStore.kt never got committed.
 /data/
 *.db
-*.sqlite
-*.sqlite3
 
 # Secrets / local env
 .env

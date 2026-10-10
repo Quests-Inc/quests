@@ -29,7 +29,7 @@ type MFAStatus struct {
 	RecoveryLeft int  `json:"recovery_left"`
 }
 
-func (s *Store) mfaReady() bool { return s.Workspaces && s.Box != nil }
+func (s *Store) mfaReady() bool { return s.Box != nil }
 
 // HasMFA reports whether the account must give a second factor to sign in.
 func (s *Store) HasMFA(userID int64) (bool, error) {

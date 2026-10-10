@@ -1,8 +1,6 @@
 package db
 
 import (
-	"database/sql"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -18,15 +16,8 @@ func TestCheckAlembicVersionMatch(t *testing.T) {
 }
 
 func TestCheckAlembicVersionOlderFails(t *testing.T) {
-	// The revision just before the SQLite head: every new PostgreSQL revision is appended after
-	// it, so counting from the end of alembicOrder would break with each migration.
-	older := ""
-	for i, id := range alembicOrder {
-		if id == expectedAlembicSQLite {
-			older = alembicOrder[i-1]
-		}
-	}
-	_, err := checkAlembicVersion(older)
+	// The oldest revision stays older however many migrations are added after it.
+	_, err := checkAlembicVersion(alembicOrder[0])
 	if err == nil {
 		t.Fatal("expected error for older alembic")
 	}
@@ -63,59 +54,5 @@ func TestExpectedIsLastInOrder(t *testing.T) {
 	if alembicOrder[len(alembicOrder)-1] != expectedAlembic {
 		t.Fatalf("expectedAlembic %s must be last in alembicOrder (got %s)",
 			expectedAlembic, alembicOrder[len(alembicOrder)-1])
-	}
-}
-
-func TestOpenAcceptsCurrentAndRejectsOlder(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "quests.db")
-	seed := func(ver string) {
-		raw, err := sql.Open("sqlite", path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer raw.Close()
-		if _, err := raw.Exec(`CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)`); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := raw.Exec(`DELETE FROM alembic_version`); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := raw.Exec(`INSERT INTO alembic_version (version_num) VALUES (?)`, ver); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	seed(expectedAlembicSQLite)
-	dbOK, st, err := Open(path)
-	if err != nil {
-		t.Fatalf("open current: %v", err)
-	}
-	dbOK.Close()
-	if st.State != "ok" {
-		t.Fatalf("state=%q", st.State)
-	}
-
-	seed("ffffdeadbeef")
-	dbAhead, st, err := Open(path)
-	if err != nil {
-		t.Fatalf("open ahead: %v", err)
-	}
-	dbAhead.Close()
-	if st.State != "warn" {
-		t.Fatalf("ahead state=%q", st.State)
-	}
-
-	// The revision just before the SQLite head: every new PostgreSQL revision is appended after
-	// it, so counting from the end of alembicOrder would break with each migration.
-	older := ""
-	for i, id := range alembicOrder {
-		if id == expectedAlembicSQLite {
-			older = alembicOrder[i-1]
-		}
-	}
-	seed(older)
-	if _, _, err := Open(path); err == nil {
-		t.Fatal("older db must fail open")
 	}
 }

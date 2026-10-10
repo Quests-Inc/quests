@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,9 +12,7 @@ import (
 type Config struct {
 	Root    string
 	DataDir string
-	DBPath  string
-	// DatabaseURL (QUESTS_DATABASE_URL, postgres://…) switches from the SQLite
-	// file at DBPath to PostgreSQL.
+	// DatabaseURL (QUESTS_DATABASE_URL, postgres://…) is the PostgreSQL database; the server requires it.
 	DatabaseURL string
 	// MetricsToken (QUESTS_METRICS_TOKEN) is the bearer token for GET /metrics; empty disables the endpoint.
 	MetricsToken string
@@ -135,7 +134,6 @@ func Load() Config {
 		SecureCookies:       secure,
 		Root:                root,
 		DataDir:             data,
-		DBPath:              filepath.Join(data, "quests.db"),
 		DatabaseURL:         strings.TrimSpace(os.Getenv("QUESTS_DATABASE_URL")),
 		MetricsToken:        strings.TrimSpace(os.Getenv("QUESTS_METRICS_TOKEN")),
 		Host:                host,
@@ -190,4 +188,12 @@ func (c Config) IsLoopbackBind() bool {
 		return true
 	}
 	return false
+}
+
+// RequireDatabaseURL returns the configured database URL or an error telling how to set it.
+func (c Config) RequireDatabaseURL() (string, error) {
+	if c.DatabaseURL == "" {
+		return "", errors.New("QUESTS_DATABASE_URL is not set: Quests runs on PostgreSQL (postgresql://user:pw@host:5432/db, see docs/postgres.md)")
+	}
+	return c.DatabaseURL, nil
 }

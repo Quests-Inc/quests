@@ -26,15 +26,8 @@ type Workspace struct {
 	Trusted bool `json:"trusted"`
 }
 
-// WorkspacesEnabled reports whether this store has workspace isolation (PostgreSQL).
-// SQLite deployments are a single implicit workspace.
-func (s *Store) WorkspacesEnabled() bool { return s.PGURL != "" }
-
 // WorkspaceIDs lists every workspace; background loops iterate it.
 func (s *Store) WorkspaceIDs(ctx context.Context) ([]int64, error) {
-	if !s.WorkspacesEnabled() {
-		return []int64{DefaultWorkspaceID}, nil
-	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -68,9 +61,6 @@ func (s *Store) ForEachWorkspace(ctx context.Context, fn func(ctx context.Contex
 
 // UserWorkspaces lists the workspaces a user belongs to.
 func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, error) {
-	if !s.WorkspacesEnabled() {
-		return []Workspace{{ID: DefaultWorkspaceID, Name: "Основное", Role: "owner", Trusted: true}}, nil
-	}
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT w.id, w.name, w.created_at, m.role, w.trusted
 		FROM workspace w JOIN workspace_member m ON m.workspace_id = w.id
@@ -207,9 +197,6 @@ func (s *Store) EnsureUserWorkspace(ctx context.Context, userID int64, username 
 
 // AllWorkspaces lists every workspace (for trusted callers with no account).
 func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
-	if !s.WorkspacesEnabled() {
-		return []Workspace{{ID: DefaultWorkspaceID, Name: "Основное", Role: "owner", Trusted: true}}, nil
-	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, trusted FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -260,9 +247,6 @@ var ErrServerExec = errors.New("команды на сервере в этом �
 // ServerExecAllowed reports whether the context's workspace may run commands on
 // the server. Without PostgreSQL there is one implicit, trusted workspace.
 func (s *Store) ServerExecAllowed(ctx context.Context) bool {
-	if !s.WorkspacesEnabled() {
-		return true
-	}
 	id := wsctx.From(ctx)
 	if id <= 0 {
 		return false
@@ -302,7 +286,7 @@ func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
 		return nil
 	}
 	uid := wsctx.UserFrom(ctx)
-	if uid == 0 || !s.WorkspacesEnabled() {
+	if uid == 0 {
 		return nil // background work, auth off
 	}
 	if uid == wsctx.ActorAutomation {
@@ -410,9 +394,6 @@ type DeletedWorkspace struct {
 
 // DeletedWorkspaces lists workspaces awaiting their purge.
 func (s *Store) DeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error) {
-	if !s.WorkspacesEnabled() {
-		return nil, nil
-	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, deleted_at FROM workspace WHERE deleted_at IS NOT NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -434,9 +415,6 @@ func (s *Store) DeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, erro
 
 // DueForPurge returns deleted workspaces whose grace period is over.
 func (s *Store) DueForPurge(ctx context.Context) ([]int64, error) {
-	if !s.WorkspacesEnabled() {
-		return nil, nil
-	}
 	cutoff := timeutil.NowUTC().Add(-WorkspacePurgeAfter)
 	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM workspace WHERE deleted_at IS NOT NULL AND deleted_at < ? ORDER BY id`, timeutil.ToDBUTC(cutoff))
 	if err != nil {

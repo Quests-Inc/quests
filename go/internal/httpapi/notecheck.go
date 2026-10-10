@@ -117,10 +117,6 @@ func (s *Server) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
 		reason = "Отмечена вручную"
 	}
 	if err := s.Store.SetNoteOutdated(r.Context(), id, *body.Outdated, reason, time.Now().UTC()); err != nil {
-		if errors.Is(err, store.ErrNoteCheckPG) {
-			writeErr(w, http.StatusConflict, err.Error())
-			return
-		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

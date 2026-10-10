@@ -256,7 +256,7 @@ type JobSpec struct {
 
 const jobCols = `id, runner_label, kind, quest_id, step_id, template_id, title, COALESCE(dedupe_key,''), command, state, attempt_no,
 	timeout_seconds, COALESCE(lease_id,''), lease_until, valid_until, created_at, assigned_at, started_at, finished_at,
-	exit_code, timed_out, stdout, stderr, progress_current, progress_total, log_tail, reason, cancel`
+	exit_code, timed_out, stdout, stderr, progress_current, progress_total, log_tail, reason, cancel, note_id`
 
 func parseNullTime(n sql.NullString) *time.Time {
 	if !n.Valid || n.String == "" {
@@ -269,14 +269,6 @@ func parseNullTime(n sql.NullString) *time.Time {
 	return &t
 }
 
-// jobSelect is the column list of a job; note_id exists only where notes can have checks (PostgreSQL).
-func (s *Store) jobSelect() string {
-	if s.WorkspacesEnabled() {
-		return jobCols + ", note_id"
-	}
-	return jobCols
-}
-
 func (s *Store) scanJob(sc interface{ Scan(...any) error }) (RunnerJob, error) {
 	var j RunnerJob
 	var note sql.NullInt64
@@ -285,10 +277,7 @@ func (s *Store) scanJob(sc interface{ Scan(...any) error }) (RunnerJob, error) {
 	var valid, created string
 	dest := []any{&j.ID, &j.RunnerLabel, &j.Kind, &quest, &step, &tmpl, &j.Title, &j.DedupeKey, &j.Command, &j.State, &j.AttemptNo,
 		&j.TimeoutSeconds, &j.LeaseID, &lease, &valid, &created, &assigned, &started, &finished,
-		&exit, &j.TimedOut, &j.Stdout, &j.Stderr, &pc, &pt, &j.LogTail, &j.Reason, &j.Cancel}
-	if s.WorkspacesEnabled() {
-		dest = append(dest, &note)
-	}
+		&exit, &j.TimedOut, &j.Stdout, &j.Stderr, &pc, &pt, &j.LogTail, &j.Reason, &j.Cancel, &note}
 	if err := sc.Scan(dest...); err != nil {
 		return RunnerJob{}, err
 	}
@@ -346,15 +335,11 @@ func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, crea
 	if sp.DedupeKey != "" {
 		dk = sp.DedupeKey
 	}
-	cols, marks, args := "", "", []any{}
-	if s.WorkspacesEnabled() {
-		cols, marks, args = ", note_id", ", ?", []any{sp.NoteID}
-	}
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO runner_job
-		(runner_label, kind, quest_id, step_id, template_id, title, dedupe_key, command, state, attempt_no, timeout_seconds, valid_until, created_at`+cols+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?`+marks+`)`,
-		append([]any{sp.RunnerLabel, sp.Kind, sp.QuestID, sp.StepID, sp.TemplateID, trimTo(sp.Title, 200), dk, sp.Command,
-			s.nextAttempt(ctx, sp.DedupeKey), sp.TimeoutSeconds, timeutil.ToDBUTC(now.Add(sp.ValidFor)), timeutil.ToDBUTC(now)}, args...)...)
+		(runner_label, kind, quest_id, step_id, template_id, title, dedupe_key, command, state, attempt_no, timeout_seconds, valid_until, created_at, note_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
+		sp.RunnerLabel, sp.Kind, sp.QuestID, sp.StepID, sp.TemplateID, trimTo(sp.Title, 200), dk, sp.Command,
+		s.nextAttempt(ctx, sp.DedupeKey), sp.TimeoutSeconds, timeutil.ToDBUTC(now.Add(sp.ValidFor)), timeutil.ToDBUTC(now), sp.NoteID)
 	if err != nil {
 		if sp.DedupeKey != "" && db.IsUniqueViolation(err) {
 			j, gerr := s.OpenJobByKey(ctx, sp.DedupeKey)
@@ -378,12 +363,12 @@ func (s *Store) nextAttempt(ctx context.Context, key string) int {
 }
 
 func (s *Store) OpenJobByKey(ctx context.Context, key string) (RunnerJob, error) {
-	return s.scanJob(s.DB.QueryRowContext(ctx, `SELECT `+s.jobSelect()+` FROM runner_job WHERE dedupe_key = ? AND state IN ('queued','assigned','running')`, key))
+	return s.scanJob(s.DB.QueryRowContext(ctx, `SELECT `+jobCols+` FROM runner_job WHERE dedupe_key = ? AND state IN ('queued','assigned','running')`, key))
 }
 
 // LatestJobByKey is the newest job (any state) queued under a dedupe key.
 func (s *Store) LatestJobByKey(ctx context.Context, key string) (RunnerJob, bool, error) {
-	j, err := s.scanJob(s.DB.QueryRowContext(ctx, `SELECT `+s.jobSelect()+` FROM runner_job WHERE dedupe_key = ? ORDER BY id DESC LIMIT 1`, key))
+	j, err := s.scanJob(s.DB.QueryRowContext(ctx, `SELECT `+jobCols+` FROM runner_job WHERE dedupe_key = ? ORDER BY id DESC LIMIT 1`, key))
 	if errors.Is(err, sql.ErrNoRows) {
 		return RunnerJob{}, false, nil
 	}
@@ -397,7 +382,7 @@ func (s *Store) DeleteRunnerJob(ctx context.Context, id int64) error {
 }
 
 func (s *Store) GetRunnerJob(ctx context.Context, id int64) (RunnerJob, error) {
-	j, err := s.scanJob(s.DB.QueryRowContext(ctx, `SELECT `+s.jobSelect()+` FROM runner_job WHERE id = ?`, id))
+	j, err := s.scanJob(s.DB.QueryRowContext(ctx, `SELECT `+jobCols+` FROM runner_job WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return RunnerJob{}, ErrNotFound
 	}
@@ -413,7 +398,7 @@ type JobFilter struct {
 }
 
 func (s *Store) ListRunnerJobs(ctx context.Context, f JobFilter) ([]RunnerJob, error) {
-	q := `SELECT ` + s.jobSelect() + ` FROM runner_job WHERE 1=1`
+	q := `SELECT ` + jobCols + ` FROM runner_job WHERE 1=1`
 	var args []any
 	if f.Label != "" {
 		q += ` AND runner_label = ?`
@@ -637,10 +622,9 @@ func (s *Store) CancelRunnerJob(ctx context.Context, id int64) error {
 // once, one already running is asked to stop. Returns how many it touched.
 func (s *Store) CancelOrphanJobs(ctx context.Context) (int64, error) {
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	gone := `step_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM queststep WHERE queststep.id = runner_job.step_id)`
-	if s.WorkspacesEnabled() {
-		gone = `(` + gone + `) OR (note_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM note WHERE note.id = runner_job.note_id))`
-	}
+	gone := `(step_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM queststep WHERE queststep.id = runner_job.step_id))
+		OR (note_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM note WHERE note.id = runner_job.note_id))`
+
 	res, err := s.DB.ExecContext(ctx, `UPDATE runner_job SET state = 'canceled', finished_at = ?, reason = 'квест, шаг или заметка удалены'
 		WHERE state = 'queued' AND (`+gone+`)`, now)
 	if err != nil {

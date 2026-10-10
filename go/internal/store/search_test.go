@@ -42,7 +42,7 @@ func seedSearchNotes(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Store{DB: pool, PGURL: url}
+	return &Store{DB: pool, DatabaseURL: url}
 }
 
 func TestSearchRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
@@ -77,8 +77,8 @@ func TestSearchRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
 	}
 }
 
-func TestSearchInNotePlain(t *testing.T) {
-	st := &Store{}
+func TestSearchInNote(t *testing.T) {
+	st := &Store{DB: pgtest.New(t)}
 	body := "Как выкатить сервис.\n\nДеплой делает ci-deploy.sh.\n\nБорщ и пельмени"
 	r, err := st.SearchInNote(context.Background(), body, "ltgkjq") // "деплой" in the wrong layout
 	if err != nil {

@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# Pull prod SQLite (+ icons) into ./data for local API poking.
+# Pull the prod database (+ app files such as icons) into the local dev PostgreSQL and ./data.
 #
 #   ./scripts/pull-prod-data.sh
 #   ./scripts/pull-prod-data.sh --start          # then ./scripts/dev-api-docker.sh
 #   ./scripts/pull-prod-data.sh --pull-image     # also refresh quests-api:local from GHCR
 #
-# Needs: ssh to the prod host + docker on both sides.
-# Volume path on the host is root-only — we tar from inside the API container.
+# Needs: ssh to the prod host, docker on both sides, the local dev database up (`just dev-db`).
+# The dump is taken inside the prod postgres container; it REPLACES the local dev database's contents.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA="${QUESTS_DATA_DIR:-$ROOT/data}"
 SSH_HOST="${QUESTS_PROD_SSH:?set QUESTS_PROD_SSH, e.g. user@host}"
-CONTAINER="${QUESTS_PROD_CONTAINER:-quests-api}"
+API_CONTAINER="${QUESTS_PROD_CONTAINER:-quests-api}"
+PG_CONTAINER="${QUESTS_PROD_PG_CONTAINER:-quests-postgres}"
+LOCAL_PG="${QUESTS_LOCAL_PG_CONTAINER:-quests-pg-dev}"
 IMAGE="${QUESTS_API_IMAGE:-ghcr.io/valirum/quests-api:main}"
 
 START=0
@@ -22,18 +24,20 @@ for arg in "$@"; do
     --start) START=1 ;;
     --pull-image) PULL_IMAGE=1 ;;
     -h|--help)
-      cat <<EOF
+      cat <<DOC
 usage: $0 [--pull-image] [--start]
 
-  Pull /app/data from prod container \`$CONTAINER\` on \`$SSH_HOST\`
-  into \`$DATA\` (bind-mounted by docker-compose.dev.yml).
+  Dump the database of \`$PG_CONTAINER\` on \`$SSH_HOST\` into the local container \`$LOCAL_PG\`
+  (replacing its data) and copy /app/data of \`$API_CONTAINER\` into \`$DATA\`.
 
 env:
-  QUESTS_PROD_SSH         required, e.g. user@host
-  QUESTS_PROD_CONTAINER   default: quests-api
-  QUESTS_DATA_DIR         default: <repo>/data
-  QUESTS_API_IMAGE        default: ghcr.io/valirum/quests-api:main
-EOF
+  QUESTS_PROD_SSH           required, e.g. user@host
+  QUESTS_PROD_CONTAINER     api container on prod, default: quests-api
+  QUESTS_PROD_PG_CONTAINER  postgres container on prod, default: quests-postgres
+  QUESTS_LOCAL_PG_CONTAINER local dev postgres, default: quests-pg-dev
+  QUESTS_DATA_DIR           default: <repo>/data
+  QUESTS_API_IMAGE          default: ghcr.io/valirum/quests-api:main
+DOC
       exit 0
       ;;
     *)
@@ -43,7 +47,17 @@ EOF
   esac
 done
 
+docker inspect "$LOCAL_PG" >/dev/null 2>&1 || { echo "local database container $LOCAL_PG is not running: just dev-db" >&2; exit 1; }
 mkdir -p "$DATA"
+
+echo "dumping $SSH_HOST:$PG_CONTAINER → $LOCAL_PG" >&2
+docker exec "$LOCAL_PG" psql -U quests -d postgres -qc "DROP DATABASE IF EXISTS quests WITH (FORCE)" -c "CREATE DATABASE quests"
+ssh -o BatchMode=yes "$SSH_HOST" "docker exec $PG_CONTAINER pg_dump -U quests --format=custom --no-owner quests" \
+  | docker exec -i "$LOCAL_PG" pg_restore -U quests -d quests --no-owner
+
+notes="$(docker exec "$LOCAL_PG" psql -U quests -d quests -Atc 'SELECT COUNT(*) FROM note' 2>/dev/null || echo '?')"
+quests="$(docker exec "$LOCAL_PG" psql -U quests -d quests -Atc 'SELECT COUNT(*) FROM quest' 2>/dev/null || echo '?')"
+echo "ok: database restored (notes=$notes quests=$quests)" >&2
 
 # Keep workstation overlay HUD config if present.
 overlay_bak=""
@@ -51,27 +65,10 @@ if [[ -f "$DATA/overlay.json" ]]; then
   overlay_bak="$(mktemp)"
   cp -a "$DATA/overlay.json" "$overlay_bak"
 fi
-
-echo "pulling $SSH_HOST:$CONTAINER:/app/data → $DATA" >&2
-ssh -o BatchMode=yes "$SSH_HOST" \
-  "docker exec $CONTAINER tar czf - -C /app/data ." \
-  | tar xzf - -C "$DATA"
-
+echo "pulling $SSH_HOST:$API_CONTAINER:/app/data → $DATA" >&2
+ssh -o BatchMode=yes "$SSH_HOST" "docker exec $API_CONTAINER tar czf - -C /app/data ." | tar xzf - -C "$DATA"
 if [[ -n "$overlay_bak" ]]; then
   mv -f "$overlay_bak" "$DATA/overlay.json"
-fi
-
-if [[ -f "$DATA/quests.db" ]]; then
-  if command -v sqlite3 >/dev/null 2>&1; then
-    notes="$(sqlite3 "$DATA/quests.db" 'SELECT COUNT(*) FROM note;' 2>/dev/null || echo '?')"
-    quests="$(sqlite3 "$DATA/quests.db" 'SELECT COUNT(*) FROM quest;' 2>/dev/null || echo '?')"
-    echo "ok: quests.db (notes=$notes quests=$quests)" >&2
-  else
-    ls -lh "$DATA/quests.db" >&2
-  fi
-else
-  echo "error: quests.db missing after pull" >&2
-  exit 1
 fi
 
 if [[ "$PULL_IMAGE" -eq 1 ]]; then

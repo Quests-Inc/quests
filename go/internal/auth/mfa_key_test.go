@@ -22,7 +22,7 @@ func newBox(t *testing.T) *secretbox.Box {
 // With the server key lost or replaced the sealed TOTP secret cannot be opened. A recovery code,
 // which does not depend on it, must still get the person in (once); a plain code must not.
 func TestRecoveryCodeWorksWhenTheKeyIsGone(t *testing.T) {
-	st := &Store{DB: pgtest.New(t), Workspaces: true, Box: newBox(t)}
+	st := &Store{DB: pgtest.New(t), Box: newBox(t)}
 	u, err := st.CreateUser("alice", "correcthorse")
 	if err != nil {
 		t.Fatal(err)

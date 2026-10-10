@@ -11,7 +11,7 @@ import (
 func openTagTestDB(t *testing.T) *Store {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
-	return &Store{DB: pool, PGURL: url}
+	return &Store{DB: pool, DatabaseURL: url}
 }
 
 func TestNormalizeTagSlug(t *testing.T) {

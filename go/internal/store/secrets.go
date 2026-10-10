@@ -459,24 +459,23 @@ func (s *Store) SealedHealth(ctx context.Context) ([]SealedCounts, error) {
 		return nil, failure
 	}
 	out := []SealedCounts{sec}
-	if s.WorkspacesEnabled() {
-		for _, q := range []struct {
-			c   *SealedCounts
-			sql string
-		}{{&llm, `SELECT api_key_enc FROM user_llm`}, {&totp, `SELECT secret_enc FROM user_totp`}} {
-			rows, err := s.DB.QueryContext(ctx, q.sql)
-			if err != nil {
-				return nil, err
-			}
-			for rows.Next() {
-				var v string
-				if err := rows.Scan(&v); err == nil {
-					q.c.add(s, v)
-				}
-			}
-			rows.Close()
+	for _, q := range []struct {
+		c   *SealedCounts
+		sql string
+	}{{&llm, `SELECT api_key_enc FROM user_llm`}, {&totp, `SELECT secret_enc FROM user_totp`}} {
+		rows, err := s.DB.QueryContext(ctx, q.sql)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, llm, totp)
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err == nil {
+				q.c.add(s, v)
+			}
+		}
+		rows.Close()
 	}
+	out = append(out, llm, totp)
+
 	return out, nil
 }

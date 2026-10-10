@@ -17,7 +17,7 @@ ENV GOTOOLCHAIN=local \
 WORKDIR /src
 COPY go/go.mod go/go.sum ./
 RUN go mod download
-# Compile the third-party deps (modernc sqlite/libc dominate) into the build
+# Compile the third-party deps into the build
 # cache in a layer keyed only by go.mod/go.sum, so a source-only change below
 # recompiles just our own packages. Flags must match the real build (-trimpath).
 # The import list only affects speed: if it goes stale the prime step is skipped.
@@ -35,7 +35,6 @@ import (
 	_ "github.com/pkg/sftp"
 	_ "golang.org/x/crypto/ssh"
 	_ "golang.org/x/term"
-	_ "modernc.org/sqlite"
 )
 
 func main() {}

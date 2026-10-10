@@ -25,7 +25,7 @@ import (
 	"github.com/valirum/quests/go/internal/wsctx"
 )
 
-const adminUsage = `quests-server admin commands (run on the host holding quests.db):
+const adminUsage = `quests-server admin commands (run on the host with access to the database):
 
   quests-server useradd <username>       create an account (prompts for a password)
   quests-server passwd <username>        change an account's password
@@ -48,8 +48,8 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server runner ls                list runners and when they were last seen
   quests-server runner rm <label>        revoke a runner and cancel its queued jobs
   quests-server backup-now               run one DB+attachments backup tick now
-  quests-server migrate [current]        bring the database (PostgreSQL if QUESTS_DATABASE_URL is set, else the SQLite file)
-                                         to the schema this binary expects; "current" only prints the revision
+  quests-server migrate [current]        bring the database (QUESTS_DATABASE_URL) to the schema this binary expects;
+                                         "current" only prints the revision
 
 Passwords are never taken from argv or env, so they stay out of shell history.
 `
@@ -76,7 +76,11 @@ func runAdmin(args []string) bool {
 	cfg := config.Load()
 	// Admin commands run as the database owner: they are the ones allowed to change what the API role cannot.
 	db.SkipAppRole = true
-	sqlDB, _, err := db.OpenConfigured(cfg.DBPath, cfg.DatabaseURL)
+	dbURL, err := cfg.RequireDatabaseURL()
+	if err != nil {
+		fatal("db: %v", err)
+	}
+	sqlDB, _, err := db.OpenPostgres(dbURL)
 	if err != nil {
 		fatal("db: %v", err)
 	}
@@ -88,7 +92,7 @@ func runAdmin(args []string) bool {
 	}
 
 	if args[0] == "runner" {
-		runRunnerCmd(&store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}, args[1:])
+		runRunnerCmd(&store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL}, args[1:])
 		return true
 	}
 
@@ -96,8 +100,8 @@ func runAdmin(args []string) bool {
 	if berr != nil {
 		fatal("secrets: %v", berr)
 	}
-	st := &auth.Store{DB: sqlDB, Workspaces: cfg.DatabaseURL != "", Box: box}
-	wst := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL, Box: box}
+	st := &auth.Store{DB: sqlDB, Box: box}
+	wst := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL, Box: box}
 
 	switch args[0] {
 	case "useradd":
@@ -113,13 +117,12 @@ func runAdmin(args []string) bool {
 			fatal("%v", err)
 		}
 		fmt.Printf("created account %q (id=%d)\n", u.Username, u.ID)
-		if wst.WorkspacesEnabled() {
-			w, err := wst.EnsureUserWorkspace(context.Background(), u.ID, u.Username)
-			if err != nil {
-				fatal("workspace: %v", err)
-			}
-			fmt.Printf("workspace %q (id=%d)\n", w.Name, w.ID)
+		w, err := wst.EnsureUserWorkspace(context.Background(), u.ID, u.Username)
+		if err != nil {
+			fatal("workspace: %v", err)
 		}
+		fmt.Printf("workspace %q (id=%d)\n", w.Name, w.ID)
+
 		fmt.Println("auth is now enforced on this instance — restart the server to apply.")
 	case "passwd":
 		if len(args) < 2 {
@@ -182,7 +185,7 @@ func runAdmin(args []string) bool {
 }
 
 func runBackupNow(cfg config.Config, sqlDB *sql.DB) {
-	st := &store.Store{DB: sqlDB, PGURL: cfg.DatabaseURL}
+	st := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL}
 	wd := webdav.New(cfg.WebDAVURL, cfg.WebDAVUser, cfg.WebDAVPass)
 	remote := schedule.NewSFTPRemote(schedule.BackupRemote{
 		Host: cfg.BackupRemoteHost,
@@ -333,18 +336,17 @@ func fatal(format string, a ...any) {
 
 func runRunnerCmd(st *store.Store, args []string) {
 	ctx := context.Background()
-	if st.WorkspacesEnabled() {
-		// Runners belong to a workspace: QUESTS_WORKSPACE picks it (default 1).
-		ws := int64(store.DefaultWorkspaceID)
-		if raw := strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE")); raw != "" {
-			n, err := strconv.ParseInt(raw, 10, 64)
-			if err != nil || n <= 0 {
-				fatal("QUESTS_WORKSPACE must be a workspace id")
-			}
-			ws = n
+	// Runners belong to a workspace: QUESTS_WORKSPACE picks it (default 1).
+	ws := int64(store.DefaultWorkspaceID)
+	if raw := strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE")); raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || n <= 0 {
+			fatal("QUESTS_WORKSPACE must be a workspace id")
 		}
-		ctx = wsctx.With(ctx, ws)
+		ws = n
 	}
+	ctx = wsctx.With(ctx, ws)
+
 	if len(args) == 0 {
 		fatal("usage: quests-server runner add|ls|rm")
 	}
@@ -399,9 +401,6 @@ func runRunnerCmd(st *store.Store, args []string) {
 }
 
 func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
-	if !wst.WorkspacesEnabled() {
-		fatal("workspaces need PostgreSQL (set QUESTS_DATABASE_URL)")
-	}
 	ctx := context.Background()
 	userByName := func(name string) auth.User {
 		users, err := st.ListUsers()
@@ -544,12 +543,16 @@ func trustLabel(t bool) string {
 }
 
 // runMigrate applies the embedded migrations (the API itself never migrates: it
-// refuses to start on an older schema, see db.OpenConfigured).
+// refuses to start on an older schema, see db.OpenPostgres).
 func runMigrate(args []string) {
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
+	dbURL, err := cfg.RequireDatabaseURL()
+	if err != nil {
+		fatal("migrate: %v", err)
+	}
 	if len(args) > 0 && args[0] == "current" {
-		v, err := db.CurrentRevision(cfg.DBPath, cfg.DatabaseURL)
+		v, err := db.CurrentRevision(dbURL)
 		if err != nil {
 			fatal("migrate: %v", err)
 		}
@@ -562,19 +565,13 @@ func runMigrate(args []string) {
 	if len(args) > 0 {
 		fatal("usage: quests-server migrate [current]")
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
 	logf := func(format string, a ...any) { fmt.Printf(format+"\n", a...) }
-	var err error
-	if cfg.DatabaseURL != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-		_, err = db.MigratePostgres(ctx, cfg.DatabaseURL, logf)
-	} else {
-		_, err = db.MigrateSQLite(cfg.DBPath, logf)
-	}
-	if err != nil {
+	if _, err := db.MigratePostgres(ctx, dbURL, logf); err != nil {
 		fatal("migrate: %v", err)
 	}
-	v, err := db.CurrentRevision(cfg.DBPath, cfg.DatabaseURL)
+	v, err := db.CurrentRevision(dbURL)
 	if err != nil {
 		fatal("migrate: %v", err)
 	}
