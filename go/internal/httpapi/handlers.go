@@ -81,7 +81,7 @@ func (s *Server) Handler() http.Handler {
 	return h
 }
 
-// maxJSONBody caps a JSON request body; uploads (multipart) and PDF export carry their own limits.
+// maxJSONBody caps a JSON request body; uploads (multipart) carry their own limit.
 const maxJSONBody = 8 << 20
 
 // contentSecurityPolicy is the shell's: scripts only from this origin (the build has no
@@ -100,7 +100,7 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		// Invitation links carry their secret in the URL: never hand it to another site.
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
-		if r.Body != nil && r.Body != http.NoBody && r.URL.Path != "/api/export/pdf" &&
+		if r.Body != nil && r.Body != http.NoBody &&
 			strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
 			r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 		}

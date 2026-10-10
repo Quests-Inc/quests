@@ -3,82 +3,48 @@ package httpapi
 import (
 	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/valirum/quests/go/internal/pdfdoc"
+	"github.com/valirum/quests/go/internal/store"
 )
 
-// maxPDFHTMLBytes caps the HTML payload accepted for rendering — generous
-// for a note/quest export, small enough to bound weasyprint's memory/time.
-const maxPDFHTMLBytes = 20 << 20 // 20MB
+// pdfSlots bounds concurrent renders: each is CPU- and memory-heavy.
+var pdfSlots = make(chan struct{}, 3)
 
-// pdfRenderScript renders with every external fetch refused (see render.py): the HTML
-// is user-supplied, and WeasyPrint would otherwise embed local files and internal
-// URLs it finds in it into the PDF it hands back.
-//
-//go:embed pdfrender/render.py
-var pdfRenderScript []byte
-
-// pdfSlots bounds concurrent renders: each is a CPU- and memory-heavy process.
-var pdfSlots = make(chan struct{}, 2)
-
-// pdfPython is the interpreter that has WeasyPrint: QUESTS_PDF_PYTHON, else the
-// project venv, else python3 on PATH (the container puts the venv first).
-func (s *Server) pdfPython() string {
-	if v := strings.TrimSpace(os.Getenv("QUESTS_PDF_PYTHON")); v != "" {
-		return v
-	}
-	if s.Root != "" {
-		if p := filepath.Join(s.Root, ".venv", "bin", "python"); fileExists(p) {
-			return p
-		}
-	}
-	return "python3"
-}
-
-func fileExists(p string) bool {
-	st, err := os.Stat(p)
-	return err == nil && !st.IsDir()
-}
+const pdfRenderTimeout = 60 * time.Second
 
 func (s *Server) registerPDF(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/export/pdf", s.postRenderPDF)
 }
 
 type renderPDFRequest struct {
-	HTML     string `json:"html"`
-	Filename string `json:"filename"`
+	Document pdfdoc.Document `json:"document"`
+	Filename string          `json:"filename"`
 }
 
-// postRenderPDF converts a self-contained HTML document (inline CSS, no
-// external assets) to PDF via WeasyPrint — a real HTML+CSS layout/paginator,
-// not a screenshot: text stays selectable, @page/break-inside rules drive
-// margins and pagination instead of hand-rolled pixel math.
+// postRenderPDF turns a document (title, markdown, steps — see internal/pdfdoc) into a PDF. The renderer
+// is in-process Go and never reads the network or the disk: the only things that reach the page besides
+// the text are attachment images, fetched here under the caller's own workspace.
 func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxPDFHTMLBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, pdfdoc.MaxMarkdownBytes+(1<<20))
 	var req renderPDFRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid JSON or HTML too large")
+		writeErr(w, http.StatusBadRequest, "invalid JSON or document too large")
 		return
 	}
-	if req.HTML == "" {
-		writeErr(w, http.StatusBadRequest, "html is required")
+	if len(req.Document.Blocks) == 0 && strings.TrimSpace(req.Document.Title) == "" {
+		writeErr(w, http.StatusBadRequest, "document is empty")
 		return
 	}
-
-	workDir, err := os.MkdirTemp("", "quests-pdf-*")
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	defer os.RemoveAll(workDir)
 
 	select {
 	case pdfSlots <- struct{}{}:
@@ -89,38 +55,18 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inPath := filepath.Join(workDir, "in.html")
-	outPath := filepath.Join(workDir, "out.pdf")
-	scriptPath := filepath.Join(workDir, "render.py")
-	if err := os.WriteFile(scriptPath, pdfRenderScript, 0o644); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := os.WriteFile(inPath, []byte(req.HTML), 0o644); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), pdfRenderTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, s.pdfPython(), scriptPath, inPath, outPath)
-	// The renderer needs nothing from the server's environment (database URL, tokens…).
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + workDir, "XDG_CACHE_HOME=" + workDir, "LANG=C.UTF-8"}
-	cmd.Dir = workDir
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if i := strings.LastIndex(msg, "\n"); i >= 0 {
-			msg = msg[i+1:]
+	var out bytes.Buffer
+	if err := pdfdoc.Render(ctx, req.Document, s.attachmentImageLoader(ctx), &out); err != nil {
+		switch {
+		case errors.Is(err, pdfdoc.ErrTooLong):
+			writeErr(w, http.StatusRequestEntityTooLarge, "документ слишком длинный для PDF")
+		case errors.Is(err, context.DeadlineExceeded):
+			writeErr(w, http.StatusGatewayTimeout, "рендер PDF не уложился в отведённое время")
+		default:
+			writeErr(w, http.StatusInternalServerError, "pdf render failed: "+err.Error())
 		}
-		writeErr(w, http.StatusInternalServerError, "pdf render failed: "+msg)
-		return
-	}
-
-	pdf, err := os.ReadFile(outPath)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -129,9 +75,48 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 		filename = uuid.NewString() + ".pdf"
 	}
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeFilename(filename)+`"`)
+	w.Header().Set("Content-Disposition", contentDisposition(sanitizeFilename(filename)))
+	w.Header().Set("Content-Length", fmt.Sprint(out.Len()))
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(pdf)
+	_, _ = w.Write(out.Bytes())
+}
+
+// attachmentImageLoader fetches attachment images for the renderer with the same rules as the inline
+// image endpoint: the caller's workspace (row-level security), not hidden, and a raster type that the
+// upload scan recorded — never the client's claim.
+func (s *Server) attachmentImageLoader(ctx context.Context) pdfdoc.ImageLoader {
+	return func(id int64) ([]byte, error) {
+		if !s.webdavOK() {
+			return nil, errors.New("attachment storage is not configured")
+		}
+		a, err := s.Store.GetAttachment(ctx, id)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return nil, errors.New("attachment not found")
+			}
+			return nil, err
+		}
+		if a.Hidden {
+			return nil, errors.New("attachment not found")
+		}
+		ctype, _, _ := strings.Cut(a.ContentTypeDetected, ";")
+		if !inlineImageTypes[strings.ToLower(strings.TrimSpace(ctype))] {
+			return nil, errors.New("attachment is not a raster image")
+		}
+		body, err := s.WebDAV.Get(ctx, a.WebDAVPath)
+		if err != nil {
+			return nil, err
+		}
+		defer body.Close()
+		data, err := io.ReadAll(io.LimitReader(body, pdfdoc.MaxImageBytes+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(data) > pdfdoc.MaxImageBytes {
+			return nil, errors.New("image is too large")
+		}
+		return data, nil
+	}
 }
 
 func sanitizeFilename(name string) string {
