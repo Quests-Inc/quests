@@ -1,0 +1,17 @@
+# TypeScript types of the HTTP API, generated from the Go structs: `just gen-types`
+# (frontend/src/lib/api/*.gen.ts; CI fails when they are stale).
+packages:
+  - path: "github.com/valirum/quests/go/internal/domain"
+    output_path: "../frontend/src/lib/api/domain.gen.ts"
+    type_mappings:
+      time.Time: "string"
+  - path: "github.com/valirum/quests/go/internal/store"
+    output_path: "../frontend/src/lib/api/store.gen.ts"
+    exclude_files:
+      - "store.go"
+      - "wsdata.go"
+      - "durations.go"
+    type_mappings:
+      time.Time: "string"
+      time.Duration: "number"
+      json.RawMessage: "unknown"

@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["**/*.gen.ts"],
   "printWidth": 120,
   "trailingComma": "es5",
   "semi": false,

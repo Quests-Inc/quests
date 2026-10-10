@@ -80,6 +80,12 @@ jobs:
           go build ./...
           go test ./...
 
+      - name: TypeScript types are up to date
+        working-directory: go
+        run: |
+          go tool tygo generate
+          git diff --exit-code -- ../frontend/src/lib/api
+
       - name: Sync + pytest
         run: |
           uv sync --locked --group dev --all-extras

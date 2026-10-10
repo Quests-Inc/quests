@@ -283,9 +283,6 @@ func (s *Store) guardExec(ctx context.Context, command, runOn *string) error {
 
 // --- rename / delete (quest=347) ---
 
-// WorkspacePurgeAfter is how long a deleted workspace can still be restored.
-const WorkspacePurgeAfter = 7 * 24 * time.Hour
-
 var ErrMainWorkspace = errors.New("основное пространство нельзя удалить из интерфейса")
 
 // RenameWorkspace changes the display name.

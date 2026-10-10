@@ -10,9 +10,6 @@ import (
 	"github.com/valirum/quests/go/internal/timeutil"
 )
 
-// InviteTTL is how long an invitation link stays valid.
-const InviteTTL = 7 * 24 * time.Hour
-
 var (
 	ErrInviteInvalid = errors.New("invitation is invalid, used or expired")
 	ErrLastOwner     = errors.New("a workspace needs at least one owner")

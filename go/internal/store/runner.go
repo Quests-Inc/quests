@@ -102,9 +102,6 @@ var runnerLabelRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
 // ValidRunOn: nil (run here) or a well-formed runner label.
 func ValidRunOn(v *string) bool { return v == nil || runnerLabelRe.MatchString(*v) }
 
-// RegistrationTTL is how long a fresh registration token stays valid.
-const RegistrationTTL = 24 * time.Hour
-
 const runnerCols = `id, label, COALESCE(hostname,''), COALESCE(version,''), token_hash IS NOT NULL, revoked, last_seen_at, created_at`
 
 func scanRunner(sc interface{ Scan(...any) error }) (Runner, error) {

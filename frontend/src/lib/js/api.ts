@@ -1,3 +1,5 @@
+import type { Category, QuestRead, Tag } from '../api/domain.gen'
+import type { RunnerJob } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
 const BASE = ''
@@ -17,7 +19,7 @@ export class UnauthorizedError extends Error {
   }
 }
 
-async function request(path: string, options: RequestInit = {}) {
+async function request<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
     ...options,
@@ -55,7 +57,7 @@ async function request(path: string, options: RequestInit = {}) {
     toast(msg, { kind: 'error' })
     throw new Error(msg)
   }
-  return data
+  return data as T
 }
 
 export function listQuests(params: { status?: string; pinned?: boolean | null } = {}) {
@@ -63,7 +65,7 @@ export function listQuests(params: { status?: string; pinned?: boolean | null } 
   if (params.status) q.set('status', params.status)
   if (params.pinned != null) q.set('pinned', String(params.pinned))
   const qs = q.toString()
-  return request(`/api/quests${qs ? `?${qs}` : ''}`)
+  return request<QuestRead[]>(`/api/quests${qs ? `?${qs}` : ''}`)
 }
 
 /** Aggregated liveness: API + overlay/telegram heartbeats. */
@@ -220,12 +222,12 @@ export function applyActionBatch(batch) {
 }
 
 export function listCategories() {
-  return request('/api/categories')
+  return request<Category[]>('/api/categories')
 }
 
 export function listTags(q = '') {
   const qs = q ? `?q=${encodeURIComponent(q)}` : ''
-  return request(`/api/tags${qs}`)
+  return request<Tag[]>(`/api/tags${qs}`)
 }
 
 /** Create tag; on slug conflict returns the existing tag (409 body). */
@@ -284,7 +286,8 @@ export function setTemplateTags(templateId, tagIds) {
 }
 
 export function listQuestlines() {
-  return request('/api/questlines')
+  // the server sends a free-form map here (store.QuestlineRead), not a struct
+  return request<any[]>('/api/questlines')
 }
 
 export function createQuestline(payload) {
@@ -774,8 +777,8 @@ export async function uploadGraphDraftFile(file, owner = '') {
 }
 
 /** One quest with its steps and tags. @param {number} id */
-export function getQuestFull(id) {
-  return request(`/api/quests/${id}`)
+export function getQuestFull(id: number) {
+  return request<QuestRead>(`/api/quests/${id}`)
 }
 
 /** Replaces the payload of a created thing in the draft. @param {number} id @param {any} payload */
@@ -806,7 +809,7 @@ export function getRunnerJobs(f: { label?: string; state?: string; limit?: numbe
   if (f.state) qs.set('state', f.state)
   if (f.limit) qs.set('limit', String(f.limit))
   const q = qs.toString()
-  return request(`/api/runner-jobs${q ? `?${q}` : ''}`)
+  return request<RunnerJob[]>(`/api/runner-jobs${q ? `?${q}` : ''}`)
 }
 
 /** @param {number} id */

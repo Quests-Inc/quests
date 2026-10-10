@@ -197,7 +197,7 @@
   $effect(() => {
     if (!active || tags.length) return
     listTags()
-      .then((t) => (tags = Array.isArray(t) ? t : (t?.items ?? [])))
+      .then((t) => (tags = Array.isArray(t) ? t : []))
       .catch(() => {})
   })
 

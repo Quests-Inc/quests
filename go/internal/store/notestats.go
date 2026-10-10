@@ -21,7 +21,6 @@ import (
 
 const (
 	HalfLifeDays   = 30.0
-	ReadDedupe     = 10 * time.Minute
 	weightHuman    = 1.0
 	weightAgent    = 0.3
 	weightUp       = 2.0

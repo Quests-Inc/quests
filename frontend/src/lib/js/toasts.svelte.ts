@@ -61,7 +61,7 @@ export function toastProgress(id, message) {
 }
 
 /** @param {string} id @param {string} message @param {ToastKind} [kind] */
-export function toastDone(id, message, kind = 'success') {
+export function toastDone(id: string, message: string, kind: ToastKind = 'success') {
   return toast(message, {
     id,
     kind,

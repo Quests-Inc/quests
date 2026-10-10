@@ -3,7 +3,7 @@
   "plugins": ["typescript", "oxc", "import"],
   "categories": { "correctness": "error", "suspicious": "error" },
   "env": { "builtin": true, "browser": true },
-  "ignorePatterns": ["dist", "node_modules", "public"],
+  "ignorePatterns": ["dist", "node_modules", "public", "**/*.gen.ts"],
   "rules": {
     "eqeqeq": ["warn", "always", { "null": "ignore" }],
     "no-debugger": "error",
