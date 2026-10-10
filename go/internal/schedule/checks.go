@@ -1,13 +1,10 @@
 package schedule
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"github.com/valirum/quests/go/internal/wsctx"
 	"log"
-	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,13 +25,11 @@ const (
 
 var intToken = regexp.MustCompile(`-?\d+`)
 
-// CheckRunner executes step check_command (poll and one-shot) with linear wait_previous gating.
+// CheckRunner schedules step check_command runs (poll and one-shot) with linear wait_previous gating.
+// The commands themselves execute on runners (quests-runner); the server only queues jobs and applies results.
 type CheckRunner struct {
 	Store *store.Store
 	Hub   *events.Hub
-	// Env is added to every check command's environment (the server sets
-	// QUESTS_API and an internal token so `quests …` works inside a check).
-	Env []string
 
 	mu       sync.Mutex
 	inFlight map[int64]struct{}
@@ -168,9 +163,9 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 }
 
 func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step, once bool) {
-	// Server-side execution is the operator's privilege: untrusted workspaces
-	// only run checks on runners, whatever is stored (quest=348).
-	if st.RunOn == nil && !r.Store.ServerExecAllowed(ctx) {
+	// Commands run on runners only. A step that still has a command and no runner (stored before
+	// server-side execution was removed) stays idle until a runner is chosen for it.
+	if st.RunOn == nil {
 		return
 	}
 	if !r.tryLock(st.ID) {
@@ -187,77 +182,10 @@ func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step,
 		log.Printf("checks: mark start step %d: %v", st.ID, err)
 		return
 	}
-	if st.RunOn != nil {
-		// Executed by a runner on another device: queue the job, the result is
-		// applied when it comes back (JobFinished).
-		r.dispatch(ctx, q, st, once)
-		r.unlock(st.ID)
-		return
-	}
-	if once {
-		qid := q.ID
-		r.Hub.Publish("step_auto_running", events.PublishOpts{
-			Workspace: wsctx.From(ctx),
-			QuestID:   &qid, Title: q.Title, Detail: st.Title,
-			Toast: true, Source: "system", Significance: string(q.Significance),
-			StepTitle: st.Title, Automated: q.Automated,
-		})
-	}
-	r.wg.Add(1)
-	go func() {
-		defer r.wg.Done()
-		defer r.unlock(st.ID)
-		r.exec(ctx, q.ID, st.ID, strings.TrimSpace(*st.CheckCommand), once)
-	}()
-}
-
-func (r *CheckRunner) exec(parent context.Context, questID, stepID int64, command string, once bool) {
-	timeout := pollTimeout
-	if once {
-		timeout = onceSafetyTimeout
-	}
-	ctx, cancel := context.WithTimeout(parent, timeout)
-	defer cancel()
-
-	// Secrets of the step, its quest, the template that emitted it and the
-	// questline (most specific wins) go into the command's environment and are
-	// masked in whatever it prints.
-	secrets, serr := r.Store.ResolveSecrets(ctx, store.SecretOwner{Kind: store.SecretOwnerStep, ID: stepID})
-	if serr != nil {
-		log.Printf("checks: secrets for step %d: %v", stepID, serr)
-	}
-	cmd, cleanup, cerr := commandCmd(ctx, command)
-	if cerr != nil {
-		r.apply(parent, questID, stepID, once, -1, "", cerr.Error(), false)
-		return
-	}
-	defer cleanup()
-	cmd.Env = append(CommandEnv(), r.Env...)
-	if ws := wsctx.From(parent); ws > 0 {
-		// Commands that call the CLI back act in the workspace of their quest.
-		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))
-	}
-	for name, value := range secrets {
-		cmd.Env = append(cmd.Env, name+"="+value)
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		cmd.Dir = home
-	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	out := store.MaskSecrets(stdout.String(), secrets)
-	errOut := store.MaskSecrets(stderr.String(), secrets)
-	exit := 0
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			exit = ee.ExitCode()
-		} else {
-			exit = -1
-		}
-	}
-	r.apply(parent, questID, stepID, once, exit, out, errOut, ctx.Err() == context.DeadlineExceeded)
+	// Executed by a runner on another device: queue the job, the result is
+	// applied when it comes back (JobFinished).
+	r.dispatch(ctx, q, st, once)
+	r.unlock(st.ID)
 }
 
 func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once bool, exit int, stdout, stderr string, timedOut bool) {

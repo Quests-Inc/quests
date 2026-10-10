@@ -176,7 +176,6 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 	}
 	rep.Counts = map[string]int{}
 	rep.Skipped = map[string]int{}
-	allowCmd := s.ServerExecAllowed(ctx)
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -297,26 +296,25 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 			if spec.SelfFK != "" {
 				vals[spec.SelfFK] = nil // linked in a second pass, once every row has its new id
 			}
-			// Commands that would run on the server are not imported into an untrusted workspace.
-			if !allowCmd {
-				switch spec.Name {
-				case "queststep", "questtemplatestep":
-					if c, _ := vals["check_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["run_on"]) {
-						vals["check_command"], vals["check_interval_seconds"] = nil, nil
-						rep.StrippedCommand++
-					}
-				case "questtemplate":
-					if c, _ := vals["emit_pool_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["emit_run_on"]) {
-						vals["emit_pool_command"] = nil
-						rep.StrippedCommand++
-					}
-				case "note":
-					if c, _ := vals["check_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["run_on"]) {
-						vals["check_command"], vals["check_interval_seconds"] = nil, nil
-						rep.StrippedCommand++
-					}
+			// Commands with no runner cannot run anywhere now: they are not imported.
+			switch spec.Name {
+			case "queststep", "questtemplatestep":
+				if c, _ := vals["check_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["run_on"]) {
+					vals["check_command"], vals["check_interval_seconds"] = nil, nil
+					rep.StrippedCommand++
+				}
+			case "questtemplate":
+				if c, _ := vals["emit_pool_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["emit_run_on"]) {
+					vals["emit_pool_command"] = nil
+					rep.StrippedCommand++
+				}
+			case "note":
+				if c, _ := vals["check_command"].(string); strings.TrimSpace(c) != "" && isEmptyStr(vals["run_on"]) {
+					vals["check_command"], vals["check_interval_seconds"] = nil, nil
+					rep.StrippedCommand++
 				}
 			}
+
 			// Attachments: bring the bytes along and point the row at the new path.
 			if spec.Name == "attachment" || spec.Name == "attachment_revision" {
 				if opt.Attachment == nil {

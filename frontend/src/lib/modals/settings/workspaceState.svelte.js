@@ -15,7 +15,7 @@ import {
 export const wsx = $state({
   enabled: false,
   loaded: false,
-  list: /** @type {{ id: number, name: string, trusted?: boolean }[]} */ ([]),
+  list: /** @type {{ id: number, name: string }[]} */ ([]),
   current: 0,
   members: /** @type {{ user_id: number, username: string, role: string }[]} */ ([]),
   myRole: '',
@@ -118,7 +118,7 @@ export async function doImport(file, secrets) {
   const ok = await act(async () => {
     const r = await importWorkspace(file, { secrets })
     const rep = r.report || {}
-    wsx.notice = `Создано пространство «${r.name}». Команд на сервере убрано: ${rep.stripped_commands ?? 0}, битых ссылок: ${rep.dangling_refs ?? 0}.`
+    wsx.notice = `Создано пространство «${r.name}». Команд без раннера убрано: ${rep.stripped_commands ?? 0}, битых ссылок: ${rep.dangling_refs ?? 0}.`
     await switchWorkspace(r.workspace_id)
   }, 'не удалось импортировать')
   if (ok) setTimeout(() => location.reload(), 1800)

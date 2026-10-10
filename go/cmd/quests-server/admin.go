@@ -39,8 +39,6 @@ const adminUsage = `quests-server admin commands (run on the host with access to
   quests-server workspace member <id> <user> [owner|member]
                                          add <user> to workspace <id> (default role: member; an existing member gets the new role)
   quests-server workspace restore <id>   undo a deletion within 7 days (ls shows pending purges)
-  quests-server workspace trust|untrust <id>  allow/forbid running check and emit commands on the server
-                                         (host-only on purpose: never reachable from the web UI or API)
   quests-server token ls                 list active API tokens
   quests-server token rm <id>            revoke an API token
   quests-server runner add <label>       register a device that runs checks (prints a one-time registration token;
@@ -48,6 +46,7 @@ const adminUsage = `quests-server admin commands (run on the host with access to
   quests-server runner ls                list runners and when they were last seen
   quests-server runner rm <label>        revoke a runner and cancel its queued jobs
   quests-server backup-now               run one DB+attachments backup tick now
+  quests-server backups                  list the backups (newest first: file, size, where it went, errors)
   quests-server migrate [current]        bring the database (QUESTS_DATABASE_URL) to the schema this binary expects;
                                          "current" only prints the revision
 
@@ -64,7 +63,7 @@ func runAdmin(args []string) bool {
 	case "migrate":
 		runMigrate(args[1:])
 		return true
-	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "backup-now", "workspace":
+	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "backup-now", "backups", "workspace":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -88,6 +87,10 @@ func runAdmin(args []string) bool {
 
 	if args[0] == "backup-now" {
 		runBackupNow(cfg, sqlDB)
+		return true
+	}
+	if args[0] == "backups" {
+		runBackups(sqlDB, cfg.DatabaseURL)
 		return true
 	}
 
@@ -182,6 +185,35 @@ func runAdmin(args []string) bool {
 		runWorkspaceCmd(st, wst, args[1:])
 	}
 	return true
+}
+
+func runBackups(sqlDB *sql.DB, url string) {
+	st := &store.Store{DB: sqlDB, DatabaseURL: url}
+	rows, err := st.ListBackupLogs(context.Background())
+	if err != nil {
+		fatal("backups: %v", err)
+	}
+	if len(rows) == 0 {
+		fmt.Println("no backups recorded yet")
+		return
+	}
+	for _, r := range rows {
+		where := []string{"local"}
+		if r.WebdavUploaded {
+			where = append(where, "webdav")
+		}
+		if r.RemoteUploaded {
+			where = append(where, "remote")
+		}
+		line := fmt.Sprintf("%s\t%s\t%d bytes\t%s", r.CreatedAt, r.Filename, r.SizeBytes, strings.Join(where, "+"))
+		if r.AttachmentsFilename != "" {
+			line += fmt.Sprintf("\t+ %s (%d bytes)", r.AttachmentsFilename, r.AttachmentsSizeBytes)
+		}
+		if r.Error != "" {
+			line += "\tERROR: " + r.Error
+		}
+		fmt.Println(line)
+	}
 }
 
 func runBackupNow(cfg config.Config, sqlDB *sql.DB) {
@@ -451,7 +483,7 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			allByID[w.ID] = w
 		}
 		for _, id := range ids {
-			fmt.Printf("%d\t%s\t%s\tmembers: %s\n", id, allByID[id].Name, trustLabel(allByID[id].Trusted), strings.Join(members[id], ", "))
+			fmt.Printf("%d\t%s\tmembers: %s\n", id, allByID[id].Name, strings.Join(members[id], ", "))
 		}
 		dels, err := wst.DeletedWorkspaces(ctx)
 		if err != nil {
@@ -482,22 +514,6 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			fatal("%v (already purged, or not deleted?)", err)
 		}
 		fmt.Printf("workspace %d restored\n", id)
-	case "trust", "untrust":
-		if len(args) < 2 {
-			fatal("usage: quests-server workspace %s <id>", args[0])
-		}
-		id, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			fatal("workspace id must be a number")
-		}
-		if err := wst.SetWorkspaceTrusted(ctx, id, args[0] == "trust"); err != nil {
-			fatal("%v", err)
-		}
-		if args[0] == "trust" {
-			fmt.Printf("workspace %d is trusted: its checks and emit commands may run on this server\n", id)
-		} else {
-			fmt.Printf("workspace %d is untrusted: server-side commands are refused, runners only\n", id)
-		}
 	case "member":
 		if len(args) < 3 || len(args) > 4 {
 			fatal("usage: quests-server workspace member <id> <user> [owner|member]   (default: member)")
@@ -533,13 +549,6 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 	default:
 		fatal("unknown workspace command %q", args[0])
 	}
-}
-
-func trustLabel(t bool) string {
-	if t {
-		return "trusted"
-	}
-	return "untrusted"
 }
 
 // runMigrate applies the embedded migrations (the API itself never migrates: it

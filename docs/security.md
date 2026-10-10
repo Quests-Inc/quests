@@ -7,12 +7,14 @@ Who can do what, what is enforced where, and how to re-check it.
 | Who | Can | Cannot |
 |---|---|---|
 | Anyone (no account) | `/api/ping`, login (throttled), open an invitation link and sign up through it | anything else |
-| Member of a workspace | read and write that workspace's quests, notes, attachments, tags; make API tokens for it; export nothing | set commands, secrets, runners; invite; rename/delete/export; see other workspaces; see server health details |
-| Owner of a workspace | everything above + commands, secrets, runners, invitations, rename, delete, export | invite into a *trusted* workspace |
-| Operator (owner of a trusted workspace / host admin) | commands that run **on the server** (`sh -c`), server health, heartbeats, `quests-server` admin CLI | — |
+| Member of a workspace | read and write that workspace's quests, notes, attachments, tags; make API tokens for it; see the server health chips; export nothing | set commands, secrets, runners; invite; rename/delete/export; see other workspaces |
+| Owner of a workspace | everything above + commands (for runners), secrets, runners, invitations, rename, delete (not the main workspace), export | — |
+| Host admin | `quests-server` admin CLI (accounts, tokens, backups, workspace restore), event hooks (`data/hooks.json`) | — |
 
-A **trusted** workspace is the one place server-side commands may run, so it is the host. It has exactly the owners
-you add from the host (`quests-server workspace trust`), and **no invitations**: a member would get the host.
+**The server executes no user commands.** Check and emit commands run on runners (`quests-runner` on any device, the
+server's own host included): a runner sits where its owner put it, with the rights of the user it runs as. There is no
+"trusted workspace" and no operator role in the web interface; what is left of the host's own authority lives in the
+admin CLI and in the event hooks.
 
 ## Where each rule lives
 
@@ -22,7 +24,8 @@ you add from the host (`quests-server workspace trust`), and **no invitations**:
   `X-Quests-Workspace` header is checked against membership. The assistant's loopback token must name the workspace
   (it used to fall into the default one — an invited user could rewrite the owner's quests through it).
 - **Commands** — `guardAuthor` (only owners write a command; editing around an existing one is fine) and
-  `guardExec` (a command without a runner needs a trusted workspace), both in `go/internal/store/workspaces.go`.
+  `guardExec` (a command needs a runner), both in `go/internal/store/workspaces.go`. A command stored without a runner
+  is never run: steps stay idle, notes and templates report "choose a runner".
   Secrets names that would bend how a process starts (`PATH`, `LD_*`, `BASH_ENV`, `QUESTS_*`…) are refused and never exported.
 - **Exports** — PDF is rendered in-process by `go/internal/pdfdoc` from a document the client describes (title, markdown, steps):
   no HTML or CSS is interpreted, nothing is fetched from the network or the disk, and the only images are attachments the
@@ -47,9 +50,9 @@ does not. Full write-up: quests note "Шифрование секретов".
 ## Grants (quest=360)
 
 The API connects as the owner role and drops to `quests_app`. Migration `c8e0a2b4d6f3` takes from it what is the
-host's: it cannot flip `workspace.trusted` (the switch for running commands on the host), rewrite a password hash or
-re-activate an account (only `last_login_at`), or touch `alembic_version`. The admin commands (`quests-server
-workspace trust|untrust`, `passwd`, `2fa-reset`…) run as the owner (`db.SkipAppRole`). Test: `TestPGAPIRoleGrants`.
+host's: it cannot rewrite a password hash or re-activate an account (only `last_login_at`), change a workspace beyond its
+name and deletion mark, or touch `alembic_version`. The admin commands (`passwd`, `2fa-reset`, `workspace restore`…) run
+as the owner (`db.SkipAppRole`). Test: `TestPGAPIRoleGrants`.
 
 ## Quotas (quest=358)
 
@@ -70,8 +73,8 @@ and changed only from a browser session (not with an API token).
   cannot be re-pointed inward between the check and the connection — also when the operator routes LLM traffic
   through a proxy; redirects are not followed, and the provider's reply
   body is not echoed back. Otherwise the field would be a server-side request forgery.
-- Accounts without a key get the server's key (`QUESTS_GROQ_API_KEY`) only if they are the operator, or the operator set
-  `QUESTS_LLM_SHARED=1`; everyone else is told to add their own. 20 requests / 10 min per account (all of its tokens together) and 8000 characters per request.
+- Accounts without a key get the server's key (`QUESTS_GROQ_API_KEY`) only if the host set `QUESTS_LLM_SHARED=1`;
+  everyone else is told to add their own. 20 requests / 10 min per account (all of its tokens together) and 8000 characters per request.
 
 ## Re-check after changes
 
@@ -86,6 +89,6 @@ Run it against a **scratch** instance: it creates a workspace, an attacker accou
 - Tables without row-level security (`appuser`, `usersession`, `apitoken`, `workspace*`, `backuplog`) are readable by the
   API role (it must read password hashes to check logins): only an SQL injection could reach them. No injection is
   known; every dynamic identifier is validated. What the API role can no longer *change* is listed under "Grants".
-- No per-account storage quota for attachments; two-factor sign-in is optional (an operator policy that requires it for owners of a trusted workspace is not built); Grafana/Kuma have their own logins only.
+- No per-account storage quota for attachments; two-factor sign-in is optional (a policy that requires it for workspace owners is not built); Grafana/Kuma have their own logins only.
 - `X-Forwarded-For` is trusted for throttling (the gateway rewrites it; a client on the LAN could forge it — the
   per-login stall covers that).

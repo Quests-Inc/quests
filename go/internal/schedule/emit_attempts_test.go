@@ -26,12 +26,12 @@ func TestEmitAttemptsLogFailureThenSuccess(t *testing.T) {
 	ctx := bg()
 	fail := poolTemplate(5, `echo boom >&2; exit 3`, 1)
 	now := time.Now()
-	if _, _, _, err := resolveEmitPool(ctx, st, fail, "p1", now, rand.New(rand.NewSource(1))); err != nil {
+	if _, _, _, err := resolveEmitPool(t, ctx, st, fail, "p1", now, rand.New(rand.NewSource(1))); err != nil {
 		t.Fatal(err)
 	}
 	ok := poolTemplate(5, `echo '{"steps":[{"title":"a"},{"title":"b"}]}'`, 1)
 	later := now.Add(emitPoolRetryDelays[0] + time.Second) // past the pause
-	if _, _, _, err := resolveEmitPool(ctx, st, ok, "p1", later, rand.New(rand.NewSource(1))); err != nil {
+	if _, _, _, err := resolveEmitPool(t, ctx, st, ok, "p1", later, rand.New(rand.NewSource(1))); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,70 +50,12 @@ func TestEmitAttemptsLogFailureThenSuccess(t *testing.T) {
 
 func TestEmitAttemptsLogEmptyPoolMiss(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	if _, _, _, err := resolveEmitPool(bg(), st, poolTemplate(6, `echo null`, 0), "p", time.Now(), rand.New(rand.NewSource(1))); err != nil {
+	if _, _, _, err := resolveEmitPool(t, bg(), st, poolTemplate(6, `echo null`, 0), "p", time.Now(), rand.New(rand.NewSource(1))); err != nil {
 		t.Fatal(err)
 	}
 	rows := attemptsFor(t, st, 6)
 	if len(rows) != 1 || rows[0]["status"] != "ok" || !strings.Contains(rows[0]["message"].(string), "miss: the command printed no quest") {
 		t.Fatalf("unexpected rows: %+v", rows)
-	}
-}
-
-// The reason the log exists next to template secrets: a script that echoes a
-// credential must not leak it into the attempt log or the failed quest trace.
-func TestEmitAttemptsMaskTemplateSecrets(t *testing.T) {
-	st := openTemplateSecretsDB(t)
-	ctx := bg()
-	if err := st.SetTemplateSecret(ctx, 9, "MAIL_PASSWORD", "s3cr3t-pw"); err != nil {
-		t.Fatal(err)
-	}
-	cmd := "#!/bin/sh\necho \"login failed for $MAIL_PASSWORD\" >&2\necho \"not json $MAIL_PASSWORD\"\nexit 1\n"
-	if _, _, _, err := resolveEmitPool(ctx, st, poolTemplate(9, cmd, 1), "p", time.Now(), rand.New(rand.NewSource(1))); err != nil {
-		t.Fatal(err)
-	}
-	rows := attemptsFor(t, st, 9)
-	if len(rows) != 1 {
-		t.Fatalf("want 1 row, got %+v", rows)
-	}
-	msg := rows[0]["message"].(string)
-	if strings.Contains(msg, "s3cr3t-pw") {
-		t.Fatalf("secret leaked into attempt log: %q", msg)
-	}
-	if !strings.Contains(msg, "login failed for ***") {
-		t.Errorf("expected masked stderr in %q", msg)
-	}
-
-	// Exhausting attempts must not leak it through the failed-quest trace either.
-	if err := st.SetTemplateSecret(ctx, 10, "MAIL_PASSWORD", "s3cr3t-pw"); err != nil {
-		t.Fatal(err)
-	}
-	var last string
-	at := time.Now()
-	for i := 0; i < emitPoolMaxAttempts; i++ {
-		_, _, last, _ = resolveEmitPool(ctx, st, poolTemplate(10, cmd, 1), "q", at, rand.New(rand.NewSource(1)))
-		at = at.Add(time.Hour) // past any retry pause
-	}
-	if last == "" || strings.Contains(last, "s3cr3t-pw") || !strings.Contains(last, "***") {
-		t.Fatalf("failed-quest trace must be non-empty and masked, got %q", last)
-	}
-}
-
-func TestExecEmitPoolCommandMasksFailureTrace(t *testing.T) {
-	st := openTemplateSecretsDB(t)
-	ctx := bg()
-	if err := st.SetTemplateSecret(ctx, 11, "TOKEN", "tok-12345"); err != nil {
-		t.Fatal(err)
-	}
-	_, info, err := execEmitPoolCommand(ctx, st, 11, "#!/bin/sh\necho \"bad $TOKEN\" >&2\nexit 2\n")
-	if err == nil || info.Status != "error" {
-		t.Fatalf("want error status, got %v / %+v", err, info)
-	}
-	if strings.Contains(err.Error(), "tok-12345") || strings.Contains(info.Stderr, "tok-12345") {
-		t.Fatalf("secret leaked: %v / %q", err, info.Stderr)
-	}
-	_, info, err = execEmitPoolCommand(ctx, st, 11, "#!/bin/sh\necho \"not-json $TOKEN\"\n")
-	if err == nil || info.Status != "bad_json" || strings.Contains(err.Error(), "tok-12345") {
-		t.Fatalf("bad_json case: %v / %+v", err, info)
 	}
 }
 
@@ -123,7 +65,7 @@ func TestEmitAttemptLogIsTrimmed(t *testing.T) {
 	tmpl := poolTemplate(12, `echo null`, 0)
 	for i := 0; i < 205; i++ {
 		// distinct period keys, each a fresh roll
-		_, _, _, _ = resolveEmitPool(ctx, st, tmpl, "p"+time.Duration(i).String(), time.Now(), rand.New(rand.NewSource(1)))
+		_, _, _, _ = resolveEmitPool(t, ctx, st, tmpl, "p"+time.Duration(i).String(), time.Now(), rand.New(rand.NewSource(1)))
 	}
 	rows, err := st.ListEmitAttempts(ctx, 12, 1000)
 	if err != nil {
@@ -150,11 +92,11 @@ func TestEmitPoolRetryPauseIsHonored(t *testing.T) {
 	tmpl := poolTemplate(20, `exit 9`, 1)
 	now := time.Now()
 
-	if _, _, _, err := resolveEmitPool(ctx, st, tmpl, "p", now, rng); err != nil {
+	if _, _, _, err := resolveEmitPool(t, ctx, st, tmpl, "p", now, rng); err != nil {
 		t.Fatal(err)
 	}
 	for _, d := range []time.Duration{0, 15 * time.Second, 45 * time.Second, emitPoolRetryDelays[0] - time.Second} {
-		if _, _, _, err := resolveEmitPool(ctx, st, tmpl, "p", now.Add(d), rng); err != nil {
+		if _, _, _, err := resolveEmitPool(t, ctx, st, tmpl, "p", now.Add(d), rng); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -169,7 +111,7 @@ func TestEmitPoolRetryPauseIsHonored(t *testing.T) {
 		t.Fatalf("pause ignored: attempts=%d log rows=%d, want 1/1", attempts, runs)
 	}
 
-	if _, _, _, err := resolveEmitPool(ctx, st, tmpl, "p", now.Add(emitPoolRetryDelays[0]+time.Second), rng); err != nil {
+	if _, _, _, err := resolveEmitPool(t, ctx, st, tmpl, "p", now.Add(emitPoolRetryDelays[0]+time.Second), rng); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.DB.QueryRow(`SELECT attempts FROM templateemitroll WHERE template_id = 20`).Scan(&attempts); err != nil {
@@ -186,11 +128,11 @@ func TestEmitPoolSuccessClearsRetryAt(t *testing.T) {
 	ctx := bg()
 	rng := rand.New(rand.NewSource(1))
 	now := time.Now()
-	if _, _, _, err := resolveEmitPool(ctx, st, poolTemplate(21, `exit 1`, 1), "p", now, rng); err != nil {
+	if _, _, _, err := resolveEmitPool(t, ctx, st, poolTemplate(21, `exit 1`, 1), "p", now, rng); err != nil {
 		t.Fatal(err)
 	}
 	ok := poolTemplate(21, `echo '{"title":"a"}'`, 1)
-	if _, _, _, err := resolveEmitPool(ctx, st, ok, "p", now.Add(emitPoolRetryDelays[0]+time.Second), rng); err != nil {
+	if _, _, _, err := resolveEmitPool(t, ctx, st, ok, "p", now.Add(emitPoolRetryDelays[0]+time.Second), rng); err != nil {
 		t.Fatal(err)
 	}
 	var retry *string
@@ -199,24 +141,5 @@ func TestEmitPoolSuccessClearsRetryAt(t *testing.T) {
 	}
 	if retry != nil {
 		t.Fatalf("retry_at should be cleared after a success, got %q", *retry)
-	}
-}
-
-// A timed-out command must come back at the timeout, not when its child
-// processes decide to exit (sh -c "sleep 30" used to hold the pipe for 30s).
-func TestExecEmitPoolCommandTimeoutKillsChildren(t *testing.T) {
-	old := emitPoolTimeout
-	emitPoolTimeout = 500 * time.Millisecond
-	t.Cleanup(func() { emitPoolTimeout = old })
-
-	st := openTemplateSecretsDB(t)
-	start := time.Now()
-	_, info, err := execEmitPoolCommand(bg(), st, 50, `sleep 30; echo '{"title":"late"}'`)
-	elapsed := time.Since(start)
-	if err == nil || info.Status != "timeout" {
-		t.Fatalf("want timeout, got %v / %+v", err, info)
-	}
-	if elapsed > 4*time.Second {
-		t.Fatalf("timeout took %s, the child process kept the pipe open", elapsed)
 	}
 }

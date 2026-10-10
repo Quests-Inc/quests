@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 )
 
@@ -193,5 +195,66 @@ func TestRunnerCancelRevokeAndOrder(t *testing.T) {
 	}
 	if code, _ := rr(t, h, "GET", "/api/runner/jobs?wait=0", token, nil); code != 401 {
 		t.Fatalf("revoked runner polls = %d", code)
+	}
+}
+
+// A runner is the only place a command executes, so the server is also the only place the secrets of
+// what the job belongs to reach it from: they ride in the job's environment, and whatever the runner
+// prints back is masked before it is stored.
+func TestRunnerReceivesOwnersSecretsAndOutputIsMasked(t *testing.T) {
+	s, h, token := newRunnerEnv(t, "home")
+	ctx := t.Context()
+
+	tmplID := pgtest.SeedTemplate(t, s.Store.DB, "почта")
+	if err := s.Store.SetTemplateSecret(ctx, tmplID, "MAIL_PASSWORD", "s3cr3t-pw"); err != nil {
+		t.Fatal(err)
+	}
+	pgtest.Seed(t, s.Store.DB, `INSERT INTO note (id, title, created_at, updated_at) VALUES (77, 'заметка', now(), now())`)
+	if err := s.Store.SetSecret(ctx, store.SecretOwner{Kind: store.SecretOwnerNote, ID: 77}, "NOTE_TOKEN", "note-secret"); err != nil {
+		t.Fatal(err)
+	}
+	noteID := int64(77)
+	for _, spec := range []store.JobSpec{
+		{RunnerLabel: "home", Kind: store.JobKindEmitPool, TemplateID: &tmplID, Command: "echo $MAIL_PASSWORD", DedupeKey: "emit:t"},
+		{RunnerLabel: "home", Kind: store.JobKindPoll, NoteID: &noteID, Command: "echo $NOTE_TOKEN", DedupeKey: "note:77:poll"},
+	} {
+		if _, _, err := s.Store.EnqueueJob(ctx, spec); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	want := map[string]string{"MAIL_PASSWORD": "s3cr3t-pw", "NOTE_TOKEN": "note-secret"}
+	for i := 0; i < 2; i++ {
+		code, got := rr(t, h, "GET", "/api/runner/jobs?wait=0", token, nil)
+		if code != 200 {
+			t.Fatalf("claim %d = %d %v", i, code, got)
+		}
+		env, _ := got["env"].(map[string]any)
+		var name, value string
+		for k, v := range want {
+			if x, ok := env[k]; ok {
+				name, value = k, v
+				if x != v {
+					t.Fatalf("%s = %v, want the secret", k, x)
+				}
+			}
+		}
+		if name == "" {
+			t.Fatalf("job %v carries none of the owner's secrets: %v", got["id"], env)
+		}
+		delete(want, name)
+
+		id := int64(got["id"].(float64))
+		cp := fmt.Sprintf("/api/runner/jobs/%d/complete", id)
+		if code, out := rr(t, h, "POST", cp, token, map[string]any{"lease_id": got["lease_id"], "exit": 1, "stdout": "got " + value, "stderr": "bad " + value}); code != 200 {
+			t.Fatalf("complete = %d %v", code, out)
+		}
+		stored, _ := s.Store.GetRunnerJob(ctx, id)
+		if strings.Contains(stored.Stdout+stored.Stderr, value) || !strings.Contains(stored.Stdout, "***") {
+			t.Fatalf("the secret reached the stored output: %q / %q", stored.Stdout, stored.Stderr)
+		}
+	}
+	if len(want) != 0 {
+		t.Fatalf("secrets never delivered: %v", want)
 	}
 }

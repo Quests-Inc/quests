@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -80,12 +79,10 @@ type templateStepRow struct {
 
 // MaterializeDue creates quest instances for due templates (fixed + surprise).
 func MaterializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now time.Time, rng *rand.Rand) ([]int64, error) {
-	return materializeDue(ctx, st, hub, now, rng, nil)
+	return materializeDue(ctx, st, hub, now, rng)
 }
 
-// materializeDue is MaterializeDue; a non-nil runner makes emit_pool commands
-// run in the background (the maintenance loop's mode) instead of inline.
-func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now time.Time, rng *rand.Rand, runner *poolRunner) ([]int64, error) {
+func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now time.Time, rng *rand.Rand) ([]int64, error) {
 	if rng == nil {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
@@ -204,7 +201,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		var poolFailMsg string
 		var spec *resolvedSpec
 		if usePool {
-			res, perr := resolveEmit(ctx, st, tmpl, key, now, poolOpts{runner: runner})
+			res, perr := resolveEmit(ctx, st, tmpl, key, now, poolOpts{})
 			if perr != nil {
 				return created, perr
 			}
@@ -611,12 +608,9 @@ type emitResult struct {
 }
 
 // poolOpts tunes resolveEmit. ignorePause lets a manual run ("materialize
-// now") go ahead even while a retry pause is pending; runner, when set, runs
-// the command off the calling goroutine (see poolRunner) and a not-yet-finished
-// command makes the call a no-op.
+// now") go ahead even while a retry pause is pending.
 type poolOpts struct {
 	ignorePause bool
-	runner      *poolRunner
 }
 
 // resolveEmit drives one template's emit_pool_command for the current period:
@@ -659,14 +653,10 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 		if !ready {
 			return emitResult{RollID: id}, nil
 		}
-	} else if opts.runner != nil {
-		var ready bool
-		out, info, execErr, ready = opts.runner.exec(ctx, st, tmpl.ID, periodKey, tmpl.EmitPoolCommand.String)
-		if !ready {
-			return emitResult{RollID: id}, nil // still running; a later tick collects it
-		}
 	} else {
-		out, info, execErr = execEmitPoolCommand(ctx, st, tmpl.ID, tmpl.EmitPoolCommand.String)
+		// Commands run on runners only (see store.ErrNoRunner).
+		info.Status = "error"
+		execErr = store.ErrNoRunner
 	}
 	rec := store.EmitAttempt{
 		TemplateID: tmpl.ID, PeriodKey: periodKey, At: now, Attempt: attemptNo,
@@ -795,21 +785,6 @@ func nullStrIfEmpty(s string) any {
 	return s
 }
 
-// execEmitPoolCommand runs emit_pool_command and parses its stdout as a JSON
-// array of pool items. A non-zero exit code or invalid JSON is an error —
-// the caller treats it the same as a transient failure (counts an attempt).
-//
-// A value starting with a shebang is treated as an inline script body, not
-// a shell one-liner: written to a temp file and executed directly so its
-// own shebang picks the interpreter. This is deliberate — the script then
-// lives in the template row (DB) instead of a path on whatever disk the
-// server happens to run on, so nothing needs hand-deploying/scp'd when the
-// server moves hosts. Secrets shared by every script go in the server's own
-// root .env (already loaded into the process env by config.LoadDotenv, and
-// passed through via cmd.Env below); secrets specific to one template come
-// from templatesecret instead (see store.ResolveTemplateSecrets) — set via
-// PUT /api/templates/{id}/secrets/{key}, injected only here, never returned
-// by any read endpoint or MCP tool.
 // execInfo is what one emit_pool_command run leaves behind for the attempt
 // log. Status is "ok" or, for a failed run, "error" | "timeout" | "bad_json".
 // Stderr/Message never contain template secret values.
@@ -817,67 +792,6 @@ type execInfo struct {
 	Status   string
 	Duration time.Duration
 	Stderr   string
-}
-
-// maskSecrets hides secret values in a command's output (see store.MaskSecrets).
-func maskSecrets(s string, secrets map[string]string) string {
-	return store.MaskSecrets(s, secrets)
-}
-
-func execEmitPoolCommand(parent context.Context, st *store.Store, templateID int64, command string) (out emitOutput, info execInfo, err error) {
-	ctx, cancel := context.WithTimeout(parent, emitPoolTimeout)
-	defer cancel()
-	started := time.Now()
-	info.Status = "error"
-	if !st.ServerExecAllowed(parent) {
-		return emitOutput{}, info, store.ErrServerExec
-	}
-	defer func() { info.Duration = time.Since(started) }()
-
-	var secrets map[string]string
-	if sec, serr := st.ResolveTemplateSecrets(ctx, templateID); serr == nil {
-		secrets = sec
-	}
-
-	cmd, cleanup, cerr := commandCmd(ctx, command)
-	if cerr != nil {
-		return emitOutput{}, info, cerr
-	}
-	defer cleanup()
-
-	killTree(cmd)
-	cmd.Env = CommandEnv()
-	if ws := wsctx.From(ctx); ws > 0 {
-		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))
-	}
-	for name, value := range secrets {
-		cmd.Env = append(cmd.Env, name+"="+value)
-	}
-	if home, herr := os.UserHomeDir(); herr == nil {
-		cmd.Dir = home
-	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	runErr := cmd.Run()
-	info.Stderr = truncate(maskSecrets(stderr.String(), secrets), 4000)
-	if runErr != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			info.Status = "timeout"
-		}
-		// stderr rides along in the error text — it's the only trace of what
-		// went wrong once attempts run out (also kept in the attempt log).
-		msg := maskSecrets(runErr.Error(), secrets)
-		return emitOutput{}, info, fmt.Errorf("%s\nstderr:\n%s", msg, info.Stderr)
-	}
-	parsed, perr := parseEmitOutput(stdout.Bytes())
-	if perr != nil {
-		info.Status = "bad_json"
-		return emitOutput{}, info, fmt.Errorf("%s\nstdout:\n%s",
-			maskSecrets(perr.Error(), secrets), truncate(maskSecrets(stdout.String(), secrets), 4000))
-	}
-	info.Status = "ok"
-	return parsed, info, nil
 }
 
 // joinNote prefixes the attempt's own verdict to whatever stderr it produced.

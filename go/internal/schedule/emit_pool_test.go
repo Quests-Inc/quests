@@ -22,17 +22,18 @@ func poolTemplate(id int64, command string, _ ...int) templateRow {
 	return templateRow{
 		ID:              id,
 		EmitPoolCommand: sql.NullString{String: command, Valid: true},
+		EmitRunOn:       sql.NullString{String: testLabel, Valid: true},
 	}
 }
 
 // resolveEmitPool / resolveEmitPoolOpts keep the older tests' shape: the steps
 // of the quest the command printed (nil when there is none this tick).
-func resolveEmitPool(ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, rng *rand.Rand) ([]domain.Step, int64, string, error) {
-	return resolveEmitPoolOpts(ctx, st, tmpl, period, now, rng, poolOpts{})
+func resolveEmitPool(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, rng *rand.Rand) ([]domain.Step, int64, string, error) {
+	return resolveEmitPoolOpts(t, ctx, st, tmpl, period, now, rng, poolOpts{})
 }
 
-func resolveEmitPoolOpts(ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, _ *rand.Rand, opts poolOpts) ([]domain.Step, int64, string, error) {
-	res, err := resolveEmit(ctx, st, tmpl, period, now, opts)
+func resolveEmitPoolOpts(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, _ *rand.Rand, opts poolOpts) ([]domain.Step, int64, string, error) {
+	res, err := tickAndRun(t, ctx, st, tmpl, period, now, opts)
 	var steps []domain.Step
 	if res.Spec != nil {
 		steps = res.Spec.Steps
@@ -41,9 +42,31 @@ func resolveEmitPoolOpts(ctx context.Context, st *store.Store, tmpl templateRow,
 }
 
 // emitOnce runs one tick of resolveEmit and fails the test on a storage error.
-func emitOnce(t *testing.T, st *store.Store, tmpl templateRow, period string, now time.Time) emitResult {
+// emitTick is one scheduler tick: a first one queues the job for the device and answers "nothing yet".
+func emitTick(t *testing.T, st *store.Store, tmpl templateRow, period string, now time.Time) emitResult {
 	t.Helper()
 	res, err := resolveEmit(bg(), st, tmpl, period, now, poolOpts{})
+	if err != nil {
+		t.Fatalf("resolveEmit: %v", err)
+	}
+	return res
+}
+
+// tickAndRun is a tick followed, when it queued a job, by the fake device running it and a second tick
+// that collects the result: what a synchronous executor would have given in one call.
+func tickAndRun(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, opts poolOpts) (emitResult, error) {
+	t.Helper()
+	res, err := resolveEmit(ctx, st, tmpl, period, now, opts)
+	if err == nil && runQueuedJobs(t, st, nil) > 0 {
+		res, err = resolveEmit(ctx, st, tmpl, period, now, opts)
+	}
+	return res, err
+}
+
+// emitOnce is tickAndRun for tests that only look at the result.
+func emitOnce(t *testing.T, st *store.Store, tmpl templateRow, period string, now time.Time) emitResult {
+	t.Helper()
+	res, err := tickAndRun(t, bg(), st, tmpl, period, now, poolOpts{})
 	if err != nil {
 		t.Fatalf("resolveEmit: %v", err)
 	}

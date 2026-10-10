@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -45,9 +46,8 @@ func TestParseNoteCheckOutput(t *testing.T) {
 func noteCheckRig(t *testing.T) (*CheckRunner, context.Context) {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
-	// Workspace 1 may run commands on the server, workspace 2 may not.
-	pgtest.ExecOwner(t, url, `UPDATE workspace SET trusted = 1 WHERE id = 1;
-INSERT INTO workspace (id, name, trusted) VALUES (2, 'untrusted', 0);
+	// A second workspace with a note of its own.
+	pgtest.ExecOwner(t, url, `INSERT INTO workspace (id, name) VALUES (2, 'other');
 INSERT INTO note (id, title, workspace_id, created_at, updated_at) VALUES (2, 'elsewhere', 2, now(), now());`)
 	if _, err := pool.Exec(`INSERT INTO note (id, title, created_at, updated_at) VALUES (1, 'guide', '2026-10-01 00:00:00', '2026-10-01 00:00:00')`); err != nil {
 		t.Fatal(err)
@@ -63,12 +63,12 @@ INSERT INTO note (id, title, workspace_id, created_at, updated_at) VALUES (2, 'e
 // runNoteCheck sets the check, ticks the scheduler once and waits for the run.
 func runNoteCheck(t *testing.T, r *CheckRunner, ctx context.Context, cmd string) store.NoteCheck {
 	t.Helper()
-	c := cmd
-	if _, err := r.Store.SetNoteCheck(ctx, 1, &c, nil, nil); err != nil {
+	c, label := cmd, testLabel
+	if _, err := r.Store.SetNoteCheck(ctx, 1, &c, nil, &label); err != nil {
 		t.Fatalf("set check: %v", err)
 	}
 	r.TickNotes(ctx)
-	r.Wait()
+	settle(t, r.Store, r)
 	got, err := r.Store.GetNoteCheck(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -105,31 +105,6 @@ func TestNoteCheckVerdicts(t *testing.T) {
 	}
 }
 
-func TestNoteCheckSecretsAreTheNotesOwn(t *testing.T) {
-	r, ctx := noteCheckRig(t)
-	if err := r.Store.SetSecret(ctx, store.SecretOwner{Kind: store.SecretOwnerNote, ID: 1}, "TOKEN", "abc-secret-value"); err != nil {
-		t.Fatal(err)
-	}
-	got := runNoteCheck(t, r, ctx, `[ "$TOKEN" = "abc-secret-value" ] && [ "$QUESTS_NOTE_ID" = "1" ] && echo 1 || echo 0`)
-	if !got.Outdated {
-		t.Fatalf("the note's secret and QUESTS_NOTE_ID must reach the command: %+v", got)
-	}
-	// A secret of the note is masked in what the command prints back.
-	got = runNoteCheck(t, r, ctx, `echo "$TOKEN" >&2; exit 2`)
-	if got.Error == "" || containsStr(got.Error, "abc-secret") {
-		t.Fatalf("the secret leaked into the error: %q", got.Error)
-	}
-}
-
-func containsStr(s, sub string) bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
-}
-
 func TestNoteCheckHonoursIntervalAndRunNow(t *testing.T) {
 	r, ctx := noteCheckRig(t)
 	runNoteCheck(t, r, ctx, `echo 0`)
@@ -149,25 +124,24 @@ func TestNoteCheckHonoursIntervalAndRunNow(t *testing.T) {
 	}
 }
 
-func TestNoteCheckServerCommandsNeedATrustedWorkspace(t *testing.T) {
-	r, _ := noteCheckRig(t)
-	untrusted := wsctx.With(context.Background(), 2)
+// A command needs a runner: saving one without it is refused, and one that sits in the table without it
+// (stored before commands were limited to runners) is reported on the note, never run.
+func TestNoteCheckNeedsARunner(t *testing.T) {
+	r, ctx := noteCheckRig(t)
 	cmd := "echo 1"
-	if _, err := r.Store.SetNoteCheck(untrusted, 2, &cmd, nil, nil); err == nil {
-		t.Fatal("a command for the server was accepted in an untrusted workspace")
+	if _, err := r.Store.SetNoteCheck(ctx, 1, &cmd, nil, nil); !errors.Is(err, store.ErrNoRunner) {
+		t.Fatalf("a command without a runner must be refused, got %v", err)
 	}
-	// With a runner it is accepted; it just waits for the device.
-	label := "laptop"
-	if _, err := r.Store.SetNoteCheck(untrusted, 2, &cmd, nil, &label); err != nil {
-		t.Fatalf("a runner command must be accepted anywhere: %v", err)
+	label := testLabel
+	if _, err := r.Store.SetNoteCheck(ctx, 1, &cmd, nil, &label); err != nil {
+		t.Fatalf("a runner command must be accepted: %v", err)
 	}
-	// And whatever sits in the table is never run on the server of an untrusted workspace.
-	if _, err := r.Store.DB.ExecContext(untrusted, `UPDATE note SET run_on = NULL WHERE id = 2`); err != nil {
+	if _, err := r.Store.DB.ExecContext(ctx, `UPDATE note SET run_on = NULL WHERE id = 1`); err != nil {
 		t.Fatal(err)
 	}
-	r.TickNotes(untrusted)
-	r.Wait()
-	got, _ := r.Store.GetNoteCheck(untrusted, 2)
+	r.TickNotes(ctx)
+	settle(t, r.Store, r)
+	got, _ := r.Store.GetNoteCheck(ctx, 1)
 	if got.Outdated || got.Error == "" {
 		t.Fatalf("it must refuse and say why, without a verdict: %+v", got)
 	}
@@ -175,13 +149,13 @@ func TestNoteCheckServerCommandsNeedATrustedWorkspace(t *testing.T) {
 
 func TestNoteCheckInterval(t *testing.T) {
 	r, ctx := noteCheckRig(t)
-	cmd := "echo 0"
+	cmd, label := "echo 0", testLabel
 	low := 3
-	c, err := r.Store.SetNoteCheck(ctx, 1, &cmd, &low, nil)
+	c, err := r.Store.SetNoteCheck(ctx, 1, &cmd, &low, &label)
 	if err != nil || c.IntervalSeconds == nil || *c.IntervalSeconds != store.MinCheckInterval {
 		t.Fatalf("below the floor must become %d: %+v %v", store.MinCheckInterval, c, err)
 	}
-	c, _ = r.Store.SetNoteCheck(ctx, 1, &cmd, nil, nil)
+	c, _ = r.Store.SetNoteCheck(ctx, 1, &cmd, nil, &label)
 	if c.IntervalSeconds == nil || *c.IntervalSeconds != store.DefaultNoteCheckInterval {
 		t.Fatalf("no interval → default: %+v", c)
 	}

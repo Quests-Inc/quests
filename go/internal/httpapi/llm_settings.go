@@ -25,14 +25,14 @@ func (s *Server) registerLLMSettings(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/me/llm/test", s.testMyLLM)
 }
 
-// sharedKeyAllowed: may accounts without their own key use the server's key? The operator
-// always may; everyone else only if the operator opted in (QUESTS_LLM_SHARED=1).
-func (s *Server) sharedKeyAllowed(r *http.Request) bool {
+// sharedKeyAllowed: may accounts without their own key use the server's key? Only if the host
+// opted in (QUESTS_LLM_SHARED=1).
+func (s *Server) sharedKeyAllowed(*http.Request) bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("QUESTS_LLM_SHARED"))) {
 	case "1", "true", "yes", "on":
 		return true
 	}
-	return s.isOperator(r)
+	return false
 }
 
 var errNoLLM = errors.New("ассистент не настроен: задайте провайдера и свой ключ в «Настройки → Ассистент»")

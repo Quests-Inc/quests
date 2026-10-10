@@ -68,13 +68,12 @@ COPY src ./src
 RUN uv sync --locked --no-dev
 
 # --- API runtime: Go server + SPA. Migrations are embedded (`quests-server migrate`), PDF export is
-# in-process Go (go/internal/pdfdoc): no project Python here. python3 itself stays only because users
-# write server-side check/emit commands with a `#!/usr/bin/env python3` shebang (docs/note-check.md). ---
-FROM python:3.12-slim-bookworm AS api
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# in-process Go (go/internal/pdfdoc), and the server executes no user commands: check/emit commands run
+# on runners (quests-runner), so there is no Python or other interpreter here. The only things it starts
+# are pg_dump (backups) and the operator's event hooks (`sh -c`, data/hooks.json). ---
+FROM debian:bookworm-slim AS api
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*
 # pg_dump for PostgreSQL backups: the client must be at least the server's major
 # version, which Debian's own package is not — take it from the PGDG repo.
@@ -88,7 +87,8 @@ COPY --from=go-build /out/quests /usr/local/bin/quests
 COPY --from=frontend /src/frontend/dist /app/frontend/dist
 COPY deploy/docker/entrypoint-api.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-# `quests` on PATH is the Go CLI, so check_command steps can run e.g. `quests progress N`.
+# `quests` (the Go CLI) is on PATH for the operator's hook scripts.
+WORKDIR /app
 ENV QUESTS_HOST=0.0.0.0 \
     QUESTS_PORT=8765 \
     QUESTS_ROOT=/app \

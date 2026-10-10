@@ -58,7 +58,6 @@ func TestParseEmitOutputCollectsIgnoredFields(t *testing.T) {
 func openEmitSpecDB(t *testing.T) *store.Store {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
-	pgtest.ExecOwner(t, url, `UPDATE workspace SET trusted = 1 WHERE id = 1`)
 	if _, err := pool.Exec(`
 DELETE FROM questcategory;
 INSERT INTO questcategory (id, slug, label, created_at) VALUES (1, 'work', 'Работа', now()), (2, 'home', 'Дом', now());
@@ -131,9 +130,23 @@ func TestResolveEmitSpecLimits(t *testing.T) {
 
 func insertTemplate(t *testing.T, st *store.Store, id int64, cols, vals string) {
 	t.Helper()
+	if strings.Contains(cols, "emit_pool_command") { // commands run on runners only: the fake device carries them out
+		cols, vals = cols+", emit_run_on", vals+", '"+testLabel+"'"
+	}
 	if _, err := st.DB.Exec(`INSERT INTO questtemplate (id, created_at, updated_at, `+cols+`) VALUES (?, now(), now(), `+vals+`)`, id); err != nil {
 		t.Fatalf("insert template: %v", err)
 	}
+}
+
+// materialize is a tick, the fake device running what it queued, and the tick that collects the result.
+func materialize(t *testing.T, st *store.Store) ([]int64, error) {
+	t.Helper()
+	now := time.Now()
+	if _, err := MaterializeDue(bg(), st, events.New(), now, rand.New(rand.NewSource(1))); err != nil {
+		return nil, err
+	}
+	runQueuedJobs(t, st, nil)
+	return MaterializeDue(bg(), st, events.New(), now, rand.New(rand.NewSource(1)))
 }
 
 // End to end: the quest the command prints is created with the template's
@@ -147,7 +160,7 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+	ids, err := materialize(t, st)
 	if err != nil || len(ids) != 1 {
 		t.Fatalf("created %v, err %v", ids, err)
 	}
@@ -177,7 +190,7 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 		t.Fatalf("the command's tags replace the template's, got %+v", q.Tags)
 	}
 	// the period is closed: a second tick creates nothing
-	if ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1))); err != nil || len(ids) != 0 {
+	if ids, err := materialize(t, st); err != nil || len(ids) != 0 {
 		t.Fatalf("second tick: %v %v", ids, err)
 	}
 	// and the attempt log names the ignored field
@@ -198,7 +211,7 @@ func TestMaterializeDueQuestlineCategoryWins(t *testing.T) {
 			st := openEmitSpecDB(t)
 			insertTemplate(t, st, 8, `title, emit_pool_command, questline_id, category_id`,
 				`'Шаблон', '`+strings.ReplaceAll(cmd, "'", "''")+`', 1, 2`)
-			ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+			ids, err := materialize(t, st)
 			if err != nil || len(ids) != 1 {
 				t.Fatalf("created %v, err %v", ids, err)
 			}
@@ -218,7 +231,7 @@ func TestMaterializeDueQuestlineCategoryWins(t *testing.T) {
 func TestMaterializeDueNothingPrintedCreatesNothing(t *testing.T) {
 	st := openEmitSpecDB(t)
 	insertTemplate(t, st, 8, `title, emit_pool_command`, `'Пусто', 'echo null'`)
-	ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+	ids, err := materialize(t, st)
 	if err != nil || len(ids) != 0 {
 		t.Fatalf("created %v, err %v", ids, err)
 	}
@@ -229,7 +242,7 @@ func TestMaterializeDueHonoursTemplateLimits(t *testing.T) {
 	st := openEmitSpecDB(t)
 	insertTemplate(t, st, 9, `title, emit_pool_command, emit_limits`,
 		`'Лимит', 'echo ''{"steps":[{"title":"a"},{"title":"b"}]}''', '{"max_steps":1}'`)
-	ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+	ids, err := materialize(t, st)
 	if err != nil || len(ids) != 0 {
 		t.Fatalf("over the limit must not create a quest: %v %v", ids, err)
 	}

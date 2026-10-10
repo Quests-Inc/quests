@@ -181,37 +181,26 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, detail string) {
-	// A store refusal (command on the server in an untrusted workspace) is a 403, wherever it surfaced.
-	if status >= 500 && (strings.Contains(detail, store.ErrServerExec.Error()) || strings.Contains(detail, store.ErrCommandOwner.Error())) {
-		status = http.StatusForbidden
+	// A store refusal is the caller's to fix, wherever it surfaced: not an owner (403), no runner for a command (422).
+	if status >= 500 {
+		switch {
+		case strings.Contains(detail, store.ErrCommandOwner.Error()):
+			status = http.StatusForbidden
+		case strings.Contains(detail, store.ErrNoRunner.Error()):
+			status = http.StatusUnprocessableEntity
+		}
 	}
 	writeJSON(w, status, map[string]string{"detail": detail})
 }
 
-// isOperator reports whether the caller runs this server: an owner of a trusted workspace
-// (the one allowed to run commands on the host), or no accounts at all. Server-wide facts
-// (backup file names, schema version) and health heartbeats are theirs, not an invited member's.
-func (s *Server) isOperator(r *http.Request) bool {
-	p, ok := PrincipalFrom(r.Context())
-	if !ok || p.User.ID == 0 {
-		return true
-	}
-	ctx := r.Context()
-	if !s.Store.ServerExecAllowed(ctx) {
-		return false
-	}
-	role, err := s.Store.MemberRole(ctx, wsctx.From(ctx), p.User.ID)
-	return err == nil && role == store.RoleOwner
-}
-
 func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {
 	comps := s.Health.Snapshot()
-	if !s.isOperator(r) {
-		for name, c := range comps {
-			if m, ok := c.(map[string]any); ok {
-				m["detail"] = ""
-				comps[name] = m
-			}
+	// The web shows status chips to everyone; the detail text (versions, errors, file names) stays
+	// on the host: the admin CLI (`quests-server backup-now`, logs) has it.
+	for name, c := range comps {
+		if m, ok := c.(map[string]any); ok {
+			m["detail"] = ""
+			comps[name] = m
 		}
 	}
 	overall := "ok"
@@ -233,10 +222,6 @@ func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postHeartbeat(w http.ResponseWriter, r *http.Request) {
-	if !s.isOperator(r) {
-		writeErr(w, http.StatusForbidden, "heartbeats are for the server's operator")
-		return
-	}
 	var body struct {
 		Component string `json:"component"`
 		Detail    string `json:"detail"`

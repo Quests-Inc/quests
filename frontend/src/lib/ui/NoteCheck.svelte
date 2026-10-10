@@ -3,7 +3,6 @@
   import Icon from './Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '../js/api.js'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
-  import { loadWorkspaceInfo, wsInfo } from '../js/workspaceInfo.svelte.js'
 
   /** A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer
    * is "out of date?" — a bare 0/1 or {"outdated": 0|1, "reason": "…"}. The state follows the server;
@@ -50,7 +49,6 @@
   $effect(() => {
     if (!open) return
     void loadRunners()
-    void loadWorkspaceInfo()
     const t = setInterval(load, 15000)
     return () => clearInterval(t)
   })
@@ -136,18 +134,14 @@
           oninput={() => (dirty = true)}
         />
         <select class="nc__runon" aria-label="Устройство" bind:value={runOn} onchange={() => (dirty = true)}>
-          {#if wsInfo.serverExec}
-            <option value="">на сервере</option>
-          {:else}
-            <option value="" disabled>выберите устройство</option>
-          {/if}
+          <option value="" disabled>выберите устройство</option>
           {#each runnersList.items as r (r.label)}
             <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
           {/each}
           {#if missing}<option value={missing}>{missing} (нет такого раннера)</option>{/if}
         </select>
         <HelpTip label="Как работает проверка актуальности">
-          <p>Команда работает как автопроверка шага: на сервере (в доверенном пространстве) или на раннере, с <b>секретами этой заметки</b> в окружении, раз в N секунд. Ставить команду может только владелец пространства.</p>
+          <p>Команда работает как автопроверка шага: на раннере (<code>quests-runner</code>), с <b>секретами этой заметки</b> в окружении, раз в N секунд. Ставить команду может только владелец пространства.</p>
           <p>Ответ: последняя строка <code>0</code> / <code>1</code> (1 — устарела) или JSON <code>{`{"outdated": 1, "reason": "что разошлось"}`}</code>. Любой другой исход (код ≠ 0, таймаут, непонятный вывод) — это ошибка проверки: вердикт не меняется.</p>
           <p>Прошлое значение хранит сам скрипт — удобно строкой в тексте заметки (<code>&lt;!-- verified: abc1234 --&gt;</code>) и сравнением с <code>git log -1 --format=%h -- путь</code>. Заметку «актуализируют» правкой этой строки. В скрипте доступен <code>$QUESTS_NOTE_ID</code>.</p>
         </HelpTip>

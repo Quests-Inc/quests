@@ -28,7 +28,7 @@ func TestEmitRemoteQueuesThenCollects(t *testing.T) {
 	tmpl := remoteTemplate(`#!/bin/sh
 echo '{"title":"Вернуться на пакет"}'`, "home")
 
-	first := emitOnce(t, st, tmpl, "2026-10-06", time.Now())
+	first := emitTick(t, st, tmpl, "2026-10-06", time.Now())
 	if first.Spec != nil || first.FailMsg != "" {
 		t.Fatalf("first tick must only queue: %+v", first)
 	}
@@ -38,7 +38,7 @@ echo '{"title":"Вернуться на пакет"}'`, "home")
 	}
 	// Ticks while the device is away neither queue again nor fail the template.
 	for i := 0; i < 3; i++ {
-		if r := emitOnce(t, st, tmpl, "2026-10-06", time.Now()); r.Spec != nil || r.FailMsg != "" {
+		if r := emitTick(t, st, tmpl, "2026-10-06", time.Now()); r.Spec != nil || r.FailMsg != "" {
 			t.Fatalf("waiting tick %d: %+v", i, r)
 		}
 	}
@@ -54,7 +54,7 @@ echo '{"title":"Вернуться на пакет"}'`, "home")
 	if _, _, err := st.CompleteJob(ctx, job.ID, job.LeaseID, store.JobResult{Exit: 0, Stdout: `{"title":"Вернуться на пакет"}`}); err != nil {
 		t.Fatal(err)
 	}
-	got := emitOnce(t, st, tmpl, "2026-10-06", time.Now())
+	got := emitTick(t, st, tmpl, "2026-10-06", time.Now())
 	if got.Spec == nil || got.Spec.Title != "Вернуться на пакет" {
 		t.Fatalf("result not collected: %+v", got)
 	}
@@ -68,10 +68,10 @@ func TestEmitRemoteFailureRetriesLikeALocalOne(t *testing.T) {
 	st := openRemoteEmitDB(t)
 	ctx := bg()
 	tmpl := remoteTemplate(`exit 3`, "home")
-	emitOnce(t, st, tmpl, "p", time.Now())
+	emitTick(t, st, tmpl, "p", time.Now())
 	job, _ := st.ClaimJob(ctx, "home", time.Minute)
 	_, _, _ = st.CompleteJob(ctx, job.ID, job.LeaseID, store.JobResult{Exit: 3, Stderr: "no pacman"})
-	res := emitOnce(t, st, tmpl, "p", time.Now())
+	res := emitTick(t, st, tmpl, "p", time.Now())
 	var outcome string
 	var attempts int
 	if err := st.DB.QueryRow(`SELECT outcome, attempts FROM templateemitroll WHERE id = ?`, res.RollID).Scan(&outcome, &attempts); err != nil {
@@ -92,7 +92,7 @@ func TestEmitRemoteOfflineDeviceDoesNotFailTheTemplate(t *testing.T) {
 	st := openRemoteEmitDB(t)
 	ctx := bg()
 	tmpl := remoteTemplate(`echo '{"title":"x"}'`, "laptop")
-	emitOnce(t, st, tmpl, "p", time.Now())
+	emitTick(t, st, tmpl, "p", time.Now())
 	if _, err := st.DB.Exec(`UPDATE runner_job SET valid_until = '2000-01-01 00:00:00.000000'`); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestEmitRemoteOfflineDeviceDoesNotFailTheTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 3; i++ {
-		if r := emitOnce(t, st, tmpl, "p", time.Now()); r.Spec != nil || r.FailMsg != "" {
+		if r := emitTick(t, st, tmpl, "p", time.Now()); r.Spec != nil || r.FailMsg != "" {
 			t.Fatalf("tick %d after skip: %+v", i, r)
 		}
 	}

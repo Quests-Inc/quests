@@ -2,8 +2,11 @@ package schedule
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,4 +82,11 @@ func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, peri
 	}
 	info.Status = "ok"
 	return parsed, info, nil, true
+}
+
+// poolJobKey identifies one emit run: the template, the period and the command text, so a changed command
+// is a new job and a repeated tick finds the old one.
+func poolJobKey(templateID int64, periodKey, command string) string {
+	sum := sha256.Sum256([]byte(command))
+	return strconv.FormatInt(templateID, 10) + "|" + periodKey + "|" + hex.EncodeToString(sum[:8])
 }

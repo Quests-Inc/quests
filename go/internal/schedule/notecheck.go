@@ -1,14 +1,11 @@
 package schedule
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -102,9 +99,9 @@ func (r *CheckRunner) TickNotes(ctx context.Context) {
 }
 
 func (r *CheckRunner) spawnNote(ctx context.Context, d store.DueNote, now time.Time) {
-	if d.RunOn == nil && !r.Store.ServerExecAllowed(ctx) {
-		// A command stored in (or moved into) an untrusted workspace never runs on the server.
-		r.noteError(ctx, d.ID, d.Title, "команды на сервере в этом пространстве запрещены — выберите устройство (раннер)")
+	if d.RunOn == nil {
+		// Commands run on runners only; one stored without a runner says so instead of staying silent.
+		r.noteError(ctx, d.ID, d.Title, store.ErrNoRunner.Error())
 		return
 	}
 	if !r.tryLock(noteKey(d.ID)) {
@@ -115,55 +112,8 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d store.DueNote, now time.T
 		log.Printf("checks: mark note %d: %v", d.ID, err)
 		return
 	}
-	if d.RunOn != nil {
-		r.dispatchNote(ctx, d)
-		r.unlock(noteKey(d.ID))
-		return
-	}
-	r.wg.Add(1)
-	go func() {
-		defer r.wg.Done()
-		defer r.unlock(noteKey(d.ID))
-		r.execNote(ctx, d)
-	}()
-}
-
-func (r *CheckRunner) execNote(parent context.Context, d store.DueNote) {
-	ctx, cancel := context.WithTimeout(parent, pollTimeout)
-	defer cancel()
-	secrets, serr := r.Store.ResolveSecrets(ctx, store.SecretOwner{Kind: store.SecretOwnerNote, ID: d.ID})
-	if serr != nil {
-		log.Printf("checks: secrets for note %d: %v", d.ID, serr)
-	}
-	cmd, cleanup, cerr := commandCmd(ctx, d.Command)
-	if cerr != nil {
-		r.applyNote(parent, d.ID, -1, "", cerr.Error(), false)
-		return
-	}
-	defer cleanup()
-	cmd.Env = append(CommandEnv(), r.Env...)
-	cmd.Env = append(cmd.Env, "QUESTS_NOTE_ID="+strconv.FormatInt(d.ID, 10))
-	if ws := wsctx.From(parent); ws > 0 {
-		cmd.Env = append(cmd.Env, "QUESTS_WORKSPACE="+strconv.FormatInt(ws, 10))
-	}
-	for name, value := range secrets {
-		cmd.Env = append(cmd.Env, name+"="+value)
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		cmd.Dir = home
-	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
-	exit := 0
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			exit = ee.ExitCode()
-		} else {
-			exit = -1
-		}
-	}
-	r.applyNote(parent, d.ID, exit, store.MaskSecrets(stdout.String(), secrets), store.MaskSecrets(stderr.String(), secrets), ctx.Err() == context.DeadlineExceeded)
+	r.dispatchNote(ctx, d)
+	r.unlock(noteKey(d.ID))
 }
 
 func (r *CheckRunner) dispatchNote(ctx context.Context, d store.DueNote) {

@@ -34,11 +34,10 @@ func RunMaintenanceLoop(ctx context.Context, st *store.Store, hub *events.Hub, w
 		_ = st.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) { checks.FailStaleRunning(wctx) })
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	pool := newPoolRunner()
 	ticker := time.NewTicker(PollInterval)
 	defer ticker.Stop()
 	for {
-		runOnce(ctx, st, hub, windows, rng, checks, pool)
+		runOnce(ctx, st, hub, windows, rng, checks)
 		select {
 		case <-ctx.Done():
 			return
@@ -49,15 +48,15 @@ func RunMaintenanceLoop(ctx context.Context, st *store.Store, hub *events.Hub, w
 
 // runOnce does one maintenance pass over every workspace, each under its own
 // workspace context so row-level security scopes what the pass can see.
-func runOnce(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner, pool *poolRunner) {
+func runOnce(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner) {
 	if err := st.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
-		runOnceIn(wctx, st, hub, windows, rng, checks, pool)
+		runOnceIn(wctx, st, hub, windows, rng, checks)
 	}); err != nil {
 		log.Printf("maintenance: workspaces: %v", err)
 	}
 }
 
-func runOnceIn(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner, pool *poolRunner) {
+func runOnceIn(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner) {
 	if _, err := ExpireOverdue(ctx, st, hub); err != nil {
 		log.Printf("expire: %v", err)
 	}
@@ -66,7 +65,7 @@ func runOnceIn(ctx context.Context, st *store.Store, hub *events.Hub, windows *W
 			log.Printf("window_start: %v", err)
 		}
 	}
-	if _, err := materializeDue(ctx, st, hub, time.Time{}, rng, pool); err != nil {
+	if _, err := materializeDue(ctx, st, hub, time.Time{}, rng); err != nil {
 		log.Printf("materialize: %v", err)
 	}
 	if checks != nil {

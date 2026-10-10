@@ -78,14 +78,10 @@ even through a query that forgot a filter.
   the only self-service signup. An account left in no workspace stays signed in and is offered to create one.
   API: `GET/DELETE /api/workspaces/{id}/members`, `POST /api/workspaces/{id}/invites`,
   `GET|POST /api/invites/{token}[/accept]`.
-- **Server-side commands are the operator's privilege (quest=348).** `check_command` without `run_on` and
-  `emit_pool_command` run `sh -c` inside the API container; in an untrusted workspace that would be a shell on
-  the server. So only trusted workspaces may use them: saving such a command is refused (403), and anything
-  already stored is not executed (checks, emit pools); runners (`run_on`) work everywhere. The flag is host-only:
-  `quests-server workspace trust|untrust <id>` (workspace 1 is trusted, new ones are not); there is no API or UI
-  for it on purpose. The UI hides «на сервере» in untrusted workspaces. Commands run with the server's database
-  credentials (`QUESTS_DATABASE_URL`, `POSTGRES_*`, `PG*`) removed from their environment; the rest of the root
-  `.env` still passes through for the operator's own scripts.
+- **Commands run on runners only.** The API container executes no check or emit command: `check_command`,
+  `emit_pool_command` and note checks need a runner label (`run_on` / `emit_run_on`); saving a command without one is
+  refused (422), and anything stored without one is never run. A runner on the server's own host is an ordinary runner.
+  (Event hooks, `data/hooks.json`, are the host admin's and still run `sh -c` in the API container.)
 - **Rename / delete (quest=347):** owners rename and delete from Settings → Пространства (deleting needs the
   exact name typed). A deleted workspace disappears at once — its tokens, runners and sessions stop (a token
   never falls back to another workspace; a session moves to the user's next one) — and is purged after 7 days

@@ -22,8 +22,6 @@ type Workspace struct {
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	Role      string    `json:"role,omitempty"`
-	// Trusted workspaces may run commands on the server (see ServerExecAllowed).
-	Trusted bool `json:"trusted"`
 }
 
 // WorkspaceIDs lists every workspace; background loops iterate it.
@@ -62,7 +60,7 @@ func (s *Store) ForEachWorkspace(ctx context.Context, fn func(ctx context.Contex
 // UserWorkspaces lists the workspaces a user belongs to.
 func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT w.id, w.name, w.created_at, m.role, w.trusted
+		SELECT w.id, w.name, w.created_at, m.role
 		FROM workspace w JOIN workspace_member m ON m.workspace_id = w.id
 		WHERE m.user_id = ? AND w.deleted_at IS NULL ORDER BY w.id`, userID)
 	if err != nil {
@@ -73,12 +71,10 @@ func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, 
 	for rows.Next() {
 		var w Workspace
 		var created string
-		var trusted int
-		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Role, &trusted); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Role); err != nil {
 			return nil, err
 		}
 		w.CreatedAt, _ = timeutil.ParseFlexible(created)
-		w.Trusted = trusted != 0
 		out = append(out, w)
 	}
 	return out, rows.Err()
@@ -195,9 +191,9 @@ func (s *Store) EnsureUserWorkspace(ctx context.Context, userID int64, username 
 	return s.CreateWorkspace(ctx, userID, username, DefaultWorkspaceID)
 }
 
-// AllWorkspaces lists every workspace (for trusted callers with no account).
+// AllWorkspaces lists every workspace (for callers with no account).
 func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, trusted FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -206,11 +202,9 @@ func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
 	for rows.Next() {
 		var w Workspace
 		var created string
-		var trusted int
-		if err := rows.Scan(&w.ID, &w.Name, &created, &trusted); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &created); err != nil {
 			return nil, err
 		}
-		w.Trusted = trusted != 0
 		w.CreatedAt, _ = timeutil.ParseFlexible(created)
 		out = append(out, w)
 	}
@@ -238,36 +232,6 @@ func (s *Store) RunnerWorkspaceByReg(ctx context.Context, token string) (int64, 
 		return 0, ErrRunnerToken
 	}
 	return id.Int64, nil
-}
-
-// ErrServerExec is returned when a command that would run on the server is
-// saved in (or reaches execution from) a workspace that is not trusted.
-var ErrServerExec = errors.New("команды на сервере в этом пространстве запрещены — выберите устройство (раннер)")
-
-// ServerExecAllowed reports whether the context's workspace may run commands on
-// the server. Without PostgreSQL there is one implicit, trusted workspace.
-func (s *Store) ServerExecAllowed(ctx context.Context) bool {
-	id := wsctx.From(ctx)
-	if id <= 0 {
-		return false
-	}
-	var trusted int
-	if err := s.DB.QueryRowContext(ctx, `SELECT trusted FROM workspace WHERE id = ? AND deleted_at IS NULL`, id).Scan(&trusted); err != nil {
-		return false // unknown = not trusted
-	}
-	return trusted != 0
-}
-
-// SetWorkspaceTrusted flips the flag; callable from the host CLI only.
-func (s *Store) SetWorkspaceTrusted(ctx context.Context, id int64, trusted bool) error {
-	res, err := s.DB.ExecContext(ctx, `UPDATE workspace SET trusted = ? WHERE id = ?`, boolInt(trusted), id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
 }
 
 // ErrCommandOwner is returned when a member (not an owner) sets a command.
@@ -302,8 +266,11 @@ func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
 	return nil
 }
 
-// guardExec refuses a command that would execute on the server (non-empty
-// command, no runner) in an untrusted workspace.
+// ErrNoRunner is returned for a command with no runner: commands execute on runners only
+// (quests-runner on any device, the server's own host included).
+var ErrNoRunner = errors.New("команды запускаются только на раннере — выберите устройство (раннер)")
+
+// guardExec refuses a command that has no runner (non-empty command, run_on empty).
 func (s *Store) guardExec(ctx context.Context, command, runOn *string) error {
 	if command == nil || strings.TrimSpace(*command) == "" {
 		return nil
@@ -311,10 +278,7 @@ func (s *Store) guardExec(ctx context.Context, command, runOn *string) error {
 	if runOn != nil && strings.TrimSpace(*runOn) != "" {
 		return nil
 	}
-	if s.ServerExecAllowed(ctx) {
-		return nil
-	}
-	return ErrServerExec
+	return ErrNoRunner
 }
 
 // --- rename / delete (quest=347) ---
@@ -322,7 +286,7 @@ func (s *Store) guardExec(ctx context.Context, command, runOn *string) error {
 // WorkspacePurgeAfter is how long a deleted workspace can still be restored.
 const WorkspacePurgeAfter = 7 * 24 * time.Hour
 
-var ErrWorkspaceTrusted = errors.New("доверенное пространство нельзя удалить: сначала снимите доверие на сервере (workspace untrust)")
+var ErrMainWorkspace = errors.New("основное пространство нельзя удалить из интерфейса")
 
 // RenameWorkspace changes the display name.
 func (s *Store) RenameWorkspace(ctx context.Context, id int64, name string) error {
@@ -354,18 +318,18 @@ func (s *Store) WorkspaceName(ctx context.Context, id int64) (string, error) {
 }
 
 // DeleteWorkspace hides a workspace at once (its tokens, runners and sessions stop
-// working) and schedules the purge. Trusted workspaces are refused: untrust them
-// from the host first, so the operator's own space is never one click away from gone.
+// working) and schedules the purge. The main workspace (the one the instance started with) is
+// refused: it is never one click away from gone.
 func (s *Store) DeleteWorkspace(ctx context.Context, id int64) (purgeAt time.Time, err error) {
-	var trusted int
-	if err := s.DB.QueryRowContext(ctx, `SELECT trusted FROM workspace WHERE id = ? AND deleted_at IS NULL`, id).Scan(&trusted); err != nil {
+	var live int
+	if err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM workspace WHERE id = ? AND deleted_at IS NULL`, id).Scan(&live); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, ErrNotFound
 		}
 		return time.Time{}, err
 	}
-	if trusted != 0 {
-		return time.Time{}, ErrWorkspaceTrusted
+	if id == DefaultWorkspaceID {
+		return time.Time{}, ErrMainWorkspace
 	}
 	now := timeutil.NowUTC()
 	if _, err := s.DB.ExecContext(ctx, `UPDATE workspace SET deleted_at = ? WHERE id = ?`, timeutil.ToDBUTC(now), id); err != nil {

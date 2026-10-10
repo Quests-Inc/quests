@@ -67,8 +67,8 @@ func (s *Server) putNoteCheck(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, store.ErrCommandOwner):
 		writeErr(w, http.StatusForbidden, err.Error())
 		return
-	case errors.Is(err, store.ErrServerExec):
-		writeErr(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, store.ErrNoRunner):
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	default:
 		writeErr(w, http.StatusInternalServerError, err.Error())

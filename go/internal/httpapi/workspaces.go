@@ -201,10 +201,6 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	secret, exp, err := s.Store.CreateInvite(r.Context(), id, me.ID)
-	if errors.Is(err, store.ErrTrustedInvite) {
-		writeErr(w, http.StatusConflict, err.Error())
-		return
-	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -332,10 +328,7 @@ func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, mergeMaps(map[string]any{"current": cur, "workspaces": list, "enabled": true,
-		// Whether this workspace may run check/emit commands on the server (else: runners only).
-		"server_exec": s.Store.ServerExecAllowed(r.Context()),
-	}, s.attachmentUsage(r.Context())))
+	writeJSON(w, http.StatusOK, mergeMaps(map[string]any{"current": cur, "workspaces": list, "enabled": true}, s.attachmentUsage(r.Context())))
 }
 
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -452,7 +445,7 @@ func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	purgeAt, err := s.Store.DeleteWorkspace(r.Context(), id)
 	switch {
-	case errors.Is(err, store.ErrWorkspaceTrusted):
+	case errors.Is(err, store.ErrMainWorkspace):
 		writeErr(w, http.StatusConflict, err.Error())
 	case errors.Is(err, store.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "workspace not found")

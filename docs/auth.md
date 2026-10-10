@@ -123,4 +123,4 @@ workspace it was minted for: `quests-server token add <name> [user] --workspace 
 Settings → Подключения: the signed-in user creates tokens for their own clients (HUD, MCP, Android, CLI, bot), pinned to the workspace
 they are in, and revokes them. The secret is shown once (only its hash is stored); at most 25 live tokens per account. Only a browser
 session can manage tokens — a token cannot mint or revoke tokens, so a leaked one stays contained until it is revoked.
-`quests-server token add|ls|rm` on the host still works for the operator.
+`quests-server token add|ls|rm` on the host still works for the host admin.

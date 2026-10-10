@@ -337,7 +337,6 @@ func TestPGAPIRoleGrants(t *testing.T) {
 	// The helper stops at the workspaces migration; the later columns the grants name come from here.
 	for _, q := range []string{
 		`ALTER TABLE workspace ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`,
-		`ALTER TABLE workspace ADD COLUMN IF NOT EXISTS trusted INTEGER NOT NULL DEFAULT 0`,
 		`CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)`,
 		`INSERT INTO alembic_version VALUES ('v')`,
 		`GRANT SELECT, INSERT, UPDATE, DELETE ON alembic_version TO quests_app`,
@@ -358,7 +357,7 @@ func TestPGAPIRoleGrants(t *testing.T) {
 	}
 
 	for _, c := range []struct{ name, stmt string }{
-		{"flip workspace trust", `UPDATE workspace SET trusted = 1 WHERE id = 1`},
+		{"rewrite a workspace's creation time", `UPDATE workspace SET created_at = now() WHERE id = 1`},
 		{"rewrite a password hash", `UPDATE appuser SET password_hash = 'x' WHERE id = 1`},
 		{"re-activate an account", `UPDATE appuser SET is_active = 1 WHERE id = 1`},
 		{"forge the schema revision", `UPDATE alembic_version SET version_num = 'x'`},

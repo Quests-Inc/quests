@@ -37,7 +37,6 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
-  import { loadWorkspaceInfo, wsInfo } from '../js/workspaceInfo.svelte.js'
 
   /** `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
@@ -135,7 +134,6 @@
   $effect(() => {
     if (hasPool) {
       void loadRunners()
-      void loadWorkspaceInfo()
     }
   })
 
@@ -858,15 +856,11 @@
             <span class="label">
               Устройство
               <HelpTip label="Устройство">
-                <p>Метка раннера (<code>quests-runner</code>), на котором выполнить команду; пусто — на сервере. Устройство офлайн — команда ждёт его до суток, шаблон при этом не считается сломанным: период просто пропускается.</p>
+                <p>Метка раннера (<code>quests-runner</code>), на котором выполнить команду (обязательно). Устройство офлайн — команда ждёт его до суток, шаблон при этом не считается сломанным: период просто пропускается.</p>
               </HelpTip>
             </span>
             <select bind:value={emitRunOn} aria-label="Устройство">
-              {#if wsInfo.serverExec}
-                <option value="">на сервере</option>
-              {:else}
-                <option value="" disabled>выберите устройство</option>
-              {/if}
+              <option value="" disabled>выберите устройство</option>
               {#each runnersList.items as r (r.label)}
                 <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
               {/each}

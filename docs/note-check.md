@@ -25,11 +25,11 @@ same state a check writes: a note that has a check gets the check's verdict at i
 
 In the note's check and in a step's check the command is a multi-line, resizable field. It may be several
 lines (`sh -c`) or a script with its own interpreter: a command that starts with `#!` is written to a private
-temp file and executed as is (on the server and on a runner alike), like a template's pool command.
+temp file and executed as is (on the runner), like a template's pool command.
 
 ## Where it runs
 
-Like a step's check: on the server (only in a *trusted* workspace) or on a runner. The interval has the same
+Like a step's check: on a runner (the command needs a runner label). The interval has the same
 minimum as for steps. Environment: `QUESTS_NOTE_ID`, `QUESTS_API`, `QUESTS_API_TOKEN` and, in a non-default
 workspace, `QUESTS_WORKSPACE`.
 

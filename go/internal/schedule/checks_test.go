@@ -17,13 +17,11 @@ import (
 // bg is the context tests run in: workspace 1, the one the helpers below set up.
 func bg() context.Context { return wsctx.With(context.Background(), 1) }
 
-// openChecksDB is a real database whose workspace 1 may run server commands (as the
-// operator marks a workspace "trusted"), with templates 1..40 already there for the
-// emit tables that reference them.
+// openChecksDB is a real database with templates 1..40 already there for the emit tables that
+// reference them.
 func openChecksDB(t *testing.T) *store.Store {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
-	pgtest.ExecOwner(t, url, `UPDATE workspace SET trusted = 1 WHERE id = 1`)
 	for id := 1; id <= 40; id++ {
 		if _, err := pool.Exec(`INSERT INTO questtemplate (id, title, created_at, updated_at) VALUES (?, 't', now(), now())`, id); err != nil {
 			t.Fatal(err)
@@ -96,6 +94,12 @@ func TestParseCheckOutputJSON(t *testing.T) {
 func seedQuest(t *testing.T, st *store.Store, steps []domain.Step) domain.Quest {
 	t.Helper()
 	now := timeutil.NowUTC()
+	label := testLabel
+	for i := range steps { // commands run on runners only: the fake device in these tests carries them out
+		if steps[i].CheckCommand != nil && steps[i].RunOn == nil {
+			steps[i].RunOn = &label
+		}
+	}
 	q, err := st.CreateQuest(bg(), domain.Quest{
 		Title: "auto", Status: domain.StatusActive, Significance: domain.SigCommon,
 		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: steps,
@@ -116,7 +120,7 @@ func TestCheckPollProgress(t *testing.T) {
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +140,7 @@ func TestCheckPollJSON(t *testing.T) {
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +167,7 @@ func TestCheckPollJSONBrokenKeepsDescription(t *testing.T) {
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +198,7 @@ func TestCheckWaitPrevious(t *testing.T) {
 	})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -206,7 +210,7 @@ func TestCheckWaitPrevious(t *testing.T) {
 		t.Fatal("second step must wait for previous")
 	}
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err = st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +230,7 @@ func TestCheckOnceFailQuest(t *testing.T) {
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -244,14 +248,19 @@ func TestCheckOnceFailQuest(t *testing.T) {
 	}
 }
 
+// A one-shot with no runner that was "running" when the server stopped (a step stored before commands
+// were limited to runners) can never finish: it fails. One on a runner keeps waiting for its result.
 func TestFailStaleRunning(t *testing.T) {
 	st := openChecksDB(t)
 	cmd := "sleep 99"
 	run := domain.RunRunning
 	q := seedQuest(t, st, []domain.Step{{
-		Title: "stuck", ProgressTotal: 1, SortOrder: 0,
-		CheckCommand: &cmd, RunMode: domain.RunModeOnce, RunStatus: &run,
+		Title: "stuck", ProgressTotal: 1, CheckCommand: &cmd, RunMode: domain.RunModeOnce, RunStatus: &run,
 	}})
+	// the way such a step is stored from before: a command and no runner
+	if _, err := st.DB.Exec(`UPDATE queststep SET run_on = NULL WHERE quest_id = ?`, q.ID); err != nil {
+		t.Fatal(err)
+	}
 	r := NewCheckRunner(st, events.New())
 	r.FailStaleRunning(bg())
 	got, err := st.GetQuest(bg(), q.ID)
@@ -273,7 +282,7 @@ func pollStep(t *testing.T, st *store.Store, cmd string, total, current int) dom
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -326,9 +335,10 @@ func TestCheckPollInvalidTotalIgnored(t *testing.T) {
 
 func watchStep(cmd string, total, current int, mode string) domain.Step {
 	iv := 15
+	label := testLabel
 	return domain.Step{
 		Title: "mirror", ProgressTotal: total, ProgressCurrent: current, SortOrder: 0,
-		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: mode,
+		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: mode, RunOn: &label,
 	}
 }
 
@@ -336,7 +346,7 @@ func tickAndGet(t *testing.T, st *store.Store, id int64) domain.Quest {
 	t.Helper()
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
-	r.Wait()
+	settle(t, st, r)
 	got, err := st.GetQuest(bg(), id)
 	if err != nil {
 		t.Fatal(err)
@@ -416,47 +426,5 @@ func TestNormalizeRunModeKeepsWatch(t *testing.T) {
 		if got := store.NormalizeRunMode(in); got != want {
 			t.Errorf("NormalizeRunMode(%q) = %q, want %q", in, got, want)
 		}
-	}
-}
-
-// A check command sees the secrets of its questline (inherited) and of the step
-// itself (most specific wins), and what it prints has them masked.
-func TestCheckCommandGetsInheritedSecretsAndMasksOutput(t *testing.T) {
-	st := openChecksDB(t)
-	ctx := bg()
-	if _, err := st.DB.ExecContext(ctx, `INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', now(), now())`); err != nil {
-		t.Fatal(err)
-	}
-	cmd := `printf '{"progress":%s,"description":"site said %s / %s"}' "$([ "$SITE_PASS" = step-pass ] && [ "$SITE_USER" = line-user ] && echo 1 || echo 0)" "$SITE_PASS" "$SITE_USER"`
-	iv := 15
-	now := timeutil.NowUTC()
-	q, err := st.CreateQuest(ctx, domain.Quest{
-		Title: "q", Status: domain.StatusActive, Significance: domain.SigCommon,
-		CreatedAt: now, UpdatedAt: now, Automated: true,
-		QuestlineID: func() *int64 { v := int64(7); return &v }(),
-		Steps:       []domain.Step{{Title: "s", ProgressTotal: 2, SortOrder: 0, CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	stepID := q.Steps[0].ID
-	if err := st.SetSecret(ctx, store.SecretOwner{Kind: store.SecretOwnerQuestline, ID: 7}, "SITE_USER", "line-user"); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.SetSecret(ctx, store.SecretOwner{Kind: store.SecretOwnerQuestline, ID: 7}, "SITE_PASS", "line-pass"); err != nil {
-		t.Fatal(err)
-	}
-	// the step overrides the questline's value
-	if err := st.SetSecret(ctx, store.SecretOwner{Kind: store.SecretOwnerStep, ID: stepID}, "SITE_PASS", "step-pass"); err != nil {
-		t.Fatal(err)
-	}
-
-	got := tickAndGet(t, st, q.ID)
-	step := got.Steps[0]
-	if step.ProgressCurrent != 1 {
-		t.Fatalf("command did not see the inherited/overridden secrets: progress=%d", step.ProgressCurrent)
-	}
-	if step.Description != "site said *** / ***" {
-		t.Fatalf("secret values must be masked in the step description, got %q", step.Description)
 	}
 }

@@ -25,4 +25,4 @@ Notes
 - At most 25 live tokens per account.
 - Check a token: `curl -H "Authorization: Bearer $QUESTS_API_TOKEN" $QUESTS_API/api/workspaces` shows the workspace it is bound to
   (`current`).
-- Operators can also mint tokens on the host: `quests-server token add <name> [user] --workspace <id>`.
+- The host admin can also mint tokens on the host: `quests-server token add <name> [user] --workspace <id>`.
