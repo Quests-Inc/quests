@@ -1,46 +1,14 @@
 package schedule
 
 import (
-	"context"
-	"database/sql"
 	"testing"
-
-	_ "modernc.org/sqlite"
 
 	"github.com/valirum/quests/go/internal/store"
 )
 
-const templateSecretsTestSchema = emitPoolSchema + `
-CREATE TABLE questline (id INTEGER PRIMARY KEY);
-CREATE TABLE questtemplate (id INTEGER PRIMARY KEY, questline_id INTEGER);
-CREATE TABLE quest (id INTEGER PRIMARY KEY, questline_id INTEGER, template_id INTEGER, status TEXT);
-CREATE TABLE queststep (id INTEGER PRIMARY KEY, quest_id INTEGER, check_command TEXT);
-CREATE TABLE secret (
-	id INTEGER PRIMARY KEY,
-	questline_id INTEGER, template_id INTEGER, quest_id INTEGER, step_id INTEGER,
-	key TEXT NOT NULL,
-	value TEXT NOT NULL,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL
-);
-CREATE UNIQUE INDEX ux_secret_questline_id_key ON secret (questline_id, key) WHERE questline_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_template_id_key ON secret (template_id, key) WHERE template_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_quest_id_key ON secret (quest_id, key) WHERE quest_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_step_id_key ON secret (step_id, key) WHERE step_id IS NOT NULL;
-`
-
 func openTemplateSecretsDB(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:tmplsecrets_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(templateSecretsTestSchema); err != nil {
-		t.Fatal(err)
-	}
-	return &store.Store{DB: db}
+	return openChecksDB(t)
 }
 
 // TestExecEmitPoolCommandInjectsTemplateSecret proves the end-to-end path:
@@ -48,15 +16,15 @@ func openTemplateSecretsDB(t *testing.T) *store.Store {
 // process, and nowhere else — this is the whole point of note=14/quest=199.
 func TestExecEmitPoolCommandInjectsTemplateSecret(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	const templateID = int64(42)
-	if err := st.SetTemplateSecret(context.Background(), templateID, "MY_SECRET", "hunter2"); err != nil {
+	const templateID = int64(40)
+	if err := st.SetTemplateSecret(bg(), templateID, "MY_SECRET", "hunter2"); err != nil {
 		t.Fatalf("SetTemplateSecret: %v", err)
 	}
 
 	command := `#!/bin/sh
 printf '{"title":"%s"}' "$MY_SECRET"
 `
-	out, _, err := execEmitPoolCommand(context.Background(), st, templateID, command)
+	out, _, err := execEmitPoolCommand(bg(), st, templateID, command)
 	if err != nil {
 		t.Fatalf("execEmitPoolCommand: %v", err)
 	}
@@ -77,7 +45,7 @@ func TestExecEmitPoolCommandNoSecretsIsFine(t *testing.T) {
 	command := `#!/bin/sh
 printf '{"title":"%s"}' "$MY_SECRET"
 `
-	out, _, err := execEmitPoolCommand(context.Background(), st, templateID, command)
+	out, _, err := execEmitPoolCommand(bg(), st, templateID, command)
 	if err != nil {
 		t.Fatalf("execEmitPoolCommand: %v", err)
 	}
@@ -91,11 +59,11 @@ printf '{"title":"%s"}' "$MY_SECRET"
 func TestTemplateSecretsNeverListValues(t *testing.T) {
 	st := openTemplateSecretsDB(t)
 	const templateID = int64(1)
-	if err := st.SetTemplateSecret(context.Background(), templateID, "PASSWORD", "hunter2"); err != nil {
+	if err := st.SetTemplateSecret(bg(), templateID, "PASSWORD", "hunter2"); err != nil {
 		t.Fatalf("SetTemplateSecret: %v", err)
 	}
 
-	keys, err := st.ListTemplateSecretKeys(context.Background(), templateID)
+	keys, err := st.ListTemplateSecretKeys(bg(), templateID)
 	if err != nil {
 		t.Fatalf("ListTemplateSecretKeys: %v", err)
 	}
@@ -103,10 +71,10 @@ func TestTemplateSecretsNeverListValues(t *testing.T) {
 		t.Fatalf("want [PASSWORD], got %v", keys)
 	}
 
-	if err := st.DeleteTemplateSecret(context.Background(), templateID, "PASSWORD"); err != nil {
+	if err := st.DeleteTemplateSecret(bg(), templateID, "PASSWORD"); err != nil {
 		t.Fatalf("DeleteTemplateSecret: %v", err)
 	}
-	resolved, err := st.ResolveTemplateSecrets(context.Background(), templateID)
+	resolved, err := st.ResolveTemplateSecrets(bg(), templateID)
 	if err != nil {
 		t.Fatalf("ResolveTemplateSecrets: %v", err)
 	}

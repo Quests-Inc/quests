@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -11,11 +10,7 @@ import (
 
 func openRemoteEmitDB(t *testing.T) *store.Store {
 	t.Helper()
-	st := openEmitPoolDB(t)
-	if _, err := st.DB.Exec(runnerJobSchema); err != nil {
-		t.Fatal(err)
-	}
-	return st
+	return openEmitPoolDB(t)
 }
 
 func remoteTemplate(command, label string) templateRow {
@@ -29,7 +24,7 @@ func remoteTemplate(command, label string) templateRow {
 // quest is picked up on a later tick once the runner delivered it.
 func TestEmitRemoteQueuesThenCollects(t *testing.T) {
 	st := openRemoteEmitDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	tmpl := remoteTemplate(`#!/bin/sh
 echo '{"title":"Вернуться на пакет"}'`, "home")
 
@@ -71,7 +66,7 @@ echo '{"title":"Вернуться на пакет"}'`, "home")
 
 func TestEmitRemoteFailureRetriesLikeALocalOne(t *testing.T) {
 	st := openRemoteEmitDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	tmpl := remoteTemplate(`exit 3`, "home")
 	emitOnce(t, st, tmpl, "p", time.Now())
 	job, _ := st.ClaimJob(ctx, "home", time.Minute)
@@ -95,7 +90,7 @@ func TestEmitRemoteFailureRetriesLikeALocalOne(t *testing.T) {
 // A device that never came online leaves the job skipped: no retry storm, no error outcome.
 func TestEmitRemoteOfflineDeviceDoesNotFailTheTemplate(t *testing.T) {
 	st := openRemoteEmitDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	tmpl := remoteTemplate(`echo '{"title":"x"}'`, "laptop")
 	emitOnce(t, st, tmpl, "p", time.Now())
 	if _, err := st.DB.Exec(`UPDATE runner_job SET valid_until = '2000-01-01 00:00:00.000000'`); err != nil {

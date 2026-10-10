@@ -513,7 +513,7 @@ func TestGraphMoreAndOnlyExpansion(t *testing.T) {
 	if _, err := s.Store.DB.Exec(`UPDATE quest SET description = ? WHERE id = ?`, fmt.Sprintf("quest=%d", b), a); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Store.DB.Exec(`INSERT INTO note (title, description, created_at, updated_at) VALUES ('n', ?, datetime('now'), datetime('now'))`, fmt.Sprintf("quest=%d", b)); err != nil {
+	if _, err := s.Store.DB.Exec(`INSERT INTO note (title, description, created_at, updated_at) VALUES ('n', ?, now(), now())`, fmt.Sprintf("quest=%d", b)); err != nil {
 		t.Fatal(err)
 	}
 	root := []store.GraphRoot{{Type: "quest", ID: a}}

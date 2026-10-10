@@ -12,7 +12,7 @@ func attemptsFor(t *testing.T, st interface {
 	ListEmitAttempts(context.Context, int64, int) ([]map[string]any, error)
 }, templateID int64) []map[string]any {
 	t.Helper()
-	rows, err := st.ListEmitAttempts(context.Background(), templateID, 50)
+	rows, err := st.ListEmitAttempts(bg(), templateID, 50)
 	if err != nil {
 		t.Fatalf("ListEmitAttempts: %v", err)
 	}
@@ -23,7 +23,7 @@ func attemptsFor(t *testing.T, st interface {
 // with the step count.
 func TestEmitAttemptsLogFailureThenSuccess(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	fail := poolTemplate(5, `echo boom >&2; exit 3`, 1)
 	now := time.Now()
 	if _, _, _, err := resolveEmitPool(ctx, st, fail, "p1", now, rand.New(rand.NewSource(1))); err != nil {
@@ -50,7 +50,7 @@ func TestEmitAttemptsLogFailureThenSuccess(t *testing.T) {
 
 func TestEmitAttemptsLogEmptyPoolMiss(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	if _, _, _, err := resolveEmitPool(context.Background(), st, poolTemplate(6, `echo null`, 0), "p", time.Now(), rand.New(rand.NewSource(1))); err != nil {
+	if _, _, _, err := resolveEmitPool(bg(), st, poolTemplate(6, `echo null`, 0), "p", time.Now(), rand.New(rand.NewSource(1))); err != nil {
 		t.Fatal(err)
 	}
 	rows := attemptsFor(t, st, 6)
@@ -63,7 +63,7 @@ func TestEmitAttemptsLogEmptyPoolMiss(t *testing.T) {
 // credential must not leak it into the attempt log or the failed quest trace.
 func TestEmitAttemptsMaskTemplateSecrets(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	if err := st.SetTemplateSecret(ctx, 9, "MAIL_PASSWORD", "s3cr3t-pw"); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestEmitAttemptsMaskTemplateSecrets(t *testing.T) {
 
 func TestExecEmitPoolCommandMasksFailureTrace(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	if err := st.SetTemplateSecret(ctx, 11, "TOKEN", "tok-12345"); err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestExecEmitPoolCommandMasksFailureTrace(t *testing.T) {
 
 func TestEmitAttemptLogIsTrimmed(t *testing.T) {
 	st := openTemplateSecretsDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	tmpl := poolTemplate(12, `echo null`, 0)
 	for i := 0; i < 205; i++ {
 		// distinct period keys, each a fresh roll
@@ -145,7 +145,7 @@ func TestEmitAttemptLogIsTrimmed(t *testing.T) {
 // again (no new attempt, no new log row), the first tick after it must.
 func TestEmitPoolRetryPauseIsHonored(t *testing.T) {
 	st := openEmitPoolDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	rng := rand.New(rand.NewSource(1))
 	tmpl := poolTemplate(20, `exit 9`, 1)
 	now := time.Now()
@@ -183,7 +183,7 @@ func TestEmitPoolRetryPauseIsHonored(t *testing.T) {
 // A success after a failure clears the pending retry.
 func TestEmitPoolSuccessClearsRetryAt(t *testing.T) {
 	st := openEmitPoolDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	rng := rand.New(rand.NewSource(1))
 	now := time.Now()
 	if _, _, _, err := resolveEmitPool(ctx, st, poolTemplate(21, `exit 1`, 1), "p", now, rng); err != nil {
@@ -211,7 +211,7 @@ func TestExecEmitPoolCommandTimeoutKillsChildren(t *testing.T) {
 
 	st := openTemplateSecretsDB(t)
 	start := time.Now()
-	_, info, err := execEmitPoolCommand(context.Background(), st, 50, `sleep 30; echo '{"title":"late"}'`)
+	_, info, err := execEmitPoolCommand(bg(), st, 50, `sleep 30; echo '{"title":"late"}'`)
 	elapsed := time.Since(start)
 	if err == nil || info.Status != "timeout" {
 		t.Fatalf("want timeout, got %v / %+v", err, info)

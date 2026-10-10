@@ -2,11 +2,10 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"testing"
 
-	_ "modernc.org/sqlite"
+	"github.com/valirum/quests/go/internal/pgtest"
 )
 
 func TestSearchVariantsLayout(t *testing.T) {
@@ -32,30 +31,22 @@ func TestPrefixTerm(t *testing.T) {
 	}
 }
 
-const searchNotesSchema = `
-CREATE TABLE note (
-	id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-	pinned INTEGER NOT NULL DEFAULT 0, is_readme INTEGER NOT NULL DEFAULT 0, is_private INTEGER NOT NULL DEFAULT 0,
-	is_category INTEGER NOT NULL DEFAULT 0, sort_order INTEGER NOT NULL DEFAULT 0, parent_id INTEGER,
-	color TEXT, icon TEXT, custom_icon TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-INSERT INTO note (id, title, description, is_private, created_at, updated_at) VALUES
+func seedSearchNotes(t *testing.T) *Store {
+	t.Helper()
+	pool, url := pgtest.NewWithURL(t)
+	_, err := pool.Exec(`INSERT INTO note (id, title, description, is_private, created_at, updated_at) VALUES
  (1, 'Деплой на прод', 'Как выкатить сервис: ci-deploy.sh, затем проверить здоровье.', 0, '2026-10-01 10:00:00', '2026-10-01 10:00:00'),
  (2, 'Мониторинг', 'Kuma, Prometheus, Grafana. Деплой не нужен.', 0, '2026-10-02 10:00:00', '2026-10-02 10:00:00'),
  (3, 'Пароли', 'деплой-секрет и прочее', 1, '2026-10-03 10:00:00', '2026-10-03 10:00:00'),
- (4, 'Рецепты', 'Борщ и пельмени', 0, '2026-10-04 10:00:00', '2026-10-04 10:00:00');
-`
-
-func TestSearchPlainRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
-	db, err := sql.Open("sqlite", "file:search_"+t.Name()+"?mode=memory&cache=shared")
+ (4, 'Рецепты', 'Борщ и пельмени', 0, '2026-10-04 10:00:00', '2026-10-04 10:00:00')`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(searchNotesSchema); err != nil {
-		t.Fatal(err)
-	}
-	st := &Store{DB: db}
+	return &Store{DB: pool, PGURL: url}
+}
+
+func TestSearchRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
+	st := seedSearchNotes(t)
 	hits, err := st.SearchNotes(context.Background(), "деплой", SearchOpts{})
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +54,7 @@ func TestSearchPlainRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
 	if len(hits) != 3 || hits[0].ID != 1 || hits[0].Where != "title" {
 		t.Fatalf("hits = %+v (the title match must come first)", hits)
 	}
-	if !strings.Contains(hits[1].Snippet, MarkOpen+"Деплой"+MarkClose) && !strings.Contains(strings.ToLower(hits[1].Snippet), MarkOpen+"деплой"+MarkClose) {
+	if !strings.Contains(strings.ToLower(hits[1].Snippet), MarkOpen+"деплой"+MarkClose) {
 		t.Fatalf("snippet does not mark the match: %q", hits[1].Snippet)
 	}
 	for _, h := range hits {

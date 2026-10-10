@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,31 +9,9 @@ import (
 	"github.com/valirum/quests/go/internal/store"
 )
 
-const runnerJobSchema = `
-CREATE TABLE runner (
-	id INTEGER PRIMARY KEY, label TEXT NOT NULL UNIQUE, reg_hash TEXT, reg_expires_at DATETIME, token_hash TEXT,
-	hostname TEXT, version TEXT, last_seen_at DATETIME, revoked BOOLEAN NOT NULL DEFAULT 0, created_at DATETIME NOT NULL
-);
-CREATE TABLE runner_job (
-	id INTEGER PRIMARY KEY, runner_label TEXT NOT NULL, kind TEXT NOT NULL, quest_id INTEGER, step_id INTEGER, template_id INTEGER,
-	title TEXT NOT NULL DEFAULT '', dedupe_key TEXT, command TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'queued',
-	attempt_no INTEGER NOT NULL DEFAULT 1, timeout_seconds INTEGER NOT NULL, lease_id TEXT, lease_until DATETIME,
-	valid_until DATETIME NOT NULL, created_at DATETIME NOT NULL, assigned_at DATETIME, started_at DATETIME, finished_at DATETIME,
-	exit_code INTEGER, timed_out BOOLEAN NOT NULL DEFAULT 0, stdout TEXT NOT NULL DEFAULT '', stderr TEXT NOT NULL DEFAULT '',
-	progress_current INTEGER, progress_total INTEGER, log_tail TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
-	cancel BOOLEAN NOT NULL DEFAULT 0
-);
-CREATE UNIQUE INDEX ux_runner_job_open_dedupe ON runner_job (dedupe_key)
-	WHERE dedupe_key IS NOT NULL AND state IN ('queued','assigned','running');
-`
-
 func openRunnerChecksDB(t *testing.T) *store.Store {
 	t.Helper()
-	st := openChecksDB(t)
-	if _, err := st.DB.Exec(runnerJobSchema); err != nil {
-		t.Fatal(err)
-	}
-	return st
+	return openChecksDB(t)
 }
 
 func remoteStep(title, cmd, label, mode string) domain.Step {
@@ -53,7 +30,7 @@ func remoteStep(title, cmd, label, mode string) domain.Step {
 // does not pile up jobs while the device is away.
 func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 	st := openRunnerChecksDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	q := seedQuest(t, st, []domain.Step{remoteStep("poll", "echo 3", "home", domain.RunModePoll)})
 	r := NewCheckRunner(st, events.New())
 
@@ -96,7 +73,7 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 
 func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 	st := openRunnerChecksDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	idle := domain.RunIdle
 	step := remoteStep("once", "true", "laptop", domain.RunModeOnce)
 	step.RunStatus = &idle
@@ -125,7 +102,7 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 
 func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 	st := openRunnerChecksDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	idle := domain.RunIdle
 	step := remoteStep("once", "true", "laptop", domain.RunModeOnce)
 	step.RunStatus = &idle
@@ -159,7 +136,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 
 func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 	st := openRunnerChecksDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	running := domain.RunRunning
 	step := remoteStep("once", "true", "laptop", domain.RunModeOnce)
 	step.RunStatus = &running
@@ -174,7 +151,7 @@ func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 // Deleting the quest (or step) takes its jobs out of the queue; a running one is told to stop.
 func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
 	st := openRunnerChecksDB(t)
-	ctx := context.Background()
+	ctx := bg()
 	idle := domain.RunIdle
 	a := remoteStep("waits", "true", "ghost", domain.RunModeOnce)
 	a.RunStatus = &idle

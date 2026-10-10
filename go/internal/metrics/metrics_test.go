@@ -1,45 +1,32 @@
 package metrics
 
 import (
-	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/health"
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 )
 
 func testMetrics(t *testing.T) *Metrics {
 	t.Helper()
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "m.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
+	pool, url := pgtest.NewWithURL(t)
 	for _, q := range []string{
-		`CREATE TABLE quest (id INTEGER PRIMARY KEY, status TEXT)`,
-		`CREATE TABLE runner_job (id INTEGER PRIMARY KEY, state TEXT)`,
-		`CREATE TABLE note (id INTEGER PRIMARY KEY)`,
-		`CREATE TABLE runner (id INTEGER PRIMARY KEY, revoked INTEGER)`,
-		`CREATE TABLE attachment (id INTEGER PRIMARY KEY, size_bytes INTEGER)`,
-		`CREATE TABLE backuplog (id INTEGER PRIMARY KEY, filename TEXT, size_bytes INTEGER, created_at TEXT,
-			webdav_uploaded INTEGER, remote_uploaded INTEGER, attachments_filename TEXT, attachments_size_bytes INTEGER, error TEXT)`,
-		`INSERT INTO quest (status) VALUES ('active'), ('active'), ('completed')`,
-		`INSERT INTO runner_job (state) VALUES ('queued')`,
+		`INSERT INTO quest (title, description, status, pinned, sort_order, created_at, updated_at)
+			VALUES ('a', '', 'active', 0, 0, now(), now()), ('b', '', 'active', 0, 0, now(), now()), ('c', '', 'completed', 0, 0, now(), now())`,
+		`INSERT INTO runner_job (runner_label, kind, command, timeout_seconds, valid_until, created_at) VALUES ('r', 'check', 'true', 60, now(), now())`,
 		`INSERT INTO backuplog (filename, size_bytes, created_at, webdav_uploaded, remote_uploaded) VALUES ('b.db', 1234, '2026-10-08 12:00:00.000000', 0, 0)`,
 	} {
-		if _, err := db.Exec(q); err != nil {
+		if _, err := pool.Exec(q); err != nil {
 			t.Fatal(err)
 		}
 	}
-	return New(db, &store.Store{DB: db}, events.New(), health.New())
+	return New(pool, &store.Store{DB: pool, PGURL: url}, events.New(), health.New())
 }
 
 func get(h http.Handler, token string) (int, string) {

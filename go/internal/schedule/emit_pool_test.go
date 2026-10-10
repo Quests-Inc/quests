@@ -8,52 +8,13 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/store"
 )
 
-const emitPoolSchema = `
-CREATE TABLE templateemitroll (
-	id INTEGER PRIMARY KEY,
-	template_id INTEGER NOT NULL,
-	period_key TEXT NOT NULL,
-	outcome TEXT NOT NULL,
-	scheduled_at DATETIME,
-	attempts INTEGER NOT NULL DEFAULT 0,
-	picked_refs TEXT,
-	retry_at DATETIME,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL
-);
-CREATE TABLE templateemitattempt (
-	id INTEGER PRIMARY KEY,
-	template_id INTEGER NOT NULL,
-	period_key TEXT NOT NULL,
-	at DATETIME NOT NULL,
-	attempt INTEGER NOT NULL DEFAULT 1,
-	status TEXT NOT NULL,
-	duration_ms INTEGER NOT NULL DEFAULT 0,
-	items INTEGER NOT NULL DEFAULT 0,
-	picked INTEGER NOT NULL DEFAULT 0,
-	picked_refs TEXT,
-	message TEXT
-);
-`
-
 func openEmitPoolDB(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:emitpool_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(emitPoolSchema); err != nil {
-		t.Fatal(err)
-	}
-	return &store.Store{DB: db}
+	return openChecksDB(t)
 }
 
 // poolTemplate: the trailing pick argument predates the one-quest format and is ignored.
@@ -82,7 +43,7 @@ func resolveEmitPoolOpts(ctx context.Context, st *store.Store, tmpl templateRow,
 // emitOnce runs one tick of resolveEmit and fails the test on a storage error.
 func emitOnce(t *testing.T, st *store.Store, tmpl templateRow, period string, now time.Time) emitResult {
 	t.Helper()
-	res, err := resolveEmit(context.Background(), st, tmpl, period, now, poolOpts{})
+	res, err := resolveEmit(bg(), st, tmpl, period, now, poolOpts{})
 	if err != nil {
 		t.Fatalf("resolveEmit: %v", err)
 	}

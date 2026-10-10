@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"context"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -26,7 +25,7 @@ func TestPoolRunnerFastCommandReadyInSameCall(t *testing.T) {
 	st := openEmitPoolDB(t)
 	r := newPoolRunner()
 	tmpl := poolTemplate(30, `echo '{"steps":[{"title":"a"}]}'`, 1)
-	items, _, _, err := resolveEmitPoolOpts(context.Background(), st, tmpl, "p", time.Now(), rand.New(rand.NewSource(1)), poolOpts{runner: r})
+	items, _, _, err := resolveEmitPoolOpts(bg(), st, tmpl, "p", time.Now(), rand.New(rand.NewSource(1)), poolOpts{runner: r})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +44,7 @@ func TestPoolRunnerSlowCommandDoesNotBlockAndRunsOnce(t *testing.T) {
 	counter := filepath.Join(t.TempDir(), "runs")
 	cmd := "#!/bin/sh\necho x >> " + counter + "\nsleep 1\necho '{\"steps\":[{\"title\":\"slow\"}]}'\n"
 	tmpl := poolTemplate(31, cmd, 1)
-	ctx := context.Background()
+	ctx := bg()
 	rng := rand.New(rand.NewSource(1))
 
 	start := time.Now()
@@ -104,7 +103,7 @@ func TestPoolRunnerConcurrentCallers(t *testing.T) {
 			defer func() { done <- struct{}{} }()
 			cmd := `echo '{"title":"c"}'`
 			for i := 0; i < 20; i++ {
-				_, _, _, _ = r.exec(context.Background(), st, int64(100+g), "p", cmd)
+				_, _, _, _ = r.exec(bg(), st, int64(100+g), "p", cmd)
 				time.Sleep(time.Millisecond)
 			}
 		}(g)

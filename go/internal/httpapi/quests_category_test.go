@@ -27,7 +27,7 @@ func TestPatchQuestCategoryFollowsQuestline(t *testing.T) {
 		slug string
 	}{{&workCat, "work"}, {&funCat, "fun"}} {
 		res, err := s.Store.DB.Exec(
-			`INSERT INTO questcategory (slug, label, color, created_at) VALUES (?, ?, '#000000', datetime('now'))`,
+			`INSERT INTO questcategory (slug, label, color, created_at) VALUES (?, ?, '#000000', now())`,
 			cat.slug, cat.slug,
 		)
 		if err != nil {
@@ -37,7 +37,7 @@ func TestPatchQuestCategoryFollowsQuestline(t *testing.T) {
 		*cat.id = id
 	}
 	res, err := s.Store.DB.Exec(
-		`INSERT INTO questline (title, category_id, created_at, updated_at) VALUES ('line', ?, datetime('now'), datetime('now'))`,
+		`INSERT INTO questline (title, category_id, created_at, updated_at) VALUES ('line', ?, now(), now())`,
 		workCat,
 	)
 	if err != nil {
@@ -101,7 +101,7 @@ func TestGetQuestResolvesRefs(t *testing.T) {
 	h := s.Handler()
 
 	res, err := s.Store.DB.Exec(
-		`INSERT INTO note (title, description, created_at, updated_at) VALUES ('Toolkit', '', datetime('now'), datetime('now'))`,
+		`INSERT INTO note (title, description, created_at, updated_at) VALUES ('Toolkit', '', now(), now())`,
 	)
 	if err != nil {
 		t.Fatalf("insert note: %v", err)

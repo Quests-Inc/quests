@@ -95,7 +95,7 @@ func openTestPG(t *testing.T) *sql.DB {
 			}
 		}
 	}
-	pool := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
+	pool := sql.OpenDB(pgConnector{inner: stdlib.GetConnector(*cfg)})
 	t.Cleanup(func() { _ = pool.Close() })
 	return pool
 }
@@ -200,7 +200,7 @@ func openTestPGWorkspaces(t *testing.T) (*sql.DB, string, string) {
 			t.Fatal(err)
 		}
 	}
-	pool := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
+	pool := sql.OpenDB(pgConnector{inner: stdlib.GetConnector(*cfg)})
 	t.Cleanup(func() { _ = pool.Close() })
 	return pool, schema, url
 }

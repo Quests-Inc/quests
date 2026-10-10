@@ -85,15 +85,27 @@ fix:
 
 test: test-go test-py test-frontend
 
-# DB tests need PostgreSQL: set QUESTS_TEST_PG_URL (e.g. `just pg-test` starts one in Docker).
+# Go tests run against a real PostgreSQL (QUESTS_TEST_PG_URL). Without it set, a throwaway
+# one is started in Docker (container quests-pg-test, left running between runs).
 test-go:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${QUESTS_TEST_PG_URL:-}" ]; then
+        just pg-test >/dev/null
+        export QUESTS_TEST_PG_URL="postgresql://quests:test@127.0.0.1:55432/quests?sslmode=disable"
+    fi
     cd go && go build ./... && go test ./...
 
-# Throwaway PostgreSQL for the DB tests; prints the URL to export.
+# Throwaway PostgreSQL for the Go tests (idempotent); stop with `docker stop quests-pg-test`.
 pg-test:
-    docker run -d --rm --name quests-pg-test -e POSTGRES_USER=quests -e POSTGRES_PASSWORD=test -e POSTGRES_DB=quests -p 127.0.0.1:55432:5432 postgres:17
-    @echo 'export QUESTS_TEST_PG_URL="postgresql://quests:test@127.0.0.1:55432/quests?sslmode=disable"'
-    @echo 'stop with: docker stop quests-pg-test'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "$(docker ps -q -f name=^quests-pg-test$)" ]; then
+        docker run -d --rm --name quests-pg-test -e POSTGRES_USER=quests -e POSTGRES_PASSWORD=test \
+            -e POSTGRES_DB=quests -p 127.0.0.1:55432:5432 postgres:17 >/dev/null
+    fi
+    until docker exec quests-pg-test pg_isready -U quests >/dev/null 2>&1; do sleep 0.5; done
+    echo 'export QUESTS_TEST_PG_URL="postgresql://quests:test@127.0.0.1:55432/quests?sslmode=disable"'
 
 test-py:
     uv run --all-extras --group dev pytest

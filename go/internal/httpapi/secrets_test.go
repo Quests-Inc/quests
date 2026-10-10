@@ -7,25 +7,17 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+
+	"github.com/valirum/quests/go/internal/pgtest"
 )
 
 func secretsServer(t *testing.T) (http.Handler, *Server) {
 	t.Helper()
 	s := newAttachmentServer(t, "", "", 0)
-	if _, err := s.Store.DB.Exec(`
-		CREATE TABLE secret (
-			id INTEGER PRIMARY KEY,
-			questline_id INTEGER, template_id INTEGER, quest_id INTEGER, step_id INTEGER,
-			key TEXT NOT NULL, value TEXT NOT NULL,
-			created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL);
-		CREATE UNIQUE INDEX ux_secret_questline_id_key ON secret (questline_id, key) WHERE questline_id IS NOT NULL;
-		CREATE UNIQUE INDEX ux_secret_template_id_key ON secret (template_id, key) WHERE template_id IS NOT NULL;
-		CREATE UNIQUE INDEX ux_secret_quest_id_key ON secret (quest_id, key) WHERE quest_id IS NOT NULL;
-		CREATE UNIQUE INDEX ux_secret_step_id_key ON secret (step_id, key) WHERE step_id IS NOT NULL;
-		INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', datetime('now'), datetime('now'));
-		INSERT INTO questtemplate (id, questline_id) VALUES (5, 7);`); err != nil {
-		t.Fatalf("schema: %v", err)
-	}
+	pgtest.Seed(t, s.Store.DB, `
+		INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', now(), now());
+		INSERT INTO questtemplate (id, title, questline_id, created_at, updated_at) VALUES (5, 'tmpl', 7, now(), now())`)
+	pgtest.FixSequences(t, s.Store.PGURL)
 	return s.Handler(), s
 }
 

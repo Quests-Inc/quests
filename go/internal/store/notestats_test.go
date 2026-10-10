@@ -2,12 +2,11 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"math"
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/valirum/quests/go/internal/pgtest"
 )
 
 func TestDecayHalvesEveryThirtyDays(t *testing.T) {
@@ -45,29 +44,14 @@ func TestBoostIsBoundedAndSaturates(t *testing.T) {
 	}
 }
 
-const noteStatTestSchema = `
-CREATE TABLE note (id INTEGER PRIMARY KEY, title TEXT);
-INSERT INTO note (id, title) VALUES (1, 'a'), (2, 'b');
-CREATE TABLE note_stat (
-	note_id INTEGER PRIMARY KEY REFERENCES note(id) ON DELETE CASCADE,
-	score REAL NOT NULL DEFAULT 0, score_at TEXT,
-	opens_human INTEGER NOT NULL DEFAULT 0, opens_agent INTEGER NOT NULL DEFAULT 0, shown INTEGER NOT NULL DEFAULT 0,
-	last_human_at TEXT, last_agent_at TEXT,
-	rated_up INTEGER NOT NULL DEFAULT 0, rated_down INTEGER NOT NULL DEFAULT 0, manual INTEGER NOT NULL DEFAULT 0);
-`
-
 func openStatDB(t *testing.T) *Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:stat_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
+	pool, url := pgtest.NewWithURL(t)
+	if _, err := pool.Exec(`INSERT INTO note (id, title, created_at, updated_at) VALUES
+ (1, 'a', '2026-01-01', '2026-01-01'), (2, 'b', '2026-01-01', '2026-01-01')`); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(noteStatTestSchema); err != nil {
-		t.Fatal(err)
-	}
-	return &Store{DB: db, PGURL: "stub"} // PGURL only switches the feature on (SQLite runs the same SQL)
+	return &Store{DB: pool, PGURL: url}
 }
 
 func TestReadSignalsDedupeAndWeigh(t *testing.T) {

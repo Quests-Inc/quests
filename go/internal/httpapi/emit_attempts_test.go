@@ -7,22 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 )
 
 func TestListEmitAttemptsEndpoint(t *testing.T) {
 	s := newAttachmentServer(t, "", "", 0)
 	h := s.Handler()
-	db := s.Store.DB
-	if _, err := db.Exec(`
-		CREATE TABLE templateemitattempt (
-			id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL, period_key TEXT NOT NULL,
-			at DATETIME NOT NULL, attempt INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL,
-			duration_ms INTEGER NOT NULL DEFAULT 0, items INTEGER NOT NULL DEFAULT 0,
-			picked INTEGER NOT NULL DEFAULT 0, picked_refs TEXT, message TEXT);
-		INSERT INTO questtemplate (id) VALUES (7);`); err != nil {
-		t.Skipf("test schema lacks questtemplate(id): %v", err)
-	}
+	pgtest.Seed(t, s.Store.DB, `INSERT INTO questtemplate (id, title, created_at, updated_at) VALUES (7, 't', now(), now())`)
 	for i, status := range []string{"error", "ok"} {
 		if err := s.Store.RecordEmitAttempt(t.Context(), store.EmitAttempt{
 			TemplateID: 7, PeriodKey: "2026-10-02", At: time.Now(), Attempt: i + 1,

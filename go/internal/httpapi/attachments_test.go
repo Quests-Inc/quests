@@ -3,7 +3,6 @@ package httpapi
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -17,212 +16,14 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/clamav"
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
 	"github.com/valirum/quests/go/internal/webdav"
 )
-
-const attachmentsSchema = `
-CREATE TABLE questcategory (
-	id INTEGER PRIMARY KEY,
-	slug TEXT NOT NULL,
-	label TEXT NOT NULL,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	created_at DATETIME NOT NULL
-);
-CREATE TABLE questline (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	category_id INTEGER,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	icon TEXT NOT NULL DEFAULT 'document',
-	custom_icon TEXT,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL
-);
-CREATE TABLE quest (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	status TEXT NOT NULL,
-	significance TEXT NOT NULL,
-	pinned INTEGER NOT NULL DEFAULT 0,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	deadline_at DATETIME,
-	duration_seconds INTEGER,
-	category_id INTEGER,
-	questline_id INTEGER,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL,
-	completed_at DATETIME,
-	template_id INTEGER,
-	period_key TEXT,
-	automated INTEGER NOT NULL DEFAULT 0,
-	source TEXT
-);
-CREATE TABLE queststep (
-	id INTEGER PRIMARY KEY,
-	quest_id INTEGER NOT NULL,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	progress_current INTEGER NOT NULL DEFAULT 0,
-	progress_total INTEGER NOT NULL DEFAULT 1,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	check_command TEXT,
-	check_interval_seconds INTEGER,
-	check_last_run_at DATETIME,
-	wait_previous INTEGER NOT NULL DEFAULT 0,
-	run_mode TEXT NOT NULL DEFAULT 'poll',
-	run_status TEXT,
-	run_on TEXT
-);
-CREATE TABLE questchangelog (
-	id INTEGER PRIMARY KEY,
-	at DATETIME NOT NULL,
-	kind TEXT NOT NULL,
-	quest_id INTEGER,
-	title TEXT NOT NULL DEFAULT '',
-	detail TEXT NOT NULL DEFAULT '',
-	significance TEXT,
-	revision INTEGER,
-	comment TEXT,
-	entity_type TEXT NOT NULL DEFAULT 'quest',
-	entity_id INTEGER,
-	parent_type TEXT,
-	parent_id INTEGER
-);
-CREATE TABLE graphdraft_op (
-	id INTEGER PRIMARY KEY,
-	kind TEXT NOT NULL,
-	payload TEXT NOT NULL,
-	created_at DATETIME NOT NULL
-);
-CREATE TABLE graphdraft_state (
-	id INTEGER PRIMARY KEY,
-	roots TEXT NOT NULL DEFAULT '[]',
-	updated_at DATETIME NOT NULL
-);
-CREATE TABLE runner (
-	id INTEGER PRIMARY KEY,
-	label TEXT NOT NULL UNIQUE,
-	reg_hash TEXT,
-	reg_expires_at DATETIME,
-	token_hash TEXT,
-	hostname TEXT,
-	version TEXT,
-	last_seen_at DATETIME,
-	revoked BOOLEAN NOT NULL DEFAULT 0,
-	created_at DATETIME NOT NULL
-);
-CREATE TABLE runner_job (
-	id INTEGER PRIMARY KEY,
-	runner_label TEXT NOT NULL,
-	kind TEXT NOT NULL,
-	quest_id INTEGER,
-	step_id INTEGER,
-	template_id INTEGER,
-	title TEXT NOT NULL DEFAULT '',
-	dedupe_key TEXT,
-	command TEXT NOT NULL,
-	state TEXT NOT NULL DEFAULT 'queued',
-	attempt_no INTEGER NOT NULL DEFAULT 1,
-	timeout_seconds INTEGER NOT NULL,
-	lease_id TEXT,
-	lease_until DATETIME,
-	valid_until DATETIME NOT NULL,
-	created_at DATETIME NOT NULL,
-	assigned_at DATETIME,
-	started_at DATETIME,
-	finished_at DATETIME,
-	exit_code INTEGER,
-	timed_out BOOLEAN NOT NULL DEFAULT 0,
-	stdout TEXT NOT NULL DEFAULT '',
-	stderr TEXT NOT NULL DEFAULT '',
-	progress_current INTEGER,
-	progress_total INTEGER,
-	log_tail TEXT NOT NULL DEFAULT '',
-	reason TEXT NOT NULL DEFAULT '',
-	cancel BOOLEAN NOT NULL DEFAULT 0
-);
-CREATE UNIQUE INDEX ux_runner_job_open_dedupe ON runner_job (dedupe_key)
-	WHERE dedupe_key IS NOT NULL AND state IN ('queued','assigned','running');
-CREATE TABLE questtemplate (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL DEFAULT '',
-	questline_id INTEGER
-);
-CREATE TABLE attachment (
-	id INTEGER PRIMARY KEY,
-	owner_type TEXT NOT NULL,
-	owner_id INTEGER NOT NULL,
-	filename TEXT NOT NULL,
-	webdav_path TEXT NOT NULL UNIQUE,
-	size_bytes INTEGER NOT NULL DEFAULT 0,
-	content_type_declared TEXT NOT NULL DEFAULT '',
-	content_type_detected TEXT NOT NULL DEFAULT '',
-	comment TEXT NOT NULL DEFAULT '',
-	uploaded_at DATETIME NOT NULL,
-	scan_status TEXT NOT NULL DEFAULT 'pending',
-	scanned_at DATETIME,
-	current_revision INTEGER NOT NULL DEFAULT 1,
-	hidden INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE attachment_revision (
-	id INTEGER PRIMARY KEY,
-	attachment_id INTEGER NOT NULL,
-	revision INTEGER NOT NULL,
-	filename TEXT NOT NULL,
-	webdav_path TEXT NOT NULL UNIQUE,
-	size_bytes INTEGER NOT NULL DEFAULT 0,
-	content_type_declared TEXT NOT NULL DEFAULT '',
-	content_type_detected TEXT NOT NULL DEFAULT '',
-	comment TEXT NOT NULL DEFAULT '',
-	uploaded_at DATETIME NOT NULL,
-	scan_status TEXT NOT NULL DEFAULT 'pending',
-	scanned_at DATETIME,
-	UNIQUE(attachment_id, revision)
-);
-CREATE TABLE note (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	pinned INTEGER NOT NULL DEFAULT 0,
-	is_readme INTEGER NOT NULL DEFAULT 0,
-	is_private INTEGER NOT NULL DEFAULT 0,
-	is_category INTEGER NOT NULL DEFAULT 0,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	parent_id INTEGER,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	icon TEXT NOT NULL DEFAULT 'document',
-	custom_icon TEXT,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL
-);
-CREATE TABLE tag (
-	id INTEGER PRIMARY KEY,
-	slug TEXT NOT NULL UNIQUE,
-	label TEXT NOT NULL,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	created_at DATETIME NOT NULL
-);
-CREATE TABLE quest_tag (
-	quest_id INTEGER NOT NULL,
-	tag_id INTEGER NOT NULL,
-	PRIMARY KEY (quest_id, tag_id)
-);
-CREATE TABLE template_tag (
-	template_id INTEGER NOT NULL,
-	tag_id INTEGER NOT NULL,
-	PRIMARY KEY (template_id, tag_id)
-);
-`
 
 type davFile struct {
 	body  []byte
@@ -339,17 +140,8 @@ func fakeClamd(t *testing.T, reply string) string {
 
 func newAttachmentServer(t *testing.T, davURL, clamAddr string, maxUpload int64) *Server {
 	t.Helper()
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.Exec(attachmentsSchema); err != nil {
-		t.Fatalf("schema: %v", err)
-	}
-	st := &store.Store{DB: db}
+	pool, url := pgtest.NewWithURL(t)
+	st := &store.Store{DB: pool, PGURL: url}
 	if maxUpload <= 0 {
 		maxUpload = 25 << 20
 	}

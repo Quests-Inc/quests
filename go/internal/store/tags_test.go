@@ -2,44 +2,16 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"path/filepath"
 	"testing"
 
-	_ "modernc.org/sqlite"
+	"github.com/valirum/quests/go/internal/pgtest"
 )
 
 func openTagTestDB(t *testing.T) *Store {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "quests.db")
-	raw, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = raw.Close() })
-	schema := `
-CREATE TABLE tag (
-  id INTEGER PRIMARY KEY,
-  slug TEXT NOT NULL UNIQUE,
-  label TEXT NOT NULL,
-  color TEXT NOT NULL DEFAULT '#9a9a9a',
-  created_at TEXT NOT NULL
-);
-CREATE TABLE quest_tag (
-  quest_id INTEGER NOT NULL,
-  tag_id INTEGER NOT NULL,
-  PRIMARY KEY (quest_id, tag_id)
-);
-CREATE TABLE template_tag (
-  template_id INTEGER NOT NULL,
-  tag_id INTEGER NOT NULL,
-  PRIMARY KEY (template_id, tag_id)
-);`
-	if _, err := raw.Exec(schema); err != nil {
-		t.Fatal(err)
-	}
-	return &Store{DB: raw}
+	pool, url := pgtest.NewWithURL(t)
+	return &Store{DB: pool, PGURL: url}
 }
 
 func TestNormalizeTagSlug(t *testing.T) {
@@ -75,6 +47,7 @@ func TestCreateTagConflictReturnsExisting(t *testing.T) {
 func TestSetQuestTagsLimit(t *testing.T) {
 	st := openTagTestDB(t)
 	ctx := context.Background()
+	qid := pgtest.SeedQuest(t, st.DB, "q")
 	var ids []int64
 	for i := 0; i < 6; i++ {
 		tg, err := st.CreateTag(ctx, TagCreate{Slug: fmt.Sprintf("tag-%d", i), Label: "t"})
@@ -83,39 +56,41 @@ func TestSetQuestTagsLimit(t *testing.T) {
 		}
 		ids = append(ids, tg.ID)
 	}
-	if err := st.SetQuestTags(ctx, 1, ids); err != ErrTooManyTags {
+	if err := st.SetQuestTags(ctx, qid, ids); err != ErrTooManyTags {
 		t.Fatalf("err=%v want too many", err)
 	}
-	if err := st.SetQuestTags(ctx, 1, ids[:5]); err != nil {
+	if err := st.SetQuestTags(ctx, qid, ids[:5]); err != nil {
 		t.Fatal(err)
 	}
-	m, err := st.loadTagsForQuests(ctx, []int64{1})
+	m, err := st.loadTagsForQuests(ctx, []int64{qid})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m[1]) != 5 {
-		t.Fatalf("got %d tags", len(m[1]))
+	if len(m[qid]) != 5 {
+		t.Fatalf("got %d tags", len(m[qid]))
 	}
 }
 
 func TestCopyTemplateTagsToQuest(t *testing.T) {
 	st := openTagTestDB(t)
 	ctx := context.Background()
+	tmpl := pgtest.SeedTemplate(t, st.DB, "t")
+	quest := pgtest.SeedQuest(t, st.DB, "q")
 	tg, err := st.CreateTag(ctx, TagCreate{Slug: "api", Label: "API"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetTemplateTags(ctx, 7, []int64{tg.ID}); err != nil {
+	if err := st.SetTemplateTags(ctx, tmpl, []int64{tg.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.CopyTemplateTagsToQuest(ctx, 7, 42); err != nil {
+	if err := st.CopyTemplateTagsToQuest(ctx, tmpl, quest); err != nil {
 		t.Fatal(err)
 	}
-	m, err := st.loadTagsForQuests(ctx, []int64{42})
+	m, err := st.loadTagsForQuests(ctx, []int64{quest})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m[42]) != 1 || m[42][0].Slug != "api" {
-		t.Fatalf("%v", m[42])
+	if len(m[quest]) != 1 || m[quest][0].Slug != "api" {
+		t.Fatalf("%v", m[quest])
 	}
 }

@@ -90,14 +90,18 @@ var SkipAppRole bool
 // appRole is the non-owner role the API drops to so that the RLS policies bind it.
 const appRole = "quests_app"
 
-type pgConnector struct{ inner driver.Connector }
+type pgConnector struct {
+	inner     driver.Connector
+	defaultWS int64
+	owner     bool
+}
 
 func (c pgConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	cn, err := c.inner.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	pc := &pgConn{Conn: cn}
+	pc := &pgConn{Conn: cn, defaultWS: c.defaultWS, owner: c.owner}
 	if err := pc.dropToAppRole(ctx); err != nil {
 		_ = cn.Close()
 		return nil, err
@@ -111,12 +115,15 @@ type pgConn struct {
 	driver.Conn
 	// ws is the app.workspace_id the session currently has ("" = unset, "?" = unknown).
 	ws string
+	// defaultWS stands in for a context without a workspace (tests only; 0 = fail closed).
+	defaultWS int64
+	owner     bool
 }
 
 // dropToAppRole makes RLS apply to this connection. Without the role (a database
 // that predates the workspaces migration) the connection stays as it is.
 func (c *pgConn) dropToAppRole(ctx context.Context) error {
-	if SkipAppRole {
+	if SkipAppRole || c.owner {
 		return nil
 	}
 	q := c.Conn.(driver.QueryerContext)
@@ -139,7 +146,11 @@ func (c *pgConn) dropToAppRole(ctx context.Context) error {
 // useWorkspace points the session's app.workspace_id at ctx's workspace.
 func (c *pgConn) useWorkspace(ctx context.Context) error {
 	want := ""
-	if id := wsctx.From(ctx); id > 0 {
+	id := wsctx.From(ctx)
+	if id <= 0 {
+		id = c.defaultWS
+	}
+	if id > 0 {
 		want = strconv.FormatInt(id, 10)
 	}
 	if c.ws == want {
@@ -266,14 +277,30 @@ type pgResult struct{ id, rows int64 }
 func (r pgResult) LastInsertId() (int64, error) { return r.id, nil }
 func (r pgResult) RowsAffected() (int64, error) { return r.rows, nil }
 
+// PGOptions tunes a pool; the zero value is what production uses.
+type PGOptions struct {
+	// DefaultWorkspace is used for statements whose context carries no workspace.
+	// Production leaves it 0 so that such statements see nothing (fail closed);
+	// tests set it to 1 instead of threading a workspace through every call.
+	DefaultWorkspace int64
+	// Owner keeps the pool on the login (owner) role, like the host-side admin commands:
+	// no row-level security, and it may change what the API role may not.
+	Owner bool
+}
+
 // OpenPostgres opens a pool on a postgres:// URL and checks the schema revision.
 func OpenPostgres(url string) (*sql.DB, SchemaStatus, error) {
+	return OpenPostgresOpts(url, PGOptions{})
+}
+
+// OpenPostgresOpts is OpenPostgres with options.
+func OpenPostgresOpts(url string, opts PGOptions) (*sql.DB, SchemaStatus, error) {
 	var zero SchemaStatus
 	cfg, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, zero, fmt.Errorf("parse database url: %w", err)
 	}
-	sqlDB := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
+	sqlDB := sql.OpenDB(pgConnector{inner: stdlib.GetConnector(*cfg), defaultWS: opts.DefaultWorkspace, owner: opts.Owner})
 	sqlDB.SetMaxOpenConns(10)
 	sqlDB.SetMaxIdleConns(5)
 	if err := sqlDB.Ping(); err != nil {

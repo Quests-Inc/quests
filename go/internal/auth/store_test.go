@@ -1,68 +1,17 @@
 package auth
 
 import (
-	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/valirum/quests/go/internal/pgtest"
 )
 
-// newTestStore builds an in-memory SQLite DB with just the three accounts
-// tables (mirroring migration a2b3c4d5e6f7) — no Python/Alembic involved, so
-// `go test` stays self-contained.
+// newTestStore is a Store on a fresh PostgreSQL database with the real schema, set up
+// as production runs it (workspaces on).
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	// A unique DSN per test — shared-cache in-memory SQLite is keyed by name,
-	// so reusing "file::memory:" across tests can collide on leftover tables.
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = db.Close() })
-
-	const schema = `
-	CREATE TABLE appuser (
-		id INTEGER NOT NULL PRIMARY KEY,
-		username VARCHAR(64) NOT NULL,
-		password_hash VARCHAR(256) NOT NULL,
-		is_active BOOLEAN NOT NULL DEFAULT 1,
-		created_at DATETIME NOT NULL,
-		last_login_at DATETIME
-	);
-	CREATE UNIQUE INDEX ix_appuser_username ON appuser (username);
-
-	CREATE TABLE usersession (
-		id INTEGER NOT NULL PRIMARY KEY,
-		user_id INTEGER NOT NULL REFERENCES appuser(id) ON DELETE CASCADE,
-		token_hash VARCHAR(64) NOT NULL,
-		created_at DATETIME NOT NULL,
-		expires_at DATETIME NOT NULL,
-		last_seen_at DATETIME,
-		user_agent VARCHAR(256) NOT NULL DEFAULT ''
-	);
-	CREATE UNIQUE INDEX ix_usersession_token_hash ON usersession (token_hash);
-	CREATE INDEX ix_usersession_user_id ON usersession (user_id);
-
-	CREATE TABLE apitoken (
-		id INTEGER NOT NULL PRIMARY KEY,
-		user_id INTEGER NOT NULL REFERENCES appuser(id) ON DELETE CASCADE,
-		name VARCHAR(64) NOT NULL,
-		token_hash VARCHAR(64) NOT NULL,
-		created_at DATETIME NOT NULL,
-		last_used_at DATETIME,
-		revoked_at DATETIME
-	);
-	CREATE UNIQUE INDEX ix_apitoken_token_hash ON apitoken (token_hash);
-	CREATE INDEX ix_apitoken_user_id ON apitoken (user_id);
-	`
-	if _, err := db.Exec(schema); err != nil {
-		t.Fatalf("create schema: %v", err)
-	}
-	return &Store{DB: db}
+	return &Store{DB: pgtest.New(t), Workspaces: true}
 }
 
 func TestCreateUser(t *testing.T) {
@@ -119,8 +68,16 @@ func TestAuthenticate(t *testing.T) {
 	}
 }
 
+// newOwnerStore is newTestStore on the owner role: the host's admin commands change
+// passwords and account state, which the API role may not.
+func newOwnerStore(t *testing.T) *Store {
+	t.Helper()
+	_, url := pgtest.NewWithURL(t)
+	return &Store{DB: pgtest.Owner(t, url), Workspaces: true}
+}
+
 func TestAuthenticateInactiveUser(t *testing.T) {
-	s := newTestStore(t)
+	s := newOwnerStore(t)
 	u, err := s.CreateUser("alice", "correcthorse")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -134,7 +91,7 @@ func TestAuthenticateInactiveUser(t *testing.T) {
 }
 
 func TestSetPassword(t *testing.T) {
-	s := newTestStore(t)
+	s := newOwnerStore(t)
 	if _, err := s.CreateUser("alice", "correcthorse"); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

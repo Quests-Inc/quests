@@ -2,56 +2,28 @@ package store
 
 import (
 	"context"
-	"database/sql"
-	"github.com/valirum/quests/go/internal/secretbox"
 	"reflect"
 	"strings"
 	"testing"
 
-	_ "modernc.org/sqlite"
+	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/secretbox"
 )
 
-const secretsTestSchema = `
-PRAGMA foreign_keys = ON;
-CREATE TABLE questline (id INTEGER PRIMARY KEY);
-CREATE TABLE questtemplate (id INTEGER PRIMARY KEY, questline_id INTEGER REFERENCES questline(id));
-CREATE TABLE quest (id INTEGER PRIMARY KEY, questline_id INTEGER REFERENCES questline(id), template_id INTEGER, status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE queststep (id INTEGER PRIMARY KEY, quest_id INTEGER NOT NULL REFERENCES quest(id) ON DELETE CASCADE, check_command TEXT);
-CREATE TABLE secret (
-	id INTEGER PRIMARY KEY,
-	questline_id INTEGER REFERENCES questline(id) ON DELETE CASCADE,
-	template_id INTEGER REFERENCES questtemplate(id) ON DELETE CASCADE,
-	quest_id INTEGER REFERENCES quest(id) ON DELETE CASCADE,
-	step_id INTEGER REFERENCES queststep(id) ON DELETE CASCADE,
-	key TEXT NOT NULL,
-	value TEXT NOT NULL,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL,
-	CHECK ((questline_id IS NOT NULL) + (template_id IS NOT NULL) + (quest_id IS NOT NULL) + (step_id IS NOT NULL) = 1)
-);
-CREATE UNIQUE INDEX ux_secret_questline_id_key ON secret (questline_id, key) WHERE questline_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_template_id_key ON secret (template_id, key) WHERE template_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_quest_id_key ON secret (quest_id, key) WHERE quest_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_step_id_key ON secret (step_id, key) WHERE step_id IS NOT NULL;
-
-INSERT INTO questline (id) VALUES (1);
-INSERT INTO questtemplate (id, questline_id) VALUES (10, 1);
-INSERT INTO quest (id, questline_id, template_id) VALUES (100, 1, 10);
-INSERT INTO queststep (id, quest_id, check_command) VALUES (1000, 100, 'true');
+const secretsTestSeed = `
+INSERT INTO questline (id, title, created_at, updated_at) VALUES (1, 'line', '2026-01-01', '2026-01-01');
+INSERT INTO questtemplate (id, title, questline_id, created_at, updated_at) VALUES (10, 'tmpl', 1, '2026-01-01', '2026-01-01');
+INSERT INTO quest (id, title, description, status, pinned, sort_order, questline_id, template_id, created_at, updated_at)
+	VALUES (100, 'quest', '', 'active', 0, 0, 1, 10, '2026-01-01', '2026-01-01');
+INSERT INTO queststep (id, quest_id, title, description, progress_current, progress_total, sort_order, check_command)
+	VALUES (1000, 100, 'step', '', 0, 1, 0, 'true');
 `
 
 func openSecretsDB(t *testing.T) *Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:secrets_"+t.Name()+"?mode=memory&cache=shared&_pragma=foreign_keys(ON)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(secretsTestSchema); err != nil {
-		t.Fatal(err)
-	}
-	return &Store{DB: db}
+	pool, url := pgtest.NewWithURL(t)
+	pgtest.Seed(t, pool, secretsTestSeed)
+	return &Store{DB: pool, PGURL: url}
 }
 
 var (
@@ -225,8 +197,8 @@ func TestSecretsAreSealedAtRest(t *testing.T) {
 	// A row from before sealing is read as is, then sealed by the start-up pass; a plain value
 	// that merely begins with the marker is sealed too.
 	if _, err := st.DB.Exec(`INSERT INTO secret (quest_id, key, value, created_at, updated_at) VALUES
-		(100, 'OLD', 'legacy-value', datetime('now'), datetime('now')),
-		(100, 'ODD', 'v1:looks-sealed-but-is-not', datetime('now'), datetime('now'))`); err != nil {
+		(100, 'OLD', 'legacy-value', now(), now()),
+		(100, 'ODD', 'v1:looks-sealed-but-is-not', now(), now())`); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := st.ResolveSecrets(ctx, oQuest); got["OLD"] != "legacy-value" {
@@ -260,20 +232,28 @@ func TestSealedHealthTellsWhichKeySealed(t *testing.T) {
 	ctx := context.Background()
 	mustSet(t, st, oLine, "A", "one")
 	mustSet(t, st, oQuest, "B", "two")
-	if _, err := st.DB.Exec(`INSERT INTO secret (step_id, key, value, created_at, updated_at) VALUES (1000, 'OLD', 'plain', datetime('now'), datetime('now'))`); err != nil {
+	if _, err := st.DB.Exec(`INSERT INTO secret (step_id, key, value, created_at, updated_at) VALUES (1000, 'OLD', 'plain', now(), now())`); err != nil {
 		t.Fatal(err)
 	}
-	h, err := st.SealedHealth(ctx)
-	if err != nil || len(h) != 1 {
-		t.Fatalf("health: %+v %v", h, err)
+	secretRow := func() SealedCounts {
+		h, err := st.SealedHealth(ctx)
+		if err != nil {
+			t.Fatalf("health: %v", err)
+		}
+		for _, r := range h {
+			if r.Table == "secret" {
+				return r
+			}
+		}
+		t.Fatalf("no secret row in %+v", h)
+		return SealedCounts{}
 	}
-	if c := h[0]; c.Total != 3 || c.Readable != 2 || c.Plain != 1 || c.Unreadable != 0 {
+	if c := secretRow(); c.Total != 3 || c.Readable != 2 || c.Plain != 1 || c.Unreadable != 0 {
 		t.Fatalf("with the right key: %+v", c)
 	}
 	other, _ := secretbox.Load(t.TempDir())
 	st.Box = other
-	h, _ = st.SealedHealth(ctx)
-	if c := h[0]; c.Unreadable != 2 || c.Readable != 0 {
+	if c := secretRow(); c.Unreadable != 2 || c.Readable != 0 {
 		t.Fatalf("with another key: %+v", c)
 	}
 }

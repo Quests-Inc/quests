@@ -6,127 +6,31 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/wsctx"
 )
 
-const checksSchema = `
-CREATE TABLE questcategory (
-	id INTEGER PRIMARY KEY,
-	slug TEXT NOT NULL,
-	label TEXT NOT NULL,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	created_at DATETIME NOT NULL
-);
-CREATE TABLE questline (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	category_id INTEGER,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	icon TEXT NOT NULL DEFAULT 'document',
-	custom_icon TEXT,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL
-);
-CREATE TABLE quest (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	status TEXT NOT NULL,
-	significance TEXT NOT NULL,
-	pinned INTEGER NOT NULL DEFAULT 0,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	deadline_at DATETIME,
-	duration_seconds INTEGER,
-	category_id INTEGER,
-	questline_id INTEGER,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL,
-	completed_at DATETIME,
-	template_id INTEGER,
-	period_key TEXT,
-	automated INTEGER NOT NULL DEFAULT 0,
-	source TEXT
-);
-CREATE TABLE queststep (
-	id INTEGER PRIMARY KEY,
-	quest_id INTEGER NOT NULL,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	progress_current INTEGER NOT NULL DEFAULT 0,
-	progress_total INTEGER NOT NULL DEFAULT 1,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	check_command TEXT,
-	check_interval_seconds INTEGER,
-	check_last_run_at DATETIME,
-	wait_previous INTEGER NOT NULL DEFAULT 0,
-	run_mode TEXT NOT NULL DEFAULT 'poll',
-	run_status TEXT,
-	run_on TEXT
-);
-CREATE TABLE questchangelog (
-	id INTEGER PRIMARY KEY,
-	at DATETIME NOT NULL,
-	kind TEXT NOT NULL,
-	quest_id INTEGER,
-	title TEXT NOT NULL DEFAULT '',
-	detail TEXT NOT NULL DEFAULT '',
-	significance TEXT,
-	revision INTEGER,
-	comment TEXT,
-	entity_type TEXT NOT NULL DEFAULT 'quest',
-	entity_id INTEGER,
-	parent_type TEXT,
-	parent_id INTEGER
-);
-CREATE TABLE tag (
-	id INTEGER PRIMARY KEY,
-	slug TEXT NOT NULL UNIQUE,
-	label TEXT NOT NULL,
-	color TEXT NOT NULL DEFAULT '#9a9a9a',
-	created_at DATETIME NOT NULL
-);
-CREATE TABLE quest_tag (
-	quest_id INTEGER NOT NULL,
-	tag_id INTEGER NOT NULL,
-	PRIMARY KEY (quest_id, tag_id)
-);
-CREATE TABLE secret (
-	id INTEGER PRIMARY KEY,
-	questline_id INTEGER, template_id INTEGER, quest_id INTEGER, step_id INTEGER,
-	key TEXT NOT NULL,
-	value TEXT NOT NULL,
-	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL
-);
-CREATE UNIQUE INDEX ux_secret_questline_id_key ON secret (questline_id, key) WHERE questline_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_quest_id_key ON secret (quest_id, key) WHERE quest_id IS NOT NULL;
-CREATE UNIQUE INDEX ux_secret_step_id_key ON secret (step_id, key) WHERE step_id IS NOT NULL;
-CREATE TABLE template_tag (
-	template_id INTEGER NOT NULL,
-	tag_id INTEGER NOT NULL,
-	PRIMARY KEY (template_id, tag_id)
-);
-`
+// bg is the context tests run in: workspace 1, the one the helpers below set up.
+func bg() context.Context { return wsctx.With(context.Background(), 1) }
 
+// openChecksDB is a real database whose workspace 1 may run server commands (as the
+// operator marks a workspace "trusted"), with templates 1..40 already there for the
+// emit tables that reference them.
 func openChecksDB(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:checks_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
-		t.Fatal(err)
+	pool, url := pgtest.NewWithURL(t)
+	pgtest.ExecOwner(t, url, `UPDATE workspace SET trusted = 1 WHERE id = 1`)
+	for id := 1; id <= 40; id++ {
+		if _, err := pool.Exec(`INSERT INTO questtemplate (id, title, created_at, updated_at) VALUES (?, 't', now(), now())`, id); err != nil {
+			t.Fatal(err)
+		}
 	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(checksSchema); err != nil {
-		t.Fatal(err)
-	}
-	return &store.Store{DB: db}
+	pgtest.FixSequences(t, url)
+	return &store.Store{DB: pool, PGURL: url}
 }
 
 func TestParseCheckStdout(t *testing.T) {
@@ -192,7 +96,7 @@ func TestParseCheckOutputJSON(t *testing.T) {
 func seedQuest(t *testing.T, st *store.Store, steps []domain.Step) domain.Quest {
 	t.Helper()
 	now := timeutil.NowUTC()
-	q, err := st.CreateQuest(context.Background(), domain.Quest{
+	q, err := st.CreateQuest(bg(), domain.Quest{
 		Title: "auto", Status: domain.StatusActive, Significance: domain.SigCommon,
 		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: steps,
 	})
@@ -211,9 +115,9 @@ func TestCheckPollProgress(t *testing.T) {
 		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
 	}})
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,9 +135,9 @@ func TestCheckPollJSON(t *testing.T) {
 		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
 	}})
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,9 +162,9 @@ func TestCheckPollJSONBrokenKeepsDescription(t *testing.T) {
 		ProgressCurrent: 1,
 	}})
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,9 +193,9 @@ func TestCheckWaitPrevious(t *testing.T) {
 		},
 	})
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,9 +205,9 @@ func TestCheckWaitPrevious(t *testing.T) {
 	if got.Steps[1].Done {
 		t.Fatal("second step must wait for previous")
 	}
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err = st.GetQuest(context.Background(), q.ID)
+	got, err = st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,9 +225,9 @@ func TestCheckOnceFailQuest(t *testing.T) {
 		CheckCommand: &cmd, RunMode: domain.RunModeOnce, RunStatus: &idle,
 	}})
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,8 +253,8 @@ func TestFailStaleRunning(t *testing.T) {
 		CheckCommand: &cmd, RunMode: domain.RunModeOnce, RunStatus: &run,
 	}})
 	r := NewCheckRunner(st, events.New())
-	r.FailStaleRunning(context.Background())
-	got, err := st.GetQuest(context.Background(), q.ID)
+	r.FailStaleRunning(bg())
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,9 +272,9 @@ func pollStep(t *testing.T, st *store.Store, cmd string, total, current int) dom
 		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
 	}})
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,9 +335,9 @@ func watchStep(cmd string, total, current int, mode string) domain.Step {
 func tickAndGet(t *testing.T, st *store.Store, id int64) domain.Quest {
 	t.Helper()
 	r := NewCheckRunner(st, events.New())
-	r.Tick(context.Background())
+	r.Tick(bg())
 	r.Wait()
-	got, err := st.GetQuest(context.Background(), id)
+	got, err := st.GetQuest(bg(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,7 +376,7 @@ func TestCheckWatchIgnoresInactiveQuests(t *testing.T) {
 	now := timeutil.NowUTC()
 	step := watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, domain.RunModeWatch)
 	step.Done = true
-	q, err := st.CreateQuest(context.Background(), domain.Quest{
+	q, err := st.CreateQuest(bg(), domain.Quest{
 		Title: "done-parent", Status: domain.StatusCompleted, Significance: domain.SigCommon,
 		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: []domain.Step{step},
 	})
@@ -489,7 +393,7 @@ func TestCheckWatchIgnoresInactiveQuests(t *testing.T) {
 func TestCheckWatchClosedStepIsPolledLazily(t *testing.T) {
 	st := openChecksDB(t)
 	q := seedQuest(t, st, []domain.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, domain.RunModeWatch)})
-	ctx := context.Background()
+	ctx := bg()
 	recent := timeutil.NowUTC().Add(-30 * time.Second) // past 15s, not past 60s
 	if _, err := st.DB.ExecContext(ctx, `UPDATE queststep SET check_last_run_at = ? WHERE quest_id = ?`, timeutil.ToDBUTC(recent), q.ID); err != nil {
 		t.Skipf("cannot seed check_last_run_at: %v", err)
@@ -519,8 +423,8 @@ func TestNormalizeRunModeKeepsWatch(t *testing.T) {
 // itself (most specific wins), and what it prints has them masked.
 func TestCheckCommandGetsInheritedSecretsAndMasksOutput(t *testing.T) {
 	st := openChecksDB(t)
-	ctx := context.Background()
-	if _, err := st.DB.ExecContext(ctx, `INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', datetime('now'), datetime('now'))`); err != nil {
+	ctx := bg()
+	if _, err := st.DB.ExecContext(ctx, `INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', now(), now())`); err != nil {
 		t.Fatal(err)
 	}
 	cmd := `printf '{"progress":%s,"description":"site said %s / %s"}' "$([ "$SITE_PASS" = step-pass ] && [ "$SITE_USER" = line-user ] && echo 1 || echo 0)" "$SITE_PASS" "$SITE_USER"`

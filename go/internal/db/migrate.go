@@ -276,3 +276,6 @@ func CurrentRevision(path, databaseURL string) (string, error) {
 	}
 	return v, nil
 }
+
+// ExpectedRevision is the schema revision this binary expects (the head of the chain).
+func ExpectedRevision() string { return expectedAlembic }

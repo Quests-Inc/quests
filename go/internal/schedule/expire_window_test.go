@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -80,7 +79,7 @@ func countStarted(hub *events.Hub) int {
 
 func seedWindowQuest(t *testing.T, st *store.Store, deadline time.Time, duration int, updatedAt time.Time) domain.Quest {
 	t.Helper()
-	q, err := st.CreateQuest(context.Background(), domain.Quest{
+	q, err := st.CreateQuest(bg(), domain.Quest{
 		Title:           "window",
 		Status:          domain.StatusActive,
 		Significance:    domain.SigCommon,
@@ -94,13 +93,13 @@ func seedWindowQuest(t *testing.T, st *store.Store, deadline time.Time, duration
 		t.Fatal(err)
 	}
 	// CreateQuest overwrites UpdatedAt with NowUTC — force the times we care about.
-	_, err = st.DB.ExecContext(context.Background(),
+	_, err = st.DB.ExecContext(bg(),
 		`UPDATE quest SET deadline_at=?, duration_seconds=?, updated_at=?, created_at=? WHERE id=?`,
 		timeutil.ToDBUTC(deadline), duration, timeutil.ToDBUTC(updatedAt), timeutil.ToDBUTC(updatedAt), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := st.GetQuest(context.Background(), q.ID)
+	got, err := st.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +110,7 @@ func TestWindowNotifier_PostponeSuppressesStarted(t *testing.T) {
 	st := openChecksDB(t)
 	hub := events.New()
 	w := NewWindowNotifier()
-	ctx := context.Background()
+	ctx := bg()
 
 	// Seed empty so the next tick is "live".
 	if _, err := w.Notify(ctx, st, hub); err != nil {
@@ -147,7 +146,7 @@ func TestWindowNotifier_NaturalCrossingFires(t *testing.T) {
 	st := openChecksDB(t)
 	hub := events.New()
 	w := NewWindowNotifier()
-	ctx := context.Background()
+	ctx := bg()
 
 	if _, err := w.Notify(ctx, st, hub); err != nil {
 		t.Fatal(err)
@@ -181,7 +180,7 @@ func TestWindowNotifier_PerWorkspaceMemory(t *testing.T) {
 
 	for tick := 0; tick < 3; tick++ {
 		for _, ws := range []int64{1, 2} {
-			if _, err := w.Notify(wsctx.With(context.Background(), ws), st, hub); err != nil {
+			if _, err := w.Notify(wsctx.With(bg(), ws), st, hub); err != nil {
 				t.Fatal(err)
 			}
 		}

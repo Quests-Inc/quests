@@ -17,13 +17,13 @@ func TestPatchQuestlinePartialKeepsCategory(t *testing.T) {
 	h := s.Handler()
 
 	res, err := s.Store.DB.Exec(
-		`INSERT INTO questcategory (slug, label, color, created_at) VALUES ('fun', 'fun', '#000000', datetime('now'))`)
+		`INSERT INTO questcategory (slug, label, color, created_at) VALUES ('fun', 'fun', '#000000', now())`)
 	if err != nil {
 		t.Fatalf("insert category: %v", err)
 	}
 	catID, _ := res.LastInsertId()
 	res, err = s.Store.DB.Exec(
-		`INSERT INTO questline (title, category_id, created_at, updated_at) VALUES ('line', ?, datetime('now'), datetime('now'))`, catID)
+		`INSERT INTO questline (title, category_id, created_at, updated_at) VALUES ('line', ?, now(), now())`, catID)
 	if err != nil {
 		t.Fatalf("insert questline: %v", err)
 	}

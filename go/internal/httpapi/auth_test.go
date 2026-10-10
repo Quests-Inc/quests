@@ -2,18 +2,15 @@ package httpapi
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/pgtest"
 )
 
 // newTestServer wires just enough of Server to exercise requireAuth + the
@@ -21,52 +18,7 @@ import (
 // never touch them.
 func newTestServer(t *testing.T, authRequired bool) (*Server, *auth.Store) {
 	t.Helper()
-	// A unique DSN per test — shared-cache in-memory SQLite is keyed by name,
-	// so reusing "file::memory:" across tests can collide on leftover tables.
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = db.Close() })
-
-	const schema = `
-	CREATE TABLE appuser (
-		id INTEGER NOT NULL PRIMARY KEY,
-		username VARCHAR(64) NOT NULL,
-		password_hash VARCHAR(256) NOT NULL,
-		is_active BOOLEAN NOT NULL DEFAULT 1,
-		created_at DATETIME NOT NULL,
-		last_login_at DATETIME
-	);
-	CREATE UNIQUE INDEX ix_appuser_username ON appuser (username);
-	CREATE TABLE usersession (
-		id INTEGER NOT NULL PRIMARY KEY,
-		user_id INTEGER NOT NULL REFERENCES appuser(id) ON DELETE CASCADE,
-		token_hash VARCHAR(64) NOT NULL,
-		created_at DATETIME NOT NULL,
-		expires_at DATETIME NOT NULL,
-		last_seen_at DATETIME,
-		user_agent VARCHAR(256) NOT NULL DEFAULT ''
-	);
-	CREATE UNIQUE INDEX ix_usersession_token_hash ON usersession (token_hash);
-	CREATE TABLE apitoken (
-		id INTEGER NOT NULL PRIMARY KEY,
-		user_id INTEGER NOT NULL REFERENCES appuser(id) ON DELETE CASCADE,
-		name VARCHAR(64) NOT NULL,
-		token_hash VARCHAR(64) NOT NULL,
-		created_at DATETIME NOT NULL,
-		last_used_at DATETIME,
-		revoked_at DATETIME
-	);
-	CREATE UNIQUE INDEX ix_apitoken_token_hash ON apitoken (token_hash);
-	`
-	if _, err := db.Exec(schema); err != nil {
-		t.Fatalf("create schema: %v", err)
-	}
-
-	authStore := &auth.Store{DB: db}
+	authStore := &auth.Store{DB: pgtest.New(t), Workspaces: true}
 	s := &Server{Auth: authStore, AuthRequired: authRequired}
 	return s, authStore
 }
@@ -473,6 +425,12 @@ func TestSelfServiceTokens(t *testing.T) {
 	s, authStore := newTestServer(t, true)
 	alice, _ := authStore.CreateUser("alice", "correcthorse")
 	bob, _ := authStore.CreateUser("bob", "correcthorse")
+	// A token is pinned to the workspace of the session that mints it: both people are in workspace 1.
+	for _, u := range []int64{alice.ID, bob.ID} {
+		if _, err := authStore.DB.Exec(`INSERT INTO workspace_member (workspace_id, user_id) VALUES (1, ?)`, u); err != nil {
+			t.Fatal(err)
+		}
+	}
 	mux := http.NewServeMux()
 	s.registerAuth(mux)
 	s.registerTokens(mux)

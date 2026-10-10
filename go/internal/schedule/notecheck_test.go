@@ -2,13 +2,11 @@ package schedule
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/secretbox"
 	"github.com/valirum/quests/go/internal/store"
 	"github.com/valirum/quests/go/internal/wsctx"
@@ -44,40 +42,20 @@ func TestParseNoteCheckOutput(t *testing.T) {
 	}
 }
 
-const noteCheckSchema = `
-CREATE TABLE workspace (id INTEGER PRIMARY KEY, name TEXT, trusted INTEGER NOT NULL DEFAULT 0, deleted_at TEXT);
-INSERT INTO workspace (id, name, trusted) VALUES (1, 'trusted', 1), (2, 'untrusted', 0);
-CREATE TABLE note (
-	id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-	pinned INTEGER NOT NULL DEFAULT 0, is_readme INTEGER NOT NULL DEFAULT 0, is_private INTEGER NOT NULL DEFAULT 0,
-	is_category INTEGER NOT NULL DEFAULT 0, sort_order INTEGER NOT NULL DEFAULT 0, parent_id INTEGER,
-	color TEXT, icon TEXT, custom_icon TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-	check_command TEXT, check_interval_seconds INTEGER, check_last_run_at TEXT, run_on TEXT,
-	outdated INTEGER NOT NULL DEFAULT 0, outdated_at TEXT, check_reason TEXT NOT NULL DEFAULT '',
-	check_error TEXT NOT NULL DEFAULT '', check_error_at TEXT);
-INSERT INTO note (id, title, created_at, updated_at) VALUES (1, 'guide', '2026-10-01 00:00:00', '2026-10-01 00:00:00');
-CREATE TABLE secret (id INTEGER PRIMARY KEY, questline_id INTEGER, template_id INTEGER, quest_id INTEGER, step_id INTEGER, note_id INTEGER,
-	key TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-CREATE UNIQUE INDEX ux_secret_note_id_key ON secret (note_id, key) WHERE note_id IS NOT NULL;
-CREATE TABLE questchangelog (id INTEGER PRIMARY KEY, kind TEXT, entity_type TEXT, entity_id INTEGER, title TEXT, detail TEXT, comment TEXT, quest_id INTEGER,
-	parent_type TEXT, parent_id INTEGER, created_at TEXT, significance TEXT, count INTEGER DEFAULT 1);
-`
-
 func noteCheckRig(t *testing.T) (*CheckRunner, context.Context) {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:notecheck_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
+	pool, url := pgtest.NewWithURL(t)
+	// Workspace 1 may run commands on the server, workspace 2 may not.
+	pgtest.ExecOwner(t, url, `UPDATE workspace SET trusted = 1 WHERE id = 1;
+INSERT INTO workspace (id, name, trusted) VALUES (2, 'untrusted', 0);
+INSERT INTO note (id, title, workspace_id, created_at, updated_at) VALUES (2, 'elsewhere', 2, now(), now());`)
+	if _, err := pool.Exec(`INSERT INTO note (id, title, created_at, updated_at) VALUES (1, 'guide', '2026-10-01 00:00:00', '2026-10-01 00:00:00')`); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(noteCheckSchema); err != nil {
-		t.Fatal(err)
-	}
+	pgtest.FixSequences(t, url)
 	t.Setenv("QUESTS_SECRET_KEY", "")
 	box, _ := secretbox.Load(t.TempDir())
-	// PGURL only switches the feature on: the same SQL runs on SQLite.
-	st := &store.Store{DB: db, PGURL: "stub", Box: box}
+	st := &store.Store{DB: pool, PGURL: url, Box: box}
 	r := NewCheckRunner(st, events.New())
 	return r, wsctx.With(context.Background(), 1)
 }
@@ -175,21 +153,21 @@ func TestNoteCheckServerCommandsNeedATrustedWorkspace(t *testing.T) {
 	r, _ := noteCheckRig(t)
 	untrusted := wsctx.With(context.Background(), 2)
 	cmd := "echo 1"
-	if _, err := r.Store.SetNoteCheck(untrusted, 1, &cmd, nil, nil); err == nil {
+	if _, err := r.Store.SetNoteCheck(untrusted, 2, &cmd, nil, nil); err == nil {
 		t.Fatal("a command for the server was accepted in an untrusted workspace")
 	}
 	// With a runner it is accepted; it just waits for the device.
 	label := "laptop"
-	if _, err := r.Store.SetNoteCheck(untrusted, 1, &cmd, nil, &label); err != nil {
+	if _, err := r.Store.SetNoteCheck(untrusted, 2, &cmd, nil, &label); err != nil {
 		t.Fatalf("a runner command must be accepted anywhere: %v", err)
 	}
 	// And whatever sits in the table is never run on the server of an untrusted workspace.
-	if _, err := r.Store.DB.Exec(`UPDATE note SET run_on = NULL WHERE id = 1`); err != nil {
+	if _, err := r.Store.DB.ExecContext(untrusted, `UPDATE note SET run_on = NULL WHERE id = 2`); err != nil {
 		t.Fatal(err)
 	}
 	r.TickNotes(untrusted)
 	r.Wait()
-	got, _ := r.Store.GetNoteCheck(untrusted, 1)
+	got, _ := r.Store.GetNoteCheck(untrusted, 2)
 	if got.Outdated || got.Error == "" {
 		t.Fatalf("it must refuse and say why, without a verdict: %+v", got)
 	}

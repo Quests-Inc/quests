@@ -1,8 +1,6 @@
 package schedule
 
 import (
-	"context"
-	"database/sql"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -11,6 +9,7 @@ import (
 
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 )
 
@@ -56,65 +55,22 @@ func TestParseEmitOutputCollectsIgnoredFields(t *testing.T) {
 	}
 }
 
-const emitSpecSchema = checksSchema + emitPoolSchema + `
-CREATE TABLE questtemplate (
-	id INTEGER PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	pinned INTEGER NOT NULL DEFAULT 0,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	duration_seconds INTEGER,
-	freq TEXT NOT NULL DEFAULT 'daily',
-	weekdays TEXT NOT NULL DEFAULT '0,1,2,3,4,5,6',
-	enabled INTEGER NOT NULL DEFAULT 1,
-	timezone TEXT NOT NULL DEFAULT 'UTC',
-	deadline_time TEXT,
-	significance TEXT NOT NULL DEFAULT 'common',
-	emit_mode TEXT NOT NULL DEFAULT 'fixed',
-	emit_chance REAL NOT NULL DEFAULT 1,
-	emit_window_start TEXT,
-	emit_window_end TEXT,
-	emit_pool_command TEXT,
-	emit_run_on TEXT,
-	emit_limits TEXT,
-	category_id INTEGER,
-	questline_id INTEGER,
-	automated INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE questtemplatestep (
-	id INTEGER PRIMARY KEY,
-	template_id INTEGER NOT NULL,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	progress_min INTEGER NOT NULL DEFAULT 1,
-	progress_max INTEGER NOT NULL DEFAULT 1,
-	check_command TEXT,
-	check_interval_seconds INTEGER,
-	wait_previous INTEGER NOT NULL DEFAULT 0,
-	run_mode TEXT NOT NULL DEFAULT 'poll',
-	run_on TEXT
-);
-INSERT INTO questcategory (id, slug, label, created_at) VALUES (1, 'work', 'Работа', datetime('now')), (2, 'home', 'Дом', datetime('now'));
-INSERT INTO questline (id, title, category_id, created_at, updated_at) VALUES
-	(1, 'Сайт Рефкул', 1, datetime('now'), datetime('now')),
-	(2, 'Рутина', 2, datetime('now'), datetime('now')),
-	(3, 'Рутина дома', 2, datetime('now'), datetime('now'));
-INSERT INTO tag (id, slug, label, created_at) VALUES (1, 'infra', 'infra', datetime('now')), (2, 'api', 'api', datetime('now'));
-`
-
 func openEmitSpecDB(t *testing.T) *store.Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:emitspec_"+t.Name()+"?mode=memory&cache=shared")
-	if err != nil {
+	pool, url := pgtest.NewWithURL(t)
+	pgtest.ExecOwner(t, url, `UPDATE workspace SET trusted = 1 WHERE id = 1`)
+	if _, err := pool.Exec(`
+DELETE FROM questcategory;
+INSERT INTO questcategory (id, slug, label, created_at) VALUES (1, 'work', 'Работа', now()), (2, 'home', 'Дом', now());
+INSERT INTO questline (id, title, category_id, created_at, updated_at) VALUES
+	(1, 'Сайт Рефкул', 1, now(), now()),
+	(2, 'Рутина', 2, now(), now()),
+	(3, 'Рутина дома', 2, now(), now());
+INSERT INTO tag (id, slug, label, created_at) VALUES (1, 'infra', 'infra', now()), (2, 'api', 'api', now());`); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(emitSpecSchema); err != nil {
-		t.Fatal(err)
-	}
-	return &store.Store{DB: db}
+	pgtest.FixSequences(t, url)
+	return &store.Store{DB: pool, PGURL: url}
 }
 
 func resolveJSON(t *testing.T, st *store.Store, js string, lim store.EmitLimits) (*resolvedSpec, error) {
@@ -123,7 +79,7 @@ func resolveJSON(t *testing.T, st *store.Store, js string, lim store.EmitLimits)
 	if err != nil || out.Spec == nil {
 		t.Fatalf("parse %q: spec=%v err=%v", js, out.Spec, err)
 	}
-	return resolveEmitSpec(context.Background(), st, out.Spec, lim)
+	return resolveEmitSpec(bg(), st, out.Spec, lim)
 }
 
 func TestResolveEmitSpecNamesAndTags(t *testing.T) {
@@ -175,7 +131,7 @@ func TestResolveEmitSpecLimits(t *testing.T) {
 
 func insertTemplate(t *testing.T, st *store.Store, id int64, cols, vals string) {
 	t.Helper()
-	if _, err := st.DB.Exec(`INSERT INTO questtemplate (id, `+cols+`) VALUES (`+`?, `+vals+`)`, id); err != nil {
+	if _, err := st.DB.Exec(`INSERT INTO questtemplate (id, created_at, updated_at, `+cols+`) VALUES (?, now(), now(), `+vals+`)`, id); err != nil {
 		t.Fatalf("insert template: %v", err)
 	}
 }
@@ -191,11 +147,11 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ids, err := MaterializeDue(context.Background(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+	ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
 	if err != nil || len(ids) != 1 {
 		t.Fatalf("created %v, err %v", ids, err)
 	}
-	q, err := st.GetQuest(context.Background(), ids[0])
+	q, err := st.GetQuest(bg(), ids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +177,7 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 		t.Fatalf("the command's tags replace the template's, got %+v", q.Tags)
 	}
 	// the period is closed: a second tick creates nothing
-	if ids, err := MaterializeDue(context.Background(), st, events.New(), time.Now(), rand.New(rand.NewSource(1))); err != nil || len(ids) != 0 {
+	if ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1))); err != nil || len(ids) != 0 {
 		t.Fatalf("second tick: %v %v", ids, err)
 	}
 	// and the attempt log names the ignored field
@@ -242,11 +198,11 @@ func TestMaterializeDueQuestlineCategoryWins(t *testing.T) {
 			st := openEmitSpecDB(t)
 			insertTemplate(t, st, 8, `title, emit_pool_command, questline_id, category_id`,
 				`'Шаблон', '`+strings.ReplaceAll(cmd, "'", "''")+`', 1, 2`)
-			ids, err := MaterializeDue(context.Background(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+			ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
 			if err != nil || len(ids) != 1 {
 				t.Fatalf("created %v, err %v", ids, err)
 			}
-			q, err := st.GetQuest(context.Background(), ids[0])
+			q, err := st.GetQuest(bg(), ids[0])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -262,7 +218,7 @@ func TestMaterializeDueQuestlineCategoryWins(t *testing.T) {
 func TestMaterializeDueNothingPrintedCreatesNothing(t *testing.T) {
 	st := openEmitSpecDB(t)
 	insertTemplate(t, st, 8, `title, emit_pool_command`, `'Пусто', 'echo null'`)
-	ids, err := MaterializeDue(context.Background(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+	ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
 	if err != nil || len(ids) != 0 {
 		t.Fatalf("created %v, err %v", ids, err)
 	}
@@ -273,7 +229,7 @@ func TestMaterializeDueHonoursTemplateLimits(t *testing.T) {
 	st := openEmitSpecDB(t)
 	insertTemplate(t, st, 9, `title, emit_pool_command, emit_limits`,
 		`'Лимит', 'echo ''{"steps":[{"title":"a"},{"title":"b"}]}''', '{"max_steps":1}'`)
-	ids, err := MaterializeDue(context.Background(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
+	ids, err := MaterializeDue(bg(), st, events.New(), time.Now(), rand.New(rand.NewSource(1)))
 	if err != nil || len(ids) != 0 {
 		t.Fatalf("over the limit must not create a quest: %v %v", ids, err)
 	}
