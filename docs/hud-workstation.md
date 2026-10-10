@@ -100,7 +100,7 @@ systemctl --user status quests-overlay.service
 
 Ожидание: `components.overlay.status == "ok"` в `/api/health` (чип HUD в SPA).
 
-Разовый смоук без systemd: `./scripts/run-overlay-smoke.sh` с теми же env —
+Разовый смоук без systemd: `just run-overlay` с теми же env —
 для отладки. Для постоянной работы — только unit.
 
 ## 5. Бинды niri

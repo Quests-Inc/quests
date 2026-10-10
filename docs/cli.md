@@ -6,8 +6,8 @@
 
 ```bash
 just build-cli                  # один раз (или после изменений CLI)
-./scripts/quests --help
-./scripts/quests list --json
+just quests --help
+just quests list --json
 go/bin/quests list              # напрямую
 uv run quests list              # launcher → тот же бинарник
 ```

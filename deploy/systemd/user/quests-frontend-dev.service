@@ -8,7 +8,7 @@ Wants=network-online.target quests-server.service
 Type=simple
 WorkingDirectory=%h/Quests/frontend
 Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
-ExecStart=%h/Quests/scripts/run-frontend.sh
+ExecStart=/usr/bin/env npm run dev
 Restart=on-failure
 RestartSec=3
 

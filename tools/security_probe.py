@@ -6,7 +6,7 @@ main one). The probe invites a throw-away "attacker" into a fresh workspace and 
 from there, to reach or change what belongs to the owner's workspace. Every check
 prints PASS or FAIL; exit status 1 on any FAIL.
 
-    python3 scripts/security_probe.py --base http://127.0.0.1:8765 --owner alice
+    python3 tools/security_probe.py --base http://127.0.0.1:8765 --owner alice
 
 Standard library only (no uv, no venv). The password is asked for without echo, or read
 from $QUESTS_PROBE_PASSWORD; it is deliberately not a command-line argument (shell

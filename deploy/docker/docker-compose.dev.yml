@@ -1,8 +1,8 @@
 # Local API only — no bot / nginx / clamav.
 # Host data + frontend/dist are bind-mounted so SPA rebuilds don't need an image rebuild.
 #
-#   ./scripts/dev-api-docker.sh
-#   ./scripts/dev-api-docker.sh --rebuild   # after Go/Python/Dockerfile changes
+#   just dev-api
+#   just dev-api --rebuild   # after Go/Python/Dockerfile changes
 #
 # network_mode: host + 127.0.0.1 so QUESTS_AUTH=off is allowed (0.0.0.0 refuses
 # unauthenticated binds).

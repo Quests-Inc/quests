@@ -120,7 +120,7 @@ CORS нужен только если Vite/SPA открывают с друго�
 ## 3. Проверка руками
 
 ```bash
-./scripts/run-server.sh
+just run-server
 # в другом терминале:
 curl -sS http://127.0.0.1:8765/api/health
 # с другой машины:
@@ -130,8 +130,8 @@ curl -sS http://SERVER_IP:8765/api/health
 Бот (после заполнения TG-переменных; сначала STT-сайдкар, если нужны голосовые):
 
 ```bash
-./scripts/run-stt.sh &
-./scripts/run-telegram.sh
+just run-stt &
+just run-telegram
 ```
 
 В веб-UI чипы **API / HUD / Bot**: Bot зелёный после heartbeat (~несколько секунд).

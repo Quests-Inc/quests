@@ -21,7 +21,7 @@ Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
 # Environment=QUESTS_TG_USER_IDS=
 # Environment=QUESTS_TG_PROXY=http://127.0.0.1:12334
 # Environment=QUESTS_API=http://127.0.0.1:8765
-ExecStart=%h/Quests/scripts/run-telegram.sh
+ExecStart=/usr/bin/env uv run quests-telegram
 Restart=on-failure
 RestartSec=5
 

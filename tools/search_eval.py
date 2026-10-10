@@ -5,7 +5,7 @@ Creates a small fixed corpus of notes in the workspace you point it at (and remo
 asks the search endpoint each question and checks that the expected note is where it should be.
 Run it on a scratch instance:
 
-    python3 scripts/search_eval.py --base http://127.0.0.1:8765 --user alice
+    python3 tools/search_eval.py --base http://127.0.0.1:8765 --user alice
 
 Password: prompt, or $QUESTS_PROBE_PASSWORD. Prints the rank of the expected note per query and the
 share found at rank 1 / in the top 3. Exit status 1 when a query that must work does not.

@@ -15,10 +15,10 @@ voice notes (through the optional STT sidecar, `faster-whisper`, a ~1.5 GB image
 3. Anywhere with Python and access to the Quests URL:
    ```bash
    QUESTS_API=https://your-quests-host QUESTS_API_TOKEN=… QUESTS_TG_TOKEN=… QUESTS_TG_USER_IDS=<your id> \
-     ./scripts/run-telegram.sh          # or: uv run quests-telegram
+     just run-telegram          # or: uv run quests-telegram
    ```
    If `api.telegram.org` is blocked where it runs, set `QUESTS_TG_PROXY`. Voice needs the STT sidecar
-   (`./scripts/run-stt.sh`, then `QUESTS_STT=http://127.0.0.1:8766`).
+   (`just run-stt`, then `QUESTS_STT=http://127.0.0.1:8766`).
 
 ## On the operator's server
 

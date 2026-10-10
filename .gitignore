@@ -55,7 +55,7 @@ sandbox.json
 *.log
 *.sock
 
-# Vendored overlay deps (installed by scripts/run-overlay-smoke.sh)
+# Vendored overlay deps (installed by `just run-overlay`)
 overlay/_vendor/
 
 # Homelab dashboard (not part of Quests)
@@ -73,5 +73,5 @@ go/bin/
 # Claude Code preview-pane dev server config (local only)
 .claude/launch.json
 
-# Local manual backups (scripts/pull-prod-data.sh, ad-hoc tar snapshots)
+# Local manual backups (`just pull-prod-data`, ad-hoc tar snapshots)
 /backups/

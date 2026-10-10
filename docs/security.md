@@ -76,7 +76,7 @@ and changed only from a browser session (not with an API token).
 ## Re-check after changes
 
 ```bash
-python3 scripts/security_probe.py --base http://127.0.0.1:8765 --owner <user>   # asks for the password
+python3 tools/security_probe.py --base http://127.0.0.1:8765 --owner <user>   # asks for the password
 ```
 
 Run it against a **scratch** instance: it creates a workspace, an attacker account and a few rows (it removes what it can).

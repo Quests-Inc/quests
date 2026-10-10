@@ -1,13 +1,13 @@
 # Go API cutover — done
 
-Default API is the Go binary (`go/bin/quests-server` via `./scripts/run-server.sh` on `:8765`).
+Default API is the Go binary (`go/bin/quests-server` via `just run-server` on `:8765`).
 
 ## Run
 
 ```bash
 just build-server build-cli
-./scripts/run-server.sh          # :8765
-./scripts/quests list
+just run-server          # :8765
+just quests list
 ```
 
 SPA: build `frontend/dist` (or use Vite proxy to the API).

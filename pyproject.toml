@@ -75,9 +75,9 @@ ignore = [
 "overlay/**" = ["E402"]
 # the closure runs synchronously inside the iteration that defines it.
 "overlay/services/ipc.py" = ["B023"]
-"scripts/pipelines/**" = ["B023"]
+"tools/pipelines/**" = ["B023"]
 # `%` formatting keeps the probe output templates readable.
-"scripts/security_probe.py" = ["UP031"]
+"tools/security_probe.py" = ["UP031"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["quests", "overlay"]

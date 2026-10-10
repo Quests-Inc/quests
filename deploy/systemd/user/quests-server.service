@@ -11,7 +11,8 @@ Environment=PATH=%h/.local/bin:%h/go/bin:/usr/local/go/bin:/usr/local/bin:/usr/b
 # Local-only by default. For remote HUD/bot:
 # Environment=QUESTS_HOST=0.0.0.0
 # Environment=QUESTS_CORS_ORIGINS=http://127.0.0.1:5173,http://LAN_IP:5173
-ExecStart=%h/Quests/scripts/run-server.sh
+# Build first: `just build-server`. Config comes from %h/Quests/.env (QUESTS_DATABASE_URL is required).
+ExecStart=%h/Quests/go/bin/quests-server
 Restart=on-failure
 RestartSec=3
 

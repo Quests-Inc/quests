@@ -63,7 +63,7 @@ class QuestsApi:
         except aiohttp.ClientError as e:
             raise ApiError(
                 f"не удалось связаться с API ({self.base}): {e}. "
-                "Запусти сервер: ./scripts/run-server.sh"
+                "Запусти сервер: just run-server"
             ) from e
 
     async def list_quests(self, *, status: str | None = "active") -> list[dict]:

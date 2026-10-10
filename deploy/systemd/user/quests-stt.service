@@ -13,7 +13,7 @@ Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
 # Overrides (defaults: small/cpu/int8/ru, bind 0.0.0.0:8766):
 # Environment=QUESTS_WHISPER_MODEL=small
 # Environment=QUESTS_STT_PORT=8766
-ExecStart=%h/Quests/scripts/run-stt.sh
+ExecStart=/usr/bin/env uv run quests-stt
 Restart=on-failure
 RestartSec=5
 

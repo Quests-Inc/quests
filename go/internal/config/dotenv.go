@@ -10,7 +10,7 @@ import (
 // LoadDotenv sets process env vars from ROOT/.env for values not already
 // set — mirrors python-dotenv's default (non-override) behavior. Docker
 // already injects these via compose's env_file:, so this only matters for
-// bare `./scripts/run-server.sh` local dev.
+// bare `quests-server` run in local dev.
 func LoadDotenv(root string) {
 	path := filepath.Join(root, ".env")
 	f, err := os.Open(path)

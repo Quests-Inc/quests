@@ -36,7 +36,7 @@ just bootstrap
 | Фронт (HMR) | `just run-frontend` | http://127.0.0.1:5173 (нужен запущенный API) |
 | Сборка SPA | `just build-frontend` | в `frontend/dist` |
 | Миграции | `just migrate` | `quests-server migrate` (нужен `QUESTS_DATABASE_URL`; локально — `just dev-db`) |
-| CLI | `./scripts/quests` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
+| CLI | `just quests …` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
 | Оверлей | `just run-overlay` | или `python -m overlay` |
 | Telegram | `just run-telegram` | HTTP-клиент к API |
 | STT (голос → текст) | `just run-stt` | сайдкар для бота, http://127.0.0.1:8766, нужен для голосовых сообщений |
@@ -53,7 +53,7 @@ python -m overlay status
 Тема / позиция HUD сохраняются в `data/overlay.json` (`style_pack`, `monitor_connector`, `margins`). Переключение стиля — в interactive-режиме (dropdown). Env `QUESTS_STYLE_PACK` перекрывает конфиг на старте.
 
 ```bash
-QUESTS_STYLE_PACK=cyberpunk ./scripts/run-overlay-smoke.sh
+QUESTS_STYLE_PACK=cyberpunk just run-overlay
 ```
 
 Layer-shell namespaces (для `niri msg layers` / `layer-rule`): `quests-overlay` (HUD), `quests-major`, `quests-minor`.

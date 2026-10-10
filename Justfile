@@ -24,11 +24,13 @@ dev-db:
 
 # --- build -----------------------------------------------------------------
 
+# API → go/bin/quests-server (QUESTS_SERVER_OUT overrides the path)
 build-server:
-    ./scripts/build-server.sh
+    cd go && go build -o "${QUESTS_SERVER_OUT:-bin/quests-server}" ./cmd/quests-server
 
+# CLI → go/bin/quests
 build-cli:
-    ./scripts/build-cli.sh
+    cd go && go build -o "${QUESTS_CLI_OUT:-bin/quests}" ./cmd/quests
 
 # Check runner (executes checks on the device) → go/bin/quests-runner
 build-runner:
@@ -44,24 +46,181 @@ build-frontend:
 
 # --- run -------------------------------------------------------------------
 
-run-server: dev-db
-    ./scripts/run-server.sh
+# The API on :8765 (local PostgreSQL via `just dev-db`, migrated first); needs a built SPA for the UI.
+run-server: dev-db build-server
+    ./go/bin/quests-server migrate
+    QUESTS_ROOT="${QUESTS_ROOT:-{{ justfile_directory() }}}" \
+    QUESTS_DATA_DIR="${QUESTS_DATA_DIR:-{{ justfile_directory() }}/data}" \
+    QUESTS_HOST="${QUESTS_HOST:-127.0.0.1}" \
+    QUESTS_PORT="${QUESTS_PORT:-8765}" \
+    ./go/bin/quests-server
 
+# Vite dev server with HMR on :5173 (proxies /api to a running API)
 run-frontend:
-    ./scripts/run-frontend.sh
+    cd frontend && npm run dev
 
 run-telegram:
-    ./scripts/run-telegram.sh
+    uv run quests-telegram
 
+# Speech-to-text sidecar for the bot on :8766
 run-stt:
-    ./scripts/run-stt.sh
+    uv run quests-stt
 
+# Wayland HUD (needs gtk4, gtk4-layer-shell, python-gobject; installs pywayland into overlay/_vendor once)
 run-overlay:
-    ./scripts/run-overlay-smoke.sh
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! pacman -Q gtk4-layer-shell &>/dev/null; then
+        echo "Missing gtk4-layer-shell. Install with: sudo pacman -S gtk4-layer-shell" >&2
+        exit 1
+    fi
+    vendor="{{ justfile_directory() }}/overlay/_vendor"
+    if [[ ! -d "$vendor/pywayland" ]]; then
+        mkdir -p "$vendor"
+        uv pip install --target "$vendor" pywayland >/dev/null 2>&1 || true
+    fi
+    export PYTHONPATH="${vendor}${PYTHONPATH:+:$PYTHONPATH}"
+    cd "{{ justfile_directory() }}"
+    exec python3 -m overlay
 
-# Local API in Docker; pass --rebuild after Go/Python/Dockerfile changes.
+# The CLI: `just quests list --json` (builds it first)
+quests *args: build-cli
+    ./go/bin/quests {{ args }}
+
+# Local API in Docker (container quests-api-dev on :8765 with its own PostgreSQL); --rebuild after Go/Dockerfile changes.
 dev-api *args:
-    ./scripts/dev-api-docker.sh {{ args }}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rebuild=0
+    for arg in {{ args }}; do
+        case "$arg" in
+            --rebuild|-b) rebuild=1 ;;
+            *) echo "usage: just dev-api [--rebuild]" >&2; exit 2 ;;
+        esac
+    done
+    compose=(docker compose -f deploy/docker/docker-compose.dev.yml)
+    # Free :8765 from a host binary / old container.
+    if command -v lsof >/dev/null 2>&1; then
+        pids="$(lsof -t -iTCP:8765 -sTCP:LISTEN 2>/dev/null || true)"
+        if [[ -n "$pids" ]]; then
+            echo "stopping host listeners on :8765: $pids" >&2
+            # shellcheck disable=SC2086
+            kill $pids 2>/dev/null || true
+            sleep 0.4
+        fi
+    fi
+    docker rm -f quests-api-dev >/dev/null 2>&1 || true
+    if [[ ! -d frontend/dist ]]; then
+        echo "frontend/dist missing — building SPA…" >&2
+        (cd frontend && npm run build)
+    fi
+    if [[ "$rebuild" -eq 1 ]]; then
+        "${compose[@]}" up -d --build --force-recreate api
+    else
+        # Use the existing image if present; build once otherwise.
+        docker image inspect quests-api:local >/dev/null 2>&1 || "${compose[@]}" build api
+        "${compose[@]}" up -d --force-recreate api
+    fi
+    echo -n "waiting for /api/ping" >&2
+    for _ in $(seq 1 40); do
+        if curl -fsS --noproxy '*' http://127.0.0.1:8765/api/ping >/dev/null 2>&1; then
+            echo " ok" >&2
+            curl -fsS --noproxy '*' http://127.0.0.1:8765/api/health | head -c 120
+            echo
+            exit 0
+        fi
+        echo -n . >&2
+        sleep 0.5
+    done
+    echo " timeout" >&2
+    "${compose[@]}" logs --tail 80 api >&2 || true
+    exit 1
+
+# Pull the prod database (+ icons) into the local dev PostgreSQL and ./data. Flags: --start, --pull-image.
+# Needs QUESTS_PROD_SSH=user@host, docker on both sides, and `just dev-db` running. REPLACES the dev database's contents.
+pull-prod-data *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    ROOT="{{ justfile_directory() }}"
+    DATA="${QUESTS_DATA_DIR:-$ROOT/data}"
+    SSH_HOST="${QUESTS_PROD_SSH:?set QUESTS_PROD_SSH, e.g. user@host}"
+    API_CONTAINER="${QUESTS_PROD_CONTAINER:-quests-api}"
+    PG_CONTAINER="${QUESTS_PROD_PG_CONTAINER:-quests-postgres}"
+    LOCAL_PG="${QUESTS_LOCAL_PG_CONTAINER:-quests-pg-dev}"
+    IMAGE="${QUESTS_API_IMAGE:-ghcr.io/valirum/quests-api:main}"
+
+    START=0
+    PULL_IMAGE=0
+    for arg in {{ args }}; do
+      case "$arg" in
+        --start) START=1 ;;
+        --pull-image) PULL_IMAGE=1 ;;
+        -h|--help)
+          cat <<DOC
+    usage: just pull-prod-data [--pull-image] [--start]
+
+      Dump the database of \`$PG_CONTAINER\` on \`$SSH_HOST\` into the local container \`$LOCAL_PG\`
+      (replacing its data) and copy /app/data of \`$API_CONTAINER\` into \`$DATA\`.
+
+    env:
+      QUESTS_PROD_SSH           required, e.g. user@host
+      QUESTS_PROD_CONTAINER     api container on prod, default: quests-api
+      QUESTS_PROD_PG_CONTAINER  postgres container on prod, default: quests-postgres
+      QUESTS_LOCAL_PG_CONTAINER local dev postgres, default: quests-pg-dev
+      QUESTS_DATA_DIR           default: <repo>/data
+      QUESTS_API_IMAGE          default: ghcr.io/valirum/quests-api:main
+    DOC
+          exit 0
+          ;;
+        *)
+          echo "unknown arg: $arg (try --help)" >&2
+          exit 2
+          ;;
+      esac
+    done
+
+    docker inspect "$LOCAL_PG" >/dev/null 2>&1 || { echo "local database container $LOCAL_PG is not running: just dev-db" >&2; exit 1; }
+    mkdir -p "$DATA"
+
+    echo "dumping $SSH_HOST:$PG_CONTAINER → $LOCAL_PG" >&2
+    docker exec "$LOCAL_PG" psql -U quests -d postgres -qc "DROP DATABASE IF EXISTS quests WITH (FORCE)" -c "CREATE DATABASE quests"
+    ssh -o BatchMode=yes "$SSH_HOST" "docker exec $PG_CONTAINER pg_dump -U quests --format=custom --no-owner quests" \
+      | docker exec -i "$LOCAL_PG" pg_restore -U quests -d quests --no-owner
+
+    notes="$(docker exec "$LOCAL_PG" psql -U quests -d quests -Atc 'SELECT COUNT(*) FROM note' 2>/dev/null || echo '?')"
+    quests="$(docker exec "$LOCAL_PG" psql -U quests -d quests -Atc 'SELECT COUNT(*) FROM quest' 2>/dev/null || echo '?')"
+    echo "ok: database restored (notes=$notes quests=$quests)" >&2
+
+    # Keep workstation overlay HUD config if present.
+    overlay_bak=""
+    if [[ -f "$DATA/overlay.json" ]]; then
+      overlay_bak="$(mktemp)"
+      cp -a "$DATA/overlay.json" "$overlay_bak"
+    fi
+    echo "pulling $SSH_HOST:$API_CONTAINER:/app/data → $DATA" >&2
+    ssh -o BatchMode=yes "$SSH_HOST" "docker exec $API_CONTAINER tar czf - -C /app/data ." | tar xzf - -C "$DATA"
+    if [[ -n "$overlay_bak" ]]; then
+      mv -f "$overlay_bak" "$DATA/overlay.json"
+    fi
+
+    if [[ "$PULL_IMAGE" -eq 1 ]]; then
+      echo "pulling $IMAGE → quests-api:local" >&2
+      if docker pull "$IMAGE"; then
+        docker tag "$IMAGE" quests-api:local
+      else
+        echo "ghcr pull failed — docker save|load from prod" >&2
+        ssh -o BatchMode=yes "$SSH_HOST" "docker save $IMAGE" | docker load
+        docker tag "$IMAGE" quests-api:local
+      fi
+    fi
+
+    if [[ "$START" -eq 1 ]]; then
+      exec just dev-api
+    fi
+
+    echo "next: just dev-api   # UI http://127.0.0.1:8765/" >&2
+
 
 # Apply schema migrations to QUESTS_DATABASE_URL; `just migrate current` prints the revision.
 migrate *args: build-server
@@ -83,7 +242,7 @@ lint-py:
     uv run ruff check .
 
 lint-sh:
-    shellcheck --severity=warning scripts/*.sh scripts/quests deploy/docker/*.sh deploy/monitoring/*.sh
+    shellcheck --severity=warning deploy/docker/*.sh deploy/monitoring/*.sh
 
 # Auto-fix what ruff/gofmt can fix.
 fix:

@@ -18,7 +18,7 @@ Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
 # Remote API (when server is not on this machine):
 # Environment=QUESTS_API=http://api-host:8765
 # Environment=QUESTS_WEB_URL=http://api-host:8765
-ExecStart=%h/Quests/scripts/run-overlay-smoke.sh
+ExecStart=/usr/bin/env just run-overlay
 Restart=on-failure
 RestartSec=3
 

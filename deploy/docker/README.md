@@ -1,6 +1,6 @@
 # Quests — Docker (сервер: api + bot + frontend)
 
-HUD в Docker нет — на рабочей станции: `./scripts/run-overlay-smoke.sh` и
+HUD в Docker нет — на рабочей станции: `just run-overlay` и
 `quests-overlay.service`.
 
 ## Сервисы
@@ -104,7 +104,7 @@ connection refused.
 
 ```bash
 export QUESTS_API=http://SERVER_IP:8765
-./scripts/run-overlay-smoke.sh
+just run-overlay
 # или: systemctl --user enable --now quests-overlay.service
 ```
 
