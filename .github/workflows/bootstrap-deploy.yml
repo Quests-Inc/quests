@@ -1,0 +1,35 @@
+name: Bootstrap deploy agent
+
+# Starts (or updates) doco-cd on the production host. This is the only workflow that runs on the server and
+# the only one that is not triggered by a push: by hand, behind the `production` environment's approval.
+# It exists for as long as nobody has a shell on that host; with shell access, run
+# deploy/doco-cd/bootstrap.sh there instead and delete the runner.
+#
+# !!! SECURITY — a self-hosted runner executes whatever this repository's workflows say. The rules:
+#   - this file is workflow_dispatch ONLY: never add push / pull_request / pull_request_target here;
+#   - no other workflow may use `runs-on: self-hosted`;
+#   - keep the repository private, and the `production` environment on required reviewers.
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start doco-cd
+        env:
+          DEPLOY_REPO_URL: https://github.com/${{ github.repository }}.git
+          DEPLOY_STATE: ${{ vars.DEPLOY_STATE_DIR || '/srv/quests-deploy' }}
+          DEPLOY_GIT_TOKEN: ${{ secrets.DEPLOY_GIT_TOKEN }}
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+          GHCR_USER: ${{ vars.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ vars.TG_CHAT_ID }}
+          DOCO_CD_VERSION: ${{ vars.DOCO_CD_VERSION }}
+        run: deploy/doco-cd/bootstrap.sh

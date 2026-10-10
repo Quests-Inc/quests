@@ -2,7 +2,7 @@
 """Create (or update) the Quests probes in Uptime Kuma. Idempotent: monitors are matched by name.
 
     pip install uptime-kuma-api          # one-off, anywhere that can reach Kuma
-    KUMA_PASSWORD=… python3 deploy/monitoring/kuma-monitors.py \\
+    KUMA_PASSWORD=… python3 deploy/prod/monitoring/kuma-monitors.py \\
         --url http://192.168.1.11:3001 --user admin [--public https://quests.example.org] [--webdav http://…]
 
 The admin account is created by hand in the Kuma UI on first start; the password is read

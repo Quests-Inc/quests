@@ -1,0 +1,137 @@
+name: Release
+
+# A release is explicit: someone publishes a GitHub Release (tag vMAJOR.MINOR.PATCH) from main.
+# Publishing builds and pushes the images with that version, and — for a final (not pre-)release — moves the
+# `prod` branch to it, which is what doco-cd on the server deploys. Nothing else reaches production.
+#
+#   gh release create v1.4.0 --target main --generate-notes        (or: just release 1.4.0)
+#   gh release create v1.5.0-rc.1 --target main --prerelease …      (images only, no deploy)
+#
+# Rollback / redeploy: run this workflow by hand (Actions → Release → Run workflow) with an earlier version:
+# the images already exist, only `prod` moves. The schema is never rolled back: a release is only
+# rollback-able while the data still fits it (docs/postgres.md).
+"on":
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release to deploy again, e.g. 1.3.2 (its images must already exist)
+        required: true
+
+# One release at a time; a second one waits instead of racing the first for `prod`.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+      deploy: ${{ steps.v.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          INPUT: ${{ inputs.version }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            version="${INPUT#v}"
+            build=false
+          else
+            version="${TAG#v}"
+            build=true
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$version' is not a SemVer version (MAJOR.MINOR.PATCH[-prerelease])"
+            exit 1
+          fi
+          deploy=true
+          if [[ "$version" == *-* ]] || [ "$PRERELEASE" = true ]; then deploy=false; fi
+          if [ "$EVENT" = release ]; then
+            # Only what is on main can be released.
+            git fetch -q origin main
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+              echo "::error::the release tag does not point at a commit of main"
+              exit 1
+            }
+          fi
+          {
+            echo "version=$version"
+            echo "build=$build"
+            echo "deploy=$deploy"
+          } >> "$GITHUB_OUTPUT"
+
+  checks:
+    needs: meta
+    if: needs.meta.outputs.build == 'true'
+    uses: ./.github/workflows/checks.yml
+
+  images:
+    needs: [meta, checks]
+    if: needs.meta.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image names
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "API_IMAGE=ghcr.io/${owner}/quests-api"
+            echo "BOT_IMAGE=ghcr.io/${owner}/quests-bot"
+            echo "STT_IMAGE=ghcr.io/${owner}/quests-stt"
+          } >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/bake-action@v6
+        env:
+          TAG: ${{ needs.meta.outputs.version }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        with:
+          source: .
+          files: deploy/docker/docker-bake.hcl
+          targets: api,bot,stt
+          push: true
+          set: |
+            *.cache-from=type=gha,scope=quests
+            *.cache-to=type=gha,mode=max,scope=quests
+
+  # The one step that touches production, and the one that waits for a person: the `production`
+  # environment (Settings → Environments) is set to require a reviewer, so a published release does not
+  # go live until someone approves this job.
+  deploy:
+    needs: [meta, images]
+    if: ${{ !cancelled() && needs.meta.outputs.deploy == 'true' && (needs.images.result == 'success' || needs.images.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write # pushes the `prod` branch
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # a redeploy publishes the configuration of that release too
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.meta.outputs.version) || github.sha }}
+      - name: Point prod at the release
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deploy/prod/publish.sh "$VERSION" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" prod

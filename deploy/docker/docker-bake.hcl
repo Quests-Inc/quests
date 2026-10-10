@@ -4,7 +4,7 @@
 #   docker buildx bake -f deploy/docker/docker-bake.hcl api
 #   docker buildx bake -f deploy/docker/docker-bake.hcl api bot stt
 #
-# CI sets API_IMAGE / BOT_IMAGE / STT_IMAGE / TAG via --set / bake-action vars.
+# CI sets API_IMAGE / BOT_IMAGE / STT_IMAGE / TAG / VERSION through the environment (release.yml).
 
 variable "API_IMAGE" {
   default = "quests-api"
@@ -18,15 +18,14 @@ variable "STT_IMAGE" {
   default = "quests-stt"
 }
 
+# The image tag: the release version in CI (1.4.0), "local" on a workstation.
 variable "TAG" {
   default = "local"
 }
 
-# CI pushes only :${TAG} and promotes :main after the tests pass (promote job
-# in .github/workflows/main.yml); locally :main stays part of the tags.
-variable "MAIN_TAG" {
-  type    = bool
-  default = true
+# The release, stamped into `quests-server version` and /api/health ("dev" outside a release).
+variable "VERSION" {
+  default = "dev"
 }
 
 target "_common" {
@@ -40,28 +39,20 @@ target "_common" {
 target "api" {
   inherits = ["_common"]
   target   = "api"
-  tags = compact([
-    MAIN_TAG ? "${API_IMAGE}:main" : "",
-    "${API_IMAGE}:${TAG}",
-  ])
+  args     = { VERSION = VERSION }
+  tags     = ["${API_IMAGE}:${TAG}"]
 }
 
 target "bot" {
   inherits = ["_common"]
   target   = "bot"
-  tags = compact([
-    MAIN_TAG ? "${BOT_IMAGE}:main" : "",
-    "${BOT_IMAGE}:${TAG}",
-  ])
+  tags     = ["${BOT_IMAGE}:${TAG}"]
 }
 
 target "stt" {
   inherits = ["_common"]
   target   = "stt"
-  tags = compact([
-    MAIN_TAG ? "${STT_IMAGE}:main" : "",
-    "${STT_IMAGE}:${TAG}",
-  ])
+  tags     = ["${STT_IMAGE}:${TAG}"]
 }
 
 group "default" {

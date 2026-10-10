@@ -1,12 +1,9 @@
-# Uptime Kuma overlay (quest=345): probes, uptime graph and alerts for the stack.
-# Opt-in: MONITORING=1 in .env makes ci-deploy.sh add this file (otherwise `--remove-orphans`
-# would delete the container on the next deploy).
-#
-#   docker compose --env-file .env -f deploy/docker/docker-compose.yml \
-#     -f deploy/docker/docker-compose.monitoring.yml up -d kuma
+# Monitoring stack (quest=345): Uptime Kuma (probes, uptime graph, alerts), Prometheus, Grafana and
+# exporters. Part of the production deployment: `.doco-cd.yml` lists this file next to docker-compose.yml
+# (remove it from `compose_files` there to switch monitoring off).
 #
 # First start: open http://<host>:${KUMA_PORT:-3001}, create the admin account, then
-# `deploy/monitoring/kuma-monitors.py` adds the probes (docs/monitoring.md).
+# `monitoring/kuma-monitors.py` adds the probes (docs/monitoring.md).
 
 services:
   kuma:
@@ -28,13 +25,13 @@ services:
 
   # --- metrics (quest=345): Prometheus scrapes the API's /metrics (bearer QUESTS_METRICS_TOKEN),
   # the host (node-exporter) and Postgres; Grafana draws them. Needs QUESTS_METRICS_TOKEN and
-  # GRAFANA_ADMIN_PASSWORD in .env; Prometheus and the exporters publish no ports.
+  # GRAFANA_ADMIN_PASSWORD in secrets.enc.env; Prometheus and the exporters publish no ports.
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: quests-prometheus
     restart: unless-stopped
     environment:
-      QUESTS_METRICS_TOKEN: ${QUESTS_METRICS_TOKEN:?set QUESTS_METRICS_TOKEN in .env}
+      QUESTS_METRICS_TOKEN: ${QUESTS_METRICS_TOKEN:?set QUESTS_METRICS_TOKEN in secrets.enc.env}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
@@ -42,7 +39,7 @@ services:
         exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml
         --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}
     volumes:
-      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
 
   blackbox-exporter:
@@ -51,7 +48,7 @@ services:
     restart: unless-stopped
     command: ["--config.file=/etc/blackbox/blackbox.yml"]
     volumes:
-      - ../monitoring/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+      - ./monitoring/blackbox.yml:/etc/blackbox/blackbox.yml:ro
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -77,15 +74,15 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in secrets.enc.env}
       # Public address when Grafana sits behind the gateway (redirects and links are built from it).
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     volumes:
-      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "${GRAFANA_PORT:-3002}:3000"

@@ -59,7 +59,10 @@ func PreMigrationBackup(ctx context.Context, url, dataDir, from, to string, keep
 	}
 	old, _ := filepath.Glob(filepath.Join(dir, "pre-migrate-*.dump"))
 	// the name ends with -YYYYMMDD-HHMMSS.dump; the revisions before it do not order by time
-	stamp := func(p string) string { b := strings.TrimSuffix(filepath.Base(p), ".dump"); return b[max(0, len(b)-15):] }
+	stamp := func(p string) string {
+		b := strings.TrimSuffix(filepath.Base(p), ".dump")
+		return b[max(0, len(b)-15):]
+	}
 	sort.Slice(old, func(i, j int) bool { return stamp(old[i]) < stamp(old[j]) })
 	for len(old) > keep {
 		_ = os.Remove(old[0])

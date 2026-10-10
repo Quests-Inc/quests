@@ -1,0 +1,27 @@
+# doco-cd deploy settings for the production stack. This file sits at the root of the `prod` branch
+# (the release workflow publishes deploy/prod/ there); doco-cd polls that branch (see ../doco-cd).
+name: quests
+
+compose_files:
+  - docker-compose.yml
+  - docker-compose.monitoring.yml # drop this line to switch monitoring off
+
+# version.env (written by the release) and config.env feed ${…} in the compose files;
+# secrets.enc.env is SOPS-encrypted and decrypted by doco-cd with the age key from the host.
+env_files:
+  - version.env
+  - config.env
+  - secrets.enc.env
+
+# bot + stt (Telegram bot and voice-to-text).
+profiles:
+  - bot
+
+# The images are versioned (immutable tags): nothing to re-pull.
+force_image_pull: false
+
+# Never remove containers this project did not define: the host may run other things next to it.
+remove_orphans: false
+
+# api waits for postgres/clamav health and migrates the schema on start, so give it room.
+timeout: 10m

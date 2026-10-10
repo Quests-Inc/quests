@@ -1,0 +1,50 @@
+name: CI
+
+# Quote "on": YAML 1.1 treats bare `on` as boolean true.
+"on":
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  # The production stack must at least render: a typo in deploy/prod shows up on the change, not on release day.
+  deploy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - run: just check-deploy
+
+  # The images are only built here (nothing is pushed): a broken Dockerfile shows up on the change that
+  # broke it, not on release day. Releases build and push them (release.yml).
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/bake-action@v6
+        env:
+          TAG: ci
+          VERSION: dev
+        with:
+          source: .
+          files: deploy/docker/docker-bake.hcl
+          targets: api,bot,stt
+          push: false
+          set: |
+            *.cache-from=type=gha,scope=quests
+            *.cache-to=type=gha,mode=max,scope=quests

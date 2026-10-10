@@ -75,3 +75,6 @@ go/bin/
 
 # Local manual backups (`just pull-prod-data`, ad-hoc tar snapshots)
 /backups/
+
+# Local, unencrypted secrets for a hand-started production stack (deploy/SERVER.md)
+deploy/prod/secrets.env

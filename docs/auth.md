@@ -40,8 +40,7 @@ quests-server passwd <username>  # сменить пароль
 В Docker:
 
 ```bash
-docker compose --env-file .env -f deploy/docker/docker-compose.yml \
-  exec api quests-server useradd <username>
+docker exec -it quests-api quests-server useradd <username>
 ```
 
 После создания первого аккаунта сервер нужно перезапустить.

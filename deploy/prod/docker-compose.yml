@@ -1,30 +1,21 @@
-# Quests — Docker Compose (server: api + bot + stt + frontend)
+# Quests — production stack (api + postgres + clamav + frontend; bot + stt under the `bot` profile).
 #
-#   cd /path/to/Quests
-#   cp .env.example .env   # POSTGRES_PASSWORD (required), TG_* ; QUESTS_*_IMAGE for GHCR
-#
-# Важно: -f deploy/docker/... сам по себе НЕ читает корневой .env для
-# подстановки ${QUESTS_API_IMAGE}. Всегда передавай --env-file:
-#
-#   docker compose --env-file .env -f deploy/docker/docker-compose.yml up -d --build
-#   docker compose --env-file .env -f deploy/docker/docker-compose.yml pull
-#
-# HUD: not in Docker — `just run-overlay` + quests-overlay.service
+# Deployed by doco-cd from the `prod` branch (see deploy/README.md): every release moves that branch to
+# a commit that pins QUESTS_VERSION in version.env, so what runs is always one explicit release.
+# Settings: config.env (plain), secrets.enc.env (SOPS-encrypted), version.env (written by the release).
+# Locally, for a look at it:  docker compose --env-file version.env --env-file config.env -f docker-compose.yml config
 
 name: quests
 
+
 services:
   api:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile
-      target: api
-    image: ${QUESTS_API_IMAGE:-quests-api:local}
+    image: ${QUESTS_IMAGE_REPO:-ghcr.io/valirum}/quests-api:${QUESTS_VERSION:?version.env is missing, deploy through a release}
     container_name: quests-api
     restart: unless-stopped
     env_file:
-      - path: ../../.env
-        required: false
+      - config.env
+      - secrets.enc.env
     environment:
       QUESTS_ROOT: /app
       QUESTS_DATA_DIR: /app/data
@@ -34,25 +25,18 @@ services:
       # Accounts: "auto" enforces auth as soon as an account exists. Create the
       # first one with:
       #   docker compose exec api quests-server useradd <username>
-      QUESTS_AUTH: ${QUESTS_AUTH:-auto}
-      # Bearer token for GET /metrics (Prometheus, docs/monitoring.md); empty = endpoint off.
-      QUESTS_METRICS_TOKEN: ${QUESTS_METRICS_TOKEN:-}
-      # Set to 1 when this instance is served over HTTPS (marks the session
-      # cookie Secure). Leave 0 for plain http, or the browser drops the cookie.
-      QUESTS_SECURE_COOKIES: ${QUESTS_SECURE_COOKIES:-0}
+      # The rest (QUESTS_AUTH, QUESTS_SECURE_COOKIES, QUESTS_METRICS_TOKEN, WebDAV, LLM keys…) comes
+      # from config.env and secrets.enc.env above.
       # Action-batch assistant (text -> Groq -> quest actions) is in-process
       # Go now — api itself needs Groq egress, hence extra_hosts below.
       # bridge network can't reach 127.0.0.1:12334 on the host directly —
       # host.docker.internal (via extra_hosts) is the bridge-safe way in.
       QUESTS_LLM_PROXY: ${QUESTS_LLM_PROXY:-http://host.docker.internal:12334}
-      # Attachments: bytes live on the already-running WebDAV, not in this
-      # compose. clamd is the sidecar below; uploads 503 until it is ready.
-      QUESTS_WEBDAV_URL: ${QUESTS_WEBDAV_URL:-}
-      QUESTS_WEBDAV_USER: ${QUESTS_WEBDAV_USER:-}
-      QUESTS_WEBDAV_PASS: ${QUESTS_WEBDAV_PASS:-}
+      # Attachments: bytes live on the already-running WebDAV (QUESTS_WEBDAV_* in the env files).
+      # clamd is the sidecar below; uploads 503 until it is ready.
       QUESTS_CLAMAV_ADDR: ${QUESTS_CLAMAV_ADDR:-clamav:3310}
-      # PostgreSQL below; the entrypoint migrates the schema before the server starts.
-      QUESTS_DATABASE_URL: postgresql://quests:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/quests
+      # PostgreSQL below; the server migrates the schema itself when it starts.
+      QUESTS_DATABASE_URL: postgresql://quests:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in secrets.enc.env}@postgres:5432/quests
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -80,7 +64,7 @@ services:
     environment:
       POSTGRES_USER: quests
       POSTGRES_DB: quests
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in secrets.enc.env}
     volumes:
       - quests-pg:/var/lib/postgresql/data
     # No published port: api reaches it on the compose network as postgres:5432.
@@ -108,22 +92,18 @@ services:
   # Loopback-only publish: nothing outside this host has business calling it.
   stt:
     # Optional personal-client stack (profile "bot"): not part of the multi-user platform, see docs/telegram-bot.md.
-    # Enable with COMPOSE_PROFILES=bot in .env (the prod host has it).
+    # Enabled by `profiles: [bot]` in .doco-cd.yml.
     profiles: ["bot"]
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile
-      target: stt
-    image: ${QUESTS_STT_IMAGE:-quests-stt:local}
+    image: ${QUESTS_IMAGE_REPO:-ghcr.io/valirum}/quests-stt:${QUESTS_VERSION:?version.env is missing, deploy through a release}
     container_name: quests-stt
     restart: unless-stopped
     env_file:
-      - path: ../../.env
-        required: false
+      - config.env
+      - secrets.enc.env
     environment:
       QUESTS_ROOT: /app
       QUESTS_DATA_DIR: /app/data
-      # QUESTS_WHISPER_* from env_file (.env): small|medium|large — app default small
+      # QUESTS_WHISPER_* from config.env: small|medium|large — app default small
     volumes:
       - quests-data:/app/data
     ports:
@@ -140,11 +120,7 @@ services:
   # host network: proxy on 127.0.0.1:12334 is reachable (bridge → host.docker.internal is not)
   bot:
     profiles: ["bot"]
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile
-      target: bot
-    image: ${QUESTS_BOT_IMAGE:-quests-bot:local}
+    image: ${QUESTS_IMAGE_REPO:-ghcr.io/valirum}/quests-bot:${QUESTS_VERSION:?version.env is missing, deploy through a release}
     container_name: quests-bot
     restart: unless-stopped
     network_mode: host
@@ -154,15 +130,15 @@ services:
       stt:
         condition: service_healthy
     env_file:
-      - path: ../../.env
-        required: false
+      - config.env
+      - secrets.enc.env
     environment:
       QUESTS_ROOT: /app
       QUESTS_DATA_DIR: /app/data
       QUESTS_API: http://127.0.0.1:${QUESTS_PUBLISH_PORT:-8765}
       QUESTS_STT: http://127.0.0.1:${QUESTS_STT_PORT:-8766}
       # Mint with: docker compose exec api quests-server token add telegram
-      QUESTS_API_TOKEN: ${QUESTS_API_TOKEN:-}
+      # (QUESTS_API_TOKEN, QUESTS_TG_TOKEN… come from secrets.enc.env)
       QUESTS_TG_PROXY: ${QUESTS_TG_PROXY:-http://127.0.0.1:12334}
     volumes:
       - quests-data:/app/data

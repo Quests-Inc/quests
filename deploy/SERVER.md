@@ -9,27 +9,18 @@ HUD остаётся на рабочей станции с Wayland и ходит
 
 ## Вариант A — Docker (рекомендуется на сервере)
 
+Прод ставится и обновляется через релизы и doco-cd: см. [`README.md`](README.md) (схема, первая установка, откат).
+Для разового поднятия **без** doco-cd (отладка) — образы и compose из каталога `prod/`:
+
 ```bash
-cd ~
-git clone <repo-url> Quests
-cd Quests
-cp .env.example .env
-$EDITOR .env   # QUESTS_TG_* ; прокси см. ниже
-
-# HTTP-прокси для Telegram на хосте :12334 (свой стек), затем:
-# либо локальная сборка:
-docker compose -f deploy/docker/docker-compose.yml up -d --build
-# либо образы из GHCR после CI (см. docker/README.md → CI / GHCR):
-# QUESTS_API_IMAGE=ghcr.io/<owner>/quests-api:main
-# QUESTS_BOT_IMAGE=ghcr.io/<owner>/quests-bot:main
-# docker compose -f deploy/docker/docker-compose.yml pull && \
-#   docker compose -f deploy/docker/docker-compose.yml up -d
-
-curl -sS http://127.0.0.1:8765/api/health
-# UI: http://SERVER_IP:8765  или  :8080 (nginx)
+cd deploy/prod
+cp secrets.example.env secrets.env && $EDITOR secrets.env   # POSTGRES_PASSWORD и др. (локально — без шифрования)
+echo "QUESTS_VERSION=1.4.0" > version.env
+docker compose --env-file version.env --env-file config.env --env-file secrets.env -f docker-compose.yml up -d
 ```
 
-Подробнее: [`docker/README.md`](docker/README.md) (CI → GHCR; на сервере pull вручную или Watchtower).
+(в `docker-compose.yml` секреты читаются из `secrets.enc.env`: для ручного запуска расшифруйте его
+(`sops decrypt`) или подложите свой файл с таким именем.)
 
 Дальше — firewall на `8765`/`8080`, на ПК HUD: `QUESTS_API=http://SERVER_IP:8765`.
 

@@ -1,0 +1,98 @@
+name: Checks
+
+# The checks every change and every release must pass; called by ci.yml (main, pull requests)
+# and release.yml (before images are built).
+"on":
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: extractions/setup-just@v3
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: gofmt + go vet
+        run: |
+          cd go
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.0
+          working-directory: go
+
+      - name: ruff + shellcheck
+        run: |
+          uv sync --locked --group dev
+          just lint-py lint-sh
+
+  test:
+    runs-on: ubuntu-latest
+    # Production runs on PostgreSQL: the db/migration tests need a real server.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quests
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: quests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quests"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Go build + test
+        working-directory: go
+        env:
+          QUESTS_TEST_PG_URL: postgresql://quests:test@127.0.0.1:5432/quests?sslmode=disable
+        run: |
+          go build ./...
+          go test ./...
+
+      - name: Sync + pytest
+        run: |
+          uv sync --locked --group dev --all-extras
+          uv run pytest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
