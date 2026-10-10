@@ -1,7 +1,7 @@
 import { exportedAtLabel } from './pdfExport.ts'
 
 /** Print colours of the status chip (the app's CSS variables mean nothing to the server). */
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   active: '#2f7d4f',
   frozen: '#2b6fb3',
   expired: '#b0701a',
@@ -16,8 +16,9 @@ const STATUS_COLORS = {
 
 /** @param {any} quest @param {QuestFormat} fmt */
 function metaChips(quest, fmt) {
-  /** @type {{ text: string, color?: string }[]} */
-  const chips = [{ text: String(quest.status || ''), color: STATUS_COLORS[quest.status] }]
+  const chips: { text: string; color?: string }[] = [
+    { text: String(quest.status || ''), color: STATUS_COLORS[quest.status] },
+  ]
   if (quest.significance && quest.significance !== 'common') chips.push({ text: fmt.significanceLabel(quest) })
   if (quest.category_label) chips.push({ text: String(quest.category_label) })
   const period = fmt.periodBadge(quest)

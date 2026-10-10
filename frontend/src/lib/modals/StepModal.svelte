@@ -1,6 +1,6 @@
 <script>
   import { updateQuestStep } from '../js/api.js'
-  import { checkPayload, questStepDraft } from '../js/steps.js'
+  import { checkPayload, questStepDraft } from '../js/steps.ts'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import StepAutoCheck from '../ui/StepAutoCheck.svelte'
   import ModalShell from './ModalShell.svelte'

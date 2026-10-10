@@ -1,5 +1,5 @@
 <script>
-  import { suggestions, completeToken } from '../js/searchFlags.js'
+  import { suggestions, completeToken } from '../js/searchFlags.ts'
 
   /** Chips under a search box while a `key:…` token is being typed, and a warning for an unknown value.
    * @type {{ value: string, spec: Record<string, any>, parsed: { unknown: string[] }, onPick: (next: string) => void }} */

@@ -3,7 +3,7 @@
   import Icon from '../ui/Icon.svelte'
   import { cancelRunnerJob, createRunner, deleteRunner, getRunnerJobs, getRunners } from '../js/api.js'
   import { copyText } from '../js/clipboard.ts'
-  import { parseApiDate } from '../js/time.js'
+  import { parseApiDate } from '../js/time.ts'
   import { toast } from '../js/toasts.svelte.js'
 
   /** Devices that run checks for us, and what they are doing: who is online,

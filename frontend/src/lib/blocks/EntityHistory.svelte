@@ -2,7 +2,7 @@
   import Icon from '../ui/Icon.svelte'
   import { getQuestLog } from '../js/api.js'
   import { KINDS, detailOf } from '../js/historyKinds.ts'
-  import { formatLocal } from '../js/time.js'
+  import { formatLocal } from '../js/time.ts'
 
   /** Collapsed timeline of one entity's change-log entries (plus what hangs off it).
    * `version` is any value that changes when the entity does, to refetch while open.

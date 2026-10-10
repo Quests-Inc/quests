@@ -4,7 +4,7 @@
   import RefText from '../ui/RefText.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { helpLine } from '../js/searchFlags.js'
+  import { helpLine } from '../js/searchFlags.ts'
   import {
     isQuestInactive,
     periodBadge,

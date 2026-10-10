@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte'
-  import { parseApiDate } from '../js/time.js'
+  import { parseApiDate } from '../js/time.ts'
   import { QUEST_STATUS_LABELS } from '../js/api.js'
   import { statusColor } from '../js/questFormat.ts'
   import Icon from '../ui/Icon.svelte'

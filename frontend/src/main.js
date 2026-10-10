@@ -2,7 +2,7 @@ import { mount } from 'svelte'
 
 import './app.css'
 import App from './App.svelte'
-import { applyTheme, loadSavedTheme } from './lib/js/theme.js'
+import { applyTheme, loadSavedTheme } from './lib/js/theme.ts'
 
 applyTheme(loadSavedTheme())
 

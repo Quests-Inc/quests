@@ -8,7 +8,7 @@
   import EntityHistory from './EntityHistory.svelte'
   import TemplateStreak from './TemplateStreak.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
-  import { formatLocal, localTimeZone } from '../js/time.js'
+  import { formatLocal, localTimeZone } from '../js/time.ts'
   import { parseRefs } from '../js/refs.ts'
   import {
     OPEN_STATUSES,

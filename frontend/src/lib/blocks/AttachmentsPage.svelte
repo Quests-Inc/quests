@@ -1,5 +1,5 @@
 <script>
-  import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '../js/searchFlags.js'
+  import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '../js/searchFlags.ts'
   import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'

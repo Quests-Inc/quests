@@ -1,7 +1,7 @@
 import { test } from 'bun:test'
 import assert from 'node:assert/strict'
 
-import { buildQuestPdfDocument } from '../src/lib/js/questPdfDocument.js'
+import { buildQuestPdfDocument } from '../src/lib/js/questPdfDocument.ts'
 
 test('a quest becomes meta, steps, attachments and dates blocks', () => {
   const doc = buildQuestPdfDocument(

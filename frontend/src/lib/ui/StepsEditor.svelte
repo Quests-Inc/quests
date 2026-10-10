@@ -2,7 +2,7 @@
   import Icon from './Icon.svelte'
   import MentionTextarea from './MentionTextarea.svelte'
   import StepAutoCheck from './StepAutoCheck.svelte'
-  import { mirrorQuestId, questStepDraft, templateStepDraft } from '../js/steps.js'
+  import { mirrorQuestId, questStepDraft, templateStepDraft } from '../js/steps.ts'
 
   /**
    * The one step-list editor (quest and template modals). Each step is a

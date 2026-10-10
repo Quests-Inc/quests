@@ -18,9 +18,9 @@
     localInputToUtcIso,
     localTimeZone,
     toLocalInputValue,
-  } from '../js/time.js'
+  } from '../js/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.ts'
-  import { questStepDraft, questStepsPayload } from '../js/steps.js'
+  import { questStepDraft, questStepsPayload } from '../js/steps.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import OptionPills from '../ui/OptionPills.svelte'

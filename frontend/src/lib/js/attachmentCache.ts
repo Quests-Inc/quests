@@ -13,9 +13,8 @@ function asIdList(rows) {
   return (rows || []).map((row) => row.id).join(',')
 }
 
-/** @type {Map<string, { items: any[], probed: boolean }>} */
-const cache = new Map()
-const liveListeners = new Set()
+const cache = new Map<string, { items: any[]; probed: boolean }>()
+const liveListeners = new Set<() => void>()
 
 function notifyLive() {
   for (const fn of liveListeners) fn()
@@ -35,8 +34,8 @@ function rowsFor(bucket, id) {
   return bucket[id] || bucket[String(id)] || []
 }
 
-function keepLiveFlags(prevItems, incoming) {
-  const prev = new Map((prevItems || []).map((row) => [row.id, row]))
+function keepLiveFlags(prevItems: any[] | undefined, incoming: any[] | undefined) {
+  const prev = new Map<number, any>((prevItems || []).map((row) => [row.id, row]))
   return (incoming || []).map((row) => {
     const old = prev.get(row.id)
     if (!old) return row
@@ -85,14 +84,13 @@ export function onAttachmentLiveInvalidate(fn) {
 }
 
 /** Flat list from GET /api/attachments grouped payload. */
-export function flattenAttachmentIndex(index) {
+export function flattenAttachmentIndex(index: any) {
   if (!index || typeof index !== 'object') return []
-  /** @type {any[]} */
-  const out = []
+  const out: any[] = []
   for (const type of ['quest', 'questline', 'note']) {
     const bucket = index[type]
     if (!bucket || typeof bucket !== 'object') continue
-    for (const rows of Object.values(bucket)) {
+    for (const rows of Object.values<any[]>(bucket)) {
       for (const a of rows || []) {
         out.push({
           ...a,

@@ -15,14 +15,14 @@
     uploadAttachmentRevision,
     attachmentDownloadUrl,
   } from '../js/api.js'
-  import { formatLocal } from '../js/time.js'
+  import { formatLocal } from '../js/time.ts'
   import { copyText } from '../js/clipboard.ts'
   import { toast } from '../js/toasts.svelte.js'
   import {
     peekAttachmentList,
     setAttachmentList,
     onAttachmentLiveInvalidate,
-  } from '../js/attachmentCache.js'
+  } from '../js/attachmentCache.ts'
 
   /** @type {{ ownerType: 'quest' | 'questline' | 'note', ownerId: number, onOpenOwner?: (kind: string, id: number) => void, label?: string, labelClass?: string }} */
   let { ownerType, ownerId, onOpenOwner, label = 'Вложения', labelClass = 'block__label' } = $props()

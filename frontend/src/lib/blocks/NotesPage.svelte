@@ -11,7 +11,7 @@
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.ts'
   import NoteCheck from '../ui/NoteCheck.svelte'
   import NoteFind from '../ui/NoteFind.svelte'
-  import { parseQuery, passes, helpLine } from '../js/searchFlags.js'
+  import { parseQuery, passes, helpLine } from '../js/searchFlags.ts'
   import FlagHints from '../ui/FlagHints.svelte'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
   import { copyText } from '../js/clipboard.ts'

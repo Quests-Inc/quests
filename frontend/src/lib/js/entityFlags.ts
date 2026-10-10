@@ -1,4 +1,4 @@
-import { parseQuery, passes } from './searchFlags.js'
+import { parseQuery, passes } from './searchFlags.ts'
 
 /** What pickers that search quests, notes and questlines together understand (map centre, «insert a link»).
  *  An item is { type: 'quest' | 'note' | 'questline', x: <the entity> }. */

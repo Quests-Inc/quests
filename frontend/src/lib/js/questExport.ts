@@ -1,7 +1,7 @@
 import { listAttachments } from './api.js'
 import { downloadPdf } from './pdfExport.ts'
 import { significanceLabel, periodBadge, quantifiedProgress } from './questFormat.ts'
-import { buildQuestPdfDocument } from './questPdfDocument.js'
+import { buildQuestPdfDocument } from './questPdfDocument.ts'
 
 /**
  * @param {{ id?: number | null, title?: string }} quest

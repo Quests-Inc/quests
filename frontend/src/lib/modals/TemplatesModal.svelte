@@ -13,9 +13,9 @@
     listTemplates,
     updateTemplate,
   } from '../js/api.js'
-  import { defaultLocalDeadlineParts, localTimeZone } from '../js/time.js'
+  import { defaultLocalDeadlineParts, localTimeZone } from '../js/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.ts'
-  import { templateStepDraft, templateStepsPayload } from '../js/steps.js'
+  import { templateStepDraft, templateStepsPayload } from '../js/steps.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import OptionPills from '../ui/OptionPills.svelte'

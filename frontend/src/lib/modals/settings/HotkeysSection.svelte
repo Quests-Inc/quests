@@ -1,5 +1,5 @@
 <script>
-  import { hotkeyGroups } from '../../js/hotkeys.js'
+  import { hotkeyGroups } from '../../js/hotkeys.ts'
   import SettingsBlock from './SettingsBlock.svelte'
 
   /** Registered keyboard actions, read when the section opens (the registry is not reactive). */

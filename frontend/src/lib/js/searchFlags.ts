@@ -109,7 +109,7 @@ export function completeToken(raw, key, value, neg) {
 }
 
 /** "key:a|b" help line for a title attribute. */
-export function helpLine(spec) {
+export function helpLine(spec: Record<string, { values?: { id: string }[]; hint?: string }>) {
   return Object.entries(spec)
     .map(([k, d]) => `${k}:${d.values ? d.values.map((v) => v.id).join('|') : d.hint || '…'}`)
     .join('  ')

@@ -59,8 +59,8 @@ export function partitionByQuestline(items, questlines) {
       alone.push(q)
     }
   }
-  const lineById = new Map(questlines.map((l) => [l.id, l]))
-  const lines = []
+  const lineById = new Map<number, any>(questlines.map((l: any) => [l.id, l]))
+  const lines: any[] = []
   for (const [id, quests] of byLine) {
     const meta = lineById.get(id)
     const sorted = [...quests].sort((a, b) => {

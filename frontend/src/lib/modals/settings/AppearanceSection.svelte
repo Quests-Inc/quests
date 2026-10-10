@@ -1,5 +1,5 @@
 <script>
-  import { THEMES, applyTheme, currentThemeId } from '../../js/theme.js'
+  import { THEMES, applyTheme, currentThemeId } from '../../js/theme.ts'
   import Icon from '../../ui/Icon.svelte'
   import SettingsBlock from './SettingsBlock.svelte'
 
