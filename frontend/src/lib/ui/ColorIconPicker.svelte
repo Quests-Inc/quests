@@ -1,5 +1,5 @@
 <script>
-  import { QUESTLINE_COLORS, QUESTLINE_ICONS } from '../js/api.js'
+  import { QUESTLINE_COLORS, QUESTLINE_ICONS } from '../js/api.ts'
   import Icon from './Icon.svelte'
   import QuestlineIcon from './QuestlineIcon.svelte'
 

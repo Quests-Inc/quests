@@ -14,7 +14,7 @@
     uploadAttachment,
     uploadAttachmentRevision,
     attachmentDownloadUrl,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import { formatLocal } from '../js/time.ts'
   import { copyText } from '../js/clipboard.ts'
   import { toast } from '../js/toasts.svelte.ts'

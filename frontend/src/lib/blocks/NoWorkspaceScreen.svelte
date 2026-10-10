@@ -1,6 +1,6 @@
 <script>
   // Signed in but a member of no workspace (e.g. removed from the last one).
-  import { createWorkspace, switchWorkspace, logout } from '../js/api.js'
+  import { createWorkspace, switchWorkspace, logout } from '../js/api.ts'
 
   let name = $state('')
   let busy = $state(false)

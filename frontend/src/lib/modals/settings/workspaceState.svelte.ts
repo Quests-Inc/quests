@@ -8,7 +8,7 @@ import {
   renameWorkspace,
   deleteWorkspace,
   importWorkspace,
-} from '../../js/api.js'
+} from '../../js/api.ts'
 
 /** Workspaces of the signed-in account, shared by the settings sections.
  * Switching / creating / deleting reloads the page: every list in the app belongs to one workspace. */

@@ -1,6 +1,6 @@
 <script>
   import Icon from '../ui/Icon.svelte'
-  import { getQuestLog } from '../js/api.js'
+  import { getQuestLog } from '../js/api.ts'
   import { KINDS, detailOf } from '../js/historyKinds.ts'
   import { formatLocal } from '../js/time.ts'
 

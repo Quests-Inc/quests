@@ -6,7 +6,7 @@
     listCategories,
     updateQuestline,
     uploadQuestlineIcon,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import Picker from '../ui/Picker.svelte'

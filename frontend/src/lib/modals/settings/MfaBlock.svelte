@@ -1,6 +1,6 @@
 <script>
   import SettingsBlock from './SettingsBlock.svelte'
-  import { getMyMfa, setupMyMfa, enableMyMfa, disableMyMfa, regenerateRecoveryCodes } from '../../js/api.js'
+  import { getMyMfa, setupMyMfa, enableMyMfa, disableMyMfa, regenerateRecoveryCodes } from '../../js/api.ts'
 
   /** @type {any} */
   let st = $state(null)

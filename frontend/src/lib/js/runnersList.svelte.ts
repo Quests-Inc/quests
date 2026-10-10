@@ -1,4 +1,4 @@
-import { getRunners } from './api.js'
+import { getRunners } from './api.ts'
 
 /** Runners (devices that execute checks) for pickers. One shared list, refreshed
  * at most every 20 s however many forms ask for it. */

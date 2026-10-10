@@ -1,5 +1,5 @@
 <script>
-  import { getTemplateStreak } from '../js/api.js'
+  import { getTemplateStreak } from '../js/api.ts'
 
   /** Streak row for a quest emitted by a template; renders nothing until the
    * template has closed periods. `status` refetches when the quest closes.

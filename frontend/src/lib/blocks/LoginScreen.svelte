@@ -1,7 +1,7 @@
 <script>
   // Sign-in gate. Rendered instead of the journal whenever the instance
   // requires accounts and no valid session cookie is present.
-  import { login, loginMfa } from '../js/api.js'
+  import { login, loginMfa } from '../js/api.ts'
 
   /** @type {{ onAuthenticated: (username: string) => void }} */
   let { onAuthenticated } = $props()

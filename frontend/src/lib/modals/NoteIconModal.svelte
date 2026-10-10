@@ -1,5 +1,5 @@
 <script>
-  import { clearNoteIcon, updateNote, uploadNoteIcon } from '../js/api.js'
+  import { clearNoteIcon, updateNote, uploadNoteIcon } from '../js/api.ts'
   import ColorIconPicker from '../ui/ColorIconPicker.svelte'
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'

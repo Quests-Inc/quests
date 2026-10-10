@@ -24,7 +24,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     fetchAuthState,
     logout as apiLogout,
     setUnauthorizedHandler,
-  } from './lib/js/api.js'
+  } from './lib/js/api.ts'
   import { subscribeQuestEvents } from './lib/js/live.ts'
   import { seedAttachmentIndex, invalidateAttachmentLiveFlags, flattenAttachmentIndex } from './lib/js/attachmentCache.ts'
   import { applyTheme, loadSavedTheme } from './lib/js/theme.ts'

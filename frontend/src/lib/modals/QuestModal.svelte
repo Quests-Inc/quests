@@ -12,7 +12,7 @@
     listCategories,
     listQuestlines,
     listTags,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import {
     defaultLocalDeadlineParts,
     localInputToUtcIso,

@@ -3,7 +3,7 @@
   import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
   import DateInput from '../ui/DateInput.svelte'
-  import { getQuestLog, listTags } from '../js/api.js'
+  import { getQuestLog, listTags } from '../js/api.ts'
   import { parseApiDate } from '../js/time.ts'
   import { KINDS, detailOf } from '../js/historyKinds.ts'
 

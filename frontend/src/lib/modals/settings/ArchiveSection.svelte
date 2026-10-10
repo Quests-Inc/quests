@@ -1,7 +1,7 @@
 <script>
   import SettingsBlock from './SettingsBlock.svelte'
   import Toggle from '../../ui/Toggle.svelte'
-  import { workspaceExportUrl } from '../../js/api.js'
+  import { workspaceExportUrl } from '../../js/api.ts'
   import { wsx, doImport } from './workspaceState.svelte.ts'
 
   let exportSecrets = $state(false)

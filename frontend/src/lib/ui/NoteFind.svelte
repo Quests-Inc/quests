@@ -1,5 +1,5 @@
 <script>
-  import { searchInNote } from '../js/api.js'
+  import { searchInNote } from '../js/api.ts'
 
   /** Search inside the open note with the notes search's rules (word forms, prefix, other layout…):
    * the server says which words matched, this marks them in the rendered text and steps through them.

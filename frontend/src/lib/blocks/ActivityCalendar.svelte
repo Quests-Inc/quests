@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte'
   import { parseApiDate } from '../js/time.ts'
-  import { QUEST_STATUS_LABELS } from '../js/api.js'
+  import { QUEST_STATUS_LABELS } from '../js/api.ts'
   import { statusColor } from '../js/questFormat.ts'
   import Icon from '../ui/Icon.svelte'
   import DateInput from '../ui/DateInput.svelte'

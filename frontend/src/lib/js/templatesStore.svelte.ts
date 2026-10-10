@@ -1,4 +1,4 @@
-import { listTemplates } from './api.js'
+import { listTemplates } from './api.ts'
 
 /**
  * Quest templates, loaded once and shared: `@` autocomplete and ref labels need

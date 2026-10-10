@@ -1,5 +1,5 @@
 <script>
-  import { listTags, createTag, updateTag, deleteTag } from '../js/api.js'
+  import { listTags, createTag, updateTag, deleteTag } from '../js/api.ts'
   import Icon from '../ui/Icon.svelte'
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'

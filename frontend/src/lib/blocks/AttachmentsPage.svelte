@@ -15,7 +15,7 @@
     setAttachmentHidden,
     updateAttachmentComment,
     uploadAttachmentRevision,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import { copyText } from '../js/clipboard.ts'
   import { toast } from '../js/toasts.svelte.ts'
 

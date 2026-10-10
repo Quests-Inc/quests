@@ -17,7 +17,7 @@ export class UnauthorizedError extends Error {
   }
 }
 
-async function request(path, options = {}) {
+async function request(path: string, options: RequestInit = {}) {
   const res = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
     ...options,
@@ -58,7 +58,7 @@ async function request(path, options = {}) {
   return data
 }
 
-export function listQuests(params = {}) {
+export function listQuests(params: { status?: string; pinned?: boolean | null } = {}) {
   const q = new URLSearchParams()
   if (params.status) q.set('status', params.status)
   if (params.pinned != null) q.set('pinned', String(params.pinned))
@@ -114,7 +114,7 @@ export function deleteQuest(id, { quiet = true } = {}) {
   return request(`/api/quests/${id}${quietQs(quiet)}`, { method: 'DELETE' })
 }
 
-export function listTemplates(params = {}) {
+export function listTemplates(params: { enabled?: boolean | null } = {}) {
   const q = new URLSearchParams()
   if (params.enabled != null) q.set('enabled', String(params.enabled))
   const qs = q.toString()
@@ -561,13 +561,13 @@ export function switchWorkspace(id) {
 
 // --- attachments (bytes live on WebDAV; we only ever talk to the API proxy) ---
 
-function ownerAttachmentsPath(ownerType, ownerId, attachmentId) {
+function ownerAttachmentsPath(ownerType: string, ownerId: number, attachmentId?: number | null) {
   const seg = ownerType === 'questline' ? 'questlines' : ownerType === 'note' ? 'notes' : 'quests'
   const base = `/api/${seg}/${ownerId}/attachments`
   return attachmentId == null ? base : `${base}/${attachmentId}`
 }
 
-export function listAttachments(ownerType, ownerId, { stat = true } = {}) {
+export function listAttachments(ownerType: string, ownerId: number, { stat = true } = {}) {
   const path = ownerAttachmentsPath(ownerType, ownerId)
   return request(stat ? path : `${path}?stat=0`)
 }
@@ -800,7 +800,7 @@ export function deleteRunner(label) {
 }
 
 /** @param {{ label?: string, state?: string, limit?: number }} [f] */
-export function getRunnerJobs(f = {}) {
+export function getRunnerJobs(f: { label?: string; state?: string; limit?: number } = {}) {
   const qs = new URLSearchParams()
   if (f.label) qs.set('label', f.label)
   if (f.state) qs.set('state', f.state)

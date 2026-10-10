@@ -1,4 +1,4 @@
-import { QUEST_SIGNIFICANCES } from './api.js'
+import { QUEST_SIGNIFICANCES } from './api.ts'
 import { formatRemaining, remainingFromDeadline, timerTone } from './time.ts'
 
 export const OPEN_STATUSES = new Set(['active', 'expired'])

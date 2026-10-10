@@ -27,7 +27,7 @@
     putGraphDraftOp,
     putGraphDraftRoots,
     uploadGraphDraftFile,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import { toast } from '../js/toasts.svelte.ts'
   import { applyDraft, describeOp } from '../js/graphDraft.js'
   import { layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown } from '../js/graphLayout.js'

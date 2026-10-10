@@ -12,7 +12,7 @@
     listTags,
     listTemplates,
     updateTemplate,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import { defaultLocalDeadlineParts, localTimeZone } from '../js/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.ts'
   import { templateStepDraft, templateStepsPayload } from '../js/steps.ts'

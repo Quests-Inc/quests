@@ -1,7 +1,7 @@
 <script>
   import HelpTip from './HelpTip.svelte'
   import Icon from './Icon.svelte'
-  import { getNote, setNoteCheck, runNoteCheck } from '../js/api.js'
+  import { getNote, setNoteCheck, runNoteCheck } from '../js/api.ts'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
 
   /** A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer

@@ -2,7 +2,7 @@
   // Opened from an invitation link (?invite=…). Joins the workspace with the
   // current account, or signs up a new account through the link.
   import { onMount } from 'svelte'
-  import { fetchInvite, acceptInvite } from '../js/api.js'
+  import { fetchInvite, acceptInvite } from '../js/api.ts'
   import LoginScreen from './LoginScreen.svelte'
 
   /** @type {{ token: string }} */

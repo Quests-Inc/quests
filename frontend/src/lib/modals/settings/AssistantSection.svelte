@@ -1,6 +1,6 @@
 <script>
   import SettingsBlock from './SettingsBlock.svelte'
-  import { getMyLLM, saveMyLLM, deleteMyLLM, testMyLLM } from '../../js/api.js'
+  import { getMyLLM, saveMyLLM, deleteMyLLM, testMyLLM } from '../../js/api.ts'
 
   /** @type {any} */
   let info = $state(null)

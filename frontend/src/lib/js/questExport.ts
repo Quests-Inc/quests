@@ -1,4 +1,4 @@
-import { listAttachments } from './api.js'
+import { listAttachments } from './api.ts'
 import { downloadPdf } from './pdfExport.ts'
 import { significanceLabel, periodBadge, quantifiedProgress } from './questFormat.ts'
 import { buildQuestPdfDocument } from './questPdfDocument.ts'

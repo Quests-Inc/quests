@@ -7,7 +7,7 @@
     updateNote,
     searchNotes,
     setNoteOutdated,
-  } from '../js/api.js'
+  } from '../js/api.ts'
   import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.ts'
   import NoteCheck from '../ui/NoteCheck.svelte'
   import NoteFind from '../ui/NoteFind.svelte'

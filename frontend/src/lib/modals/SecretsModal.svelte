@@ -1,5 +1,5 @@
 <script>
-  import { SECRET_OWNER_KINDS, listSecrets, setSecret, deleteSecret } from '../js/api.js'
+  import { SECRET_OWNER_KINDS, listSecrets, setSecret, deleteSecret } from '../js/api.ts'
   import { parseRefs } from '../js/refs.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'

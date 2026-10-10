@@ -1,5 +1,5 @@
 <script>
-  import { previewActionBatch, applyActionBatch } from '../js/api.js'
+  import { previewActionBatch, applyActionBatch } from '../js/api.ts'
   import { buildPreviewTree } from '../js/actionsPreview.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
