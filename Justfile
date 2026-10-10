@@ -16,7 +16,6 @@ bootstrap: dev-db
     cd frontend && npm install
     mkdir -p data
     just build-cli build-server
-    ./go/bin/quests-server migrate
 
 # Local PostgreSQL in Docker (127.0.0.1:55433, quests/quests); data survives restarts in a volume.
 dev-db:
@@ -46,9 +45,8 @@ build-frontend:
 
 # --- run -------------------------------------------------------------------
 
-# The API on :8765 (local PostgreSQL via `just dev-db`, migrated first); needs a built SPA for the UI.
+# The API on :8765 (local PostgreSQL via `just dev-db`; the server migrates it on start); needs a built SPA for the UI.
 run-server: dev-db build-server
-    ./go/bin/quests-server migrate
     QUESTS_ROOT="${QUESTS_ROOT:-{{ justfile_directory() }}}" \
     QUESTS_DATA_DIR="${QUESTS_DATA_DIR:-{{ justfile_directory() }}/data}" \
     QUESTS_HOST="${QUESTS_HOST:-127.0.0.1}" \
@@ -222,9 +220,9 @@ pull-prod-data *args:
     echo "next: just dev-api   # UI http://127.0.0.1:8765/" >&2
 
 
-# Apply schema migrations to QUESTS_DATABASE_URL; `just migrate current` prints the revision.
-migrate *args: build-server
-    ./go/bin/quests-server migrate {{ args }}
+# Schema revision of QUESTS_DATABASE_URL vs. what this build expects (the server migrates itself on start).
+schema: build-server
+    ./go/bin/quests-server schema
 
 # --- quality ---------------------------------------------------------------
 

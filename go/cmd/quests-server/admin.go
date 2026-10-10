@@ -47,8 +47,8 @@ const adminUsage = `quests-server admin commands (run on the host with access to
   quests-server runner rm <label>        revoke a runner and cancel its queued jobs
   quests-server backup-now               run one DB+attachments backup tick now
   quests-server backups                  list the backups (newest first: file, size, where it went, errors)
-  quests-server migrate [current]        bring the database (QUESTS_DATABASE_URL) to the schema this binary expects;
-                                         "current" only prints the revision
+  quests-server schema                   print the database's schema revision and the one this binary expects
+                                         (the server migrates the schema itself when it starts)
 
 Passwords are never taken from argv or env, so they stay out of shell history.
 `
@@ -60,8 +60,8 @@ func runAdmin(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "migrate":
-		runMigrate(args[1:])
+	case "schema":
+		runSchema()
 		return true
 	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "backup-now", "backups", "workspace":
 	case "help", "-h", "--help":
@@ -551,38 +551,20 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 	}
 }
 
-// runMigrate applies the embedded migrations (the API itself never migrates: it
-// refuses to start on an older schema, see db.OpenPostgres).
-func runMigrate(args []string) {
+// runSchema prints where the database is and where this binary wants it.
+func runSchema() {
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
 	dbURL, err := cfg.RequireDatabaseURL()
 	if err != nil {
-		fatal("migrate: %v", err)
-	}
-	if len(args) > 0 && args[0] == "current" {
-		v, err := db.CurrentRevision(dbURL)
-		if err != nil {
-			fatal("migrate: %v", err)
-		}
-		if v == "" {
-			v = "(none)"
-		}
-		fmt.Println(v)
-		return
-	}
-	if len(args) > 0 {
-		fatal("usage: quests-server migrate [current]")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	logf := func(format string, a ...any) { fmt.Printf(format+"\n", a...) }
-	if _, err := db.MigratePostgres(ctx, dbURL, logf); err != nil {
-		fatal("migrate: %v", err)
+		fatal("schema: %v", err)
 	}
 	v, err := db.CurrentRevision(dbURL)
 	if err != nil {
-		fatal("migrate: %v", err)
+		fatal("schema: %v", err)
 	}
-	fmt.Println("revision:", v)
+	if v == "" {
+		v = "(none)"
+	}
+	fmt.Printf("database: %s\nexpected: %s\n", v, db.ExpectedRevision())
 }

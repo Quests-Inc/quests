@@ -301,3 +301,41 @@ func TestAttachmentsArchiveName(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+func TestPreMigrationBackupWritesAndPrunes(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "pg_dump"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	orig := dumpDatabase
+	dumpDatabase = func(_ context.Context, _, out string) error { return os.WriteFile(out, []byte("dump"), 0o600) }
+	t.Cleanup(func() { dumpDatabase = orig })
+
+	dataDir := t.TempDir()
+	dir := filepath.Join(dataDir, backupSubdir)
+	_ = os.MkdirAll(dir, 0o755)
+	for _, old := range []string{"20250101-000000", "20250102-000000", "20250103-000000"} {
+		_ = os.WriteFile(filepath.Join(dir, "pre-migrate-a-to-b-"+old+".dump"), []byte("x"), 0o600)
+	}
+	path, err := PreMigrationBackup(context.Background(), "postgresql://x", dataDir, "0010", "0012", 2, t.Logf)
+	if err != nil || !strings.Contains(filepath.Base(path), "pre-migrate-0010-to-0012-") {
+		t.Fatalf("path=%q err=%v", path, err)
+	}
+	left, _ := filepath.Glob(filepath.Join(dir, "pre-migrate-*.dump"))
+	if len(left) != 2 {
+		t.Fatalf("want the newest 2 kept, got %v", left)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the new dump was pruned: %v", err)
+	}
+}
+
+func TestPreMigrationBackupSkipsWithoutPgDump(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	warned := false
+	path, err := PreMigrationBackup(context.Background(), "postgresql://x", t.TempDir(), "a", "b", 5, func(string, ...any) { warned = true })
+	if err != nil || path != "" || !warned {
+		t.Fatalf("path=%q err=%v warned=%v", path, err, warned)
+	}
+}

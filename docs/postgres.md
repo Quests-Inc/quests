@@ -1,12 +1,14 @@
 # PostgreSQL
 
 Quests runs on PostgreSQL: `QUESTS_DATABASE_URL` (`postgresql://user:pw@host:port/db`) is required.
-`quests-server migrate` (run by the api image's entrypoint before the server starts) brings the schema up to
-date; `quests-server` itself refuses to start on an older one.
+`quests-server` migrates the schema itself before it serves anything (starting the bare binary is enough); there is no
+separate migration step in the entrypoint or in CI. If the database already has data and migrations are pending, it first
+writes a `pg_dump` to `<data>/backups/pre-migrate-<from>-to-<to>-<time>.dump` (the newest 5 are kept; a start on a host
+without `pg_dump` skips this with a warning, a `pg_dump` that fails stops the start).
 
 ## Schema migrations
 
-Migrations are plain SQL files embedded in the binary and applied by `quests-server migrate`
+Migrations are plain SQL files embedded in the binary and applied by the server at start
 (`go/internal/db/migrate.go`): `go/internal/db/sql/pg/NNNN_*.sql`, each in its own transaction under an advisory lock.
 
 The applied revision is kept in `alembic_version` (same table and format Alembic used), so databases
@@ -14,8 +16,9 @@ migrated by Alembic continue from where they are. Files `0001`–`0011` carry th
 (`NNNN_<12 hex>_<name>.sql`); new ones are `NNNN_<name>.sql` and their revision is just `NNNN`.
 
 **Adding a migration:** create `go/internal/db/sql/pg/NNNN_<name>.sql` with the next number (PG only, no
-Python wrapper, no list to update — the head is derived from the files). The API refuses to start on an older
-schema and warns on a newer one; run `quests-server migrate current` to see the revision.
+Python wrapper, no list to update — the head is derived from the files). Several servers starting at once queue on an
+advisory lock. A database newer than the binary (a rollback) is left alone with a warning; `quests-server schema` prints the
+revision. Roll back only to a release whose schema the data still fits: add columns first, drop them a release later.
 
 The table is still called `alembic_version` (and files `0001`–`0011` carry Alembic ids) because the production
 database was created by Alembic; the Alembic chain itself has been removed from the repository (see git history).
@@ -28,7 +31,7 @@ boolean-ish columns are `INTEGER` 0/1, timestamps are naive-UTC `TIMESTAMP`, `VA
 
 ```bash
 just dev-db                 # PostgreSQL in Docker: 127.0.0.1:55433, quests/quests (the Justfile exports the URL)
-just migrate                # quests-server migrate
+just run-server             # migrates on start; `just schema` shows the revision
 just run-server
 ```
 

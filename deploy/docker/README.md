@@ -7,7 +7,7 @@ HUD в Docker нет — на рабочей станции: `just run-overlay` 
 
 | Сервис | Порт | Описание |
 |--------|------|----------|
-| `api` | `8765` | Go API + собранный SPA + миграции при старте (`quests-server migrate`) |
+| `api` | `8765` | Go API + собранный SPA + миграции схемы сам при старте |
 | `bot` | host net | Telegram-бот → `127.0.0.1:8765`, прокси `127.0.0.1:12334` |
 | `frontend` | `8080` | nginx → проксирует всё на `api` |
 | `clamav` | internal `3310` | clamd sidecar; сигнатуры в volume `clamav-sigs` |

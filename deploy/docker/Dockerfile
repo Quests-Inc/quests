@@ -42,7 +42,9 @@ GO
 go build -trimpath -o /dev/null ./_prime || echo "deps prime skipped"
 PRIME
 COPY go/ ./
-RUN go build -trimpath -ldflags="-s -w" -o /out/quests-server ./cmd/quests-server \
+# VERSION is the release (1.2.3), stamped into `quests-server version` and /api/health.
+ARG VERSION=dev
+RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/quests-server ./cmd/quests-server \
  && go build -trimpath -ldflags="-s -w" -o /out/quests ./cmd/quests
 
 # --- Python (migrations + bot tooling) ---
@@ -67,7 +69,7 @@ COPY src ./src
 # Core only (dotenv/tzdata) for the bot and STT images below.
 RUN uv sync --locked --no-dev
 
-# --- API runtime: Go server + SPA. Migrations are embedded (`quests-server migrate`), PDF export is
+# --- API runtime: Go server + SPA. The server migrates its own schema (embedded migrations), PDF export is
 # in-process Go (go/internal/pdfdoc), and the server executes no user commands: check/emit commands run
 # on runners (quests-runner), so there is no Python or other interpreter here. The only things it starts
 # are pg_dump (backups) and the operator's event hooks (`sh -c`, data/hooks.json). ---
@@ -85,8 +87,6 @@ RUN apt-get update \
 COPY --from=go-build /out/quests-server /usr/local/bin/quests-server
 COPY --from=go-build /out/quests /usr/local/bin/quests
 COPY --from=frontend /src/frontend/dist /app/frontend/dist
-COPY deploy/docker/entrypoint-api.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 # `quests` (the Go CLI) is on PATH for the operator's hook scripts.
 WORKDIR /app
 ENV QUESTS_HOST=0.0.0.0 \
@@ -94,8 +94,9 @@ ENV QUESTS_HOST=0.0.0.0 \
     QUESTS_ROOT=/app \
     QUESTS_DATA_DIR=/app/data
 EXPOSE 8765
+RUN mkdir -p /app/data
 VOLUME ["/app/data"]
-ENTRYPOINT ["/entrypoint.sh"]
+# The server migrates the schema itself before it starts serving.
 CMD ["quests-server"]
 
 # --- Telegram bot: aiogram only — STT lives in its own image/container ---

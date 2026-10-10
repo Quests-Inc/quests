@@ -35,7 +35,7 @@ just bootstrap
 | Сборка API | `just build-server` | → `go/bin/quests-server` |
 | Фронт (HMR) | `just run-frontend` | http://127.0.0.1:5173 (нужен запущенный API) |
 | Сборка SPA | `just build-frontend` | в `frontend/dist` |
-| Миграции | `just migrate` | `quests-server migrate` (нужен `QUESTS_DATABASE_URL`; локально — `just dev-db`) |
+| Схема БД | `just schema` | сервер сам мигрирует схему при старте; `quests-server schema` показывает ревизию (нужен `QUESTS_DATABASE_URL`; локально — `just dev-db`) |
 | CLI | `just quests …` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
 | Оверлей | `just run-overlay` | или `python -m overlay` |
 | Telegram | `just run-telegram` | HTTP-клиент к API |
@@ -79,7 +79,7 @@ quests-server token add overlay    # bearer-токен для HUD / бота / C
 Наружу инстанс без аккаунтов не поднимется — сервер откажется биндиться не на
 loopback. Подробности: [`docs/auth.md`](docs/auth.md).
 
-База — PostgreSQL (`QUESTS_DATABASE_URL`); локально `just dev-db` поднимает её в Docker, схему накатывает `quests-server migrate` (см. [`docs/postgres.md`](docs/postgres.md)).
+База — PostgreSQL (`QUESTS_DATABASE_URL`); локально `just dev-db` поднимает её в Docker, схему накатывает сам сервер при старте (см. [`docs/postgres.md`](docs/postgres.md)).
 
 User systemd units: [`deploy/systemd/`](deploy/systemd/).  
 Деплой на сервер после клона: [`deploy/SERVER.md`](deploy/SERVER.md).  

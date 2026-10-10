@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -156,5 +157,72 @@ func TestMigratePostgresRollsBackBrokenMigration(t *testing.T) {
 	_ = raw.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'half_done'`).Scan(&n)
 	if n != 0 || versionOf(t, dbURL) != expectedAlembic {
 		t.Fatalf("a failed migration left traces: tables=%d version=%s", n, versionOf(t, dbURL))
+	}
+}
+
+func TestMigrateBeforeApplyRunsOnlyForExistingDatabases(t *testing.T) {
+	// fresh database: nothing to protect, the hook is not called
+	fresh := freshDatabase(t)
+	called := false
+	if _, err := MigratePostgresOpts(context.Background(), fresh, MigrateOptions{BeforeApply: func(context.Context, string, []Migration) error {
+		called = true
+		return nil
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("BeforeApply must not run on a fresh database")
+	}
+
+	// a database stopped at revision 3: the hook sees where it is and what is coming
+	dbURL := freshDatabase(t)
+	raw, err := sql.Open("pgx", dbURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	for _, m := range pgMigrations[:3] {
+		if _, err := raw.Exec(m.SQL); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, q := range []string{versionTable, `INSERT INTO alembic_version VALUES ('` + pgMigrations[2].Revision + `')`} {
+		if _, err := raw.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var from string
+	var got int
+	hook := func(_ context.Context, f string, todo []Migration) error {
+		from, got = f, len(todo)
+		return nil
+	}
+	if _, err := MigratePostgresOpts(context.Background(), dbURL, MigrateOptions{BeforeApply: hook}); err != nil {
+		t.Fatal(err)
+	}
+	if from != pgMigrations[2].Revision || got != len(pgMigrations)-3 {
+		t.Fatalf("hook saw from=%q todo=%d", from, got)
+	}
+
+	// a failing hook stops the migration with nothing applied
+	stuck := freshDatabase(t)
+	raw2, _ := sql.Open("pgx", stuck)
+	defer raw2.Close()
+	if _, err := raw2.Exec(pgMigrations[0].SQL); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{versionTable, `INSERT INTO alembic_version VALUES ('` + pgMigrations[0].Revision + `')`} {
+		if _, err := raw2.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	applied, err := MigratePostgresOpts(context.Background(), stuck, MigrateOptions{BeforeApply: func(context.Context, string, []Migration) error {
+		return errors.New("no backup, no migration")
+	}})
+	if err == nil || len(applied) != 0 {
+		t.Fatalf("a failing hook must stop the migration: applied=%v err=%v", applied, err)
+	}
+	if v := versionOf(t, stuck); v != pgMigrations[0].Revision {
+		t.Fatalf("revision moved to %q", v)
 	}
 }

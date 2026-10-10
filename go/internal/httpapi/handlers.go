@@ -26,6 +26,8 @@ import (
 )
 
 type Server struct {
+	// Version is the release this server was built from ("dev" locally); shown in /api/health.
+	Version string
 	// Metrics serves /metrics (nil = not built in); MetricsToken guards it (empty = disabled).
 	Metrics      *metrics.Metrics
 	MetricsToken string
@@ -215,7 +217,7 @@ func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":              overall,
-		"api":                 map[string]string{"status": "ok"},
+		"api":                 map[string]string{"status": "ok", "version": s.Version},
 		"components":          comps,
 		"stale_after_seconds": health.StaleAfter,
 	})

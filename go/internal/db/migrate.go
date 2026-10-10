@@ -106,10 +106,27 @@ const versionTable = `CREATE TABLE IF NOT EXISTS alembic_version (
 	CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 )`
 
-// MigratePostgres brings the database at url to the head of the embedded chain and
-// returns the revisions it applied. It logs through logf (may be nil). Run as the
-// database owner: the migrations create roles, policies and grants.
+// MigrateOptions tunes MigratePostgresOpts.
+type MigrateOptions struct {
+	// Logf receives progress lines (nil: silent).
+	Logf func(string, ...any)
+	// BeforeApply runs under the migration lock when an existing database (one already at some
+	// revision) is about to get todo applied: the place for a safety backup. An error stops the
+	// migration with nothing applied. It is not called for a fresh database.
+	BeforeApply func(ctx context.Context, from string, todo []Migration) error
+}
+
+// MigratePostgres is MigratePostgresOpts with only a logger.
 func MigratePostgres(ctx context.Context, url string, logf func(string, ...any)) ([]string, error) {
+	return MigratePostgresOpts(ctx, url, MigrateOptions{Logf: logf})
+}
+
+// MigratePostgresOpts brings the database at url to the head of the embedded chain and
+// returns the revisions it applied. Run as the database owner: the migrations create
+// roles, policies and grants. Concurrent callers (several replicas starting together)
+// queue on an advisory lock; the later ones find nothing left to do.
+func MigratePostgresOpts(ctx context.Context, url string, opts MigrateOptions) ([]string, error) {
+	logf := opts.Logf
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
@@ -151,6 +168,11 @@ func MigratePostgres(ctx context.Context, url string, logf func(string, ...any))
 	if !known {
 		logf("database revision %s is newer than this binary (head %s): nothing to apply", version, expectedAlembic)
 		return nil, nil
+	}
+	if len(todo) > 0 && version != "" && opts.BeforeApply != nil {
+		if err := opts.BeforeApply(ctx, version, todo); err != nil {
+			return nil, fmt.Errorf("before applying %04d %s: %w", todo[0].Seq, todo[0].Name, err)
+		}
 	}
 	var applied []string
 	for _, m := range todo {

@@ -24,7 +24,15 @@ import (
 	"github.com/valirum/quests/go/internal/webdav"
 )
 
+// version is the release this binary was built from (set with -ldflags "-X main.version=1.2.3");
+// "dev" for a local build.
+var version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "version" || os.Args[1] == "--version") {
+		fmt.Println(version)
+		return
+	}
 	if runAdmin(os.Args[1:]) {
 		return
 	}
@@ -35,6 +43,26 @@ func main() {
 	dbURL, err := cfg.RequireDatabaseURL()
 	if err != nil {
 		log.Fatalf("db: %v", err)
+	}
+	// The schema is brought up to date here, before anything serves: starting the bare binary is
+	// enough. An existing database is dumped first when there is something to apply.
+	migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), 10*time.Minute)
+	applied, err := db.MigratePostgresOpts(migrateCtx, dbURL, db.MigrateOptions{
+		Logf: log.Printf,
+		BeforeApply: func(ctx context.Context, from string, todo []db.Migration) error {
+			path, err := schedule.PreMigrationBackup(ctx, dbURL, cfg.DataDir, from, todo[len(todo)-1].Revision, 5, log.Printf)
+			if path != "" {
+				log.Printf("db: pre-migration backup %s", path)
+			}
+			return err
+		},
+	})
+	cancelMigrate()
+	if err != nil {
+		log.Fatalf("db: migrate: %v", err)
+	}
+	if len(applied) > 0 {
+		log.Printf("db: schema migrated to %s", applied[len(applied)-1])
 	}
 	sqlDB, schema, err := db.OpenPostgres(dbURL)
 	if err != nil {
@@ -98,6 +126,7 @@ func main() {
 	reg := health.New()
 	reg.SetProbe("db", schema.State, schema.Detail)
 	srv := &httpapi.Server{
+		Version:       version,
 		Store:         st,
 		Auth:          authStore,
 		AuthRequired:  authRequired,

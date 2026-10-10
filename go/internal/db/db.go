@@ -41,10 +41,10 @@ func assertMigrated(db *sql.DB, expected string) (SchemaStatus, error) {
 	var ver string
 	err := db.QueryRow(`SELECT version_num FROM alembic_version LIMIT 1`).Scan(&ver)
 	if err == sql.ErrNoRows {
-		return SchemaStatus{}, fmt.Errorf("the database has no alembic_version; run: quests-server migrate")
+		return SchemaStatus{}, fmt.Errorf("the database has no alembic_version: start the server, it migrates the schema itself")
 	}
 	if err != nil {
-		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (run: quests-server migrate)", err)
+		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (start the server: it migrates the schema itself)", err)
 	}
 	return checkAlembicVersionAgainst(ver, expected, alembicOrder)
 }
@@ -67,7 +67,7 @@ func checkAlembicVersionAgainst(ver, expected string, order []string) (SchemaSta
 		return st, nil
 	}
 	if dbIdx < expIdx {
-		return SchemaStatus{}, fmt.Errorf("alembic_version=%s older than required %s; run: quests-server migrate", ver, expected)
+		return SchemaStatus{}, fmt.Errorf("alembic_version=%s older than required %s: start the server, it migrates the schema itself", ver, expected)
 	}
 	if dbIdx > expIdx {
 		st.State = "warn"
