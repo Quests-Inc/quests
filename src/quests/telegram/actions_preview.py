@@ -8,7 +8,13 @@ from html import escape
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from quests.models import SIGNIFICANCE_LABEL_RU
+SIGNIFICANCE_LABEL_RU: dict[str, str] = {
+    "insignificant": "незначительное",
+    "common": "обычное",
+    "uncommon": "необычное",
+    "epic": "эпическое",
+    "legendary": "легендарное",
+}
 
 _ACTION_RU = {
     "create_questline": "создать квестлайн",

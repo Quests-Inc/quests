@@ -9,20 +9,6 @@ ROOT = Path(_ROOT_ENV) if _ROOT_ENV else Path(__file__).resolve().parents[2]
 
 _DATA_ENV = (os.environ.get("QUESTS_DATA_DIR") or "").strip()
 DATA_DIR = Path(_DATA_ENV) if _DATA_ENV else ROOT / "data"
-DB_PATH = DATA_DIR / "quests.db"
-# QUESTS_DATABASE_URL (postgresql://user:pw@host:port/db) switches the whole stack
-# to PostgreSQL; unset keeps the local SQLite file.
-_PG_URL = (os.environ.get("QUESTS_DATABASE_URL") or "").strip()
-if _PG_URL.startswith("postgres://"):
-    _PG_URL = "postgresql://" + _PG_URL[len("postgres://") :]
-IS_POSTGRES = bool(_PG_URL)
-DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
-# Sync URL for Alembic (and any sync tooling).
-DATABASE_URL_SYNC = (
-    _PG_URL.replace("postgresql://", "postgresql+psycopg://", 1)
-    if IS_POSTGRES
-    else f"sqlite:///{DB_PATH}"
-)
 
 # Bind address. Use 0.0.0.0 (or a LAN IP) when the API must accept remote HUD/bot/web.
 HOST = (os.environ.get("QUESTS_HOST") or "127.0.0.1").strip() or "127.0.0.1"

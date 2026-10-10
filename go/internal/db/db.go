@@ -15,7 +15,7 @@ import (
 // The PostgreSQL schema chain is embedded (sql/pg, applied by MigratePostgres);
 // its head is expectedAlembic and needs no manual bump. The version table keeps
 // Alembic's name and format so the archived Alembic chain and this binary read the
-// same database (the Python side is frozen, see alembic/README.md).
+// same database (a leftover of the Alembic era, kept so existing databases carry on).
 //
 // The SQLite chain is frozen at expectedAlembicSQLite; a fresh file gets sql/sqlite.
 const expectedAlembicSQLite = "1a2b3c4d5e6f"

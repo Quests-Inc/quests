@@ -21,8 +21,8 @@ migrated by Alembic continue from where they are. Files `0001`–`0011` carry th
 Python wrapper, no list to update — the head is derived from the files). The API refuses to start on an older
 schema and warns on a newer one; run `quests-server migrate current` to see the revision.
 
-The Alembic chain (`alembic/`) is an archive of the history up to `0011` and is no longer run;
-`go test ./internal/db` checks that the embedded copy stays identical to it.
+The table is still called `alembic_version` (and files `0001`–`0011` carry Alembic ids) because the production
+database was created by Alembic; the Alembic chain itself has been removed from the repository (see git history).
 
 Baseline conventions (kept so the Go store works unchanged on both):
 boolean-ish columns are `INTEGER` 0/1, timestamps are naive-UTC `TIMESTAMP`, `VARCHAR(n)` is `TEXT`
@@ -41,21 +41,6 @@ Go tests that need a real PG (`go/internal/db`, applies the baseline into a thro
 ```bash
 QUESTS_TEST_PG_URL=postgresql://quests@127.0.0.1:5432/quests go test ./go/internal/db
 ```
-
-## Cutover from the SQLite prod
-
-1. Add `POSTGRES_PASSWORD` to `.env`; start only the DB:
-   `docker compose --env-file .env -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.pg.yml up -d postgres`
-2. Stop the API (`stop api bot`) so SQLite is quiescent.
-3. Migrate PG (to head, workspaces included) and copy the data into workspace 1 (from a host with the volume and uv; `QUESTS_DATABASE_URL` points at the new DB):
-   ```bash
-   quests-server migrate
-   uv run python scripts/sqlite_to_pg.py path/to/quests.db "$QUESTS_DATABASE_URL"
-   ```
-   The script refuses a non-empty target, compares row counts per table and rolls back on any mismatch.
-4. Start the stack with the overlay (`up -d`). The API logs the backend; `/api/health` shows the backup probe.
-5. Keep `quests.db` and its latest `backups/*.db` as the rollback: drop the overlay and start as before
-   (anything written after the cutover is not in SQLite).
 
 ## Backups
 

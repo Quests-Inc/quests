@@ -53,7 +53,7 @@
 
 <SettingsBlock
   title="Сервисы"
-  hint="API отвечает сам; HUD и бот шлют heartbeat. WebDAV и ClamAV сервер опрашивает сам раз в 15 с. БД — сверка alembic при старте."
+  hint="API отвечает сам; HUD и бот шлют heartbeat. WebDAV и ClamAV сервер опрашивает сам раз в 15 с. БД — сверка версии схемы при старте."
 >
   <ul class="svc-list">
     {#each rows as r (r.name)}
