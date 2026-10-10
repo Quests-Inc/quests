@@ -36,10 +36,8 @@ just release 1.4.0        # проверит, что CI на main зелёный
 | `DEPLOY_REPO_TOKEN` | secret | Release workflow открывает PR в `quests-deploy` | *Settings → Developer settings → Fine-grained tokens*: владелец ресурса — организация `Quests-Inc` (организация должна разрешать fine-grained токены), репозиторий только `quests-deploy`, права *Contents: Read and write* + *Pull requests: Read and write* |
 | `DEPLOY_REPO` | variable | если репозиторий деплоя называется иначе | по умолчанию `Quests-Inc/quests-deploy` |
 
-Для одноразового *Bootstrap deploy agent* (запускает doco-cd на сервере через временный self-hosted раннер этого
-репозитория) нужны ещё `DEPLOY_GIT_TOKEN`, `GHCR_PULL_TOKEN`, `GHCR_USER` и по желанию `LEGACY_ENV*`, `SOPS_AGE_KEY`, `TG_*`: их
-описание и способ получения — в README репозитория `quests-deploy`. Как только на сервере появится shell, bootstrap запускается
-руками (`doco-cd/bootstrap.sh` оттуда), а раннер и эти секреты здесь можно удалить.
+Первый запуск doco-cd на сервере делается руками (`doco-cd/bootstrap.sh` из репозитория `quests-deploy`, см. его README);
+в этом репозитории для деплоя нужен только `DEPLOY_REPO_TOKEN`.
 
 ## Прокси для бота и ассистента
 

@@ -74,6 +74,7 @@ RUN uv sync --locked --no-dev
 # on runners (quests-runner), so there is no Python or other interpreter here. The only things it starts
 # are pg_dump (backups) and the operator's event hooks (`sh -c`, data/hooks.json). ---
 FROM debian:bookworm-slim AS api
+LABEL org.opencontainers.image.source="https://github.com/Quests-Inc/quests"
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*
@@ -101,6 +102,7 @@ CMD ["quests-server"]
 
 # --- Telegram bot: aiogram only — STT lives in its own image/container ---
 FROM python-base AS bot
+LABEL org.opencontainers.image.source="https://github.com/Quests-Inc/quests"
 RUN uv sync --locked --no-dev --extra bot
 COPY deploy/docker/entrypoint-bot.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -112,6 +114,7 @@ CMD ["quests-telegram"]
 # so it only rebuilds/redownloads when STT itself changes, not on every
 # aiogram bump. Bot talks to it over HTTP (quests.telegram.sttclient). ---
 FROM python-base AS stt
+LABEL org.opencontainers.image.source="https://github.com/Quests-Inc/quests"
 RUN uv sync --locked --no-dev --extra stt
 COPY deploy/docker/entrypoint-stt.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
