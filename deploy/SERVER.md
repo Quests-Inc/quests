@@ -39,9 +39,9 @@ ln -sfn ~/Documents/projects/Quests ~/Quests
 # uv: https://docs.astral.sh/uv/  (миграции, Telegram, MCP)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Node.js / npm (сборка SPA)
-# Arch: sudo pacman -S nodejs npm
-# Debian/Ubuntu: sudo apt install nodejs npm
+# Bun (сборка SPA)
+# Arch: sudo pacman -S bun
+# Debian/Ubuntu: curl -fsSL https://bun.sh/install | bash
 ```
 
 Для бота нужен исходящий доступ к Telegram **через HTTP-прокси**
@@ -61,7 +61,7 @@ just bootstrap
 just build-frontend
 ```
 
-`just bootstrap`: `uv sync`, Go CLI/API build, `npm install`, `data/`, миграции DB.  
+`just bootstrap`: `uv sync`, Go CLI/API build, `bun install`, `data/`, миграции DB.  
 `just build-frontend`: `frontend/dist` — отдаёт Go API на `:8765`.
 
 ---

@@ -13,7 +13,7 @@ default:
 # Python deps (all extras), frontend deps, data dir, local PostgreSQL, Go binaries, migrations.
 bootstrap: dev-db
     uv sync --group dev --all-extras
-    cd frontend && npm install
+    cd frontend && bun install --frozen-lockfile
     mkdir -p data
     just build-cli build-server
 
@@ -41,7 +41,7 @@ build-runner:
 
 # SPA → frontend/dist (served by the API)
 build-frontend:
-    cd frontend && npm run build
+    cd frontend && bun run build
 
 # --- run -------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ run-server: dev-db build-server
 
 # Vite dev server with HMR on :5173 (proxies /api to a running API)
 run-frontend:
-    cd frontend && npm run dev
+    cd frontend && bun run dev
 
 run-telegram:
     uv run quests-telegram
@@ -110,7 +110,7 @@ dev-api *args:
     docker rm -f quests-api-dev >/dev/null 2>&1 || true
     if [[ ! -d frontend/dist ]]; then
         echo "frontend/dist missing — building SPA…" >&2
-        (cd frontend && npm run build)
+        (cd frontend && bun run build)
     fi
     if [[ "$rebuild" -eq 1 ]]; then
         "${compose[@]}" up -d --build --force-recreate api
@@ -290,4 +290,4 @@ test-py:
     uv run --all-extras --group dev pytest
 
 test-frontend:
-    cd frontend && npm ci && npm test && npm run build
+    cd frontend && bun install --frozen-lockfile && bun run verify

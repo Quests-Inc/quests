@@ -1,4 +1,4 @@
-import test from 'node:test'
+import { test } from 'bun:test'
 import assert from 'node:assert/strict'
 
 class FakeEl {
@@ -8,12 +8,16 @@ class FakeEl {
     this.isContentEditable = false
     this.blurred = false
   }
-  getAttribute(n) { return this.attrs[n] ?? null }
+  getAttribute(n) {
+    return this.attrs[n] ?? null
+  }
   closest(sel) {
     if (sel.startsWith('[data-nav]')) return this.attrs.navRow ? this : null
     return this.attrs.activatable && sel.includes('button') ? this : null
   }
-  blur() { this.blurred = true }
+  blur() {
+    this.blurred = true
+  }
 }
 globalThis.HTMLElement = FakeEl
 let overlay = false
@@ -23,15 +27,38 @@ globalThis.window = { addEventListener() {}, removeEventListener() {} }
 const { handleKeydown, registerHotkeys, hotkeyGroups } = await import('../src/lib/js/hotkeys.js')
 
 function press(code, { target = new FakeEl(), ...mods } = {}) {
-  const ev = { code, target, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, isComposing: false, defaultPrevented: false, ...mods }
-  ev.preventDefault = () => { ev.defaultPrevented = true }
+  const ev = {
+    code,
+    target,
+    shiftKey: false,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    isComposing: false,
+    defaultPrevented: false,
+    ...mods,
+  }
+  ev.preventDefault = () => {
+    ev.defaultPrevented = true
+  }
   handleKeydown(ev)
   return ev
 }
 
 test('a plain key runs its action and is swallowed', () => {
   let n = 0
-  const off = registerHotkeys([{ id: 't1', group: 'g', label: 'l', keys: 'N', codes: ['KeyN'], run: () => { n++ } }])
+  const off = registerHotkeys([
+    {
+      id: 't1',
+      group: 'g',
+      label: 'l',
+      keys: 'N',
+      codes: ['KeyN'],
+      run: () => {
+        n++
+      },
+    },
+  ])
   assert.equal(press('KeyN').defaultPrevented, true)
   assert.equal(n, 1)
   off()
@@ -41,7 +68,18 @@ test('a plain key runs its action and is swallowed', () => {
 
 test('silent while typing, with modifiers and over a modal', () => {
   let n = 0
-  const off = registerHotkeys([{ id: 't2', group: 'g', label: 'l', keys: 'N', codes: ['KeyN'], run: () => { n++ } }])
+  const off = registerHotkeys([
+    {
+      id: 't2',
+      group: 'g',
+      label: 'l',
+      keys: 'N',
+      codes: ['KeyN'],
+      run: () => {
+        n++
+      },
+    },
+  ])
   press('KeyN', { target: new FakeEl('INPUT', { type: 'text' }) })
   press('KeyN', { target: new FakeEl('TEXTAREA') })
   press('KeyN', { ctrlKey: true })
@@ -68,10 +106,31 @@ test('Esc in a field leaves it, unless a modal is open', () => {
 })
 
 test('Shift must match; "any" accepts both', () => {
-  let strict = 0, loose = 0
+  let strict = 0,
+    loose = 0
   const off = registerHotkeys([
-    { id: 't3', group: 'g', label: 'l', keys: '?', codes: ['Slash'], shift: true, run: () => { strict++ } },
-    { id: 't4', group: 'g', label: 'l', keys: '+', codes: ['Equal'], shift: 'any', run: () => { loose++ } },
+    {
+      id: 't3',
+      group: 'g',
+      label: 'l',
+      keys: '?',
+      codes: ['Slash'],
+      shift: true,
+      run: () => {
+        strict++
+      },
+    },
+    {
+      id: 't4',
+      group: 'g',
+      label: 'l',
+      keys: '+',
+      codes: ['Equal'],
+      shift: 'any',
+      run: () => {
+        loose++
+      },
+    },
   ])
   press('Slash')
   press('Slash', { shiftKey: true })
@@ -83,7 +142,18 @@ test('Shift must match; "any" accepts both', () => {
 
 test('Space on a focused button presses the button, not the hotkey', () => {
   let n = 0
-  const off = registerHotkeys([{ id: 't5', group: 'g', label: 'l', keys: 'Space', codes: ['Space'], run: () => { n++ } }])
+  const off = registerHotkeys([
+    {
+      id: 't5',
+      group: 'g',
+      label: 'l',
+      keys: 'Space',
+      codes: ['Space'],
+      run: () => {
+        n++
+      },
+    },
+  ])
   press('Space', { target: new FakeEl('BUTTON', { activatable: true }) })
   assert.equal(n, 0)
   press('Space')
@@ -95,11 +165,21 @@ test('Space on a focused button presses the button, not the hotkey', () => {
 })
 
 test('when() gates, and run() === false lets the key fall through', () => {
-  let on = false, second = 0
+  let on = false,
+    second = 0
   const off = registerHotkeys([
     { id: 't6', group: 'g', label: 'a', keys: 'J', codes: ['KeyJ'], when: () => on, run: () => {} },
     { id: 't7', group: 'g', label: 'b', keys: 'J', codes: ['KeyJ'], run: () => false },
-    { id: 't8', group: 'g', label: 'c', keys: 'J', codes: ['KeyJ'], run: () => { second++ } },
+    {
+      id: 't8',
+      group: 'g',
+      label: 'c',
+      keys: 'J',
+      codes: ['KeyJ'],
+      run: () => {
+        second++
+      },
+    },
   ])
   const ev = press('KeyJ')
   assert.equal(second, 1, 'falls past the disabled and the declining action')
@@ -119,7 +199,13 @@ test('help groups follow the registry', () => {
     { id: 'h2', group: 'Группа А', label: 'два', keys: '2', codes: ['Digit2'], run: () => {} },
   ])
   const g = hotkeyGroups().find((x) => x.title === 'Группа А')
-  assert.deepEqual(g.items.map((i) => i.label), ['один', 'два'])
+  assert.deepEqual(
+    g.items.map((i) => i.label),
+    ['один', 'два']
+  )
   off()
-  assert.equal(hotkeyGroups().some((x) => x.title === 'Группа А'), false)
+  assert.equal(
+    hotkeyGroups().some((x) => x.title === 'Группа А'),
+    false
+  )
 })

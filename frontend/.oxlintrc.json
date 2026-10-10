@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "import"],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "env": { "builtin": true, "browser": true },
+  "ignorePatterns": ["dist", "node_modules", "public"],
+  "rules": {
+    "eqeqeq": ["warn", "always", { "null": "ignore" }],
+    "no-debugger": "error",
+    "no-eval": "error",
+    "no-var": "error",
+    "radix": "error",
+    "no-duplicate-imports": "error",
+    "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
+    "no-unused-expressions": "off",
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
+    "no-unassigned-import": "off"
+  }
+}

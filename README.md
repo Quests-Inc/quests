@@ -9,7 +9,7 @@
 - Go ≥ 1.26 (сборка API/CLI)
 - Docker (локальный PostgreSQL: `just dev-db`)
 - Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (миграции, MCP, Telegram)
-- Node.js / npm (фронт)
+- Bun (фронт)
 - Для оверлея: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
 
 ```bash
@@ -25,7 +25,7 @@ just bootstrap
 
 Нужен [`just`](https://just.systems). Список всех рецептов (сборка, запуск, `just check` = линтеры + тесты) — просто `just`.
 
-Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `npm install` во `frontend/`, создаст `data/` и накатит миграции.
+Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `bun install` во `frontend/`, создаст `data/` и накатит миграции.
 
 ## Запуск
 

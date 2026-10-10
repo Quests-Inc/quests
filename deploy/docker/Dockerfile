@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # --- Frontend (Vite / Svelte) ---
-FROM node:22-bookworm-slim AS frontend
+FROM oven/bun:1.4.2-debian AS frontend
 WORKDIR /src/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+COPY frontend/package.json frontend/bun.lock ./
+RUN bun install --frozen-lockfile
 COPY frontend/ ./
-RUN npm run build
+RUN bun run build
 
 # --- Go API (+ CLI) ---
 FROM golang:1.26-bookworm AS go-build

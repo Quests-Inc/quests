@@ -1,5 +1,6 @@
-import test from 'node:test'
+import { test } from 'bun:test'
 import assert from 'node:assert/strict'
+
 import { scrollRoom, swipeDir } from '../src/lib/js/tabSwipe.js'
 
 test('swipeDir: clear horizontal swipes only', () => {

@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "trailingComma": "es5",
+  "semi": false,
+  "jsxSingleQuote": false,
+  "singleQuote": true,
+  "useTabs": false,
+  "tabWidth": 2,
+  "experimentalSortImports": {
+    "order": "asc",
+    "ignoreCase": true,
+    "newlinesBetween": true,
+    "partitionByComment": true,
+    "sortSideEffects": false,
+  },
+}
