@@ -21,14 +21,6 @@ jobs:
   checks:
     uses: ./.github/workflows/checks.yml
 
-  # The production stack must at least render: a typo in deploy/prod shows up on the change, not on release day.
-  deploy-config:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
-      - run: just check-deploy
-
   # The images are only built here (nothing is pushed): a broken Dockerfile shows up on the change that
   # broke it, not on release day. Releases build and push them (release.yml).
   images:

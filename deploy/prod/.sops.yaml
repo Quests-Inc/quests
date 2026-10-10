@@ -1,5 +1,0 @@
-# SOPS rules for the production secrets. Put the PUBLIC age key here (`just secrets-init` does it);
-# the private key lives on the deploy host for doco-cd and in your own safe place.
-creation_rules:
-  - path_regex: secrets\.enc\.env$
-    age: REPLACE_WITH_AGE_PUBLIC_KEY

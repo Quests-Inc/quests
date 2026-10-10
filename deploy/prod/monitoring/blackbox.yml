@@ -1,9 +1,0 @@
-# Blackbox probes (quest=345): what a client would see, not what the app says about itself.
-modules:
-  http_2xx:
-    prober: http
-    timeout: 5s
-    http:
-      method: GET
-      valid_status_codes: []   # any 2xx
-      preferred_ip_protocol: ip4

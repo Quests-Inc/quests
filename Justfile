@@ -227,7 +227,7 @@ schema: build-server
 # --- release & deploy -------------------------------------------------------
 
 # Publish release VERSION (e.g. `just release 1.4.0`) from the tip of main: the tag, the images, and — after the
-# `production` environment's approval — the deployment (deploy/README.md). Needs `gh` and main's CI to be green.
+# pull request in the deploy repository that makes it live when merged (deploy/README.md). Needs `gh` and main's CI green.
 release version:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -238,39 +238,6 @@ release version:
     [ "$conclusion" = success ] || { echo "CI on main ($tip) is '$conclusion', not success" >&2; exit 1; }
     pre=(); [[ "$v" == *-* ]] && pre=(--prerelease)
     gh release create "v$v" --target main --title "v$v" --generate-notes "${pre[@]}"
-
-# Render the production compose with stand-in values: catches a broken stack before a release does.
-check-deploy:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-    cp -a deploy/prod/. "$tmp/"
-    echo "QUESTS_VERSION=0.0.0" > "$tmp/version.env"
-    cd "$tmp" && docker compose --env-file version.env --env-file config.env \
-        -f docker-compose.yml -f docker-compose.monitoring.yml --profile bot config -q
-    echo "production compose renders"
-
-# One-time: create the age key (kept outside the repo), put its public half into deploy/prod/.sops.yaml and
-# encrypt a first secrets.enc.env from the template. The private key is what bootstrap needs as SOPS_AGE_KEY.
-secrets-init:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    key="${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/keys.txt}"
-    if [ ! -f "$key" ]; then mkdir -p "$(dirname "$key")"; age-keygen -o "$key"; fi
-    pub="$(age-keygen -y "$key")"
-    cd deploy/prod
-    sed -i.bak "s|age: .*|age: $pub|" .sops.yaml && rm -f .sops.yaml.bak
-    if [ ! -f secrets.enc.env ]; then
-        SOPS_AGE_KEY_FILE="$key" sops encrypt --filename-override secrets.enc.env --input-type dotenv --output-type dotenv secrets.example.env > secrets.enc.env.tmp
-        mv secrets.enc.env.tmp secrets.enc.env
-        echo "created deploy/prod/secrets.enc.env: fill it in with 'just secrets-edit'"
-    fi
-    echo "public key: $pub"
-    echo "private key file: $key  (keep it safe; its contents are the SOPS_AGE_KEY secret of the bootstrap)"
-
-# Edit the production secrets (decrypts into $EDITOR, encrypts on save).
-secrets-edit:
-    cd deploy/prod && SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/keys.txt}" sops --input-type dotenv --output-type dotenv secrets.enc.env
 
 # --- quality ---------------------------------------------------------------
 
@@ -288,7 +255,7 @@ lint-py:
     uv run ruff check .
 
 lint-sh:
-    shellcheck --severity=warning deploy/docker/*.sh deploy/doco-cd/*.sh deploy/prod/*.sh deploy/prod/monitoring/*.sh
+    shellcheck --severity=warning deploy/docker/*.sh
 
 # Auto-fix what ruff/gofmt can fix.
 fix:

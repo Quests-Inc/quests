@@ -1,15 +1,16 @@
 name: Release
 
 # A release is explicit: someone publishes a GitHub Release (tag vMAJOR.MINOR.PATCH) from main.
-# Publishing builds and pushes the images with that version, and — for a final (not pre-)release — moves the
-# `prod` branch to it, which is what doco-cd on the server deploys. Nothing else reaches production.
+# Publishing builds and pushes the images with that version and, for a final (not pre-)release, opens a pull
+# request in the deploy repository (Quests-Inc/quests-deploy) that sets QUESTS_VERSION; merging it there is what
+# doco-cd on the server deploys. Nothing else reaches production.
 #
 #   gh release create v1.4.0 --target main --generate-notes        (or: just release 1.4.0)
 #   gh release create v1.5.0-rc.1 --target main --prerelease …      (images only, no deploy)
 #
-# Rollback / redeploy: run this workflow by hand (Actions → Release → Run workflow) with an earlier version:
-# the images already exist, only `prod` moves. The schema is never rolled back: a release is only
-# rollback-able while the data still fits it (docs/postgres.md).
+# Rollback / redeploy: run this workflow by hand (Actions → Release → Run workflow) with an earlier version
+# (or simply revert the release commit in the deploy repository): the images already exist. The schema is
+# never rolled back: a release is only rollback-able while the data still fits it (docs/postgres.md).
 "on":
   release:
     types: [published]
@@ -114,24 +115,43 @@ jobs:
             *.cache-from=type=gha,scope=quests
             *.cache-to=type=gha,mode=max,scope=quests
 
-  # The one step that touches production, and the one that waits for a person: the `production`
-  # environment (Settings → Environments) is set to require a reviewer, so a published release does not
-  # go live until someone approves this job.
+  # Production is not touched from here: the release is announced to the deploy repository as a pull request that
+  # sets QUESTS_VERSION. Merging it there is the explicit step that makes doco-cd roll the version out, and
+  # reverting it is the rollback. The token below is the only thing this repository holds for that: write access
+  # to that one repository (contents + pull requests), nothing on the server.
   deploy:
     needs: [meta, images]
     if: ${{ !cancelled() && needs.meta.outputs.deploy == 'true' && (needs.images.result == 'success' || needs.images.result == 'skipped') }}
     runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: write # pushes the `prod` branch
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # a redeploy publishes the configuration of that release too
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.meta.outputs.version) || github.sha }}
-      - name: Point prod at the release
+      - name: Open the release pull request in the deploy repository
         env:
           VERSION: ${{ needs.meta.outputs.version }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          DEPLOY_REPO: ${{ vars.DEPLOY_REPO || 'Quests-Inc/quests-deploy' }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.meta.outputs.version }}
         run: |
-          deploy/prod/publish.sh "$VERSION" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" prod
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::secret DEPLOY_REPO_TOKEN is not set (fine-grained token: Contents + Pull requests write on $DEPLOY_REPO)"
+            exit 1
+          fi
+          git clone -q --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${DEPLOY_REPO}.git" deploy
+          cd deploy
+          current="$(sed -n 's/^QUESTS_VERSION=//p' version.env 2>/dev/null || true)"
+          if [ "$current" = "$VERSION" ]; then
+            echo "the deploy repository already runs $VERSION"
+            exit 0
+          fi
+          branch="release/v${VERSION}-${GITHUB_RUN_ID}"
+          git switch -q -c "$branch"
+          printf 'QUESTS_VERSION=%s\n' "$VERSION" > version.env
+          git add version.env
+          git -c user.name="quests-release" -c user.email="quests-release@users.noreply.github.com" \
+            commit -q -m "release v${VERSION}" -m "source: ${SOURCE}"
+          git push -q origin "$branch"
+          kind="Release"
+          if [ -n "$current" ] && [ "$(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | head -1)" = "$VERSION" ]; then kind="Rollback to"; fi
+          gh pr create --repo "$DEPLOY_REPO" --base main --head "$branch" \
+            --title "${kind} v${VERSION}" \
+            --body "Sets \`QUESTS_VERSION\` to ${VERSION} (was: ${current:-none}). Merging makes doco-cd deploy it; the images are already published. Release: ${SOURCE}"

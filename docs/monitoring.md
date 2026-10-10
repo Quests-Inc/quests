@@ -5,18 +5,18 @@ already see their runners / HUD / bot in Settings → Сервисы.
 
 | What | Where | Gives |
 |---|---|---|
-| **Uptime Kuma** | the home server (`arch`), `deploy/prod/docker-compose.monitoring.yml` | probes, uptime graph and %, alerts |
-| **Edge watchdog** | the gateway VPS, `deploy/prod/monitoring/edge-probe.sh` | availability seen from outside the home server, **log only** (covers the case where `arch` itself is down — Kuma would be down with it) |
+| **Uptime Kuma** | the home server (`arch`), `docker-compose.monitoring.yml` (deploy repository) | probes, uptime graph and %, alerts |
+| **Edge watchdog** | the gateway VPS, `monitoring/edge-probe.sh` (deploy repository) | availability seen from outside the home server, **log only** (covers the case where `arch` itself is down — Kuma would be down with it) |
 | **Prometheus + Grafana** | the home server, same overlay | trends: API latency/errors, quests and runner queue, DB pool and size, host CPU/RAM/disk, backup age |
 
 ## Uptime Kuma
 
-1. The stack ships with every release: `deploy/prod/docker-compose.monitoring.yml` is listed in `deploy/prod/.doco-cd.yml`
+1. The stack ships with every release: `docker-compose.monitoring.yml` of the deploy repository (`Quests-Inc/quests-deploy`) is listed in its `.doco-cd.yml`
    (drop it from `compose_files` to switch monitoring off); optional `KUMA_PORT` (default 3001) goes to `config.env`.
 2. Open `http://<server>:3001` and create the admin account (done by hand on purpose).
 3. Add the probes (needs `pip install uptime-kuma-api`; the password comes from the environment):
    ```bash
-   KUMA_PASSWORD=… python3 deploy/prod/monitoring/kuma-monitors.py --url http://<server>:3001 --user <admin> \
+   KUMA_PASSWORD=… python3 monitoring/kuma-monitors.py --url http://<server>:3001 --user <admin> \
        --public https://quests.84-38-180-123.sslip.io
    ```
    It creates API, nginx, Postgres, ClamAV (+ the public address through the gateway, + WebDAV with `--webdav`);
@@ -42,7 +42,7 @@ the endpoint off), `GRAFANA_ADMIN_PASSWORD`; optional `GRAFANA_PORT` (3002), `PR
 - Prometheus scrapes `api:8765/metrics`, `node-exporter` (host: CPU, RAM, disk), `postgres-exporter` (size, connections)
   and itself every 15 s; no ports are published for any of them.
 - Grafana (`http://<server>:3002`, or behind the gateway at `https://grafana.<base domain>` with `GRAFANA_ROOT_URL` in `.env`; needs port 3002 in the Tailscale ACL grant, user `admin`, password from `.env`) comes with the Prometheus data source and the
-  «Quests — обзор» dashboard provisioned from `deploy/prod/monitoring/grafana/`. Edit the JSON in the repo, not in the UI
+  «Quests — обзор» dashboard provisioned from `monitoring/grafana/` of the deploy repository. Edit the JSON in the repo, not in the UI
   (provisioned dashboards are read-only there).
 
 ## Edge watchdog (gateway VPS)

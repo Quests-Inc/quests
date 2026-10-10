@@ -3,12 +3,14 @@ name: Bootstrap deploy agent
 # Starts (or updates) doco-cd on the production host. This is the only workflow that runs on the server and
 # the only one that is not triggered by a push: by hand, behind the `production` environment's approval.
 # It exists for as long as nobody has a shell on that host; with shell access, run
-# deploy/doco-cd/bootstrap.sh there instead and delete the runner.
+# doco-cd/bootstrap.sh of the deploy repository there instead and delete the runner.
 #
 # !!! SECURITY — a self-hosted runner executes whatever this repository's workflows say. The rules:
 #   - this file is workflow_dispatch ONLY: never add push / pull_request / pull_request_target here;
 #   - no other workflow may use `runs-on: self-hosted`;
-#   - keep the repository private, and the `production` environment on required reviewers.
+#   - keep the repository private.
+# The runner is registered to THIS repository, so the one-time start of the agent is done from here; the
+# stack itself lives in the deploy repository, which this job checks out.
 "on":
   workflow_dispatch: {}
 
@@ -21,9 +23,13 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.DEPLOY_REPO || 'Quests-Inc/quests-deploy' }}
+          token: ${{ secrets.DEPLOY_GIT_TOKEN }}
+          path: deploy
       - name: Start doco-cd
         env:
-          DEPLOY_REPO_URL: https://github.com/${{ github.repository }}.git
+          DEPLOY_REPO_URL: https://github.com/${{ vars.DEPLOY_REPO || 'Quests-Inc/quests-deploy' }}.git
           DEPLOY_STATE: ${{ vars.DEPLOY_STATE_DIR || '/srv/quests-deploy' }}
           DEPLOY_GIT_TOKEN: ${{ secrets.DEPLOY_GIT_TOKEN }}
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}

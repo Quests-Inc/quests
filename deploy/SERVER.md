@@ -9,18 +9,9 @@ HUD остаётся на рабочей станции с Wayland и ходит
 
 ## Вариант A — Docker (рекомендуется на сервере)
 
-Прод ставится и обновляется через релизы и doco-cd: см. [`README.md`](README.md) (схема, первая установка, откат).
-Для разового поднятия **без** doco-cd (отладка) — образы и compose из каталога `prod/`:
-
-```bash
-cd deploy/prod
-cp secrets.example.env secrets.env && $EDITOR secrets.env   # POSTGRES_PASSWORD и др. (локально — без шифрования)
-echo "QUESTS_VERSION=1.4.0" > version.env
-docker compose --env-file version.env --env-file config.env --env-file secrets.env -f docker-compose.yml up -d
-```
-
-(в `docker-compose.yml` секреты читаются из `secrets.enc.env`: для ручного запуска расшифруйте его
-(`sops decrypt`) или подложите свой файл с таким именем.)
+Прод ставится и обновляется через релизы и doco-cd: см. [`README.md`](README.md); сам стек (compose, настройки, секреты)
+живёт в репозитории [Quests-Inc/quests-deploy](https://github.com/Quests-Inc/quests-deploy) — для ручного запуска без
+doco-cd клонируйте его и следуйте его README.
 
 Дальше — firewall на `8765`/`8080`, на ПК HUD: `QUESTS_API=http://SERVER_IP:8765`.
 
