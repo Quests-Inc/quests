@@ -272,15 +272,15 @@ func SystemPrompt(pc PromptContext) string {
 	}
 
 	b.WriteString("\nКОНТЕКСТ СЕЙЧАС:\n")
-	b.WriteString(fmt.Sprintf("  Локальное время: %s\n", pc.NowLocal))
-	b.WriteString(fmt.Sprintf("  Часовой пояс: %s (все относительные сроки — от этого якоря).\n", pc.TimeZone))
+	fmt.Fprintf(&b, "  Локальное время: %s\n", pc.NowLocal)
+	fmt.Fprintf(&b, "  Часовой пояс: %s (все относительные сроки — от этого якоря).\n", pc.TimeZone)
 	b.WriteString("РАЗДЕЛЫ (category / category_id) — выбирай из списка; для create_quest ")
 	b.WriteString("без квестлайна почти всегда нужен раздел:\n")
 	if len(pc.Categories) == 0 {
 		b.WriteString("  (список пуст — category=null)\n")
 	} else {
 		for _, c := range pc.Categories {
-			b.WriteString(fmt.Sprintf("  • id=%d slug=%q label=%q\n", c.ID, c.Slug, c.Label))
+			fmt.Fprintf(&b, "  • id=%d slug=%q label=%q\n", c.ID, c.Slug, c.Label)
 		}
 	}
 	b.WriteString("\nJSON Schema:\n")

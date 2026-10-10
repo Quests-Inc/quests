@@ -102,7 +102,7 @@ func printHelp() {
 Usage:
   quests [--json] [--api URL] COMMAND …
 
-Build: ./scripts/build-cli.sh  →  go/bin/quests
+Build: just build-cli  →  go/bin/quests
 Run:   ./scripts/quests …  |  go/bin/quests …
 
 Commands:
@@ -1305,7 +1305,7 @@ func cmdHookAdd(args []string, asJSON bool) (int, error) {
 	if *quest >= 0 {
 		qid = quest
 	}
-	var ws int64 = 1
+	var ws int64
 	switch strings.ToLower(strings.TrimSpace(*workspace)) {
 	case "all", "*", "0":
 		ws = 0 // operator-wide: events of every workspace

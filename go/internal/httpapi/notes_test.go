@@ -160,9 +160,7 @@ func TestNoteDescriptionInsertAndReplace(t *testing.T) {
 	if code != 422 {
 		t.Fatalf("missing find want 422 got %d %v", code, out)
 	}
-	if outDesc, _ := out["description"].(string); outDesc != "" {
-		// error body; description of note unchanged — re-get
-	}
+	// The error body carries no note; re-get it to check the note itself is unchanged.
 	r = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/notes/%d", id), nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)

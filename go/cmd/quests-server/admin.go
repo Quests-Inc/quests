@@ -421,7 +421,6 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			fatal("%v", err)
 		}
 		members := map[int64][]string{}
-		var order []int64
 		seen := map[int64]store.Workspace{}
 		for _, u := range users {
 			ws, err := wst.UserWorkspaces(ctx, u.ID)
@@ -431,7 +430,6 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			for _, w := range ws {
 				if _, ok := seen[w.ID]; !ok {
 					seen[w.ID] = w
-					order = append(order, w.ID)
 				}
 				members[w.ID] = append(members[w.ID], u.Username)
 			}

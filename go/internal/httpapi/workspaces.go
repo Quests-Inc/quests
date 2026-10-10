@@ -315,7 +315,7 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	cur := wsctx.From(r.Context())
-	if p, ok := PrincipalFrom(r.Context()); cur == 0 && !(ok && p.User.ID != 0) {
+	if p, ok := PrincipalFrom(r.Context()); cur == 0 && (!ok || p.User.ID == 0) {
 		cur = store.DefaultWorkspaceID
 	}
 	var list []store.Workspace

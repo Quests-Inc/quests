@@ -104,7 +104,7 @@ func TestPoolRunnerConcurrentCallers(t *testing.T) {
 			defer func() { done <- struct{}{} }()
 			cmd := `echo '{"title":"c"}'`
 			for i := 0; i < 20; i++ {
-				r.exec(context.Background(), st, int64(100+g), "p", cmd)
+				_, _, _, _ = r.exec(context.Background(), st, int64(100+g), "p", cmd)
 				time.Sleep(time.Millisecond)
 			}
 		}(g)

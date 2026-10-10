@@ -5,8 +5,7 @@ Default API is the Go binary (`go/bin/quests-server` via `./scripts/run-server.s
 ## Run
 
 ```bash
-./scripts/build-server.sh
-./scripts/build-cli.sh
+just build-server build-cli
 ./scripts/run-server.sh          # :8765
 ./scripts/quests list
 ```

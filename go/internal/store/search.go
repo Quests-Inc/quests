@@ -355,9 +355,7 @@ func (s *Store) searchNotesPlain(ctx context.Context, variants []string, o Searc
 	}
 	var terms []string
 	for _, v := range variants {
-		for _, w := range wordRe.FindAllString(strings.ToLower(v), -1) {
-			terms = append(terms, w)
-		}
+		terms = append(terms, wordRe.FindAllString(strings.ToLower(v), -1)...)
 	}
 	hits := []SearchHit{}
 	for _, n := range notes {

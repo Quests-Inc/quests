@@ -107,7 +107,7 @@ func (c *Client) Do(method, path string, query map[string]string, body any) (jso
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось связаться с API (%s): %w. Запусти: QUESTS_PORT=8765 ./scripts/run-go-server.sh", c.Base, err)
+		return nil, fmt.Errorf("не удалось связаться с API (%s): %w. Запусти: just run-server", c.Base, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(resp.Body)

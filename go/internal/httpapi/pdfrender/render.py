@@ -10,7 +10,6 @@ import sys
 
 from weasyprint import HTML
 
-
 try:  # WeasyPrint >= 68: a fetcher object with a protocol allow-list
     from weasyprint.urls import URLFetcher
 
