@@ -5,7 +5,7 @@
 Реализация — **Go-бинарник** `go/bin/quests` (не зависит от Python/`go run` в runtime):
 
 ```bash
-./scripts/build-cli.sh          # один раз (или после изменений CLI)
+just build-cli                  # один раз (или после изменений CLI)
 ./scripts/quests --help
 ./scripts/quests list --json
 go/bin/quests list              # напрямую
@@ -14,7 +14,7 @@ uv run quests list              # launcher → тот же бинарник
 
 Опционально в PATH: `cp go/bin/quests ~/.local/bin/quests`
 
-Нужен запущенный API (`QUESTS_PORT=8765 ./scripts/run-go-server.sh`), кроме команд `hook *` — они работают с файлом напрямую.
+Нужен запущенный API (`just run-server`), кроме команд `hook *` — они работают с файлом напрямую.
 
 | Env / флаг | Default | Назначение |
 |-----|---------|------------|

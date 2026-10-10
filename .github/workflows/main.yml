@@ -89,6 +89,39 @@ jobs:
               - 'deploy/docker/docker-bake.hcl'
               - 'deploy/docker/entrypoint-stt.sh'
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: extractions/setup-just@v3
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: gofmt + go vet
+        run: |
+          cd go
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.0
+          working-directory: go
+
+      - name: ruff + shellcheck
+        run: |
+          uv sync --locked --group dev
+          just lint-py lint-sh
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -114,6 +147,18 @@ jobs:
         run: |
           uv sync --locked --group dev --all-extras
           uv run pytest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
 
   # One BuildKit session → api+bot share python-base layer digests on GHCR.
   # Runs in parallel with `test` and pushes only :<sha>; the `promote` job
@@ -207,12 +252,13 @@ jobs:
   # Safe to run on workflow_dispatch from main too (hosted runner, unlike
   # deploy below); never from any other ref.
   promote:
-    needs: [build-images, test]
+    needs: [build-images, test, lint]
     if: |
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       needs.build-images.result == 'success' &&
-      needs.test.result == 'success'
+      needs.test.result == 'success' &&
+      needs.lint.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -269,4 +315,8 @@ jobs:
       # Runner lives on the target box itself — no SSH hop needed, just run
       # the same script the forced deploy key used to invoke remotely.
       - name: Deploy
-        run: bash /home/amarant/Documents/projects/quests/deploy/docker/ci-deploy.sh
+        env:
+          # Checkout of the repo on the runner host that compose runs from
+          # (repo variable QUESTS_DEPLOY_DIR; the old path stays the default).
+          DEPLOY_DIR: ${{ vars.QUESTS_DEPLOY_DIR || '/home/amarant/Documents/projects/quests' }}
+        run: bash "$DEPLOY_DIR/deploy/docker/ci-deploy.sh"

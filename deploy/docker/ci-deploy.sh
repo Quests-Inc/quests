@@ -8,7 +8,7 @@
 # can't do anything beyond "redeploy from origin/main", not arbitrary shell.
 set -euo pipefail
 
-REPO_DIR="$HOME/Documents/projects/quests"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE="docker compose --env-file .env -f deploy/docker/docker-compose.yml"
 
 cd "$REPO_DIR"

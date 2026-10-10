@@ -19,8 +19,10 @@ sudo pacman -S gtk4 gtk4-layer-shell python-gobject
 ## Развёртывание
 
 ```bash
-./scripts/bootstrap.sh
+just bootstrap
 ```
+
+Нужен [`just`](https://just.systems). Список всех рецептов (сборка, запуск, `just check` = линтеры + тесты) — просто `just`.
 
 Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `npm install` во `frontend/`, создаст `data/` и накатит миграции.
 
@@ -28,15 +30,15 @@ sudo pacman -S gtk4 gtk4-layer-shell python-gobject
 
 | Что | Команда | URL / заметка |
 |-----|---------|----------------|
-| API + SPA | `./scripts/run-server.sh` | http://127.0.0.1:8765 (нужен собранный `frontend/dist`) |
-| Сборка API | `./scripts/build-server.sh` | → `go/bin/quests-server` |
-| Фронт (HMR) | `./scripts/run-frontend.sh` | http://127.0.0.1:5173 (нужен запущенный API) |
-| Сборка SPA | `./scripts/build-frontend.sh` | в `frontend/dist` |
-| Миграции | `./scripts/migrate.sh` | или `uv run quests-migrate` |
+| API + SPA | `just run-server` | http://127.0.0.1:8765 (нужен собранный `frontend/dist`) |
+| Сборка API | `just build-server` | → `go/bin/quests-server` |
+| Фронт (HMR) | `just run-frontend` | http://127.0.0.1:5173 (нужен запущенный API) |
+| Сборка SPA | `just build-frontend` | в `frontend/dist` |
+| Миграции | `just migrate` | или `uv run quests-migrate` |
 | CLI | `./scripts/quests` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
-| Оверлей | `./scripts/run-overlay-smoke.sh` | или `python -m overlay` |
-| Telegram | `./scripts/run-telegram.sh` | HTTP-клиент к API |
-| STT (голос → текст) | `./scripts/run-stt.sh` | сайдкар для бота, http://127.0.0.1:8766, нужен для голосовых сообщений |
+| Оверлей | `just run-overlay` | или `python -m overlay` |
+| Telegram | `just run-telegram` | HTTP-клиент к API |
+| STT (голос → текст) | `just run-stt` | сайдкар для бота, http://127.0.0.1:8766, нужен для голосовых сообщений |
 | Шаблоны | UI «Шаблоны» / `/api/templates` | daily/weekly → инстансы-квесты |
 
 Оверлей (IPC):
@@ -85,4 +87,4 @@ HUD на удалённый API (токен, unit, niri): [`docs/hud-workstation
 CI на `main` деплоит на прод сам (self-hosted runner прямо на сервере): [`docs/deploy-ssh.md`](docs/deploy-ssh.md).
 
 > **Не запускайте голый `uv sync`.** Он синхронизирует окружение точно и удаляет необязательные пакеты (`mcp`, `aiogram`, `weasyprint`, `faster-whisper`):
-> `quests-mcp`, бот и PDF-экспорт тогда падают с `No module named …`. Всегда `uv sync --group dev --all-extras` (так делает `scripts/bootstrap.sh`).
+> `quests-mcp`, бот и PDF-экспорт тогда падают с `No module named …`. Всегда `uv sync --group dev --all-extras` (так делает `just bootstrap`).

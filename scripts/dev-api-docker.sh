@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Local Quests API in Docker (quests-api-dev on 127.0.0.1:8765).
-# SPA: rebuild with ./scripts/build-frontend.sh — dist is bind-mounted.
+# SPA: rebuild with `just build-frontend` — dist is bind-mounted.
 # Go/Python image: pass --rebuild.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,7 +30,7 @@ docker rm -f quests-api-dev >/dev/null 2>&1 || true
 
 if [[ ! -d "$ROOT/frontend/dist" ]]; then
   echo "frontend/dist missing — building SPA…" >&2
-  "$ROOT/scripts/build-frontend.sh"
+  (cd "$ROOT/frontend" && npm run build)
 fi
 
 cd "$ROOT"

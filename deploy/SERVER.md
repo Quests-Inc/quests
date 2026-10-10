@@ -75,12 +75,12 @@ cd ~
 git clone <repo-url> Quests
 cd Quests
 
-./scripts/bootstrap.sh
-./scripts/build-frontend.sh
+just bootstrap
+just build-frontend
 ```
 
-`bootstrap.sh`: `uv sync`, Go CLI/API build, `npm install`, `data/`, миграции DB.  
-`build-frontend.sh`: `frontend/dist` — отдаёт Go API на `:8765`.
+`just bootstrap`: `uv sync`, Go CLI/API build, `npm install`, `data/`, миграции DB.  
+`just build-frontend`: `frontend/dist` — отдаёт Go API на `:8765`.
 
 ---
 
@@ -213,8 +213,8 @@ systemctl --user enable --now quests-overlay.service
 ```bash
 cd ~/Quests
 git pull
-./scripts/bootstrap.sh          # deps + migrate
-./scripts/build-frontend.sh
+just bootstrap          # deps + migrate
+just build-frontend
 systemctl --user restart quests-server.service
 systemctl --user restart quests-telegram.service   # если включён
 ```
@@ -322,7 +322,7 @@ quests-server runner add home          # метка: a-z, 0-9, _ и -, до 32 �
 # то же из UI: вкладка «Раннеры» → «Добавить»
 
 # на устройстве: собрать и поставить
-./scripts/build-runner.sh              # → go/bin/quests-runner
+just build-runner                     # → go/bin/quests-runner
 install -Dm755 go/bin/quests-runner ~/.local/bin/quests-runner
 quests-runner register --server https://quests.example --token <токен>
 ln -sf "$PWD/deploy/systemd/user/quests-runner.service" ~/.config/systemd/user/
