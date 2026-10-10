@@ -55,10 +55,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     QUESTS_ROOT=/app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       curl ca-certificates \
-       libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
-       fonts-dejavu-core fontconfig \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.19 /uv /usr/local/bin/uv
@@ -67,12 +64,18 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
-# Core only (sqlmodel/dotenv) — api needs nothing heavier than this;
-# the action-batch assistant is pure Go now (go/internal/llmassist).
+# Core only (dotenv/tzdata) for the bot and STT images below.
 RUN uv sync --locked --no-dev
 
-# --- API runtime: Go server + SPA (schema migrations are embedded: `quests-server migrate`) ---
-FROM python-base AS api
+# --- API runtime: Go server + SPA. Migrations are embedded (`quests-server migrate`), PDF export is
+# in-process Go (go/internal/pdfdoc): no project Python here. python3 itself stays only because users
+# write server-side check/emit commands with a `#!/usr/bin/env python3` shebang (docs/note-check.md). ---
+FROM python:3.12-slim-bookworm AS api
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 # pg_dump for PostgreSQL backups: the client must be at least the server's major
 # version, which Debian's own package is not — take it from the PGDG repo.
 RUN apt-get update \
@@ -80,7 +83,6 @@ RUN apt-get update \
     && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
     && apt-get install -y --no-install-recommends postgresql-client-17 \
     && rm -rf /var/lib/apt/lists/*
-RUN uv sync --locked --no-dev --extra pdf
 COPY --from=go-build /out/quests-server /usr/local/bin/quests-server
 COPY --from=go-build /out/quests /usr/local/bin/quests
 COPY --from=frontend /src/frontend/dist /app/frontend/dist

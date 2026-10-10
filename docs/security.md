@@ -24,8 +24,9 @@ you add from the host (`quests-server workspace trust`), and **no invitations**:
 - **Commands** — `guardAuthor` (only owners write a command; editing around an existing one is fine) and
   `guardExec` (a command without a runner needs a trusted workspace), both in `go/internal/store/workspaces.go`.
   Secrets names that would bend how a process starts (`PATH`, `LD_*`, `BASH_ENV`, `QUESTS_*`…) are refused and never exported.
-- **Exports** — PDF is rendered by `go/internal/httpapi/pdfrender/render.py` with every external fetch refused
-  (the HTML is user-supplied; WeasyPrint would embed `file://` targets into the PDF).
+- **Exports** — PDF is rendered in-process by `go/internal/pdfdoc` from a document the client describes (title, markdown, steps):
+  no HTML or CSS is interpreted, nothing is fetched from the network or the disk, and the only images are attachments the
+  server loads itself under the caller's workspace.
 - **Browser** — CSP, `X-Frame-Options`, `Referrer-Policy: no-referrer` (invitation secrets sit in URLs),
   `nosniff`; uploaded SVG icons and attachment images are served sandboxed.
 - **Logins** — optional TOTP second factor (`docs/auth.md`), PBKDF2-SHA256 600k, equal cost for unknown logins, per-IP throttle (port stripped), per-login stall

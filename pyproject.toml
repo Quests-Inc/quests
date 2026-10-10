@@ -22,9 +22,6 @@ bot = [
 mcp = [
     "mcp>=2.0.0",
 ]
-pdf = [
-    "weasyprint>=62.0",
-]
 # Standalone STT sidecar (quests-stt) — split out from `bot` because
 # faster-whisper drags in ctranslate2/onnxruntime/av (~450MB unpacked), which
 # has nothing to do with aiogram and would otherwise redownload on every

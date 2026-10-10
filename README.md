@@ -85,7 +85,7 @@ User systemd units: [`deploy/systemd/`](deploy/systemd/).
 Деплой на сервер после клона: [`deploy/SERVER.md`](deploy/SERVER.md).  
 Docker (api / bot / frontend): [`deploy/docker/`](deploy/docker/).  
 HUD на удалённый API (токен, unit, niri): [`docs/hud-workstation.md`](docs/hud-workstation.md).  
-CI на `main` деплоит на прод сам (self-hosted runner прямо на сервере): [`docs/deploy-ssh.md`](docs/deploy-ssh.md).
+CI на `main` собирает и тестирует образы; автодеплой на прод временно отключён (см. `.github/workflows/main.yml`, [`docs/deploy-ssh.md`](docs/deploy-ssh.md)).
 
-> **Не запускайте голый `uv sync`.** Он синхронизирует окружение точно и удаляет необязательные пакеты (`mcp`, `aiogram`, `weasyprint`, `faster-whisper`):
-> `quests-mcp`, бот и PDF-экспорт тогда падают с `No module named …`. Всегда `uv sync --group dev --all-extras` (так делает `just bootstrap`).
+> **Не запускайте голый `uv sync`.** Он синхронизирует окружение точно и удаляет необязательные пакеты (`mcp`, `aiogram`, `faster-whisper`):
+> `quests-mcp`, бот и STT тогда падают с `No module named …`. Всегда `uv sync --group dev --all-extras` (так делает `just bootstrap`).
