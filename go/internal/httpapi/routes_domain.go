@@ -18,7 +18,7 @@ import (
 	"github.com/valirum/quests/go/internal/timeutil"
 )
 
-func (s *Server) registerParity(mux *http.ServeMux) {
+func (s *Server) registerDomainRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/questlines", s.listQuestlines)
 	mux.HandleFunc("POST /api/questlines", s.createQuestline)
 	mux.HandleFunc("GET /api/questlines/{id}", s.getQuestline)

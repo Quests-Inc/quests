@@ -134,7 +134,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerAttachments(mux)
 	s.registerNotes(mux)
 	s.registerPDF(mux)
-	s.registerParity(mux)
+	s.registerDomainRoutes(mux)
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
