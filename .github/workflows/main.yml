@@ -299,23 +299,27 @@ jobs:
   #   - NEVER loosen this job's `if:` to admit anything but a direct push to
   #     `main` (no `pull_request`, no `workflow_dispatch` from an arbitrary ref)
   # If any of that changes, self-hosted here becomes a real attack surface.
-  deploy:
-    needs: promote
-    # A job with an explicit `if:` stops inheriting the implicit "needs
-    # succeeded" gate, so it's spelled out here — otherwise this would also
-    # run when promote was skipped (no images built, or tests red).
-    if: |
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.promote.result == 'success'
-    runs-on: self-hosted
-    permissions:
-      contents: read
-    steps:
-      # Runner lives on the target box itself — no SSH hop needed, just run
-      # the same script the forced deploy key used to invoke remotely.
-      - name: Deploy
-        env:
-          # Checkout of the repo on the runner host that compose runs from
-          # (repo variable QUESTS_DEPLOY_DIR; the old path stays the default).
-          DEPLOY_DIR: ${{ vars.QUESTS_DEPLOY_DIR || '/home/amarant/Documents/projects/quests' }}
-        run: bash "$DEPLOY_DIR/deploy/docker/ci-deploy.sh"
+  # DEPLOY TEMPORARILY DISABLED (issue #3): the deploy flow is being reworked.
+  # Until then CI only builds, tests and promotes images; nothing is rolled out
+  # to the server. Restore the job below together with the new flow (and
+  # keep the self-hosted runner warnings above: see issue #1).
+  # deploy:
+  #   needs: promote
+  #   # A job with an explicit `if:` stops inheriting the implicit "needs
+  #   # succeeded" gate, so it's spelled out here — otherwise this would also
+  #   # run when promote was skipped (no images built, or tests red).
+  #   if: |
+  #     github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+  #     needs.promote.result == 'success'
+  #   runs-on: self-hosted
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     # Runner lives on the target box itself — no SSH hop needed, just run
+  #     # the same script the forced deploy key used to invoke remotely.
+  #     - name: Deploy
+  #       env:
+  #         # Checkout of the repo on the runner host that compose runs from
+  #         # (repo variable QUESTS_DEPLOY_DIR; the old path stays the default).
+  #         DEPLOY_DIR: ${{ vars.QUESTS_DEPLOY_DIR || '/home/amarant/Documents/projects/quests' }}
+  #       run: bash "$DEPLOY_DIR/deploy/docker/ci-deploy.sh"
