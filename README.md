@@ -2,7 +2,7 @@
 
 Менеджер задач в духе игрового журнала: веб-UI, API и Wayland-оверлей (HUD + тосты) для niri / CachyOS.
 
-Стек: **Go (API + CLI) · SQLite · Svelte (Vite) · Python (MCP / Telegram / Alembic / LLM) · GTK4 + gtk4-layer-shell**
+Стек: **Go (API + CLI) · SQLite · Svelte (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
 
 ## Требования
 
@@ -34,7 +34,7 @@ just bootstrap
 | Сборка API | `just build-server` | → `go/bin/quests-server` |
 | Фронт (HMR) | `just run-frontend` | http://127.0.0.1:5173 (нужен запущенный API) |
 | Сборка SPA | `just build-frontend` | в `frontend/dist` |
-| Миграции | `just migrate` | или `uv run quests-migrate` |
+| Миграции | `just migrate` | `quests-server migrate` (PG, если задан `QUESTS_DATABASE_URL`, иначе SQLite) |
 | CLI | `./scripts/quests` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
 | Оверлей | `just run-overlay` | или `python -m overlay` |
 | Telegram | `just run-telegram` | HTTP-клиент к API |

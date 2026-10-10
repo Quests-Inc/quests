@@ -3,12 +3,8 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -61,31 +57,20 @@ func TestInsertReturningID(t *testing.T) {
 // named by QUESTS_TEST_PG_URL (skips when unset) and returns a pool pinned to it.
 func openTestPG(t *testing.T) *sql.DB {
 	t.Helper()
-	url := os.Getenv("QUESTS_TEST_PG_URL")
-	if url == "" {
-		t.Skip("QUESTS_TEST_PG_URL not set")
-	}
+	url := freshDatabase(t)
 	cfg, err := pgx.ParseConfig(url)
 	if err != nil {
 		t.Fatal(err)
 	}
-	schema := fmt.Sprintf("t_%d", time.Now().UnixNano())
+	// A database of its own: the migrations pin SECURITY DEFINER functions to schema public.
+	const schema = "public"
 	cfg.RuntimeParams["search_path"] = schema
 	admin, err := sql.Open("pgx", url)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_, _ = admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`)
-		_ = admin.Close()
-	})
-	if _, err := admin.Exec(`CREATE SCHEMA ` + schema); err != nil {
-		t.Fatal(err)
-	}
-	baseline, err := os.ReadFile(filepath.Join("..", "..", "..", "alembic", "versions_pg", "baseline.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Cleanup(func() { _ = admin.Close() })
+	baseline := pgMigrations[0].SQL
 	conn, err := admin.Conn(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +79,7 @@ func openTestPG(t *testing.T) *sql.DB {
 	if _, err := conn.ExecContext(context.Background(), `SET search_path TO `+schema); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.ExecContext(context.Background(), string(baseline)); err != nil {
+	if _, err := conn.ExecContext(context.Background(), baseline); err != nil {
 		t.Fatalf("apply baseline: %v", err)
 	}
 	// If the workspaces migration ever ran on this server the pool drops to quests_app.
@@ -177,29 +162,21 @@ func TestPGLastInsertIDAndPlaceholders(t *testing.T) {
 // openTestPGWorkspaces is openTestPG plus the workspaces migration, with the
 // quests_app grants pointed at the throwaway schema. The pool drops to
 // quests_app (as the API does), so RLS applies. Needs a role that may CREATE ROLE.
-func openTestPGWorkspaces(t *testing.T) (*sql.DB, string) {
+func openTestPGWorkspaces(t *testing.T) (*sql.DB, string, string) {
 	t.Helper()
-	url := os.Getenv("QUESTS_TEST_PG_URL")
-	if url == "" {
-		t.Skip("QUESTS_TEST_PG_URL not set")
-	}
+	url := freshDatabase(t)
 	cfg, err := pgx.ParseConfig(url)
 	if err != nil {
 		t.Fatal(err)
 	}
-	schema := fmt.Sprintf("t_%d", time.Now().UnixNano())
+	// A database of its own: the migrations pin SECURITY DEFINER functions to schema public.
+	const schema = "public"
 	cfg.RuntimeParams["search_path"] = schema
 	admin, err := sql.Open("pgx", url)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_, _ = admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`)
-		_ = admin.Close()
-	})
-	if _, err := admin.Exec(`CREATE SCHEMA ` + schema); err != nil {
-		t.Fatal(err)
-	}
+	t.Cleanup(func() { _ = admin.Close() })
 	conn, err := admin.Conn(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -209,17 +186,9 @@ func openTestPGWorkspaces(t *testing.T) (*sql.DB, string) {
 	if _, err := conn.ExecContext(ctx, `SET search_path TO `+schema); err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range []string{"1a2b3c4d5e6f_pg_baseline.py", "c7e1a9b3d5f2_workspaces.sql"} {
-		path := filepath.Join("..", "..", "..", "alembic", "versions_pg", f)
-		if f == "1a2b3c4d5e6f_pg_baseline.py" {
-			path = filepath.Join("..", "..", "..", "alembic", "versions_pg", "baseline.sql")
-		}
-		b, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := conn.ExecContext(ctx, string(b)); err != nil {
-			t.Fatalf("apply %s: %v", f, err)
+	for _, m := range pgMigrations[:2] { // baseline + workspaces
+		if _, err := conn.ExecContext(ctx, m.SQL); err != nil {
+			t.Fatalf("apply %s: %v", m.Name, err)
 		}
 	}
 	for _, g := range []string{
@@ -233,11 +202,11 @@ func openTestPGWorkspaces(t *testing.T) (*sql.DB, string) {
 	}
 	pool := sql.OpenDB(pgConnector{stdlib.GetConnector(*cfg)})
 	t.Cleanup(func() { _ = pool.Close() })
-	return pool, schema
+	return pool, schema, url
 }
 
 func TestPGWorkspaceIsolation(t *testing.T) {
-	pool, _ := openTestPGWorkspaces(t)
+	pool, _, _ := openTestPGWorkspaces(t)
 	bg := context.Background()
 	ws1, ws2 := wsctx.With(bg, 1), wsctx.With(bg, 2)
 	if _, err := pool.ExecContext(bg, `INSERT INTO workspace (id, name) VALUES (2, 'two') ON CONFLICT DO NOTHING`); err != nil {
@@ -350,8 +319,7 @@ func TestPGBoolArgsAreIntegers(t *testing.T) {
 // The API role may not change what is the host's: workspace trust, password hashes, the
 // schema revision (migration c8e0a2b4d6f3) — while still doing what the API needs.
 func TestPGAPIRoleGrants(t *testing.T) {
-	pool, schema := openTestPGWorkspaces(t)
-	url := os.Getenv("QUESTS_TEST_PG_URL")
+	pool, schema, url := openTestPGWorkspaces(t)
 	admin, err := sql.Open("pgx", url)
 	if err != nil {
 		t.Fatal(err)
@@ -378,11 +346,11 @@ func TestPGAPIRoleGrants(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	grants, err := os.ReadFile(filepath.Join("..", "..", "..", "alembic", "versions_pg", "c8e0a2b4d6f3_api_role_grants.sql"))
-	if err != nil {
-		t.Fatal(err)
+	grants := pgMigrations[7] // api_role_grants
+	if grants.Name != "api_role_grants" {
+		t.Fatalf("migration 8 is %s, test expects api_role_grants", grants.Name)
 	}
-	if _, err := conn.ExecContext(ctx, string(grants)); err != nil {
+	if _, err := conn.ExecContext(ctx, grants.SQL); err != nil {
 		t.Fatalf("apply grants: %v", err)
 	}
 	if _, err := conn.ExecContext(ctx, `INSERT INTO appuser (id, username, password_hash, is_active, created_at) VALUES (1, 'u', 'hash', 1, now())`); err != nil {

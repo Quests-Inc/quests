@@ -14,7 +14,6 @@ SPA: build `frontend/dist` (or use Vite proxy to the API).
 
 ## Still Python
 
-- Alembic migrations (`quests-migrate`)
 - Telegram bot, MCP, overlay, STT
 - CLI `llm-add` (Go shells into Python)
 

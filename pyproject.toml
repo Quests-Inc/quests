@@ -7,13 +7,12 @@ requires-python = ">=3.12"
 dependencies = [
     "sqlmodel>=0.0.22",
     "aiosqlite>=0.20",
-    "alembic>=1.18.5",
     "psycopg[binary]>=3.2",
     "python-dotenv>=1.2.2",
 ]
 
 # The api/llm-action path is pure Go now — the only Python left needs just
-# the core deps above (alembic migrations). Everything heavy is opt-in per
+# the core deps above. Everything heavy is opt-in per
 # entrypoint so `docker build --target api` doesn't drag in Telegram/STT.
 [project.optional-dependencies]
 bot = [
@@ -37,7 +36,6 @@ stt = [
 ]
 
 [project.scripts]
-quests-migrate = "quests.migrate:main"
 quests-telegram = "quests.telegram.main:main"
 quests-mcp = "quests.mcp_server:main"
 quests-stt = "quests.stt_server:main"
@@ -56,6 +54,11 @@ packages = ["src/quests"]
 package = true
 
 [dependency-groups]
+# Only for running the archived Alembic chain (alembic/README.md); the
+# schema is migrated by `quests-server migrate`.
+archive = [
+    "alembic>=1.18.5",
+]
 dev = [
     "httpx>=0.28",
     "pytest>=8.0",

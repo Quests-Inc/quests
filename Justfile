@@ -12,8 +12,8 @@ bootstrap:
     uv sync --group dev --all-extras
     cd frontend && npm install
     mkdir -p data
-    uv run quests-migrate upgrade
     just build-cli build-server
+    ./go/bin/quests-server migrate
 
 # --- build -----------------------------------------------------------------
 
@@ -56,9 +56,9 @@ run-overlay:
 dev-api *args:
     ./scripts/dev-api-docker.sh {{ args }}
 
-# `up` / `current` / `stamp-head`
-migrate cmd="upgrade":
-    uv run quests-migrate {{ cmd }}
+# Apply schema migrations (uses QUESTS_DATABASE_URL, else data/quests.db); `just migrate current` prints the revision.
+migrate *args: build-server
+    ./go/bin/quests-server migrate {{ args }}
 
 # --- quality ---------------------------------------------------------------
 
@@ -85,8 +85,15 @@ fix:
 
 test: test-go test-py test-frontend
 
+# DB tests need PostgreSQL: set QUESTS_TEST_PG_URL (e.g. `just pg-test` starts one in Docker).
 test-go:
     cd go && go build ./... && go test ./...
+
+# Throwaway PostgreSQL for the DB tests; prints the URL to export.
+pg-test:
+    docker run -d --rm --name quests-pg-test -e POSTGRES_USER=quests -e POSTGRES_PASSWORD=test -e POSTGRES_DB=quests -p 127.0.0.1:55432:5432 postgres:17
+    @echo 'export QUESTS_TEST_PG_URL="postgresql://quests:test@127.0.0.1:55432/quests?sslmode=disable"'
+    @echo 'stop with: docker stop quests-pg-test'
 
 test-py:
     uv run --all-extras --group dev pytest

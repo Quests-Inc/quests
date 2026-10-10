@@ -7,7 +7,7 @@ HUD в Docker нет — на рабочей станции: `./scripts/run-over
 
 | Сервис | Порт | Описание |
 |--------|------|----------|
-| `api` | `8765` | Go API + собранный SPA + Alembic-миграции при старте |
+| `api` | `8765` | Go API + собранный SPA + миграции при старте (`quests-server migrate`) |
 | `bot` | host net | Telegram-бот → `127.0.0.1:8765`, прокси `127.0.0.1:12334` |
 | `frontend` | `8080` | nginx → проксирует всё на `api` |
 | `clamav` | internal `3310` | clamd sidecar; сигнатуры в volume `clamav-sigs` |

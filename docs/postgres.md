@@ -1,16 +1,28 @@
 # PostgreSQL
 
 The API runs on PostgreSQL when `QUESTS_DATABASE_URL` (`postgresql://user:pw@host:port/db`) is set,
-and on the SQLite file in `QUESTS_DATA_DIR` otherwise. Both `quests-migrate` and `quests-server` read it.
+and on the SQLite file in `QUESTS_DATA_DIR` otherwise. `quests-server migrate` (run by the api image's entrypoint before the server starts) and `quests-server` both read it.
 
-## Schema chains
+## Schema migrations
 
-| DB | Migrations | Notes |
+Migrations are plain SQL files embedded in the binary and applied by `quests-server migrate`
+(`go/internal/db/migrate.go`):
+
+| DB | Files | Notes |
 |---|---|---|
-| SQLite | `alembic/versions/` | legacy chain, frozen after cutover |
-| PostgreSQL | `alembic/versions_pg/` | `1a2b3c4d5e6f` is a baseline equal to the SQLite head, `c7e1a9b3d5f2` adds workspaces; new revisions go here, PG-only |
+| PostgreSQL | `go/internal/db/sql/pg/NNNN_*.sql` | the chain that grows; each file runs in its own transaction under an advisory lock |
+| SQLite | `go/internal/db/sql/sqlite/` | a single baseline (frozen chain head `1a2b3c4d5e6f`); SQLite is for local development |
 
-After a new PG revision, append its id to `alembicOrder`/`expectedAlembic` in `go/internal/db/db.go`.
+The applied revision is kept in `alembic_version` (same table and format Alembic used), so databases
+migrated by Alembic continue from where they are. Files `0001`–`0011` carry their Alembic revision id
+(`NNNN_<12 hex>_<name>.sql`); new ones are `NNNN_<name>.sql` and their revision is just `NNNN`.
+
+**Adding a migration:** create `go/internal/db/sql/pg/NNNN_<name>.sql` with the next number (PG only, no
+Python wrapper, no list to update — the head is derived from the files). The API refuses to start on an older
+schema and warns on a newer one; run `quests-server migrate current` to see the revision.
+
+The Alembic chain (`alembic/`) is an archive of the history up to `0011` and is no longer run;
+`go test ./internal/db` checks that the embedded copy stays identical to it.
 
 Baseline conventions (kept so the Go store works unchanged on both):
 boolean-ish columns are `INTEGER` 0/1, timestamps are naive-UTC `TIMESTAMP`, `VARCHAR(n)` is `TEXT`
@@ -20,7 +32,7 @@ boolean-ish columns are `INTEGER` 0/1, timestamps are naive-UTC `TIMESTAMP`, `VA
 
 ```bash
 export QUESTS_DATABASE_URL=postgresql://quests@127.0.0.1:5432/quests
-uv run quests-migrate
+quests-server migrate
 ./scripts/run-server.sh
 ```
 
@@ -37,7 +49,7 @@ QUESTS_TEST_PG_URL=postgresql://quests@127.0.0.1:5432/quests go test ./go/intern
 2. Stop the API (`stop api bot`) so SQLite is quiescent.
 3. Migrate PG (to head, workspaces included) and copy the data into workspace 1 (from a host with the volume and uv; `QUESTS_DATABASE_URL` points at the new DB):
    ```bash
-   uv run quests-migrate
+   quests-server migrate
    uv run python scripts/sqlite_to_pg.py path/to/quests.db "$QUESTS_DATABASE_URL"
    ```
    The script refuses a non-empty target, compares row counts per table and rolls back on any mismatch.

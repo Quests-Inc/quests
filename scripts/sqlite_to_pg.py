@@ -3,7 +3,7 @@
 
     uv run python scripts/sqlite_to_pg.py data/quests.db postgresql://user@host/db [--force]
 
-The target must have been migrated first (any PG revision; copied rows go to workspace 1) (`QUESTS_DATABASE_URL=… uv run quests-migrate`)
+The target must have been migrated first (any PG revision; copied rows go to workspace 1) (`QUESTS_DATABASE_URL=… quests-server migrate`)
 and be empty (--force truncates it). Tables are copied in foreign-key order, serial
 sequences are advanced past the copied ids, and row counts are compared at the end.
 Everything runs in one transaction: any failure leaves the target untouched.

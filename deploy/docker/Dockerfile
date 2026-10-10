@@ -67,14 +67,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.19 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-COPY alembic ./alembic
-COPY alembic.ini ./
 
-# Core only (alembic/sqlmodel/dotenv) — api needs nothing heavier than this;
+# Core only (sqlmodel/dotenv) — api needs nothing heavier than this;
 # the action-batch assistant is pure Go now (go/internal/llmassist).
 RUN uv sync --locked --no-dev
 
-# --- API runtime: Go server + SPA + Alembic migrate ---
+# --- API runtime: Go server + SPA (schema migrations are embedded: `quests-server migrate`) ---
 FROM python-base AS api
 # pg_dump for PostgreSQL backups: the client must be at least the server's major
 # version, which Debian's own package is not — take it from the PGDG repo.

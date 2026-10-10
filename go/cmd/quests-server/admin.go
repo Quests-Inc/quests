@@ -48,6 +48,8 @@ const adminUsage = `quests-server admin commands (run on the host holding quests
   quests-server runner ls                list runners and when they were last seen
   quests-server runner rm <label>        revoke a runner and cancel its queued jobs
   quests-server backup-now               run one DB+attachments backup tick now
+  quests-server migrate [current]        bring the database (PostgreSQL if QUESTS_DATABASE_URL is set, else the SQLite file)
+                                         to the schema this binary expects; "current" only prints the revision
 
 Passwords are never taken from argv or env, so they stay out of shell history.
 `
@@ -59,6 +61,9 @@ func runAdmin(args []string) bool {
 		return false
 	}
 	switch args[0] {
+	case "migrate":
+		runMigrate(args[1:])
+		return true
 	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "backup-now", "workspace":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
@@ -536,4 +541,42 @@ func trustLabel(t bool) string {
 		return "trusted"
 	}
 	return "untrusted"
+}
+
+// runMigrate applies the embedded migrations (the API itself never migrates: it
+// refuses to start on an older schema, see db.OpenConfigured).
+func runMigrate(args []string) {
+	config.LoadDotenv(config.Load().Root)
+	cfg := config.Load()
+	if len(args) > 0 && args[0] == "current" {
+		v, err := db.CurrentRevision(cfg.DBPath, cfg.DatabaseURL)
+		if err != nil {
+			fatal("migrate: %v", err)
+		}
+		if v == "" {
+			v = "(none)"
+		}
+		fmt.Println(v)
+		return
+	}
+	if len(args) > 0 {
+		fatal("usage: quests-server migrate [current]")
+	}
+	logf := func(format string, a ...any) { fmt.Printf(format+"\n", a...) }
+	var err error
+	if cfg.DatabaseURL != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		_, err = db.MigratePostgres(ctx, cfg.DatabaseURL, logf)
+	} else {
+		_, err = db.MigrateSQLite(cfg.DBPath, logf)
+	}
+	if err != nil {
+		fatal("migrate: %v", err)
+	}
+	v, err := db.CurrentRevision(cfg.DBPath, cfg.DatabaseURL)
+	if err != nil {
+		fatal("migrate: %v", err)
+	}
+	fmt.Println("revision:", v)
 }

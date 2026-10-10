@@ -12,17 +12,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// expectedAlembic is the PostgreSQL schema revision this binary was built
-// against (head of alembic/versions_pg). Append new ids to alembicOrder when
-// adding migrations. The SQLite chain is frozen at expectedAlembicSQLite.
-const expectedAlembic = "f5b7d9e1a3c6"
-
-// expectedAlembicSQLite is the head of the legacy SQLite chain (alembic/versions).
+// The PostgreSQL schema chain is embedded (sql/pg, applied by MigratePostgres);
+// its head is expectedAlembic and needs no manual bump. The version table keeps
+// Alembic's name and format so the archived Alembic chain and this binary read the
+// same database (the Python side is frozen, see alembic/README.md).
+//
+// The SQLite chain is frozen at expectedAlembicSQLite; a fresh file gets sql/sqlite.
 const expectedAlembicSQLite = "1a2b3c4d5e6f"
 
-// alembicOrder is oldest→newest. Unknown DB revisions are treated as ahead of
-// this binary (deploy race: migrate applied before the new image lands).
-var alembicOrder = []string{
+// legacySQLiteOrder is the frozen SQLite chain, oldest→newest, ending with the
+// baseline that the PostgreSQL chain starts from.
+var legacySQLiteOrder = []string{
 	"df501a4accdb",
 	"7d093d52e81e",
 	"a1b2c3d4e5f6",
@@ -63,16 +63,24 @@ var alembicOrder = []string{
 	"d5e6f7a8b9c0",
 	"e6f7a8b9c0d1",
 	"1a2b3c4d5e6f",
-	"c7e1a9b3d5f2",
-	"d8f2b4a6c1e3",
-	"e9a3c5b7d1f4",
-	"f1b4d6c8e2a5",
-	"a4c6e8b0d2f1",
-	"b6d8f0a2c4e1",
-	"c8e0a2b4d6f3",
-	"d1f3a5c7e9b2",
-	"e3a5c7e9b1d4",
-	"f5b7d9e1a3c6",
+}
+
+// alembicOrder is oldest→newest: the legacy chain, then every PostgreSQL revision
+// after the shared baseline. Unknown DB revisions are treated as ahead of this
+// binary (deploy race: migrate applied before the new image lands).
+var alembicOrder = buildOrder()
+
+// expectedAlembic is the PostgreSQL schema revision this binary was built against.
+var expectedAlembic = pgMigrations[len(pgMigrations)-1].Revision
+
+func buildOrder() []string {
+	order := append([]string(nil), legacySQLiteOrder...)
+	for _, m := range pgMigrations {
+		if m.Revision != expectedAlembicSQLite {
+			order = append(order, m.Revision)
+		}
+	}
+	return order
 }
 
 // SchemaStatus is the alembic check outcome for health probes / logs.
@@ -94,7 +102,7 @@ func OpenConfigured(path, databaseURL string) (*sql.DB, SchemaStatus, error) {
 
 func Open(path string) (*sql.DB, SchemaStatus, error) {
 	var zero SchemaStatus
-	if err := os.MkdirAll(dirOf(path), 0o755); err != nil {
+	if err := ensureDir(path); err != nil {
 		return nil, zero, err
 	}
 	// WAL + busy timeout — match Python db.py
@@ -117,6 +125,8 @@ func Open(path string) (*sql.DB, SchemaStatus, error) {
 	return sqlDB, st, nil
 }
 
+func ensureDir(path string) error { return os.MkdirAll(dirOf(path), 0o755) }
+
 func dirOf(path string) string {
 	for i := len(path) - 1; i >= 0; i-- {
 		if path[i] == '/' {
@@ -130,10 +140,10 @@ func assertMigrated(db *sql.DB, expected string) (SchemaStatus, error) {
 	var ver string
 	err := db.QueryRow(`SELECT version_num FROM alembic_version LIMIT 1`).Scan(&ver)
 	if err == sql.ErrNoRows {
-		return SchemaStatus{}, fmt.Errorf("quests.db has no alembic_version; run: uv run quests-migrate")
+		return SchemaStatus{}, fmt.Errorf("quests.db has no alembic_version; run: quests-server migrate")
 	}
 	if err != nil {
-		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (run Python migrate first)", err)
+		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (run: quests-server migrate)", err)
 	}
 	return checkAlembicVersionAgainst(ver, expected, alembicOrder)
 }
@@ -156,7 +166,7 @@ func checkAlembicVersionAgainst(ver, expected string, order []string) (SchemaSta
 		return st, nil
 	}
 	if dbIdx < expIdx {
-		return SchemaStatus{}, fmt.Errorf("alembic_version=%s older than required %s; upgrade with Python Alembic first", ver, expected)
+		return SchemaStatus{}, fmt.Errorf("alembic_version=%s older than required %s; run: quests-server migrate", ver, expected)
 	}
 	if dbIdx > expIdx {
 		st.State = "warn"

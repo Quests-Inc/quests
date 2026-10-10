@@ -2,5 +2,5 @@
 set -eu
 cd /app
 mkdir -p /app/data
-quests-migrate upgrade
+quests-server migrate
 exec "$@"

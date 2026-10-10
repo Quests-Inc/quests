@@ -55,8 +55,6 @@ jobs:
             api:
               - 'go/**'
               - 'frontend/**'
-              - 'alembic/**'
-              - 'alembic.ini'
               - 'pyproject.toml'
               - 'uv.lock'
               - 'README.md'
@@ -123,6 +121,21 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Production runs on PostgreSQL: the db/migration tests need a real server.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quests
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: quests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quests"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -138,6 +151,8 @@ jobs:
 
       - name: Go build + test
         working-directory: go
+        env:
+          QUESTS_TEST_PG_URL: postgresql://quests:test@127.0.0.1:5432/quests?sslmode=disable
         run: |
           go build ./...
           go test ./...
