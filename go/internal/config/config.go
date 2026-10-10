@@ -2,6 +2,8 @@ package config
 
 import (
 	"errors"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +15,7 @@ type Config struct {
 	Root    string
 	DataDir string
 	// DatabaseURL (QUESTS_DATABASE_URL, postgres://…) is the PostgreSQL database; the server requires it.
+	// Without it, QUESTS_DB_HOST (with POSTGRES_PASSWORD) describes the same thing in parts: see databaseURLFromEnv.
 	DatabaseURL string
 	// MetricsToken (QUESTS_METRICS_TOKEN) is the bearer token for GET /metrics; empty disables the endpoint.
 	MetricsToken string
@@ -134,7 +137,7 @@ func Load() Config {
 		SecureCookies:       secure,
 		Root:                root,
 		DataDir:             data,
-		DatabaseURL:         strings.TrimSpace(os.Getenv("QUESTS_DATABASE_URL")),
+		DatabaseURL:         databaseURLFromEnv(),
 		MetricsToken:        strings.TrimSpace(os.Getenv("QUESTS_METRICS_TOKEN")),
 		Host:                host,
 		Port:                port,
@@ -196,4 +199,32 @@ func (c Config) RequireDatabaseURL() (string, error) {
 		return "", errors.New("QUESTS_DATABASE_URL is not set: Quests runs on PostgreSQL (postgresql://user:pw@host:5432/db, see docs/postgres.md)")
 	}
 	return c.DatabaseURL, nil
+}
+
+// databaseURLFromEnv returns QUESTS_DATABASE_URL, or builds the URL from its parts when that is unset
+// and QUESTS_DB_HOST is: user QUESTS_DB_USER (quests), password POSTGRES_PASSWORD, database QUESTS_DB_NAME
+// (quests), port QUESTS_DB_PORT (5432), QUESTS_DB_SSLMODE (disable). This lets a container take the password
+// from the very env file the postgres container reads, with no ${…} interpolation of secrets in compose.
+func databaseURLFromEnv() string {
+	if u := strings.TrimSpace(os.Getenv("QUESTS_DATABASE_URL")); u != "" {
+		return u
+	}
+	host := strings.TrimSpace(os.Getenv("QUESTS_DB_HOST"))
+	if host == "" {
+		return ""
+	}
+	pick := func(name, def string) string {
+		if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+			return v
+		}
+		return def
+	}
+	u := url.URL{
+		Scheme:   "postgresql",
+		User:     url.UserPassword(pick("QUESTS_DB_USER", "quests"), os.Getenv("POSTGRES_PASSWORD")),
+		Host:     net.JoinHostPort(host, pick("QUESTS_DB_PORT", "5432")),
+		Path:     "/" + pick("QUESTS_DB_NAME", "quests"),
+		RawQuery: "sslmode=" + pick("QUESTS_DB_SSLMODE", "disable"),
+	}
+	return u.String()
 }

@@ -6,12 +6,12 @@ compose_files:
   - docker-compose.yml
   - docker-compose.monitoring.yml # drop this line to switch monitoring off
 
-# version.env (written by the release) and config.env feed ${…} in the compose files;
-# secrets.enc.env is SOPS-encrypted and decrypted by doco-cd with the age key from the host.
+# version.env (written by the release) and config.env feed ${…} in the compose files. Secrets are NOT
+# interpolated anywhere: containers read them as env_file (secrets.enc.env, SOPS-encrypted and decrypted by
+# doco-cd with the host's age key, and/or the host's legacy .env).
 env_files:
   - version.env
   - config.env
-  - secrets.enc.env
 
 # bot + stt (Telegram bot and voice-to-text).
 profiles:

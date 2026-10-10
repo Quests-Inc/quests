@@ -27,6 +27,10 @@ jobs:
           DEPLOY_STATE: ${{ vars.DEPLOY_STATE_DIR || '/srv/quests-deploy' }}
           DEPLOY_GIT_TOKEN: ${{ secrets.DEPLOY_GIT_TOKEN }}
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+          # The old .env: the content from a secret if there is one, else this file on the runner's host
+          # (where the previous deployment kept it).
+          LEGACY_ENV: ${{ secrets.LEGACY_ENV }}
+          LEGACY_ENV_FILE: ${{ vars.LEGACY_ENV_FILE || '/home/amarant/Documents/projects/quests/.env' }}
           GHCR_USER: ${{ vars.GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}

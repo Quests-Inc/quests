@@ -2,10 +2,20 @@
 #
 # Deployed by doco-cd from the `prod` branch (see deploy/README.md): every release moves that branch to
 # a commit that pins QUESTS_VERSION in version.env, so what runs is always one explicit release.
-# Settings: config.env (plain), secrets.enc.env (SOPS-encrypted), version.env (written by the release).
+# Settings: config.env (plain), secrets.enc.env (SOPS-encrypted, optional), /legacy.env (the host's old .env,
+# optional), version.env (written by the release).
 # Locally, for a look at it:  docker compose --env-file version.env --env-file config.env -f docker-compose.yml config
 
 name: quests
+
+x-env: &env
+  # Lowest to highest: the host's legacy .env (kept as it was; mounted into doco-cd by bootstrap.sh and absent
+  # when there is none), the repository's plain settings, the SOPS-encrypted secrets. A later file wins.
+  - path: /legacy.env
+    required: false
+  - config.env
+  - path: secrets.enc.env
+    required: false
 
 
 services:
@@ -13,9 +23,7 @@ services:
     image: ${QUESTS_IMAGE_REPO:-ghcr.io/valirum}/quests-api:${QUESTS_VERSION:?version.env is missing, deploy through a release}
     container_name: quests-api
     restart: unless-stopped
-    env_file:
-      - config.env
-      - secrets.enc.env
+    env_file: *env
     environment:
       QUESTS_ROOT: /app
       QUESTS_DATA_DIR: /app/data
@@ -36,7 +44,8 @@ services:
       # clamd is the sidecar below; uploads 503 until it is ready.
       QUESTS_CLAMAV_ADDR: ${QUESTS_CLAMAV_ADDR:-clamav:3310}
       # PostgreSQL below; the server migrates the schema itself when it starts.
-      QUESTS_DATABASE_URL: postgresql://quests:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in secrets.enc.env}@postgres:5432/quests
+      # The URL is built from these and POSTGRES_PASSWORD (from the env files): no secret passes through ${…}.
+      QUESTS_DB_HOST: postgres
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -61,10 +70,11 @@ services:
     image: postgres:17-bookworm
     container_name: quests-postgres
     restart: unless-stopped
+    # POSTGRES_PASSWORD comes from the env files (the other variables in them are not used by postgres).
+    env_file: *env
     environment:
       POSTGRES_USER: quests
       POSTGRES_DB: quests
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in secrets.enc.env}
     volumes:
       - quests-pg:/var/lib/postgresql/data
     # No published port: api reaches it on the compose network as postgres:5432.
@@ -97,9 +107,7 @@ services:
     image: ${QUESTS_IMAGE_REPO:-ghcr.io/valirum}/quests-stt:${QUESTS_VERSION:?version.env is missing, deploy through a release}
     container_name: quests-stt
     restart: unless-stopped
-    env_file:
-      - config.env
-      - secrets.enc.env
+    env_file: *env
     environment:
       QUESTS_ROOT: /app
       QUESTS_DATA_DIR: /app/data
@@ -129,9 +137,7 @@ services:
         condition: service_healthy
       stt:
         condition: service_healthy
-    env_file:
-      - config.env
-      - secrets.enc.env
+    env_file: *env
     environment:
       QUESTS_ROOT: /app
       QUESTS_DATA_DIR: /app/data

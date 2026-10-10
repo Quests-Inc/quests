@@ -21,7 +21,13 @@
   только `prod`. Схему БД откат не возвращает: откатывать можно, пока данные ей соответствуют (добавляем
   колонки в одном релизе, убираем в следующем). Перед каждой миграцией сервер сам делает `pg_dump`
   (`pre-migrate-….dump` в `data/backups/`).
-- **Секреты** — `deploy/prod/secrets.enc.env`, зашифрованы SOPS (age); открывает их doco-cd ключом с хоста.
+- **Секреты** — два источника, можно любой или оба (SOPS главнее там, где переменная задана и там, и там):
+  1. **Старый `.env` хоста** (запасной путь, работает сразу): bootstrap берёт его с раннера (файл прежнего деплоя,
+     `/home/amarant/Documents/projects/quests/.env`, или другой путь из `LEGACY_ENV_FILE`) либо из секрета `LEGACY_ENV`,
+     кладёт в `$DEPLOY_STATE/legacy.env`, а doco-cd монтирует его как `/legacy.env`; compose читает его как необязательный
+     `env_file`. Секреты нигде не подставляются через `${…}`: контейнеры сами читают env-файлы.
+  2. **SOPS** — `deploy/prod/secrets.enc.env` (age), лежит в репозитории зашифрованным, открывает его doco-cd ключом с хоста.
+     Включится, как только появится файл и ключ; до тех пор его просто нет.
 - **Уведомления** об итогах деплоя — в Telegram через Apprise; пока токена бота нет, они молчат.
 
 ## Выпуск релиза
@@ -39,26 +45,39 @@ Required reviewers*) → `prod` двигается → doco-cd выкатыва�
 (`.github/workflows/bootstrap-deploy.yml`). Как только на сервере появится shell, раннер можно удалить, а
 `deploy/doco-cd/bootstrap.sh` запускать руками.
 
-1. **Секреты приложения.** `just secrets-init` (создаёт age-ключ в `~/.config/sops/age/keys.txt`, кладёт публичный
-   ключ в `deploy/prod/.sops.yaml`, шифрует шаблон), затем `just secrets-edit` — заполнить значения
-   (`POSTGRES_PASSWORD` — **тот же**, что сейчас на проде, иначе api не подключится к существующей БД;
-   `QUESTS_SECRET_KEY` — тот же, что сейчас, иначе запечатанные секреты не откроются). Не обязательные
-   несекретные настройки — `deploy/prod/config.env`. Закоммитить `.sops.yaml` и `secrets.enc.env`.
-2. **GitHub → Settings → Environments → `production`**: Required reviewers — вы.
-3. **GitHub → Secrets (`production` или репозиторий):**
-   - `SOPS_AGE_KEY` — приватный ключ age (содержимое строки `AGE-SECRET-KEY-…` из файла ключа);
-   - `DEPLOY_GIT_TOKEN` — fine-grained PAT, только чтение (*Contents: read*) этого репозитория;
-   - `GHCR_PULL_TOKEN` — PAT с `read:packages` (образы приватные);
-   - `TG_BOT_TOKEN` — необязательно, пока пусто — уведомлений нет.
-   **Variables:** `GHCR_USER` (логин для ghcr.io), `TG_CHAT_ID` (с токеном), `DEPLOY_STATE_DIR`
-   (по умолчанию `/srv/quests-deploy`; каталог должен быть доступен раннеру), `DOCO_CD_VERSION` (по умолчанию `latest`: закрепите после первого запуска).
-4. **Раннер на сервере** (временно): Settings → Actions → Runners → New self-hosted runner, под отдельным пользователем,
-   состоящим в группе `docker`. Репозиторий должен оставаться **приватным**: self-hosted раннер исполняет то,
-   что говорят workflow-ы (см. предупреждение в `bootstrap-deploy.yml`).
-5. **Первый релиз**: `just release 0.1.0` (или версия, с которой начинаете). Он соберёт образы и создаст ветку `prod`.
-6. Actions → *Bootstrap deploy agent* → Run workflow: запустит doco-cd, тот увидит `prod` и поднимет стек.
+Минимум (секреты берутся из старого `.env` сервера, SOPS не нужен):
 
-Проверить: `quests-server version` / `/api/health` показывают версию; в логах doco-cd — «deployment completed».
+1. **GitHub → Settings → Environments → New environment → `production`**, включить *Required reviewers* (вы).
+2. **Секреты и переменные** (*Settings → Secrets and variables → Actions*; удобнее положить в environment `production`:
+   тогда они видны только деплой-job-ам). Что и откуда брать — в таблице ниже.
+3. **Раннер на сервере** (временно): *Settings → Actions → Runners → New self-hosted runner*, под отдельным
+   пользователем из группы `docker`, с доступом на чтение к файлу старого `.env`. Репозиторий должен оставаться
+   **приватным**: self-hosted раннер исполняет то, что говорят workflow-ы (предупреждение в `bootstrap-deploy.yml`).
+4. **Первый релиз**: `just release 0.1.0` (или версия, с которой начинаете): соберёт образы и создаст ветку `prod`
+   после вашего одобрения job `deploy`.
+5. *Actions → Bootstrap deploy agent → Run workflow*: запустит doco-cd; тот увидит `prod` и поднимет стек
+   поверх существующих томов и БД.
+
+Проверить: `/api/health` показывает версию; в логах doco-cd — «deployment completed».
+
+Позже, когда захотите SOPS: `just secrets-init`, `just secrets-edit`, закоммитить `.sops.yaml` и `secrets.enc.env`, добавить
+секрет `SOPS_AGE_KEY` и перезапустить Bootstrap. Старый `.env` после этого можно убрать.
+
+### Секреты и переменные GitHub: где взять
+
+| Имя | Тип | Обязательно | Где взять |
+|---|---|---|---|
+| `DEPLOY_GIT_TOKEN` | secret | да | GitHub → ваш профиль → *Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token*: *Repository access* → *Only select repositories* → этот репозиторий; *Permissions → Repository → Contents: Read-only*. Срок до года, потом перевыпустить. doco-cd читает с него ветку `prod` |
+| `GHCR_PULL_TOKEN` | secret | да | *Developer settings → Personal access tokens → Tokens (classic) → Generate*: единственная галка `read:packages` (fine-grained токены пакеты не умеют). Нужен серверу, чтобы тянуть приватные образы из ghcr.io |
+| `GHCR_USER` | variable | да | логин GitHub-аккаунта, которому принадлежит токен выше |
+| `LEGACY_ENV` | secret | нет | содержимое старого `.env` целиком, если раннер не может прочитать его с диска. Иначе путь на хосте раннера в `LEGACY_ENV_FILE` (по умолчанию `/home/amarant/Documents/projects/quests/.env`) |
+| `LEGACY_ENV_FILE` | variable | нет | путь к старому `.env` на хосте раннера, если он не по умолчанию |
+| `SOPS_AGE_KEY` | secret | нет (с SOPS — да) | строка `AGE-SECRET-KEY-…` из файла ключа (`~/.config/sops/age/keys.txt`, создаётся `just secrets-init`) |
+| `TG_BOT_TOKEN` + `TG_CHAT_ID` | secret + variable | нет | токен у @BotFather (`/newbot`), id чата — написать боту и открыть `https://api.telegram.org/bot<токен>/getUpdates`, поле `chat.id`. Пока пусто, уведомлений нет |
+| `DEPLOY_STATE_DIR` | variable | нет | каталог состояния на хосте, по умолчанию `/srv/quests-deploy` (раннер должен уметь в него писать) |
+| `DOCO_CD_VERSION` | variable | нет | тег образа doco-cd (по умолчанию `latest`; закрепите после первого запуска) |
+
+`GITHUB_TOKEN` для публикации образов и ветки `prod` выдаёт сам GitHub, получать ничего не нужно.
 
 ## Что где лежит
 
@@ -95,4 +114,5 @@ Required reviewers*) → `prod` двигается → doco-cd выкатыва�
 - doco-cd видит ключ age и токен из docker-секретов (`/run/secrets/…`) и умеет `compose pull` из приватного ghcr.io
   с `DOCKER_CONFIG=/docker-config`;
 - существующие тома (`quests_quests-data`, `quests_quests-pg`, `quests_clamav-sigs`) подхвачены: проект называется `quests`;
-- пустые `APPRISE_*` не требуются: без токена бота `notify.env` вообще не создаётся.
+- `/legacy.env` читается как необязательный `env_file` из контейнера doco-cd (путь в compose абсолютный) и перекрывается `config.env` и `secrets.enc.env`;
+- без токена бота и без ключа age `doco.env` не создаётся: doco-cd стартует без `APPRISE_*` и `SOPS_AGE_KEY_FILE`.

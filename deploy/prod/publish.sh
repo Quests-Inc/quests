@@ -18,13 +18,15 @@ if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "publish: '$version' is not a release version (MAJOR.MINOR.PATCH, no prerelease)" >&2
   exit 2
 fi
-if grep -q REPLACE_WITH "$src/.sops.yaml"; then
-  echo "publish: .sops.yaml still has no age public key: run 'just secrets-init'" >&2
-  exit 2
-fi
-if ! grep -q 'ENC\[' "$src/secrets.enc.env" 2>/dev/null || ! grep -q '^sops_' "$src/secrets.enc.env"; then
-  echo "publish: secrets.enc.env is missing or not SOPS-encrypted: run 'just secrets-init'" >&2
-  exit 2
+# Secrets: either SOPS-encrypted in secrets.enc.env, or (fallback) in the host's legacy .env, which doco-cd
+# mounts as /legacy.env. A secrets.enc.env that is not really encrypted must never be published.
+if [ -f "$src/secrets.enc.env" ]; then
+  if grep -q REPLACE_WITH "$src/.sops.yaml" || ! grep -q 'ENC\[' "$src/secrets.enc.env" || ! grep -q '^sops_' "$src/secrets.enc.env"; then
+    echo "publish: secrets.enc.env is not SOPS-encrypted: run 'just secrets-init' (or delete it to use the host's legacy .env)" >&2
+    exit 2
+  fi
+else
+  echo "publish: no secrets.enc.env: the stack will read secrets from the host's legacy .env only" >&2
 fi
 
 work="$(mktemp -d)"

@@ -246,8 +246,7 @@ check-deploy:
     tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
     cp -a deploy/prod/. "$tmp/"
     echo "QUESTS_VERSION=0.0.0" > "$tmp/version.env"
-    sed -e 's/^\([A-Z_]*\)=$/\1=x/' -e '/^#/d' "$tmp/secrets.example.env" > "$tmp/secrets.enc.env"
-    cd "$tmp" && docker compose --env-file version.env --env-file config.env --env-file secrets.enc.env \
+    cd "$tmp" && docker compose --env-file version.env --env-file config.env \
         -f docker-compose.yml -f docker-compose.monitoring.yml --profile bot config -q
     echo "production compose renders"
 

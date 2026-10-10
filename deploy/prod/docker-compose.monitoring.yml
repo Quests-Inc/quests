@@ -5,6 +5,13 @@
 # First start: open http://<host>:${KUMA_PORT:-3001}, create the admin account, then
 # `monitoring/kuma-monitors.py` adds the probes (docs/monitoring.md).
 
+x-env: &env
+  - path: /legacy.env
+    required: false
+  - config.env
+  - path: secrets.enc.env
+    required: false
+
 services:
   kuma:
     image: louislam/uptime-kuma:1
@@ -25,13 +32,12 @@ services:
 
   # --- metrics (quest=345): Prometheus scrapes the API's /metrics (bearer QUESTS_METRICS_TOKEN),
   # the host (node-exporter) and Postgres; Grafana draws them. Needs QUESTS_METRICS_TOKEN and
-  # GRAFANA_ADMIN_PASSWORD in secrets.enc.env; Prometheus and the exporters publish no ports.
+  # GRAFANA_ADMIN_PASSWORD in the env files; Prometheus and the exporters publish no ports.
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: quests-prometheus
     restart: unless-stopped
-    environment:
-      QUESTS_METRICS_TOKEN: ${QUESTS_METRICS_TOKEN:?set QUESTS_METRICS_TOKEN in secrets.enc.env}
+    env_file: *env # QUESTS_METRICS_TOKEN
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
@@ -65,22 +71,27 @@ services:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     container_name: quests-postgres-exporter
     restart: unless-stopped
-    environment:
-      DATA_SOURCE_NAME: postgresql://quests:${POSTGRES_PASSWORD:-}@postgres:5432/quests?sslmode=disable
+    env_file: *env # POSTGRES_PASSWORD
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        DATA_SOURCE_NAME="postgresql://quests:$$POSTGRES_PASSWORD@postgres:5432/quests?sslmode=disable"
+        exec /bin/postgres_exporter
 
   grafana:
     image: grafana/grafana:11.3.0
     container_name: quests-grafana
     restart: unless-stopped
+    env_file: *env # GRAFANA_ADMIN_PASSWORD, read by monitoring/grafana/grafana.ini
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in secrets.enc.env}
       # Public address when Grafana sits behind the gateway (redirects and links are built from it).
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     volumes:
+      - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
