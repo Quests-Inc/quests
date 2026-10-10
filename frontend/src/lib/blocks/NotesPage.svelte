@@ -21,7 +21,7 @@
     mapSourceOffsetToRendered,
     placeTextareaCaret,
     scrollRootToTextOffset,
-  } from '../js/mdCaretMap.js'
+  } from '../js/mdCaretMap.ts'
   import { downloadNoteMarkdown, downloadNotePdf } from '../js/noteExport.ts'
   import { toast, toastDone, toastProgress } from '../js/toasts.svelte.js'
   import Icon from '../ui/Icon.svelte'

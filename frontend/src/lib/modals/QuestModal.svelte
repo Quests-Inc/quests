@@ -33,7 +33,7 @@
   import StepsEditor from '../ui/StepsEditor.svelte'
   import SuggestChip from '../ui/SuggestChip.svelte'
   import TagField from '../ui/TagField.svelte'
-  import { buildSuggestIndex } from '../js/suggest.js'
+  import { buildSuggestIndex } from '../js/suggest.ts'
   import ConfirmModal from './ConfirmModal.svelte'
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'

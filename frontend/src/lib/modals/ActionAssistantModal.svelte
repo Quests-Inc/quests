@@ -1,6 +1,6 @@
 <script>
   import { previewActionBatch, applyActionBatch } from '../js/api.js'
-  import { buildPreviewTree } from '../js/actionsPreview.js'
+  import { buildPreviewTree } from '../js/actionsPreview.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import ModalShell from './ModalShell.svelte'

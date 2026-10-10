@@ -1,6 +1,6 @@
 <script>
   import DOMPurify from 'dompurify'
-  import { tailFade } from '../js/typewriter.js'
+  import { tailFade } from '../js/typewriter.ts'
   import { renderRefTextHtml, parseRefHref } from '../js/refs.ts'
 
   /** @type {{

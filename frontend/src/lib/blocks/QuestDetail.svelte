@@ -18,10 +18,10 @@
     significanceLabel,
     statusColor,
   } from '../js/questFormat.ts'
-  import { downloadQuestPdfSimple } from '../js/questPdf.js'
+  import { downloadQuestPdfSimple } from '../js/questPdf.ts'
   import { downloadQuestPdf as downloadQuestPdfRich } from '../js/questExport.ts'
   import { toastDone, toastProgress } from '../js/toasts.svelte.js'
-  import { animateText } from '../js/typewriter.js'
+  import { animateText } from '../js/typewriter.ts'
 
   /** @type {{
    *   selected: any | null,

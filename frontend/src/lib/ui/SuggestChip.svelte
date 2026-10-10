@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte'
   import Icon from './Icon.svelte'
-  import { nearestVote, pickSuggestion } from '../js/suggest.js'
+  import { nearestVote, pickSuggestion } from '../js/suggest.ts'
 
   /**
    * "похоже на: ● Quests — MVP TODO" under a questline/section picker.
@@ -9,7 +9,7 @@
    * rest of this form. Waits for 3+ title characters and a 300 ms pause in
    * typing; once shown it holds on through small wobbles in confidence.
    * @type {{
-   *   index: ReturnType<typeof import('../js/suggest.js').buildSuggestIndex> | null,
+   *   index: ReturnType<typeof import('../js/suggest.ts').buildSuggestIndex> | null,
    *   title: string,
    *   description?: string,
    *   target: 'questline' | 'category',

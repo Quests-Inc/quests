@@ -1,6 +1,6 @@
 <script>
   import { createTag } from '../js/api.js'
-  import { buildSuggestIndex, suggestTags } from '../js/suggest.js'
+  import { buildSuggestIndex, suggestTags } from '../js/suggest.ts'
 
   const MAX = 5
 
