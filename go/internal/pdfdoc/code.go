@@ -95,26 +95,7 @@ func (r *Renderer) code(lang string, lines []string) {
 		r.pdf.SetY(r.pdf.GetY() + 1.6)
 	}
 	for _, segs := range highlight(lang, lines) {
-		// expand tabs and cut the line into rows of at most cols characters
-		var rows [][]codeSeg
-		var row []codeSeg
-		n := 0
-		for _, s := range segs {
-			text := strings.ReplaceAll(s.text, "\t", "    ")
-			for _, ch := range text {
-				if n == cols {
-					rows = append(rows, row)
-					row, n = nil, 0
-				}
-				if k := len(row); k > 0 && row[k-1].color == s.color && row[k-1].bold == s.bold && row[k-1].italic == s.italic {
-					row[k-1].text += string(ch)
-				} else {
-					row = append(row, codeSeg{text: string(ch), color: s.color, bold: s.bold, italic: s.italic})
-				}
-				n++
-			}
-		}
-		rows = append(rows, row)
+		rows := wrapCode(segs, cols)
 		for _, rw := range rows {
 			r.ensure(lh)
 			if !r.ok() {
@@ -138,4 +119,65 @@ func (r *Renderer) code(lang string, lines []string) {
 	fillRow(1.6)
 	r.pdf.SetY(r.pdf.GetY() + 1.6)
 	r.gap(2)
+}
+
+type codeCell struct {
+	ch     rune
+	color  rgb
+	bold   bool
+	italic bool
+}
+
+// wrapCode expands tabs and cuts one source line into rows of at most cols characters. It breaks after a
+// space or a punctuation mark when there is one in the second half of the row (not in the middle of a word)
+// and indents continuation rows under the line's own indentation, so wrapped code stays readable.
+func wrapCode(segs []codeSeg, cols int) [][]codeSeg {
+	var cells []codeCell
+	for _, s := range segs {
+		for _, ch := range strings.ReplaceAll(s.text, "\t", "    ") {
+			cells = append(cells, codeCell{ch, s.color, s.bold, s.italic})
+		}
+	}
+	indent := 0
+	for indent < len(cells) && cells[indent].ch == ' ' {
+		indent++
+	}
+	cont := min(indent+2, cols/3)
+	group := func(prefix int, cs []codeCell) []codeSeg {
+		var out []codeSeg
+		if prefix > 0 {
+			out = append(out, codeSeg{text: strings.Repeat(" ", prefix), color: rgb{40, 40, 40}})
+		}
+		for _, c := range cs {
+			if k := len(out); k > 0 && out[k-1].color == c.color && out[k-1].bold == c.bold && out[k-1].italic == c.italic {
+				out[k-1].text += string(c.ch)
+			} else {
+				out = append(out, codeSeg{text: string(c.ch), color: c.color, bold: c.bold, italic: c.italic})
+			}
+		}
+		return out
+	}
+	if len(cells) <= cols {
+		return [][]codeSeg{group(0, cells)}
+	}
+	var rows [][]codeSeg
+	pos, prefix := 0, 0
+	for pos < len(cells) {
+		capacity := cols - prefix
+		end := min(pos+capacity, len(cells))
+		if end < len(cells) {
+			for i := end; i > pos+capacity/2; i-- { // last good break point in the row's second half
+				if c := cells[i-1].ch; c == ' ' || c == ',' || c == ';' || c == '(' || c == ')' || c == '.' {
+					end = i
+					break
+				}
+			}
+		}
+		rows = append(rows, group(prefix, cells[pos:end]))
+		pos, prefix = end, cont
+		for pos < len(cells) && cells[pos].ch == ' ' && pos > 0 { // do not start a continuation with the break's own spaces
+			pos++
+		}
+	}
+	return rows
 }
