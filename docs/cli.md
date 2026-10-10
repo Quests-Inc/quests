@@ -20,14 +20,8 @@ uv run quests list              # launcher → тот же бинарник
 |-----|---------|------------|
 | `QUESTS_API` / `--api URL` | `http://127.0.0.1:8765` | база API (`--api` перекрывает env) |
 | `QUESTS_HOOKS` | `data/hooks.json` | хранилище хуков |
-| `QUESTS_LLM_PROVIDER` | `groq` | `groq` \| `ollama` (только `llm-add`) |
-| `GROQ_API_KEY` | — | ключ Groq (console.groq.com → API Keys) |
-| `QUESTS_LLM_MODEL` | `openai/gpt-oss-20b` | модель Groq / Ollama |
-| `QUESTS_LLM_BASE` | `https://api.groq.com/openai/v1` | база для `groq` (или `http://127.0.0.1:11434` для `ollama`) |
-| `QUESTS_LLM_PROXY` | `QUESTS_TG_PROXY` | прокси для `groq` — Cloudflare перед api.groq.com банит некоторые сети/регионы (403) |
-| `QUESTS_LLM_TIMEOUT` | `180` | таймаут сек |
 
-`llm-add` по-прежнему через Python LLM (`QUESTS_CLI_NATIVE=1`).
+`llm-add TEXT…` отправляет текст ассистенту сервера (`POST /api/llm/actions/preview`), показывает план действий и после подтверждения (`-y` — без вопроса) применяет его через `/api/llm/actions/apply`. Провайдер, ключ и лимиты LLM — настройки **сервера** (`GROQ_API_KEY`, `QUESTS_LLM_*`, см. `.env.example` и `docs/security.md`), CLI их не читает. Код выхода `2` — ассистент просит уточнение (вопрос в stderr).
 
 ## `--json` / `--api` / `-h`
 
@@ -49,7 +43,7 @@ quests show 3 --json | jq .title
 | `list` / `ls` | список (`--status`, `--pinned` / `--unpinned`, `--category`, `--questline`) |
 | `show` / `get ID` | детали + шаги (+ раздел / квестлайн) |
 | `add TITLE` | создать (`-d`, `--pin`, `--significance`, `--step`×N, `--category`, `--questline`) |
-| `llm-add TEXT…` | свободный текст → Cursor/Ollama → квест (`-y` без confirm) |
+| `llm-add TEXT…` | свободный текст → ассистент сервера → план действий (`-y` без confirm) |
 | `set ID` | поля: `--title` / `-d` / `--category` / `--questline` / `--significance` (`none` снимает) |
 | `pin ID` / `unpin ID` | булавки (`pin --off`) |
 | `status ID STATUS` | `active\|expired\|frozen\|completed\|failed\|archived` |

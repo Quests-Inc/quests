@@ -89,14 +89,11 @@ COPY --from=go-build /out/quests /usr/local/bin/quests
 COPY --from=frontend /src/frontend/dist /app/frontend/dist
 COPY deploy/docker/entrypoint-api.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-# `quests` on PATH is the Python launcher from the venv (it shadows the Go CLI in
-# /usr/local/bin); point it at the real binary so check_command steps can run
-# e.g. `quests progress N`.
+# `quests` on PATH is the Go CLI, so check_command steps can run e.g. `quests progress N`.
 ENV QUESTS_HOST=0.0.0.0 \
     QUESTS_PORT=8765 \
     QUESTS_ROOT=/app \
-    QUESTS_DATA_DIR=/app/data \
-    QUESTS_CLI_BIN=/usr/local/bin/quests
+    QUESTS_DATA_DIR=/app/data
 EXPOSE 8765
 VOLUME ["/app/data"]
 ENTRYPOINT ["/entrypoint.sh"]

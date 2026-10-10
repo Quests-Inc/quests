@@ -7,7 +7,7 @@
 ## Требования
 
 - Go ≥ 1.26 (сборка API/CLI)
-- Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (миграции, MCP, Telegram, `llm-add`)
+- Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (миграции, MCP, Telegram)
 - Node.js / npm (фронт)
 - Для оверлея: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from quests.llm.schema import system_prompt
 from quests.telegram.keyboards import BTN_EDIT, quest_keyboard
 from quests.telegram.notify import should_push_event
 
@@ -66,10 +65,3 @@ def test_active_keyboard_always_full() -> None:
     labels = [btn.text for row in kb.inline_keyboard for btn in row]
     assert "✓ Выполнено" in labels
     assert "▶ Активно" in labels
-
-
-def test_llm_prompt_title_and_steps() -> None:
-    prompt = system_prompt(now_local="2026-09-17 00:00 Thursday", tz_name="Europe/Moscow")
-    assert "2–3 конкретных слова" in prompt
-    assert "steps=[]" in prompt
-    assert "Инбокс Gmail" in prompt

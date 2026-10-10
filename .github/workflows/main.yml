@@ -70,7 +70,6 @@ jobs:
               # image/container now (see `stt` filter below), shared API
               # code is via HTTP.
               - 'src/quests/telegram/**'
-              - 'src/quests/llm/**'
               - 'src/quests/config.py'
               - 'src/quests/envload.py'
               - 'pyproject.toml'

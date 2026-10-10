@@ -37,7 +37,6 @@ stt = [
 ]
 
 [project.scripts]
-quests = "quests.cli:main"
 quests-migrate = "quests.migrate:main"
 quests-telegram = "quests.telegram.main:main"
 quests-mcp = "quests.mcp_server:main"

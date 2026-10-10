@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -31,7 +29,7 @@ func Run(argv []string) int {
 	case "add", "create", "new":
 		code, err = cmdAdd(c, args)
 	case "llm-add", "add-llm", "new-llm":
-		code, err = cmdLLMAdd(args, asJSON, apiURL)
+		code, err = cmdLLMAdd(c, args)
 	case "set":
 		code, err = cmdSet(c, args)
 	case "pin":
@@ -109,7 +107,7 @@ Commands:
   list|ls          список квестов
   show|get ID      детали
   add TITLE        создать
-  llm-add TEXT…    через Python LLM (Cursor/Ollama)
+  llm-add TEXT…    текст → действия через ассистента сервера (-y без вопроса)
   set ID           поля квеста
   pin|unpin ID
   status ID STATUS
@@ -310,48 +308,6 @@ func (m *multiFlag) String() string { return strings.Join(*m, ",") }
 func (m *multiFlag) Set(v string) error {
 	*m = append(*m, v)
 	return nil
-}
-
-func cmdLLMAdd(args []string, asJSON bool, api string) (int, error) {
-	root := findRepoRoot()
-	uvArgs := []string{"run", "--directory", root, "python", "-m", "quests.cli", "llm-add"}
-	if asJSON {
-		uvArgs = append(uvArgs, "--json")
-	}
-	if api != "" {
-		uvArgs = append(uvArgs, "--api", api)
-	}
-	uvArgs = append(uvArgs, args...)
-	cmd := exec.Command("uv", uvArgs...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), "QUESTS_CLI_NATIVE=1")
-	if err := cmd.Run(); err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			return ee.ExitCode(), nil
-		}
-		return 1, err
-	}
-	return 0, nil
-}
-
-func findRepoRoot() string {
-	if v := strings.TrimSpace(os.Getenv("QUESTS_ROOT")); v != "" {
-		return v
-	}
-	wd, _ := os.Getwd()
-	dir := wd
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return wd
-		}
-		dir = parent
-	}
 }
 
 func cmdSet(c *Client, args []string) (int, error) {
