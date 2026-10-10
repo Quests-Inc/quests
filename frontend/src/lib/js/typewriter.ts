@@ -50,11 +50,10 @@ export function animateText(text, opts) {
   const units = granularity === 'char' ? Array.from(full) : wordChunks(full)
   const order = mode === 'erase' ? [...units].reverse() : units
 
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     let i = 0
     let acc = mode === 'erase' ? full : ''
-    /** @type {number | null} */
-    let timer = null
+    let timer: ReturnType<typeof setTimeout> | null = null
 
     function done() {
       if (timer != null) clearTimeout(timer)

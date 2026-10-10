@@ -32,11 +32,11 @@
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import ModalFoot from './ModalFoot.svelte'
-  import { toast } from '../js/toasts.svelte.js'
+  import { toast } from '../js/toasts.svelte.ts'
   import { copyText } from '../js/clipboard.ts'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
-  import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
+  import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
 
   /** `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.

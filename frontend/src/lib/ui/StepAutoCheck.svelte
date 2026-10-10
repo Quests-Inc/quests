@@ -2,7 +2,7 @@
   import HelpTip from './HelpTip.svelte'
   import OptionPills from './OptionPills.svelte'
   import { mirrorQuestId as findMirrorQuest } from '../js/steps.ts'
-  import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
+  import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
 
   /** A step's auto-check: command, poll interval, mode, pipeline gate.
    * The mode/gate controls only appear once there is a command to run.

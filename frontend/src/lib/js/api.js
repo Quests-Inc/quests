@@ -1,4 +1,4 @@
-import { toast } from './toasts.svelte.js'
+import { toast } from './toasts.svelte.ts'
 
 const BASE = ''
 

@@ -9,7 +9,7 @@
     removeCurrent,
     newInvite,
     dropMember,
-  } from './workspaceState.svelte.js'
+  } from './workspaceState.svelte.ts'
 
   /** @type {{ username?: string }} */
   let { username = '' } = $props()

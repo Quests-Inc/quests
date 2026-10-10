@@ -1,5 +1,5 @@
 <script>
-  import { dismissToast, toasts } from '../js/toasts.svelte.js'
+  import { dismissToast, toasts } from '../js/toasts.svelte.ts'
 </script>
 
 {#if toasts.length}

@@ -13,7 +13,7 @@
   import NoteFind from '../ui/NoteFind.svelte'
   import { parseQuery, passes, helpLine } from '../js/searchFlags.ts'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
+  import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.ts'
   import { copyText } from '../js/clipboard.ts'
   import {
     caretOffsetFromPoint,
@@ -23,7 +23,7 @@
     scrollRootToTextOffset,
   } from '../js/mdCaretMap.ts'
   import { downloadNoteMarkdown, downloadNotePdf } from '../js/noteExport.ts'
-  import { toast, toastDone, toastProgress } from '../js/toasts.svelte.js'
+  import { toast, toastDone, toastProgress } from '../js/toasts.svelte.ts'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
   import NoteOutline from '../ui/NoteOutline.svelte'

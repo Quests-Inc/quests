@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import SettingsBlock from './SettingsBlock.svelte'
   import { fetchTokens, createToken, revokeToken } from '../../js/api.js'
-  import { currentWorkspaceName } from './workspaceState.svelte.js'
+  import { currentWorkspaceName } from './workspaceState.svelte.ts'
 
   let tokens = $state(/** @type {{ id: number, name: string, created_at: string, last_used_at: string | null }[]} */ ([]))
   let name = $state('')

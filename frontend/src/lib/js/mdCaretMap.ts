@@ -139,11 +139,15 @@ export function mapSourceOffsetToRendered(source, rendered, sourceOffset) {
  * @param {number} renderedOffset
  * @param {{ block?: ScrollLogicalPosition }} [opts]
  */
-export function scrollRootToTextOffset(root, renderedOffset, opts = {}) {
+export function scrollRootToTextOffset(
+  root: ParentNode,
+  renderedOffset: number,
+  opts: { block?: ScrollLogicalPosition } = {}
+) {
   const range = rangeFromTextOffset(root, renderedOffset)
   if (!range) return
   const node = range.startContainer
-  const el = node.nodeType === Node.ELEMENT_NODE ? /** @type {Element} */ (node) : node.parentElement
+  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement
   el?.scrollIntoView({ block: opts.block ?? 'center', inline: 'nearest' })
 }
 

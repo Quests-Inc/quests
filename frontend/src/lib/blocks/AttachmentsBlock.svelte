@@ -17,7 +17,7 @@
   } from '../js/api.js'
   import { formatLocal } from '../js/time.ts'
   import { copyText } from '../js/clipboard.ts'
-  import { toast } from '../js/toasts.svelte.js'
+  import { toast } from '../js/toasts.svelte.ts'
   import {
     peekAttachmentList,
     setAttachmentList,

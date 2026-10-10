@@ -17,7 +17,7 @@
     uploadAttachmentRevision,
   } from '../js/api.js'
   import { copyText } from '../js/clipboard.ts'
-  import { toast } from '../js/toasts.svelte.js'
+  import { toast } from '../js/toasts.svelte.ts'
 
   /** @type {{
    *   attachments?: any[],

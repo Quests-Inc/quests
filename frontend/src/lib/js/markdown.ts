@@ -196,7 +196,7 @@ function splitCode(src) {
  * @param {string} source
  * @param {{ labels?: Record<string, string> }} [opts]
  */
-function linkifyRefs(source, opts = {}) {
+function linkifyRefs(source: string, opts: { labels?: Record<string, string> } = {}) {
   const labels = opts.labels || {}
   const withMdLinks = splitCode(source)
     .map((part, i) => {

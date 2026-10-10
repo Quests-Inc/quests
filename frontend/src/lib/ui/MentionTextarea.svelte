@@ -1,6 +1,6 @@
 <script>
   import { activeMentionToken, applyMention, matchMentions } from '../js/mentionSuggest.ts'
-  import { templateStore } from '../js/templatesStore.svelte.js'
+  import { templateStore } from '../js/templatesStore.svelte.ts'
 
   /** @type {{
    *   value?: string,

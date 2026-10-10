@@ -1,19 +1,10 @@
-/**
- * Minimal journal toasts. Import from `.svelte.js` so the list stays reactive.
- *
- * @typedef {'info' | 'success' | 'error' | 'progress'} ToastKind
- * @typedef {{
- *   id: string
- *   kind: ToastKind
- *   message: string
- * }} Toast
- */
+/** Minimal journal toasts. Import from `.svelte.ts` so the list stays reactive. */
+export type ToastKind = 'info' | 'success' | 'error' | 'progress'
+export type Toast = { id: string; kind: ToastKind; message: string }
 
-/** @type {Toast[]} */
-export const toasts = $state([])
+export const toasts: Toast[] = $state([])
 
-/** @type {Map<string, ReturnType<typeof setTimeout>>} */
-const timers = new Map()
+const timers = new Map<string, ReturnType<typeof setTimeout>>()
 let seq = 0
 
 function clearTimer(id) {
@@ -33,7 +24,7 @@ function clearTimer(id) {
  * }} [opts]
  * @returns {string} toast id
  */
-export function toast(message, opts = {}) {
+export function toast(message: string, opts: { id?: string; kind?: ToastKind; ttl?: number | null } = {}) {
   const id = opts.id ?? `t${++seq}`
   const kind = opts.kind ?? 'info'
   const ttl = opts.ttl !== undefined ? opts.ttl : kind === 'progress' ? null : kind === 'error' ? 5200 : 2200

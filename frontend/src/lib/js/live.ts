@@ -24,7 +24,10 @@ const RESYNC_AFTER_HIDDEN_MS = 10_000
 // Reconnect, visibility and online events often arrive together.
 const RESYNC_MIN_GAP_MS = 2_000
 
-export function subscribeQuestEvents(onEvent, { onStatus, onResync } = {}) {
+export function subscribeQuestEvents(
+  onEvent: (e: any) => void,
+  { onStatus, onResync }: { onStatus?: (s: string) => void; onResync?: () => void } = {}
+) {
   let stopped = false
   let socket = null
   let attempt = 0

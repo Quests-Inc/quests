@@ -64,7 +64,7 @@ export function buildPreviewTree(preview, { quests = [], questlines = [] } = {})
     return node
   }
 
-  function ensureQuestNode(id, { label, questlineId } = {}) {
+  function ensureQuestNode(id: number, { label, questlineId }: { label?: string; questlineId?: number } = {}) {
     let node = questNodes.get(id)
     if (!node) {
       const row = questById.get(id)

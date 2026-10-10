@@ -4,7 +4,7 @@
   import { cancelRunnerJob, createRunner, deleteRunner, getRunnerJobs, getRunners } from '../js/api.js'
   import { copyText } from '../js/clipboard.ts'
   import { parseApiDate } from '../js/time.ts'
-  import { toast } from '../js/toasts.svelte.js'
+  import { toast } from '../js/toasts.svelte.ts'
 
   /** Devices that run checks for us, and what they are doing: who is online,
    * what runs where, what waits in the queue, how the latest jobs ended.

@@ -2,7 +2,7 @@
   import HelpTip from './HelpTip.svelte'
   import Icon from './Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '../js/api.js'
-  import { loadRunners, runnersList } from '../js/runnersList.svelte.js'
+  import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
 
   /** A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer
    * is "out of date?" — a bare 0/1 or {"outdated": 0|1, "reason": "…"}. The state follows the server;

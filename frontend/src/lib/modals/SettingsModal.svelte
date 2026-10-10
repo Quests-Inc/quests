@@ -9,7 +9,7 @@
   import AccountSection from './settings/AccountSection.svelte'
   import ConnectionsSection from './settings/ConnectionsSection.svelte'
   import AssistantSection from './settings/AssistantSection.svelte'
-  import { wsx, loadWorkspaceState } from './settings/workspaceState.svelte.js'
+  import { wsx, loadWorkspaceState } from './settings/workspaceState.svelte.ts'
 
   /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
   let {
