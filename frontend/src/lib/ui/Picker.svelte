@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte'
   import Icon from './Icon.svelte'
-  import { placePopover, watchPopover } from '../js/popover.js'
+  import { placePopover, watchPopover } from '../js/popover.ts'
 
   /**
    * Single choice from an open-ended list (questlines, sections) — a button

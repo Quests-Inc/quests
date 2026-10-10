@@ -16,7 +16,7 @@
     updateAttachmentComment,
     uploadAttachmentRevision,
   } from '../js/api.js'
-  import { copyText } from '../js/clipboard.js'
+  import { copyText } from '../js/clipboard.ts'
   import { toast } from '../js/toasts.svelte.js'
 
   /** @type {{

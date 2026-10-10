@@ -1,5 +1,5 @@
 <script>
-  import { activeMentionToken, applyMention, matchMentions } from '../js/mentionSuggest.js'
+  import { activeMentionToken, applyMention, matchMentions } from '../js/mentionSuggest.ts'
   import { templateStore } from '../js/templatesStore.svelte.js'
 
   /** @type {{

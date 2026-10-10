@@ -1,7 +1,7 @@
 <script>
   import DOMPurify from 'dompurify'
   import { tailFade } from '../js/typewriter.js'
-  import { renderRefTextHtml, parseRefHref } from '../js/refs.js'
+  import { renderRefTextHtml, parseRefHref } from '../js/refs.ts'
 
   /** @type {{
    *   source?: string,

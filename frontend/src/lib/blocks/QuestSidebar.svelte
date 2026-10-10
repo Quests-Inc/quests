@@ -12,7 +12,7 @@
     quantifiedProgress,
     significanceLabel,
     statusColor,
-  } from '../js/questFormat.js'
+  } from '../js/questFormat.ts'
 
   /** @type {{
    *   loading: boolean,

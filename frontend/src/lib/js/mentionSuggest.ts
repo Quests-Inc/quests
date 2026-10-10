@@ -1,4 +1,15 @@
-const KIND_LABEL = {
+type Kind = 'questline' | 'quest' | 'step' | 'note' | 'attachment' | 'template'
+type Mention = { kind: Kind; id: number; title: string; hint?: string; label: string }
+type Titled = { id: number; title?: string | null }
+type MentionSources = {
+  quests?: (Titled & { steps?: Titled[] })[]
+  questlines?: Titled[]
+  notes?: Titled[]
+  attachments?: { id: number; filename?: string; comment?: string | null }[]
+  templates?: Titled[]
+}
+
+const KIND_LABEL: Record<Kind, string> = {
   questline: 'квестлайн',
   quest: 'квест',
   step: 'шаг',
@@ -14,17 +25,17 @@ const KIND_LABEL = {
  * questlines/quests before their nested steps within each tier.
  */
 export function matchMentions(
-  query,
-  { quests = [], questlines = [], notes = [], attachments = [], templates = [] } = {},
+  query: string,
+  { quests = [], questlines = [], notes = [], attachments = [], templates = [] }: MentionSources = {},
   limit = 8
-) {
+): Mention[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
 
-  const starts = []
-  const contains = []
+  const starts: Mention[] = []
+  const contains: Mention[] = []
 
-  function push(kind, id, title, hint) {
+  function push(kind: Kind, id: number, title: string, hint?: string) {
     const t = title.toLowerCase()
     const idx = t.indexOf(q)
     if (idx < 0) return

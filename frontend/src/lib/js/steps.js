@@ -1,4 +1,4 @@
-import { parseRefs } from './refs.js'
+import { parseRefs } from './refs.ts'
 
 /** Step drafts for the step editors (quest modal, template modal, step modal)
  * and their API payloads. One shape for the auto-check part everywhere:

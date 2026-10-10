@@ -19,7 +19,7 @@
     localTimeZone,
     toLocalInputValue,
   } from '../js/time.js'
-  import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.js'
+  import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.ts'
   import { questStepDraft, questStepsPayload } from '../js/steps.js'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'

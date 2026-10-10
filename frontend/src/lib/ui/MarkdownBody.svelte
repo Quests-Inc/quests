@@ -1,8 +1,8 @@
 <script>
   import { untrack } from 'svelte'
   import { renderMarkdown } from '../js/markdown.js'
-  import { parseRefHref } from '../js/refs.js'
-  import { copyText } from '../js/clipboard.js'
+  import { parseRefHref } from '../js/refs.ts'
+  import { copyText } from '../js/clipboard.ts'
   import { tailFade } from '../js/typewriter.js'
   import copySvg from '../../assets/icons/copy.svg?raw'
   import checkSvg from '../../assets/icons/checkmark.svg?raw'

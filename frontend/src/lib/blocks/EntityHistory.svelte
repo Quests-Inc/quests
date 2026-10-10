@@ -1,7 +1,7 @@
 <script>
   import Icon from '../ui/Icon.svelte'
   import { getQuestLog } from '../js/api.js'
-  import { KINDS, detailOf } from '../js/historyKinds.js'
+  import { KINDS, detailOf } from '../js/historyKinds.ts'
   import { formatLocal } from '../js/time.js'
 
   /** Collapsed timeline of one entity's change-log entries (plus what hangs off it).

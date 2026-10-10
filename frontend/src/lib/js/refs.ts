@@ -41,7 +41,7 @@ function escapeAttr(s) {
  * @param {string} source
  * @param {{ labels?: Record<string, string> }} [opts]
  */
-export function renderRefTextHtml(source, opts = {}) {
+export function renderRefTextHtml(source: string, opts: { labels?: Record<string, string> } = {}) {
   const labels = opts.labels || {}
   const text = String(source ?? '')
   if (!text) return ''

@@ -3,7 +3,7 @@
   import ContextMenu from '../ui/ContextMenu.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
   import { helpLine } from '../js/searchFlags.js'
-  import { ENTITY_SPEC, findEntities } from '../js/entityFlags.js'
+  import { ENTITY_SPEC, findEntities } from '../js/entityFlags.ts'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'

@@ -1,4 +1,4 @@
-import { exportedAtLabel } from './pdfExport.js'
+import { exportedAtLabel } from './pdfExport.ts'
 
 /** Print colours of the status chip (the app's CSS variables mean nothing to the server). */
 const STATUS_COLORS = {

@@ -1,5 +1,5 @@
 <script>
-  import { fileKind } from '../js/fileKind.js'
+  import { fileKind } from '../js/fileKind.ts'
 
   /** @type {{ att: any, size?: number }} */
   let { att, size = 18 } = $props()

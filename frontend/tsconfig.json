@@ -20,6 +20,7 @@
     "types": ["vite/client"],
     "allowJs": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "strict": false,
     "skipLibCheck": true,
     /**

@@ -1,6 +1,6 @@
 <script>
   import { SECRET_OWNER_KINDS, listSecrets, setSecret, deleteSecret } from '../js/api.js'
-  import { parseRefs } from '../js/refs.js'
+  import { parseRefs } from '../js/refs.ts'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import ModalShell from './ModalShell.svelte'

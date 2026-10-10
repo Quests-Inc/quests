@@ -16,7 +16,7 @@ import xml from 'highlight.js/lib/languages/xml'
 import yaml from 'highlight.js/lib/languages/yaml'
 import { marked } from 'marked'
 
-import { REF_RE, refHref } from './refs.js'
+import { REF_RE, refHref } from './refs.ts'
 
 hljs.registerLanguage('bash', bash)
 hljs.registerLanguage('shell', bash)

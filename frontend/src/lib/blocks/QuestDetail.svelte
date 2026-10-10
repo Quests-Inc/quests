@@ -9,7 +9,7 @@
   import TemplateStreak from './TemplateStreak.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { formatLocal, localTimeZone } from '../js/time.js'
-  import { parseRefs } from '../js/refs.js'
+  import { parseRefs } from '../js/refs.ts'
   import {
     OPEN_STATUSES,
     periodBadge,
@@ -17,9 +17,9 @@
     quantifiedProgress,
     significanceLabel,
     statusColor,
-  } from '../js/questFormat.js'
+  } from '../js/questFormat.ts'
   import { downloadQuestPdfSimple } from '../js/questPdf.js'
-  import { downloadQuestPdf as downloadQuestPdfRich } from '../js/questExport.js'
+  import { downloadQuestPdf as downloadQuestPdfRich } from '../js/questExport.ts'
   import { toastDone, toastProgress } from '../js/toasts.svelte.js'
   import { animateText } from '../js/typewriter.js'
 

@@ -1,4 +1,4 @@
-import { downloadPdf, exportedAtLabel } from './pdfExport.js'
+import { downloadPdf, exportedAtLabel } from './pdfExport.ts'
 
 /**
  * @param {{ id?: number | null, title?: string }} note
@@ -39,7 +39,7 @@ export function downloadNoteMarkdown(note) {
  * @param {{ id?: number | null, title?: string, description?: string }} note
  * @param {{ labels?: Record<string, string> }} [opts]
  */
-export async function downloadNotePdf(note, opts = {}) {
+export async function downloadNotePdf(note: any, opts: { labels?: Record<string, string> } = {}) {
   if (!note) return
   const title = String(note.title || '').trim() || `note=${note.id ?? ''}`
   await downloadPdf(

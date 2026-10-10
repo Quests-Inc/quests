@@ -14,7 +14,7 @@
     updateTemplate,
   } from '../js/api.js'
   import { defaultLocalDeadlineParts, localTimeZone } from '../js/time.js'
-  import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.js'
+  import { durationLabel, partsToSeconds, plural, secondsToParts } from '../js/duration.ts'
   import { templateStepDraft, templateStepsPayload } from '../js/steps.js'
   import Icon from '../ui/Icon.svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
@@ -33,7 +33,7 @@
   import ModalHead from './ModalHead.svelte'
   import ModalFoot from './ModalFoot.svelte'
   import { toast } from '../js/toasts.svelte.js'
-  import { copyText } from '../js/clipboard.js'
+  import { copyText } from '../js/clipboard.ts'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.js'

@@ -8,13 +8,13 @@
     searchNotes,
     setNoteOutdated,
   } from '../js/api.js'
-  import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.js'
+  import { snippetHtml, WHERE_LABEL } from '../js/searchSnippet.ts'
   import NoteCheck from '../ui/NoteCheck.svelte'
   import NoteFind from '../ui/NoteFind.svelte'
   import { parseQuery, passes, helpLine } from '../js/searchFlags.js'
   import FlagHints from '../ui/FlagHints.svelte'
   import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.js'
-  import { copyText } from '../js/clipboard.js'
+  import { copyText } from '../js/clipboard.ts'
   import {
     caretOffsetFromPoint,
     mapRenderedOffsetToSource,
@@ -22,7 +22,7 @@
     placeTextareaCaret,
     scrollRootToTextOffset,
   } from '../js/mdCaretMap.js'
-  import { downloadNoteMarkdown, downloadNotePdf } from '../js/noteExport.js'
+  import { downloadNoteMarkdown, downloadNotePdf } from '../js/noteExport.ts'
   import { toast, toastDone, toastProgress } from '../js/toasts.svelte.js'
   import Icon from '../ui/Icon.svelte'
   import MarkdownBody from '../ui/MarkdownBody.svelte'

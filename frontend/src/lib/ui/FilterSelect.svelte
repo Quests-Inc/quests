@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte'
   import Icon from './Icon.svelte'
-  import { placePopover, watchPopover } from '../js/popover.js'
+  import { placePopover, watchPopover } from '../js/popover.ts'
 
   /**
    * One filter axis: the name stays on the closed control, the choices

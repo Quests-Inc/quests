@@ -2,7 +2,7 @@
 // returned, so the page can show what saving would produce. The server stays
 // the judge of validity; this only mirrors it for display.
 
-import { parseRefs } from './refs.js'
+import { parseRefs } from './refs.ts'
 
 const tmpKey = (type, opId) => `${type}:t${opId}`
 

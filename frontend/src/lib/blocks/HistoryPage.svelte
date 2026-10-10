@@ -5,7 +5,7 @@
   import DateInput from '../ui/DateInput.svelte'
   import { getQuestLog, listTags } from '../js/api.js'
   import { parseApiDate } from '../js/time.js'
-  import { KINDS, detailOf } from '../js/historyKinds.js'
+  import { KINDS, detailOf } from '../js/historyKinds.ts'
 
   /** @type {{
    *   active?: boolean,

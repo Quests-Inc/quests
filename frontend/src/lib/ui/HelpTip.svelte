@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte'
-  import { placePopover, watchPopover } from '../js/popover.js'
+  import { placePopover, watchPopover } from '../js/popover.ts'
 
   /**
    * A small "?" that opens an explanation on click — for the paragraphs of

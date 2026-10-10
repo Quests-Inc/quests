@@ -3,7 +3,7 @@
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { ENTITY_SPEC, findEntities } from '../js/entityFlags.js'
+  import { ENTITY_SPEC, findEntities } from '../js/entityFlags.ts'
 
   /** Search box over quests and notes; picks one existing entity.
    * @type {{

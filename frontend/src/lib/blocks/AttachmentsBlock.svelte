@@ -16,7 +16,7 @@
     attachmentDownloadUrl,
   } from '../js/api.js'
   import { formatLocal } from '../js/time.js'
-  import { copyText } from '../js/clipboard.js'
+  import { copyText } from '../js/clipboard.ts'
   import { toast } from '../js/toasts.svelte.js'
   import {
     peekAttachmentList,
