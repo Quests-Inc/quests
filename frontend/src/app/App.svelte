@@ -1,6 +1,7 @@
 <script lang="ts">
   // Quests web UI — orchestrator (state, load, overlays)
   import { HistoryPage } from '@/pages/history'
+  import { JournalPage } from '@/pages/journal'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
@@ -39,10 +40,8 @@ import { RunnersPage } from '@/pages/runners'
   import { subscribeQuestEvents } from '@/shared/lib/live.ts'
   import { attachmentCatalog, clearAttachmentIndex, flattenAttachmentIndex, invalidateAttachmentLiveFlags, seedAttachmentIndex, setAttachmentIndex } from '@/entities/attachment'
   import { clearNotes, noteCatalog, setNotes } from '@/entities/note'
-  import { clearQuests, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple, groupQuestsByCategory, inScope, listOpenOrAll, questCatalog, questSpec, replaceQuest, scopeQuestlineChoices, setQuests } from '@/entities/quest'
+  import { clearQuests, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple, questCatalog, replaceQuest, setQuests } from '@/entities/quest'
   import { applyTheme, loadSavedTheme } from '@/shared/lib/theme.ts'
-  import { questMatchesQuery } from '@/shared/lib/search.ts'
-  import { parseQuery, passes, tokenValues, setToken } from '@/shared/lib/searchFlags.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { installHotkeys, registerHotkeys } from '@/shared/lib/hotkeys.ts'
   import { foldRow, moveRow } from '@/shared/lib/listNav.ts'
@@ -60,8 +59,6 @@ import { RunnersPage } from '@/pages/runners'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ToastHost from '@/shared/ui/ToastHost.svelte'
   import { JournalHeader } from '@/widgets/journal-header'
-  import { QuestSidebar } from '@/widgets/quest-sidebar'
-  import { QuestDetail } from '@/widgets/quest-detail'
   import { ActivityCalendar } from '@/widgets/activity-calendar'
   import { NotesPage } from '@/pages/notes'
   import { AttachmentsPage } from '@/pages/attachments'
@@ -91,7 +88,6 @@ import { RunnersPage } from '@/pages/runners'
     webdav: 'unknown',
     db: 'unknown',
   })
-  let searchQuery = $state('')
   const nav = createNavigation({
     quests: () => quests,
     revealDetail: (tab) => revealDetailOnNarrow(tab),
@@ -158,15 +154,6 @@ import { RunnersPage } from '@/pages/runners'
   let historyNonce = $state(0)
   let categories = $state([])
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
-  /** Open state for category subgroups: `${bucket}:${key}` → boolean (default true). */
-  let categoryOpen = $state(({} as Record<string, boolean>))
-  /** Open state for questline subgroups: `${bucket}:${catKey}:${lineKey}` → boolean. */
-  let lineOpen = $state(({} as Record<string, boolean>))
-  /** Sidebar "Заморожено (N)" tab — collapsed by default. */
-  let frozenOpen = $state(false)
-  function toggleFrozen() {
-    frozenOpen = !frozenOpen
-  }
 
   let modalOpen = $state(false)
   let modalMode = $state(('create' as 'create' | 'edit'))
@@ -203,70 +190,12 @@ import { RunnersPage } from '@/pages/runners'
   let stepModalOpen = $state(false)
   let stepModalQuestId = $state((null as number | null))
   let stepModalStep = $state((null as any | null))
-  /** Prefer this id across in-flight load() (URL / HUD focus). */
-  // The sidebar's search text is the single source of truth for its filters: «показывать завершённые»
-  // is `status:all`, the category / questline scope are `cat:slug` / `line:id` (searchFlags.js).
-  let questQuerySpec = $derived(questSpec({ categories }))
-  let parsedQuestSearch = $derived(parseQuery(searchQuery, questQuerySpec))
-  /** When false — only active/expired; when true — all statuses. */
-  let showAllQuests = $derived(tokenValues(parsedQuestSearch, 'status').includes('all'))
-  /** Sidebar scope narrowing: null = all, else a category, optionally further narrowed to one of its questlines. */
-  let scopeCategoryId = $derived.by(() => {
-    const slug = tokenValues(parsedQuestSearch, 'cat')[0]
-    return slug ? (categories.find((c) => c.slug === slug)?.id ?? null) : null
-  })
-  let scopeQuestlineId = $derived.by(() => {
-    const v = tokenValues(parsedQuestSearch, 'line')[0]
-    if (!v) return null
-    const byId = questlines.find((l) => String(l.id) === v)
-    if (byId) return byId.id
-    return questlines.find((l) => (l.title || '').replace(/\s+/g, '_').toLowerCase() === v.toLowerCase())?.id ?? null
-  })
   let nowMs = $state(Date.now())
-
-  function setShowAll(on: any) {
-    const rest = tokenValues(parsedQuestSearch, 'status').filter((v) => v !== 'all')
-    searchQuery = setToken(searchQuery, 'status', on ? [...rest, 'all'] : rest)
-  }
-  function setScopeCategory(id: null) {
-    const slug = id == null ? null : categories.find((c) => c.id === id)?.slug
-    searchQuery = setToken(setToken(searchQuery, 'line', []), 'cat', slug ? [slug] : [])
-  }
-  function setScopeQuestline(id: null) {
-    searchQuery = setToken(searchQuery, 'line', id == null ? [] : [String(id)])
-  }
-  /** Questlines to narrow to under the current scope category (see scopeQuestlineOptions). */
-  let scopeQuestlineOptions = $derived(scopeQuestlineChoices({ scopeCategoryId, questlines, quests, showAll: showAllQuests }))
-
-  let matchedQuests = $derived(quests.filter((q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q)))
-  let listedQuests = $derived(listOpenOrAll(matchedQuests, { showAll: showAllQuests, statusTokens: tokenValues(parsedQuestSearch, 'status') }))
-  let scopedQuests = $derived(inScope(listedQuests, { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
-  let byCategory = $derived(groupQuestsByCategory(scopedQuests, categories, questlines))
-  /** "Заморожено" — own sidebar tab, independent of showAllQuests/OPEN_STATUSES. */
-  let frozenQuests = $derived(inScope(matchedQuests.filter((q) => q.status === 'frozen'), { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
   let selected = $derived(quests.find((q) => q.id === nav.selectedId) ?? null)
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
   let attachments = $derived(allAttachments.filter((a) => !a.hidden))
   let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments }))
-
-  function isCategoryOpen(key: string|number) {
-    return categoryOpen[key] !== false
-  }
-
-  function toggleCategory(key: any) {
-    categoryOpen = { ...categoryOpen, [key]: !isCategoryOpen(key) }
-  }
-
-  function isLineOpen(catKey: any, lineKey: any) {
-    const id = `${catKey}:${lineKey}`
-    return lineOpen[id] !== false
-  }
-
-  function toggleLine(catKey: any, lineKey: any) {
-    const id = `${catKey}:${lineKey}`
-    lineOpen = { ...lineOpen, [id]: !isLineOpen(catKey, lineKey) }
-  }
 
   async function load({ silent = false } = {}) {
     if (!silent) loading = true
@@ -979,76 +908,40 @@ import { RunnersPage } from '@/pages/runners'
       />
     </div>
   {:else}
-    <div class="journal__body" class:journal__body--sidebar-collapsed={sidebarCollapsed.journal}>
-      <QuestSidebar
-        {loading}
-        {quests}
-        {matchedQuests}
-        {listedQuests}
-        {byCategory}
-        {frozenQuests}
-        {frozenOpen}
-        onToggleFrozen={toggleFrozen}
-        {categories}
-        {scopeCategoryId}
-        {scopeQuestlineId}
-        {scopeQuestlineOptions}
-        onScopeCategory={setScopeCategory}
-        onScopeQuestline={setScopeQuestline}
-        bind:searchQuery
-        {showAllQuests}
-        onShowAll={setShowAll}
-        querySpec={questQuerySpec}
-        parsedSearch={parsedQuestSearch}
-        selectedId={nav.selectedId}
-        {categoryOpen}
-        {lineOpen}
-        {nowMs}
-        onSelect={(id) => selectQuestFromUi(id)}
-        onTogglePin={togglePin}
-        onQuestContextMenu={menu.openQuest}
-        onLineContextMenu={menu.openLine}
-        onToggleCategory={toggleCategory}
-        onToggleLine={toggleLine}
-        labels={refLabels}
-        onRef={onJournalRef}
-      />
-      <QuestDetail
-        onOpenGraph={openGraph}
-        {selected}
-        {kbStepId}
-        {quests}
-        {showAllQuests}
-        {nowMs}
-        {statusBusy}
-        deleting={del.questBusy}
-        deleteAnimActive={del.animActive}
-        {consumeRemoteEdit}
-        onDeleteAnimDone={del.animDone}
-        {stepBusyId}
-        {stepEditId}
-        {stepEditValue}
-        onToggleCompleted={toggleCompleted}
-        onOpenEdit={(q) => openEdit(q)}
-        onRequestDelete={requestDeleteSelected}
-        onBumpStep={bumpStep}
-        onBeginEditStep={beginEditStep}
-        onStepEditKeydown={onStepEditKeydown}
-        onStepEditBlur={onStepEditBlur}
-        onStepEditInput={(v) => (steps.editValue = v)}
-        onQuestTitleContextMenu={menu.openQuest}
-        onLineHeadContextMenu={(e) => {
-          const line = questlines.find((l) => l.id === selected?.questline_id)
-          if (line) menu.openLine(e, line)
-        }}
-        onStepContextMenu={menu.openStep}
-        onSelectQuest={(id) => selectQuestFromUi(id)}
-        labels={refLabels}
-        onRef={onJournalRef}
-        notes={notes}
-        {questlines}
-      />
-    </div>
+    <JournalPage
+      {loading}
+      {categories}
+      {questlines}
+      selectedId={nav.selectedId}
+      {selected}
+      sidebarCollapsed={sidebarCollapsed.journal}
+      {nowMs}
+      labels={refLabels}
+      {kbStepId}
+      {statusBusy}
+      deleting={del.questBusy}
+      deleteAnimActive={del.animActive}
+      {stepBusyId}
+      {stepEditId}
+      {stepEditValue}
+      onSelect={(id) => selectQuestFromUi(id)}
+      onTogglePin={togglePin}
+      onQuestContextMenu={menu.openQuest}
+      onLineContextMenu={menu.openLine}
+      onStepContextMenu={menu.openStep}
+      onOpenGraph={openGraph}
+      onToggleCompleted={toggleCompleted}
+      onOpenEdit={(q) => openEdit(q)}
+      onRequestDelete={requestDeleteSelected}
+      onBumpStep={bumpStep}
+      onBeginEditStep={beginEditStep}
+      onStepEditKeydown={onStepEditKeydown}
+      onStepEditBlur={onStepEditBlur}
+      onStepEditInput={(v) => (steps.editValue = v)}
+      onDeleteAnimDone={del.animDone}
+      {consumeRemoteEdit}
+      onRef={onJournalRef}
+    />
   {/if}
   </div>
   {/key}
