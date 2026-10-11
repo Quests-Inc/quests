@@ -38,9 +38,10 @@
   import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { createGraphEdits } from '../model/edits.svelte.ts'
+  import { createClusterFolds } from '../model/folds.svelte.ts'
   import { createLinkMode } from '../model/linking.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, planHide, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, arrangeView, planHide, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -78,9 +79,7 @@
   let error = $state('')
   let selectedKey = $state((null as string | null))
   let showEdge: Record<string, boolean> = $state({ structure: true, reference: true, dependency: true })
-  let expanded = $state((new Set() as Set<string>))
   /** Owners whose files are laid out one by one: never a folded group or a block. */
-  let loose = $state((new Set() as Set<string>))
   let seq = 0
 
   // --- Draft: edits made here stay in a server-side log until saved (see model/draft.svelte.ts). ---
@@ -132,8 +131,7 @@
     lastRootKey = rk
     center = { type: rootType, id: rootId }
     selectedKey = null
-    expanded = new Set()
-    loose = new Set()
+    folds.reset()
     setExpand([])
     resetPositions()
   })
@@ -252,10 +250,15 @@
   const saved = new Map()
 
   /** Where an attachment group stood folded before it was opened; it goes back there. */
-  const origins = new Map()
+  const folds = createClusterFolds({
+    saved,
+    getNodes: () => view?.nodes ?? [],
+    getGroups: () => groups,
+  })
+  let expanded = $derived(folds.expanded)
+  let loose = $derived(folds.loose)
   function resetPositions() {
-    saved.clear()
-    origins.clear()
+    folds.forgetPositions()
   }
 
   let buildSeq = 0
@@ -289,40 +292,7 @@
 
   function applyLayout() {
     if (!view) return
-    const attached = view.nodes.filter((n) => n.depth >= 0)
-    const floating = view.nodes.filter((n) => n.depth < 0)
-    const keys = new Set(attached.map((n) => n.key))
-    const edges = view.edges.filter((e) => keys.has(e.from) && keys.has(e.to))
-    let groups = []
-    if (layoutMode !== 'tree') for (const n of view.nodes) delete n.group
-    if (layoutMode === 'tree') groups = layoutTree(attached, edges, { loose })
-    else if (layoutMode === 'down') groups = layoutTreeDown(attached, edges)
-    else if (layoutMode === 'radial') groups = layoutRadial(attached, edges)
-    else if (layoutMode === 'layers') groups = layoutLayers(attached)
-    else {
-      layoutGraph(attached, edges, { sizeOf: (n: { w: any; h: any }) => ({ w: n.w, h: n.h }) })
-    }
-    // Unlinked new things: where they were created, else a column left of the map.
-    const left = attached.length ? Math.min(...attached.map((n) => n.x - n.w / 2)) : 0
-    let y = attached.length ? Math.min(...attached.map((n) => n.y - n.h / 2)) : 0
-    for (const n of floating) {
-      if (n.pos) {
-        n.x = n.pos.x
-        n.y = n.pos.y
-      } else {
-        n.x = left - 260
-        n.y = y + n.h / 2
-        y += n.h + 18
-      }
-    }
-    for (const n of attached) {
-      if (n.draft && n.pos && !saved.has(n.key)) {
-        n.x = n.pos.x
-        n.y = n.pos.y
-      }
-    }
-    restoreSaved(groups)
-    view = { ...view, groups }
+    view = { ...view, groups: arrangeView(view, layoutMode, { loose, saved }) }
   }
 
   // Local view settings kept in this browser (see model/prefs.svelte.ts).
@@ -546,10 +516,6 @@
     void rebuild({ ...g, nodes, edges }, open_)
   })
 
-  const restoreSaved = (groups: GraphGroupView[]) => {
-    if (view) restoreHandPlaced(view.nodes, saved, groups)
-  }
-
   function relayout() {
     resetPositions()
     applyLayout()
@@ -677,48 +643,13 @@
 
   /** Folds an expanded attachment group back into its cluster node. */
   /** Centre of a group's cards (not of its frame, which has a header strip). */
-  function membersCenter(g: { key: any; x: any; y: any }) {
-    const ms = (view?.nodes ?? []).filter((n) => n.group === g.key)
-    if (!ms.length) return { x: g.x, y: g.y }
-    return {
-      x: (Math.min(...ms.map((m) => m.x - m.w / 2)) + Math.max(...ms.map((m) => m.x + m.w / 2))) / 2,
-      y: (Math.min(...ms.map((m) => m.y - m.h / 2)) + Math.max(...ms.map((m) => m.y + m.h / 2))) / 2,
-    }
-  }
-
-  /** Folding puts the group back where it stood before it was opened (the open
-   * block may have been nudged aside to keep clear of other cards). */
-  function foldSpot(key: string) {
-    const g = groups.find((x) => x.type === 'attachment' && `cluster:${x.owner}` === key)
-    const spot = origins.get(key) ?? (g ? membersCenter(g) : null)
-    if (spot) saved.set(key, spot)
-    origins.delete(key)
-  }
-
-  function collapse(key: string) {
-    foldSpot(key)
-    expanded = new Set([...expanded].filter((k) => k !== key))
-  }
-
-  function collapseAll() {
-    for (const k of expanded) foldSpot(k)
-    expanded = new Set()
-    loose = new Set()
-  }
-
-  /** Lays a file group out as separate cards. */
-  function disband(owner: any) {
-    const key = `cluster:${owner}`
-    if (expanded.has(key)) foldSpot(key)
-    expanded = new Set([...expanded].filter((k) => k !== key))
-    loose = new Set([...loose, owner])
-  }
+  const collapse = folds.collapse
+  const collapseAll = folds.collapseAll
+  const disband = folds.disband
 
   function select(n: { type: string; key: string; x: any; y: any }) {
     if (n.type === 'cluster') {
-      saved.set(n.key, { x: n.x, y: n.y })
-      origins.set(n.key, { x: n.x, y: n.y })
-      expanded = new Set([...expanded, n.key])
+      folds.expand(n)
       return
     }
     selectedKey = n.key
@@ -949,8 +880,7 @@
   async function clearMap() {
     center = { type: null, id: null }
     selectedKey = null
-    expanded = new Set()
-    loose = new Set()
+    folds.reset()
     lk.cancel()
     edits.editing = null
     resetPositions()
