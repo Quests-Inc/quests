@@ -114,7 +114,7 @@ func (s *Server) listAttachments(w http.ResponseWriter, r *http.Request, ownerTy
 		return
 	}
 	probe := r.URL.Query().Get("stat") != "0"
-	out := make([]store.AttachmentRead, 0, len(rows))
+	out := make([]AttachmentView, 0, len(rows))
 	for _, a := range rows {
 		out = append(out, s.decorateAttachment(r.Context(), a, probe))
 	}
@@ -130,7 +130,7 @@ func (s *Server) listAllAttachments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	probe := r.URL.Query().Get("stat") == "1"
-	out := map[string]map[string][]store.AttachmentRead{
+	out := map[string]map[string][]AttachmentView{
 		"quest":     {},
 		"questline": {},
 		"note":      {},
@@ -150,21 +150,39 @@ func (s *Server) listAllAttachments(w http.ResponseWriter, r *http.Request) {
 // the PUT) and the file server's own mtime, which may be second-granular.
 const sourceUpdatedSlack = time.Minute
 
+// AttachmentRevisions is the version history of one attachment.
+type AttachmentRevisions struct {
+	AttachmentID    int64                `json:"attachment_id"`
+	CurrentRevision int                  `json:"current_revision"`
+	Revisions       []store.RevisionRead `json:"revisions"`
+}
+
+// AttachmentLive is what the file server says about the file right now; absent from a listing that did not ask.
+type AttachmentLive struct {
+	Available     bool    `json:"available"`
+	SourceUpdated bool    `json:"source_updated"`
+	LastModified  *string `json:"last_modified"`
+}
+
+// AttachmentView is an attachment with its live file-server facts, when they were asked for.
+type AttachmentView struct {
+	store.AttachmentRead `tstype:",extends"`
+	*AttachmentLive      `tstype:"Partial<AttachmentLive>,extends"`
+}
+
 // decorateAttachment adds live file-server facts. available is false (and the
 // download link should hide) when WebDAV is down — not an error on the listing.
 // source_updated is the "актуализируй" marker: the file's Last-Modified is
 // newer than the moment the current revision was uploaded, i.e. the source
 // file changed on the file server after we took it.
-func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, probe bool) store.AttachmentRead {
-	out := store.AttachmentToRead(a)
+func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, probe bool) AttachmentView {
+	out := AttachmentView{AttachmentRead: store.AttachmentToRead(a)}
 	if !probe {
 		// Leave available/source_updated off: unknown is not "missing", and a
 		// bulk index must not paint every file as unavailable before Stat.
 		return out
 	}
-	out["available"] = false
-	out["source_updated"] = false
-	out["last_modified"] = nil
+	out.AttachmentLive = &AttachmentLive{}
 	if !s.webdavOK() {
 		return out
 	}
@@ -172,22 +190,22 @@ func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, pro
 	if err != nil {
 		return out
 	}
-	out["available"] = true
+	out.Available = true
 	if !info.LastModified.IsZero() {
-		out["last_modified"] = timeutil.ToUTCISO(&info.LastModified)
+		out.LastModified = timeutil.ToUTCISO(&info.LastModified)
 		if info.LastModified.After(a.UploadedAt.UTC().Add(sourceUpdatedSlack)) {
-			out["source_updated"] = true
+			out.SourceUpdated = true
 		}
 	}
 	return out
 }
 
-func (s *Server) attachmentsForOwner(ctx context.Context, ownerType string, ownerID int64, probe bool) []store.AttachmentRead {
+func (s *Server) attachmentsForOwner(ctx context.Context, ownerType string, ownerID int64, probe bool) []AttachmentView {
 	rows, err := s.Store.ListAttachments(ctx, ownerType, ownerID)
 	if err != nil {
-		return []store.AttachmentRead{}
+		return []AttachmentView{}
 	}
-	out := make([]store.AttachmentRead, 0, len(rows))
+	out := make([]AttachmentView, 0, len(rows))
 	for _, a := range rows {
 		if a.Hidden {
 			continue
@@ -343,10 +361,7 @@ func (s *Server) postAttachment(w http.ResponseWriter, r *http.Request, ownerTyp
 		writeErr(w, 500, err.Error())
 		return
 	}
-	out := store.AttachmentToRead(a)
-	out["available"] = true
-	out["source_updated"] = false
-	out["last_modified"] = nil
+	out := AttachmentView{AttachmentRead: store.AttachmentToRead(a), AttachmentLive: &AttachmentLive{Available: true}}
 	s.logAttachment(r.Context(), "attachment_added", a, "загружено")
 	s.publishSilent(r.Context(), "attachment_created", a.Filename, map[string]any{
 		"attachment_id": a.ID,
@@ -613,15 +628,11 @@ func (s *Server) listAttachmentRevisions(w http.ResponseWriter, r *http.Request,
 		writeErr(w, 500, err.Error())
 		return
 	}
-	out := make([]store.AttachmentRead, 0, len(revs))
+	out := make([]store.RevisionRead, 0, len(revs))
 	for _, rev := range revs {
 		out = append(out, store.RevisionToRead(rev, a.CurrentRevision))
 	}
-	writeJSON(w, 200, map[string]any{
-		"attachment_id":    a.ID,
-		"current_revision": a.CurrentRevision,
-		"revisions":        out,
-	})
+	writeJSON(w, 200, AttachmentRevisions{AttachmentID: a.ID, CurrentRevision: a.CurrentRevision, Revisions: out})
 }
 
 func (s *Server) postAttachmentRevision(w http.ResponseWriter, r *http.Request, ownerType string) {
@@ -730,10 +741,7 @@ func (s *Server) postAttachmentRevision(w http.ResponseWriter, r *http.Request, 
 			fmt.Printf("attachment %d: rotated file left on webdav: %v\n", a.ID, err)
 		}
 	}
-	out := store.AttachmentToRead(updated)
-	out["available"] = true
-	out["source_updated"] = false
-	out["last_modified"] = nil
+	out := AttachmentView{AttachmentRead: store.AttachmentToRead(updated), AttachmentLive: &AttachmentLive{Available: true}}
 	s.logAttachment(r.Context(), "attachment_version", updated, fmt.Sprintf("новая версия v%d", updated.CurrentRevision))
 	s.publishSilent(r.Context(), "attachment_updated", updated.Filename, map[string]any{
 		"attachment_id": updated.ID,

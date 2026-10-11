@@ -1,5 +1,13 @@
 import type { Category, QuestRead, Tag } from '../api/domain.gen'
-import type { LLMView, NoteCheckView, NoteListItem, NotePayload, RunnerView } from '../api/http.gen'
+import type {
+  AttachmentRevisions,
+  AttachmentView,
+  LLMView,
+  NoteCheckView,
+  NoteListItem,
+  NotePayload,
+  RunnerView,
+} from '../api/http.gen'
 import type { QuestlineRead, RunnerJob } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
@@ -572,13 +580,15 @@ function ownerAttachmentsPath(ownerType: string, ownerId: number, attachmentId?:
 
 export function listAttachments(ownerType: string, ownerId: number, { stat = true } = {}) {
   const path = ownerAttachmentsPath(ownerType, ownerId)
-  return request(stat ? path : `${path}?stat=0`)
+  return request<AttachmentView[]>(stat ? path : `${path}?stat=0`)
 }
 
 /** All attachment metadata, grouped `{ quest: { [id]: [] }, questline: { … }, note: { … } }`.
  * Default skips WebDAV Stat — cheap enough to run on every journal load. */
 export function listAllAttachments({ stat = false } = {}) {
-  return request(stat ? '/api/attachments?stat=1' : '/api/attachments')
+  return request<Record<string, Record<string, AttachmentView[]>>>(
+    stat ? '/api/attachments?stat=1' : '/api/attachments'
+  )
 }
 
 export function attachmentDownloadUrl(ownerType, ownerId, attachmentId, revision = null) {
@@ -646,8 +656,8 @@ export async function uploadAttachmentRevision(ownerType, ownerId, attachmentId,
   return data
 }
 
-export function listAttachmentRevisions(ownerType, ownerId, attachmentId) {
-  return request(`${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`)
+export function listAttachmentRevisions(ownerType: string, ownerId: number, attachmentId: number) {
+  return request<AttachmentRevisions>(`${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`)
 }
 
 export function setAttachmentCurrentRevision(ownerType, ownerId, attachmentId, revision) {

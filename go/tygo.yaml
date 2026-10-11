@@ -22,9 +22,10 @@ packages:
       - "llm_settings.go"
       - "notes.go"
       - "notecheck.go"
+      - "attachments.go"
     frontmatter: |
       import type { ResolvedRef } from "./domain.gen";
-      import type { NoteBriefRead, NotePopularity, NoteRead, Runner } from "./store.gen";
+      import type { AttachmentRead, NoteBriefRead, NotePopularity, NoteRead, Runner, RevisionRead } from "./store.gen";
       import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
@@ -32,6 +33,8 @@ packages:
       json.RawMessage: "unknown"
       llmassist.Provider: "Provider"
       store.Runner: "Runner"
+      store.AttachmentRead: "AttachmentRead"
+      store.RevisionRead: "RevisionRead"
       store.NoteRead: "NoteRead"
       store.NoteBriefRead: "NoteBriefRead"
       store.NotePopularity: "NotePopularity"

@@ -590,14 +590,14 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 		reads = append(reads, domain.ToQuestRead(qq, timeutil.NowUTC()))
 	}
 	attachments := map[string]any{
-		"questline": []store.AttachmentRead{},
-		"by_quest":  map[string][]store.AttachmentRead{},
-		"note":      []store.AttachmentRead{},
+		"questline": []AttachmentView{},
+		"by_quest":  map[string][]AttachmentView{},
+		"note":      []AttachmentView{},
 	}
 	if lineID != nil {
 		attachments["questline"] = s.attachmentsForOwner(r.Context(), ownerQuestline, *lineID, true)
 	}
-	byQuest := map[string][]store.AttachmentRead{}
+	byQuest := map[string][]AttachmentView{}
 	for _, qq := range quests {
 		byQuest[strconv.FormatInt(qq.ID, 10)] = s.attachmentsForOwner(r.Context(), ownerQuest, qq.ID, true)
 	}

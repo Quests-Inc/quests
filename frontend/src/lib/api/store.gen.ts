@@ -47,7 +47,40 @@ export interface AttachmentRevision {
   ScanStatus: string;
   ScannedAt?: string;
 }
-export type AttachmentRead = { [key: string]: any};
+/**
+ * AttachmentRead is an attachment as the API sends it. WebDAVPath is deliberately absent.
+ */
+export interface AttachmentRead {
+  id: number /* int64 */;
+  owner_type: string;
+  owner_id: number /* int64 */;
+  filename: string;
+  size_bytes: number /* int64 */;
+  content_type_declared: string;
+  content_type_detected: string;
+  comment: string;
+  uploaded_at?: string;
+  scan_status: string;
+  scanned_at?: string;
+  revision: number /* int */;
+  revision_count: number /* int */;
+  hidden: boolean;
+}
+/**
+ * RevisionRead is one version of an attachment as the API sends it.
+ */
+export interface RevisionRead {
+  revision: number /* int */;
+  filename: string;
+  size_bytes: number /* int64 */;
+  content_type_declared: string;
+  content_type_detected: string;
+  comment: string;
+  uploaded_at?: string;
+  scan_status: string;
+  scanned_at?: string;
+  is_current: boolean;
+}
 
 //////////
 // source: backups.go

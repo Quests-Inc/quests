@@ -49,7 +49,37 @@ type AttachmentRevision struct {
 	ScannedAt           *time.Time
 }
 
-type AttachmentRead map[string]any
+// AttachmentRead is an attachment as the API sends it. WebDAVPath is deliberately absent.
+type AttachmentRead struct {
+	ID                  int64   `json:"id"`
+	OwnerType           string  `json:"owner_type"`
+	OwnerID             int64   `json:"owner_id"`
+	Filename            string  `json:"filename"`
+	SizeBytes           int64   `json:"size_bytes"`
+	ContentTypeDeclared string  `json:"content_type_declared"`
+	ContentTypeDetected string  `json:"content_type_detected"`
+	Comment             string  `json:"comment"`
+	UploadedAt          *string `json:"uploaded_at"`
+	ScanStatus          string  `json:"scan_status"`
+	ScannedAt           *string `json:"scanned_at"`
+	Revision            int     `json:"revision"`
+	RevisionCount       int     `json:"revision_count"`
+	Hidden              bool    `json:"hidden"`
+}
+
+// RevisionRead is one version of an attachment as the API sends it.
+type RevisionRead struct {
+	Revision            int     `json:"revision"`
+	Filename            string  `json:"filename"`
+	SizeBytes           int64   `json:"size_bytes"`
+	ContentTypeDeclared string  `json:"content_type_declared"`
+	ContentTypeDetected string  `json:"content_type_detected"`
+	Comment             string  `json:"comment"`
+	UploadedAt          *string `json:"uploaded_at"`
+	ScanStatus          string  `json:"scan_status"`
+	ScannedAt           *string `json:"scanned_at"`
+	IsCurrent           bool    `json:"is_current"`
+}
 
 const attachmentCols = `id, owner_type, owner_id, filename, webdav_path, size_bytes,
 	content_type_declared, content_type_detected, comment, uploaded_at, scan_status, scanned_at,
@@ -113,35 +143,19 @@ func AttachmentToRead(a Attachment) AttachmentRead {
 		count = 1
 	}
 	return AttachmentRead{
-		"id":                    a.ID,
-		"owner_type":            a.OwnerType,
-		"owner_id":              a.OwnerID,
-		"filename":              a.Filename,
-		"size_bytes":            a.SizeBytes,
-		"content_type_declared": a.ContentTypeDeclared,
-		"content_type_detected": a.ContentTypeDetected,
-		"comment":               a.Comment,
-		"uploaded_at":           timeutil.ToUTCISO(&a.UploadedAt),
-		"scan_status":           a.ScanStatus,
-		"scanned_at":            timeutil.ToUTCISO(a.ScannedAt),
-		"revision":              rev,
-		"revision_count":        count,
-		"hidden":                a.Hidden,
+		ID: a.ID, OwnerType: a.OwnerType, OwnerID: a.OwnerID, Filename: a.Filename, SizeBytes: a.SizeBytes,
+		ContentTypeDeclared: a.ContentTypeDeclared, ContentTypeDetected: a.ContentTypeDetected,
+		Comment: a.Comment, UploadedAt: timeutil.ToUTCISO(&a.UploadedAt), ScanStatus: a.ScanStatus,
+		ScannedAt: timeutil.ToUTCISO(a.ScannedAt), Revision: rev, RevisionCount: count, Hidden: a.Hidden,
 	}
 }
 
-func RevisionToRead(r AttachmentRevision, current int) AttachmentRead {
-	return AttachmentRead{
-		"revision":              r.Revision,
-		"filename":              r.Filename,
-		"size_bytes":            r.SizeBytes,
-		"content_type_declared": r.ContentTypeDeclared,
-		"content_type_detected": r.ContentTypeDetected,
-		"comment":               r.Comment,
-		"uploaded_at":           timeutil.ToUTCISO(&r.UploadedAt),
-		"scan_status":           r.ScanStatus,
-		"scanned_at":            timeutil.ToUTCISO(r.ScannedAt),
-		"is_current":            r.Revision == current,
+func RevisionToRead(r AttachmentRevision, current int) RevisionRead {
+	return RevisionRead{
+		Revision: r.Revision, Filename: r.Filename, SizeBytes: r.SizeBytes,
+		ContentTypeDeclared: r.ContentTypeDeclared, ContentTypeDetected: r.ContentTypeDetected,
+		Comment: r.Comment, UploadedAt: timeutil.ToUTCISO(&r.UploadedAt), ScanStatus: r.ScanStatus,
+		ScannedAt: timeutil.ToUTCISO(r.ScannedAt), IsCurrent: r.Revision == current,
 	}
 }
 
