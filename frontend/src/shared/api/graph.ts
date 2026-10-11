@@ -1,6 +1,6 @@
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
-import type { GraphDraftView } from './http.gen'
+import type { GraphDraftView } from './graphdraft.gen'
 import { BASE, request } from './http.ts'
 import type { Graph } from './store.gen'
 

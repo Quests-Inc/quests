@@ -9,6 +9,7 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/automation"
 	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
+	"github.com/quests-inc/quests/go/internal/graphdraft"
 	"github.com/quests-inc/quests/go/internal/identity"
 	identityhttp "github.com/quests-inc/quests/go/internal/identity/http"
 	journalhttp "github.com/quests-inc/quests/go/internal/journal/http"
@@ -54,6 +55,8 @@ type Server struct {
 	journalOnce      sync.Once
 	jh               *journalhttp.Handler
 	automationOnce   sync.Once
+	graphdraftOnce   sync.Once
+	gdh              *graphdraft.Handler
 	ah               *automationhttp.Handler
 	kh               *knowledgehttp.Handler
 	idh              *identityhttp.Handler
@@ -136,7 +139,7 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerDomainRoutes(mux)
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
-	s.registerGraphDraft(mux)
+	s.graphdraftHandler().Register(mux)
 	mux.HandleFunc("GET /api/workspaces/{id}/export", func(w http.ResponseWriter, r *http.Request) { s.wsarchiveHandler().Export(w, r) })
 	mux.HandleFunc("POST /api/workspaces/import", func(w http.ResponseWriter, r *http.Request) { s.wsarchiveHandler().Import(w, r) })
 	s.mountSPA(mux)

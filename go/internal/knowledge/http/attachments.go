@@ -16,6 +16,7 @@ import (
 )
 
 func (h *Handler) RegisterAttachments(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/attachments/{id}/owner", h.postAttachmentOwner)
 	for _, owner := range []struct{ seg, typ string }{
 		{"quests", ownerQuest},
 		{"questlines", ownerQuestline},

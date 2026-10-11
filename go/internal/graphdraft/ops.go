@@ -1,4 +1,4 @@
-package httpapi
+package graphdraft
 
 import (
 	"bytes"
@@ -84,12 +84,12 @@ func pick(src map[string]any, keys ...string) map[string]any {
 	return out
 }
 
-const copySuffix = " (копия)"
+const CopySuffix = " (копия)"
 
 // copyEntity makes the real copy a "copy" op stands for and returns its id.
 // ownerRef is where a copied step or file goes (the original's owner unless
 // the draft attaches it elsewhere).
-func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.DraftOp, ownerRef string,
+func (h *Handler) copyEntity(ctx context.Context, mux http.Handler, op store.DraftOp, ownerRef string,
 	real func(string) (string, int64, bool), collection map[string]string) (int64, error) {
 	var p copyPayload
 	_ = json.Unmarshal(op.Payload, &p)
@@ -110,7 +110,7 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 			return 0, err
 		}
 		body := pick(q, "description", "significance", "category_id", "questline_id")
-		body["title"] = fmt.Sprint(q["title"]) + copySuffix
+		body["title"] = fmt.Sprint(q["title"]) + CopySuffix
 		if tags, ok := q["tags"].([]any); ok {
 			var ids []any
 			for _, t := range tags {
@@ -140,7 +140,7 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 			return 0, err
 		}
 		body := pick(n, "description", "color", "icon", "parent_id")
-		body["title"] = fmt.Sprint(n["title"]) + copySuffix
+		body["title"] = fmt.Sprint(n["title"]) + CopySuffix
 		return create("/api/notes", body)
 	case "questline":
 		l, err := getJSON(ctx, mux, fmt.Sprintf("/api/questlines/%d", sid))
@@ -148,18 +148,18 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 			return 0, err
 		}
 		body := pick(l, "description", "color", "icon", "category_id")
-		body["title"] = fmt.Sprint(l["title"]) + copySuffix
+		body["title"] = fmt.Sprint(l["title"]) + CopySuffix
 		return create("/api/questlines", body)
 	case "step":
 		_, qid, ok := real(ownerRef)
 		if !ok {
 			return 0, errors.New("copied step has no quest")
 		}
-		fromQ, err := s.Store.Journal.QuestIDForStep(ctx, sid)
+		fromQ, err := h.Store.Journal.QuestIDForStep(ctx, sid)
 		if err != nil {
 			return 0, err
 		}
-		q, err := s.Store.Journal.GetQuest(ctx, fromQ)
+		q, err := h.Store.Journal.GetQuest(ctx, fromQ)
 		if err != nil {
 			return 0, err
 		}
@@ -172,7 +172,7 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 				total = 1
 			}
 			b, _ := json.Marshal(map[string]any{
-				"title": st.Title + copySuffix, "description": st.Description, "progress_total": total,
+				"title": st.Title + CopySuffix, "description": st.Description, "progress_total": total,
 			})
 			code, out := dispatch(ctx, mux, "POST", fmt.Sprintf("/api/quests/%d/steps", qid), "application/json", b)
 			if code >= 300 {
@@ -186,11 +186,11 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 		if !ok {
 			return 0, errors.New("copied file has no owner")
 		}
-		a, err := s.Store.Knowledge.GetAttachment(ctx, sid)
+		a, err := h.Store.Knowledge.GetAttachment(ctx, sid)
 		if err != nil {
 			return 0, err
 		}
-		rc, err := s.WebDAV.Get(ctx, a.WebDAVPath)
+		rc, err := h.WebDAV.Get(ctx, a.WebDAVPath)
 		if err != nil {
 			return 0, fmt.Errorf("file unavailable: %w", err)
 		}
@@ -210,7 +210,7 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 
 // putGraphDraftOp replaces the payload of a "create" op, so a thing that only
 // exists in the draft can be edited in place.
-func (s *Server) putGraphDraftOp(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) putGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeErr(w, 400, "bad id")
@@ -223,7 +223,7 @@ func (s *Server) putGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	ops, err := s.Store.ListDraftOps(r.Context())
+	ops, err := h.Store.ListDraftOps(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -236,11 +236,11 @@ func (s *Server) putGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 422, "only created things can be edited in place")
 			return
 		}
-		if msg := s.validateDraftOp(r.Context(), o.Kind, in.Payload, ops); msg != "" {
+		if msg := h.validateDraftOp(r.Context(), o.Kind, in.Payload, ops); msg != "" {
 			writeErr(w, 422, msg)
 			return
 		}
-		if err := s.Store.UpdateDraftOpPayload(r.Context(), id, in.Payload); err != nil {
+		if err := h.Store.UpdateDraftOpPayload(r.Context(), id, in.Payload); err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}

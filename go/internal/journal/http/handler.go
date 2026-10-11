@@ -67,6 +67,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/questlines/{id}/icon", h.deleteQuestlineIcon)
 
 	mux.HandleFunc("GET /api/quest-log", h.getQuestLog)
+	mux.HandleFunc("POST /api/quests/{id}/steps/{step_id}/move", h.postStepMove)
 }
 
 var (

@@ -1,11 +1,9 @@
 package httpapi
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
-	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/refs"
 )
 
@@ -71,12 +69,4 @@ func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []refs.Re
 	}
 	noteRefs := refs.FilterKind(refs.Parse(blob.String()), "note")
 	return s.resolveRefs(r, noteRefs)
-}
-
-// publishSilent wakes journal tabs (they reload on any quests_changed) without a HUD toast or sound.
-func (s *Server) publishSilent(ctx context.Context, kind, title string, extra map[string]any) {
-	if s.Hub == nil {
-		return
-	}
-	s.Hub.PublishSilent(wsctx.From(ctx), kind, title, extra)
 }

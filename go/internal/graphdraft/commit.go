@@ -1,4 +1,4 @@
-package httpapi
+package graphdraft
 
 import (
 	"bytes"
@@ -22,9 +22,9 @@ type draftProblem struct {
 	Message string `json:"message"`
 }
 
-func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ops, err := s.Store.ListDraftOps(ctx)
+	ops, err := h.Store.ListDraftOps(ctx)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -33,26 +33,26 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"created": map[string]int64{}, "applied": 0})
 		return
 	}
-	owners, problems := s.planDraft(ctx, ops)
+	owners, problems := h.planDraft(ctx, ops)
 	if len(problems) > 0 {
 		writeJSON(w, 422, map[string]any{"error": "draft cannot be saved", "problems": problems})
 		return
 	}
-	mux := s.routes()
+	mux := h.API()
 	created := map[string]int64{}
 	var applied []int64
 	fail := func(op store.DraftOp, err error) {
 		// Keep what failed and what follows; swap placeholders that already
 		// became real entities so a retry does not create them twice.
-		_ = s.Store.DeleteDraftOps(ctx, applied)
-		rest, _ := s.Store.ListDraftOps(ctx)
+		_ = h.Store.DeleteDraftOps(ctx, applied)
+		rest, _ := h.Store.ListDraftOps(ctx)
 		for _, o := range rest {
 			text := string(o.Payload)
 			for k, id := range created {
 				text = strings.ReplaceAll(text, `"`+k+`"`, `"`+strings.Split(k, ":")[0]+":"+strconv.FormatInt(id, 10)+`"`)
 			}
 			if text != string(o.Payload) {
-				_ = s.Store.UpdateDraftOpPayload(ctx, o.ID, json.RawMessage(text))
+				_ = h.Store.UpdateDraftOpPayload(ctx, o.ID, json.RawMessage(text))
 			}
 		}
 		writeJSON(w, 500, map[string]any{
@@ -130,7 +130,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 					fail(op, errors.New("file has no owner"))
 					return
 				}
-				rc, gerr := s.WebDAV.Get(ctx, fp.Path)
+				rc, gerr := h.WebDAV.Get(ctx, fp.Path)
 				if gerr != nil {
 					fail(op, fmt.Errorf("staged file missing: %w", gerr))
 					return
@@ -147,9 +147,9 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				created[key] = id
-				_ = s.WebDAV.Delete(context.WithoutCancel(ctx), fp.Path)
+				_ = h.WebDAV.Delete(context.WithoutCancel(ctx), fp.Path)
 			case "copy":
-				id, cerr := s.copyEntity(ctx, mux, op, owners[key], real, collection)
+				id, cerr := h.copyEntity(ctx, mux, op, owners[key], real, collection)
 				if cerr != nil {
 					fail(op, cerr)
 					return
@@ -172,7 +172,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 				fail(op, errors.New("link endpoint missing"))
 				return
 			}
-			if err := s.editRef(ctx, mux, op.Kind == "add_ref", ft, fid, fmt.Sprintf("%s=%d", tt, tid)); err != nil {
+			if err := h.editRef(ctx, mux, op.Kind == "add_ref", ft, fid, fmt.Sprintf("%s=%d", tt, tid)); err != nil {
 				fail(op, err)
 				return
 			}
@@ -189,7 +189,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 				path = fmt.Sprintf("/api/notes/%d", id)
 			}
 			if op.Kind == "edit_step" {
-				qid, qerr := s.Store.Journal.QuestIDForStep(ctx, id)
+				qid, qerr := h.Store.Journal.QuestIDForStep(ctx, id)
 				if qerr != nil {
 					fail(op, qerr)
 					return
@@ -237,7 +237,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			aid, _ := strconv.ParseInt(item.ID, 10, 64)
 			if item.Type == "step" {
-				fromQ, qerr := s.Store.Journal.QuestIDForStep(ctx, aid)
+				fromQ, qerr := h.Store.Journal.QuestIDForStep(ctx, aid)
 				if qerr != nil {
 					fail(op, qerr)
 					return
@@ -266,7 +266,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 	for i, o := range ops {
 		all[i] = o.ID
 	}
-	if err := s.Store.DeleteDraftOps(ctx, all); err != nil {
+	if err := h.Store.DeleteDraftOps(ctx, all); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -275,7 +275,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 
 // planDraft works out who owns each new step and file and reports what stops
 // the draft from being saved.
-func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string]string, []draftProblem) {
+func (h *Handler) planDraft(ctx context.Context, ops []store.DraftOp) (map[string]string, []draftProblem) {
 	owners := map[string]string{} // "step:t3" → "quest:5"
 	var problems []draftProblem
 	for _, op := range ops {
@@ -308,11 +308,11 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		sid, _ := strconv.ParseInt(src.ID, 10, 64)
 		switch src.Type {
 		case "step":
-			if qid, err := s.Store.Journal.QuestIDForStep(ctx, sid); err == nil {
+			if qid, err := h.Store.Journal.QuestIDForStep(ctx, sid); err == nil {
 				owners["step:"+store.TmpID(op.ID)] = fmt.Sprintf("quest:%d", qid)
 			}
 		case "attachment":
-			if a, err := s.Store.Knowledge.GetAttachment(ctx, sid); err == nil {
+			if a, err := h.Store.Knowledge.GetAttachment(ctx, sid); err == nil {
 				owners["attachment:"+store.TmpID(op.ID)] = fmt.Sprintf("%s:%d", a.OwnerType, a.OwnerID)
 			}
 		}
@@ -346,13 +346,13 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		sid, _ := strconv.ParseInt(item.ID, 10, 64)
 		oid, _ := strconv.ParseInt(owner.ID, 10, 64)
 		finalOwner[sid] = oid
-		if origin, err := s.Store.Journal.QuestIDForStep(ctx, sid); err == nil {
+		if origin, err := h.Store.Journal.QuestIDForStep(ctx, sid); err == nil {
 			lastMoveOp[origin] = op.ID
 		}
 	}
 	delta := map[int64]int{}
 	for sid, dest := range finalOwner {
-		origin, err := s.Store.Journal.QuestIDForStep(ctx, sid)
+		origin, err := h.Store.Journal.QuestIDForStep(ctx, sid)
 		if err != nil || origin == dest {
 			continue
 		}
@@ -371,7 +371,7 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		if d >= 0 {
 			continue
 		}
-		q, err := s.Store.Journal.GetQuest(ctx, qid)
+		q, err := h.Store.Journal.GetQuest(ctx, qid)
 		if err == nil && len(q.Steps)+d < 1 {
 			problems = append(problems, draftProblem{lastMoveOp[qid], "квест «" + q.Title + "» останется без шагов"})
 		}
@@ -392,34 +392,34 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 }
 
 // editRef appends or removes a "type=id" token in an entity's description.
-func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ string, id int64, token string) error {
+func (h *Handler) editRef(ctx context.Context, mux http.Handler, add bool, typ string, id int64, token string) error {
 	var desc, path string
 	switch typ {
 	case "quest":
-		q, err := s.Store.Journal.GetQuest(ctx, id)
+		q, err := h.Store.Journal.GetQuest(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc, path = q.Description, fmt.Sprintf("/api/quests/%d", id)
 	case "note":
-		n, err := s.Store.Knowledge.GetNote(ctx, id)
+		n, err := h.Store.Knowledge.GetNote(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc, path = n.Description, fmt.Sprintf("/api/notes/%d", id)
 	case "questline":
-		ql, err := s.Store.Journal.GetQuestline(ctx, id)
+		ql, err := h.Store.Journal.GetQuestline(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc = ql.Description
 		path = fmt.Sprintf("/api/questlines/%d", id)
 	case "step":
-		qid, err := s.Store.Journal.QuestIDForStep(ctx, id)
+		qid, err := h.Store.Journal.QuestIDForStep(ctx, id)
 		if err != nil {
 			return err
 		}
-		q, err := s.Store.Journal.GetQuest(ctx, qid)
+		q, err := h.Store.Journal.GetQuest(ctx, qid)
 		if err != nil {
 			return err
 		}

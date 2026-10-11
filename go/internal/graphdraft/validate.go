@@ -1,4 +1,4 @@
-package httpapi
+package graphdraft
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 // refExists tells whether a draft reference points at something real now or
 // at an op already in the draft.
-func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.DraftOp) bool {
+func (h *Handler) draftRefExists(ctx context.Context, ref draftRef, ops []store.DraftOp) bool {
 	if ref.isTmp() {
 		id, _ := strconv.ParseInt(ref.ID[1:], 10, 64)
 		for _, o := range ops {
@@ -45,19 +45,19 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 	id, _ := strconv.ParseInt(ref.ID, 10, 64)
 	switch ref.Type {
 	case "quest":
-		_, err := s.Store.Journal.GetQuest(ctx, id)
+		_, err := h.Store.Journal.GetQuest(ctx, id)
 		return err == nil
 	case "note":
-		ok, err := s.Store.Knowledge.NoteExists(ctx, id)
+		ok, err := h.Store.Knowledge.NoteExists(ctx, id)
 		return err == nil && ok
 	case "questline":
-		_, err := s.Store.Journal.GetQuestline(ctx, id)
+		_, err := h.Store.Journal.GetQuestline(ctx, id)
 		return err == nil
 	case "step":
-		_, err := s.Store.Journal.QuestIDForStep(ctx, id)
+		_, err := h.Store.Journal.QuestIDForStep(ctx, id)
 		return err == nil
 	case "attachment":
-		_, err := s.Store.Knowledge.GetAttachment(ctx, id)
+		_, err := h.Store.Knowledge.GetAttachment(ctx, id)
 		return err == nil
 	}
 	return false
@@ -65,7 +65,7 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 
 // validateDraftOp checks shape and that referenced things exist. Whether the
 // draft as a whole can be saved is decided at commit.
-func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawMessage, ops []store.DraftOp) string {
+func (h *Handler) validateDraftOp(ctx context.Context, kind string, raw json.RawMessage, ops []store.DraftOp) string {
 	needRef := func(v, what string, types ...string) string {
 		ref, ok := parseDraftRef(v)
 		if !ok {
@@ -78,7 +78,7 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 		if !okType {
 			return what + ": unsupported type " + ref.Type
 		}
-		if !s.draftRefExists(ctx, ref, ops) {
+		if !h.draftRefExists(ctx, ref, ops) {
 			return what + ": not found"
 		}
 		return ""
@@ -145,7 +145,7 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 		if p.From == p.To {
 			return "a thing cannot link to itself"
 		}
-		has := s.draftHasRef(ctx, p.From, p.To, ops)
+		has := h.draftHasRef(ctx, p.From, p.To, ops)
 		if kind == "add_ref" && has {
 			return "ссылка уже есть"
 		}
@@ -174,7 +174,7 @@ func (s *Server) validateDraftOp(ctx context.Context, kind string, raw json.RawM
 
 // draftHasRef tells whether `from` links to `to` once the draft so far is
 // applied: its saved text first, then each op in order.
-func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.DraftOp) bool {
+func (h *Handler) draftHasRef(ctx context.Context, from, to string, ops []store.DraftOp) bool {
 	f, ok1 := parseDraftRef(from)
 	t, ok2 := parseDraftRef(to)
 	if !ok1 || !ok2 {
@@ -197,16 +197,16 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 		id, _ := strconv.ParseInt(f.ID, 10, 64)
 		switch f.Type {
 		case "quest":
-			if q, err := s.Store.Journal.GetQuest(ctx, id); err == nil {
+			if q, err := h.Store.Journal.GetQuest(ctx, id); err == nil {
 				has = textHas(q.Description)
 			}
 		case "note":
-			if n, err := s.Store.Knowledge.GetNote(ctx, id); err == nil {
+			if n, err := h.Store.Knowledge.GetNote(ctx, id); err == nil {
 				has = textHas(n.Description)
 			}
 		case "step":
-			if qid, err := s.Store.Journal.QuestIDForStep(ctx, id); err == nil {
-				if q, err := s.Store.Journal.GetQuest(ctx, qid); err == nil {
+			if qid, err := h.Store.Journal.QuestIDForStep(ctx, id); err == nil {
+				if q, err := h.Store.Journal.GetQuest(ctx, qid); err == nil {
 					for _, st := range q.Steps {
 						if st.ID == id {
 							has = textHas(st.Description)
@@ -215,7 +215,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 				}
 			}
 		case "questline":
-			if ql, err := s.Store.Journal.GetQuestline(ctx, id); err == nil {
+			if ql, err := h.Store.Journal.GetQuestline(ctx, id); err == nil {
 				has = textHas(ql.Description)
 			}
 		}

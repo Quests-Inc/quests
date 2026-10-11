@@ -85,9 +85,7 @@ packages:
     output_path: "../frontend/src/shared/api/http.gen.ts"
     include_files:
       - "llm_settings.go"
-      - "graphdraft.go"
     frontmatter: |
-      import type { DraftOp } from "./store.gen";
       import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
@@ -108,6 +106,15 @@ packages:
       time.Duration: "number"
       json.RawMessage: "unknown"
       automation.Runner: "Runner"
+  - path: "github.com/quests-inc/quests/go/internal/graphdraft"
+    output_path: "../frontend/src/shared/api/graphdraft.gen.ts"
+    include_files:
+      - "views.go"
+    frontmatter: |
+      import type { DraftOp } from "./store.gen";
+    type_mappings:
+      json.RawMessage: "unknown"
+      store.DraftOp: "DraftOp"
   - path: "github.com/quests-inc/quests/go/internal/llmassist"
     output_path: "../frontend/src/shared/api/llm.gen.ts"
     include_files:

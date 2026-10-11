@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
@@ -133,17 +132,4 @@ func (s *Store) ClearDraft(ctx context.Context) ([]DraftOp, error) {
 		return nil, err
 	}
 	return ops, nil
-}
-
-// SetAttachmentOwner re-parents an attachment. The WebDAV path is untouched:
-// bytes are found through the stored path, not through the owner.
-func (s *Store) SetAttachmentOwner(ctx context.Context, id int64, ownerType string, ownerID int64) (knowledge.Attachment, error) {
-	res, err := s.DB.ExecContext(ctx, `UPDATE attachment SET owner_type = ?, owner_id = ? WHERE id = ?`, ownerType, ownerID, id)
-	if err != nil {
-		return knowledge.Attachment{}, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return knowledge.Attachment{}, ErrNotFound
-	}
-	return s.Knowledge.GetAttachment(ctx, id)
 }

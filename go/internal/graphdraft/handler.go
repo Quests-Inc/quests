@@ -1,18 +1,43 @@
-package httpapi
+package graphdraft
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/clamav"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
 	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // The relations map is edited through a draft: an ordered log of operations
 // kept on the server. Nothing in it touches real data until /commit, and any
 // single operation can be dropped without losing the rest.
+
+// Handler serves the map draft endpoints: edits to the relations map kept on the server until committed.
+type Handler struct {
+	Store          *store.Store
+	WebDAV         *webdav.Client
+	ClamAV         *clamav.Client
+	MaxUploadBytes int64
+	// API is the whole HTTP API: a commit applies every pending op by calling it, so the usual rules and change log apply.
+	API func() http.Handler
+	// WebDAVOK, ClamAVOK and CheckQuota are the attachment upload gates of the knowledge context.
+	WebDAVOK   func() bool
+	ClamAVOK   func() bool
+	CheckQuota func(w http.ResponseWriter, ctx context.Context, incoming int64) bool
+}
+
+var writeJSON = httpx.WriteJSON
+
+func writeErr(w http.ResponseWriter, status int, detail string) {
+	httpx.WriteErr(w, kernel.StatusFor(status, detail), detail)
+}
 
 var draftKinds = map[string]bool{
 	"create_quest":     true,
@@ -95,36 +120,29 @@ type attachPayload struct {
 	Owner string `json:"owner"`
 }
 
-func (s *Server) registerGraphDraft(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/graph-draft", s.getGraphDraft)
-	mux.HandleFunc("POST /api/graph-draft/ops", s.postGraphDraftOp)
-	mux.HandleFunc("PUT /api/graph-draft/ops/{id}", s.putGraphDraftOp)
-	mux.HandleFunc("DELETE /api/graph-draft/ops/{id}", s.deleteGraphDraftOp)
-	mux.HandleFunc("PUT /api/graph-draft/roots", s.putGraphDraftRoots)
-	mux.HandleFunc("POST /api/graph-draft/files", s.postGraphDraftFile)
-	mux.HandleFunc("DELETE /api/graph-draft", s.cancelGraphDraft)
-	mux.HandleFunc("POST /api/graph-draft/commit", s.commitGraphDraft)
-	mux.HandleFunc("POST /api/attachments/{id}/owner", s.postAttachmentOwner)
-	mux.HandleFunc("POST /api/quests/{id}/steps/{step_id}/move", s.postStepMove)
+// Register mounts the map draft routes.
+func (h *Handler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/graph-draft", h.getGraphDraft)
+	mux.HandleFunc("POST /api/graph-draft/ops", h.postGraphDraftOp)
+	mux.HandleFunc("PUT /api/graph-draft/ops/{id}", h.putGraphDraftOp)
+	mux.HandleFunc("DELETE /api/graph-draft/ops/{id}", h.deleteGraphDraftOp)
+	mux.HandleFunc("PUT /api/graph-draft/roots", h.putGraphDraftRoots)
+	mux.HandleFunc("POST /api/graph-draft/files", h.postGraphDraftFile)
+	mux.HandleFunc("DELETE /api/graph-draft", h.cancelGraphDraft)
+	mux.HandleFunc("POST /api/graph-draft/commit", h.commitGraphDraft)
 }
 
-// GraphDraftView is the pending edits of the relations map and the cards it is built around.
-type GraphDraftView struct {
-	Ops   []store.DraftOp `json:"ops"`
-	Roots json.RawMessage `json:"roots" tstype:"{ type: string; id: number }[]"`
-}
-
-func (s *Server) getGraphDraft(w http.ResponseWriter, r *http.Request) {
-	ops, err := s.Store.ListDraftOps(r.Context())
+func (h *Handler) getGraphDraft(w http.ResponseWriter, r *http.Request) {
+	ops, err := h.Store.ListDraftOps(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	roots, _ := s.Store.DraftRoots(r.Context())
+	roots, _ := h.Store.DraftRoots(r.Context())
 	writeJSON(w, 200, GraphDraftView{Ops: ops, Roots: roots})
 }
 
-func (s *Server) postGraphDraftOp(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) postGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Kind    string          `json:"kind"`
 		Payload json.RawMessage `json:"payload"`
@@ -137,16 +155,16 @@ func (s *Server) postGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 422, "unknown op kind")
 		return
 	}
-	ops, err := s.Store.ListDraftOps(r.Context())
+	ops, err := h.Store.ListDraftOps(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if msg := s.validateDraftOp(r.Context(), in.Kind, in.Payload, ops); msg != "" {
+	if msg := h.validateDraftOp(r.Context(), in.Kind, in.Payload, ops); msg != "" {
 		writeErr(w, 422, msg)
 		return
 	}
-	op, err := s.Store.AddDraftOp(r.Context(), in.Kind, in.Payload)
+	op, err := h.Store.AddDraftOp(r.Context(), in.Kind, in.Payload)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -154,13 +172,13 @@ func (s *Server) postGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, op)
 }
 
-func (s *Server) deleteGraphDraftOp(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) deleteGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeErr(w, 400, "bad id")
 		return
 	}
-	ops, err := s.Store.ListDraftOps(r.Context())
+	ops, err := h.Store.ListDraftOps(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -178,15 +196,15 @@ func (s *Server) deleteGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"would_remove": ids})
 		return
 	}
-	s.dropStagedFiles(r.Context(), ops, ids)
-	if err := s.Store.DeleteDraftOps(r.Context(), ids); err != nil {
+	h.dropStagedFiles(r.Context(), ops, ids)
+	if err := h.Store.DeleteDraftOps(r.Context(), ids); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 	writeJSON(w, 200, map[string]any{"removed": ids})
 }
 
-func (s *Server) putGraphDraftRoots(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) putGraphDraftRoots(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Roots []struct {
 			Type string `json:"type"`
@@ -207,15 +225,15 @@ func (s *Server) putGraphDraftRoots(w http.ResponseWriter, r *http.Request) {
 	if in.Roots == nil {
 		raw = []byte("[]")
 	}
-	if err := s.Store.SetDraftRoots(r.Context(), raw); err != nil {
+	if err := h.Store.SetDraftRoots(r.Context(), raw); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 	writeJSON(w, 200, map[string]any{"roots": json.RawMessage(raw)})
 }
 
-func (s *Server) cancelGraphDraft(w http.ResponseWriter, r *http.Request) {
-	ops, err := s.Store.ClearDraft(r.Context())
+func (h *Handler) cancelGraphDraft(w http.ResponseWriter, r *http.Request) {
+	ops, err := h.Store.ClearDraft(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -224,6 +242,6 @@ func (s *Server) cancelGraphDraft(w http.ResponseWriter, r *http.Request) {
 	for i, o := range ops {
 		ids[i] = o.ID
 	}
-	s.dropStagedFiles(r.Context(), ops, ids)
+	h.dropStagedFiles(r.Context(), ops, ids)
 	w.WriteHeader(204)
 }
