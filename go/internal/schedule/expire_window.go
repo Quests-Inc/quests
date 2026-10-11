@@ -33,28 +33,8 @@ func deadlineSetWithOpenWindow(q journal.Quest) bool {
 // ExpireOverdue marks active quests past deadline as expired and publishes events.
 func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int64, error) {
 	now := timeutil.NowUTC()
-	nowDB := timeutil.ToDBUTC(now)
-	rows, err := st.DB.QueryContext(ctx, `
-		SELECT id FROM quest
-		WHERE status = 'active' AND deadline_at IS NOT NULL AND deadline_at <= ?
-			-- duration=0/NULL means "no window": deadline is informational only,
-			-- don't auto-flip the quest to expired just because it passed.
-			AND duration_seconds IS NOT NULL AND duration_seconds > 0
-		ORDER BY id`, nowDB)
+	ids, err := st.Journal().ActiveQuestIDsPastDeadline(ctx, now)
 	if err != nil {
-		return nil, err
-	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	if len(ids) == 0 {

@@ -39,44 +39,7 @@ func defaultTZ() string {
 	return "Europe/Moscow"
 }
 
-type templateRow struct {
-	ID              int64
-	Title           string
-	Description     string
-	Pinned          bool
-	OverlayHidden   bool
-	SortOrder       int
-	DurationSeconds sql.NullInt64
-	Freq            string
-	Weekdays        string
-	Enabled         bool
-	Timezone        string
-	DeadlineTime    sql.NullString
-	Significance    string
-	EmitMode        string
-	EmitChance      float64
-	EmitWindowStart sql.NullString
-	EmitWindowEnd   sql.NullString
-	EmitPoolCommand sql.NullString
-	EmitRunOn       sql.NullString
-	EmitLimits      sql.NullString
-	CategoryID      sql.NullInt64
-	QuestlineID     sql.NullInt64
-	Automated       bool
-}
-
-type templateStepRow struct {
-	Title                string
-	Description          string
-	SortOrder            int
-	ProgressMin          int
-	ProgressMax          int
-	CheckCommand         sql.NullString
-	CheckIntervalSeconds sql.NullInt64
-	WaitPrevious         bool
-	RunMode              string
-	RunOn                sql.NullString
-}
+type templateRow = automation.TemplateRow
 
 // MaterializeDue creates quest instances for due templates (fixed + surprise).
 func MaterializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now time.Time, rng *rand.Rand) ([]int64, error) {
@@ -90,34 +53,8 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 	if now.IsZero() {
 		now = timeutil.NowUTC()
 	}
-	rows, err := st.DB.QueryContext(ctx, `
-		SELECT id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
-			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
-			emit_window_start, emit_window_end, emit_pool_command, emit_limits, emit_run_on,
-			category_id, questline_id, automated
-		FROM questtemplate WHERE enabled = 1 ORDER BY sort_order, id`)
+	templates, err := st.Automation().ListEnabledTemplateRows(ctx)
 	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var templates []templateRow
-	for rows.Next() {
-		var t templateRow
-		var pinned, enabled, automated int
-		if err := rows.Scan(
-			&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
-			&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
-			&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits, &t.EmitRunOn,
-			&t.CategoryID, &t.QuestlineID, &automated,
-		); err != nil {
-			return nil, err
-		}
-		t.Pinned, t.OverlayHidden = journal.SplitPinState(pinned)
-		t.Enabled = enabled != 0
-		t.Automated = automated != 0
-		templates = append(templates, t)
-	}
-	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -140,15 +77,10 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		}
 		key := localNow.Format("2006-01-02")
 
-		var existing sql.NullInt64
-		err = st.DB.QueryRowContext(ctx, `
-			SELECT id FROM quest WHERE template_id = ? AND period_key = ? LIMIT 1`,
-			tmpl.ID, key).Scan(&existing)
-		if err == nil && existing.Valid {
-			continue
-		}
-		if err != nil && err != sql.ErrNoRows {
+		if _, exists, err := st.Journal().QuestIDForPeriod(ctx, tmpl.ID, key); err != nil {
 			return created, err
+		} else if exists {
+			continue
 		}
 
 		emitMode := strings.ToLower(strings.TrimSpace(tmpl.EmitMode))
@@ -289,14 +221,10 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			return created, err
 		}
 		if surpriseRollID.Valid {
-			_, _ = st.DB.ExecContext(ctx, `
-				UPDATE templateemitroll SET outcome = 'materialized', updated_at = ? WHERE id = ?`,
-				timeutil.ToDBUTC(now), surpriseRollID.Int64)
+			st.Automation().MarkEmitRollMaterialized(ctx, surpriseRollID.Int64, now)
 		}
 		if usePool && poolRollID != 0 {
-			_, _ = st.DB.ExecContext(ctx, `
-				UPDATE templateemitroll SET outcome = 'materialized', updated_at = ? WHERE id = ?`,
-				timeutil.ToDBUTC(now), poolRollID)
+			st.Automation().MarkEmitRollMaterialized(ctx, poolRollID, now)
 		}
 		qid := createdQ.ID
 		detail := "Период " + key
@@ -428,24 +356,18 @@ func surpriseDeadline(tmpl templateRow, nowUTC time.Time) (*time.Time, *int) {
 }
 
 func ensureSurpriseRoll(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string, localNow time.Time, rng *rand.Rand) (int64, string, *time.Time, error) {
-	var id int64
-	var outcome string
-	var scheduled sql.NullString
-	err := st.DB.QueryRowContext(ctx, `
-		SELECT id, outcome, scheduled_at FROM templateemitroll
-		WHERE template_id = ? AND period_key = ?`, tmpl.ID, periodKey).Scan(&id, &outcome, &scheduled)
-	if err == nil {
+	roll, found, err := st.Automation().EmitRollFor(ctx, tmpl.ID, periodKey)
+	if err != nil {
+		return 0, "", nil, err
+	}
+	if found {
 		var sched *time.Time
-		if scheduled.Valid {
-			t, e := timeutil.ParseFlexible(scheduled.String)
-			if e == nil {
+		if roll.ScheduledAt.Valid {
+			if t, e := timeutil.ParseFlexible(roll.ScheduledAt.String); e == nil {
 				sched = &t
 			}
 		}
-		return id, outcome, sched, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, "", nil, err
+		return roll.ID, roll.Outcome, sched, nil
 	}
 
 	chance := tmpl.EmitChance
@@ -457,13 +379,10 @@ func ensureSurpriseRoll(ctx context.Context, st *store.Store, tmpl templateRow, 
 	}
 	now := timeutil.NowUTC()
 	if rng.Float64() >= chance {
-		res, err := st.DB.ExecContext(ctx, `
-			INSERT INTO templateemitroll (template_id, period_key, outcome, scheduled_at, created_at, updated_at)
-			VALUES (?, ?, 'miss', NULL, ?, ?)`, tmpl.ID, periodKey, timeutil.ToDBUTC(now), timeutil.ToDBUTC(now))
+		id, err := st.Automation().InsertEmitRoll(ctx, tmpl.ID, periodKey, "miss", 0, nil, nil, "", now)
 		if err != nil {
 			return 0, "", nil, err
 		}
-		id, _ = res.LastInsertId()
 		return id, "miss", nil, nil
 	}
 
@@ -476,14 +395,10 @@ func ensureSurpriseRoll(ctx context.Context, st *store.Store, tmpl templateRow, 
 	}
 	scheduledLocal := pickScheduledAt(localNow, startRaw, endRaw, rng)
 	schedUTC := scheduledLocal.UTC()
-	res, err := st.DB.ExecContext(ctx, `
-		INSERT INTO templateemitroll (template_id, period_key, outcome, scheduled_at, created_at, updated_at)
-		VALUES (?, ?, 'scheduled', ?, ?, ?)`,
-		tmpl.ID, periodKey, timeutil.ToDBUTC(schedUTC), timeutil.ToDBUTC(now), timeutil.ToDBUTC(now))
+	id, err := st.Automation().InsertEmitRoll(ctx, tmpl.ID, periodKey, "scheduled", 0, &schedUTC, nil, "", now)
 	if err != nil {
 		return 0, "", nil, err
 	}
-	id, _ = res.LastInsertId()
 	return id, "scheduled", &schedUTC, nil
 }
 
@@ -514,28 +429,9 @@ func pickScheduledAt(localDay time.Time, windowStart, windowEnd string, rng *ran
 }
 
 func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, rng *rand.Rand) ([]journal.Step, error) {
-	rows, err := st.DB.QueryContext(ctx, `
-		SELECT title, description, sort_order, progress_min, progress_max, check_command, check_interval_seconds,
-			wait_previous, run_mode, run_on
-		FROM questtemplatestep WHERE template_id = ? ORDER BY sort_order, id`, tmpl.ID)
+	src, err := st.Automation().TemplateStepRows(ctx, tmpl.ID)
 	if err != nil {
 		return nil, err
-	}
-	defer rows.Close()
-	var src []templateStepRow
-	for rows.Next() {
-		var s templateStepRow
-		var waitPrev int
-		var runMode sql.NullString
-		if err := rows.Scan(&s.Title, &s.Description, &s.SortOrder, &s.ProgressMin, &s.ProgressMax, &s.CheckCommand, &s.CheckIntervalSeconds, &waitPrev, &runMode, &s.RunOn); err != nil {
-			return nil, err
-		}
-		s.WaitPrevious = waitPrev != 0
-		s.RunMode = journal.RunModePoll
-		if runMode.Valid {
-			s.RunMode = journal.NormalizeRunMode(runMode.String)
-		}
-		src = append(src, s)
 	}
 	if len(src) == 0 {
 		return []journal.Step{{Title: tmpl.Title, ProgressTotal: 1, SortOrder: 0}}, nil
@@ -619,20 +515,12 @@ type poolOpts struct {
 // validates the quest it printed against the template's limits and persists the
 // outcome in templateemitroll so repeated ticks don't re-run or re-create.
 func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string, now time.Time, opts poolOpts) (emitResult, error) {
-	var id int64
-	var outcome string
-	var attempts int
-	var retryAt sql.NullString
-	isNew := false
-	qerr := st.DB.QueryRowContext(ctx, `
-		SELECT id, outcome, attempts, retry_at FROM templateemitroll
-		WHERE template_id = ? AND period_key = ?`, tmpl.ID, periodKey).
-		Scan(&id, &outcome, &attempts, &retryAt)
-	if qerr == sql.ErrNoRows {
-		isNew = true
-	} else if qerr != nil {
+	roll, found, qerr := st.Automation().EmitRollFor(ctx, tmpl.ID, periodKey)
+	if qerr != nil {
 		return emitResult{}, qerr
 	}
+	id, outcome, attempts, retryAt := roll.ID, roll.Outcome, roll.Attempts, roll.RetryAt
+	isNew := !found
 	if !isNew && (outcome == "materialized" || outcome == "error" || outcome == "miss") {
 		return emitResult{RollID: id}, nil
 	}
@@ -694,31 +582,24 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 	if execErr != nil {
 		attempts++
 		newOutcome := "scheduled"
-		var nextRetry any
+		var nextRetry *time.Time
 		if attempts >= emitPoolMaxAttempts {
 			newOutcome = "error"
 			rec.Message = "giving up: attempts exhausted\n" + execErr.Error()
 		} else {
 			delay := emitPoolRetryDelays[min(attempts-1, len(emitPoolRetryDelays)-1)]
-			nextRetry = timeutil.ToDBUTC(now.Add(delay))
+			at := now.Add(delay)
+			nextRetry = &at
 			rec.Message = fmt.Sprintf("retry in %s\n", delay) + execErr.Error()
 		}
 		record()
 		if isNew {
-			res, err := st.DB.ExecContext(ctx, `
-				INSERT INTO templateemitroll (template_id, period_key, outcome, attempts, retry_at, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?)`,
-				tmpl.ID, periodKey, newOutcome, attempts, nextRetry, timeutil.ToDBUTC(now), timeutil.ToDBUTC(now))
-			if err != nil {
+			var err error
+			if id, err = st.Automation().InsertEmitRoll(ctx, tmpl.ID, periodKey, newOutcome, attempts, nil, nextRetry, "", now); err != nil {
 				return emitResult{}, err
 			}
-			id, _ = res.LastInsertId()
-		} else {
-			if _, err := st.DB.ExecContext(ctx, `
-				UPDATE templateemitroll SET outcome = ?, attempts = ?, retry_at = ?, updated_at = ? WHERE id = ?`,
-				newOutcome, attempts, nextRetry, timeutil.ToDBUTC(now), id); err != nil {
-				return emitResult{}, err
-			}
+		} else if err := st.Automation().UpdateEmitRollAttempt(ctx, id, newOutcome, attempts, nextRetry, now); err != nil {
+			return emitResult{}, err
 		}
 		if newOutcome == "error" {
 			return emitResult{RollID: id, FailMsg: execErr.Error()}, nil
@@ -764,26 +645,9 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 // isNew branching themselves.
 func persistEmitPoolOutcome(ctx context.Context, st *store.Store, id int64, isNew bool, templateID int64, periodKey, outcome string, attempts int, pickedRefsJSON string, now time.Time) (int64, error) {
 	if isNew {
-		res, err := st.DB.ExecContext(ctx, `
-			INSERT INTO templateemitroll (template_id, period_key, outcome, attempts, picked_refs, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			templateID, periodKey, outcome, attempts, nullStrIfEmpty(pickedRefsJSON), timeutil.ToDBUTC(now), timeutil.ToDBUTC(now))
-		if err != nil {
-			return 0, err
-		}
-		return res.LastInsertId()
+		return st.Automation().InsertEmitRoll(ctx, templateID, periodKey, outcome, attempts, nil, nil, pickedRefsJSON, now)
 	}
-	_, err := st.DB.ExecContext(ctx, `
-		UPDATE templateemitroll SET outcome = ?, picked_refs = ?, retry_at = NULL, updated_at = ? WHERE id = ?`,
-		outcome, nullStrIfEmpty(pickedRefsJSON), timeutil.ToDBUTC(now), id)
-	return id, err
-}
-
-func nullStrIfEmpty(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
+	return id, st.Automation().UpdateEmitRollPicked(ctx, id, outcome, pickedRefsJSON, now)
 }
 
 // execInfo is what one emit_pool_command run leaves behind for the attempt
@@ -815,29 +679,11 @@ func truncate(s string, n int) string {
 var ErrTemplateNotFound = errors.New("template not found")
 
 func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRow, error) {
-	var t templateRow
-	var pinned, enabled, automated int
-	err := st.DB.QueryRowContext(ctx, `
-		SELECT id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
-			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
-			emit_window_start, emit_window_end, emit_pool_command, emit_limits, emit_run_on,
-			category_id, questline_id, automated
-		FROM questtemplate WHERE id = ?`, id).Scan(
-		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
-		&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
-		&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits, &t.EmitRunOn,
-		&t.CategoryID, &t.QuestlineID, &automated,
-	)
-	if err == sql.ErrNoRows {
+	t, err := st.Automation().TemplateRowByID(ctx, id)
+	if errors.Is(err, automation.ErrNotFound) {
 		return templateRow{}, ErrTemplateNotFound
 	}
-	if err != nil {
-		return templateRow{}, err
-	}
-	t.Pinned, t.OverlayHidden = journal.SplitPinState(pinned)
-	t.Enabled = enabled != 0
-	t.Automated = automated != 0
-	return t, nil
+	return t, err
 }
 
 // MaterializeTemplateManual creates one quest from a template immediately (GUI
@@ -945,9 +791,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		return 0, err
 	}
 	if usePool && poolRollID != 0 {
-		_, _ = st.DB.ExecContext(ctx, `
-			UPDATE templateemitroll SET outcome = 'materialized', updated_at = ? WHERE id = ?`,
-			timeutil.ToDBUTC(now), poolRollID)
+		st.Automation().MarkEmitRollMaterialized(ctx, poolRollID, now)
 	}
 	qid := createdQ.ID
 	if hub != nil {
