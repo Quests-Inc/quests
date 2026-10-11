@@ -10,7 +10,7 @@
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
-  import { NOTE_SPEC, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { NOTE_SPEC, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { parseQuery, passes, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   type NoteForm = NoteDraft & { isReadme?: boolean; isPrivate?: boolean; isCategory?: boolean }
@@ -735,68 +735,10 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     return notes.find((n) => n.id === id) ?? null
   }
 
-  /** A note is visible in the sidebar when every ancestor up to the root is
-   * expanded (or it has no parent). */
-  function isNoteVisible(id: any) {
-    const n = noteById(id)
-    if (!n) return false
-    if (n.parent_id == null) return true
-    if (!isNoteVisible(n.parent_id)) return false
-    return showChildren(n.parent_id)
-  }
+  let readmeBubbleIds = $derived(readmeBubbles(notes, showChildren))
+  let crumbs = $derived(noteCrumbs(notes, parentId))
+  let parentMenuItems = $derived(parentMenu(notes, selectedId))
 
-  /** Walking up from a hidden note, the closest ancestor that is itself
-   * visible — the row where a "there's a README below" hint should land. */
-  function nearestVisibleAncestor(id: any) {
-    const n = noteById(id)
-    let cur = n?.parent_id != null ? noteById(n.parent_id) : null
-    while (cur) {
-      if (isNoteVisible(cur.id)) return cur.id
-      cur = cur.parent_id != null ? noteById(cur.parent_id) : null
-    }
-    return null
-  }
-
-  /** Notes that aren't README themselves but have a README descendant
-   * currently hidden behind a collapsed ancestor — bubbled up to the
-   * deepest visible ancestor so a collapsed README stays discoverable.
-   * Rendered in yellow (not red) so it isn't mistaken for the note itself
-   * being the README. */
-  let readmeBubbleIds = $derived.by(() => {
-    const out = new Set()
-    for (const n of notes) {
-      if (!n.is_readme || isNoteVisible(n.id)) continue
-      const anc = nearestVisibleAncestor(n.id)
-      if (anc != null) out.add(anc)
-    }
-    return out
-  })
-
-  let crumbs = $derived.by(() => {
-    const out: { id: number | null, title: string }[] = [{ id: null, title: 'Корень' }]
-    const pid = parentId === '' ? null : Number(parentId)
-    if (pid == null || Number.isNaN(pid)) return out
-    const chain: { id: number, title: string }[] = []
-    let cur = noteById(pid)
-    const seen = new Set()
-    while (cur && !seen.has(cur.id)) {
-      seen.add(cur.id)
-      chain.unshift({ id: cur.id, title: cur.title || `note=${cur.id}` })
-      cur = cur.parent_id != null ? noteById(cur.parent_id) : null
-    }
-    return out.concat(chain)
-  })
-
-  let parentMenuItems = $derived.by(() => {
-    const items: { id: string, label: string }[] = [{ id: 'root', label: '— корень —' }]
-    if (selectedId == null) return items
-    for (const n of notes) {
-      if (n.id === selectedId) continue
-      if (isUnder(notes, n.id, selectedId)) continue
-      items.push({ id: String(n.id), label: n.title || `note=${n.id}` })
-    }
-    return items
-  })
 
   function openParentPicker(event: MouseEvent) {
     event.preventDefault()
@@ -883,88 +825,15 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let ctxNote = $derived(ctxNoteId == null ? null : noteById(ctxNoteId))
 
-  function moveTargets(note: { parent_id: null; id: null }) {
-    const items: { id: string, label?: string, sep?: boolean, checked?: boolean }[] = []
-    if (note?.parent_id != null) {
-      items.push({ id: 'move-up', label: 'На уровень вверх' })
-    }
-    items.push({
-      id: 'move:root',
-      label: 'Корень',
-      checked: note?.parent_id == null,
-    })
-    // Only flat neighbours: the parent's level (parent + its siblings — the note
-    // keeps its depth) and the note's own level (siblings — it nests one deeper).
-    // Own descendants are excluded, so there is never an ambiguous re-parenting.
-    const pid = note?.parent_id ?? null
-    const parent = pid != null ? noteById(pid) : null
-    const hasKids = (n: { id: any }) => hasChildren(n.id)
-    const level = (parentOf: any) =>
-      notes
-        .filter(
-          (n) =>
-            (n.parent_id ?? null) === parentOf &&
-            n.id !== note?.id &&
-            !(note?.id != null && isUnder(notes, n.id, note.id)),
-        )
-        .sort((a, b) => compareNotes(a, b, hasKids))
-    const groups = [
-      ...(parent ? [level(parent.parent_id ?? null)] : []),
-      level(pid),
-    ]
-    let listed = false
-    for (const group of groups) {
-      if (!group.length) continue
-      if (!listed) {
-        items.push({ id: 'sep-move', sep: true })
-        listed = true
-      } else {
-        items.push({ id: `sep-move-${items.length}`, sep: true })
-      }
-      for (const n of group) {
-        items.push({
-          id: `move:${n.id}`,
-          label: n.title || `note=${n.id}`,
-          checked: note?.parent_id === n.id,
-        })
-      }
-    }
-    return items
-  }
-
-  let ctxItems = $derived.by(() => {
-    if (ctxNoteId == null) return []
-    return [
-      { id: 'copy-id', label: `Копировать note=${ctxNoteId}` },
-      { id: 'sep-copy', sep: true },
-      ...(searchActive ? [] : [{ id: 'rename', label: 'Переименовать' }]),
-      {
-        id: 'flags',
-        label: 'Флаги',
-        children: [
-          { id: 'pin', label: ctxNote?.pinned ? 'Снять закреп' : 'Закрепить' },
-          { id: 'readme', label: ctxNote?.is_readme ? 'Снять README' : 'Пометить README' },
-          { id: 'private', label: ctxNote?.is_private ? 'Снять PRIVATE' : 'Пометить PRIVATE' },
-          { id: 'category', label: ctxNote?.is_category ? 'Снять CATEGORY' : 'Пометить CATEGORY' },
-          { id: 'outdated', label: ctxNote?.outdated ? 'Снять «устарела»' : 'Пометить «устарела»' },
-        ],
-      },
-      { id: 'add-child', label: 'Добавить дочернюю' },
-      { id: 'move', label: 'Переместить', children: moveTargets(ctxNote) },
-      {
-        id: 'export',
-        label: 'Экспорт',
-        children: [
-          { id: 'export-md', label: 'Markdown (.md)' },
-          { id: 'export-pdf', label: exportBusy ? 'PDF…' : 'PDF' },
-        ],
-      },
-      { id: 'sep-icon', sep: true },
-      { id: 'icon', label: 'Иконка' },
-      { id: 'sep-danger', sep: true },
-      { id: 'delete', label: 'Удалить', danger: true },
-    ]
-  })
+  let ctxItems = $derived(
+    noteMenuItems({
+      noteId: ctxNoteId,
+      note: ctxNote,
+      searchActive,
+      exportBusy,
+      moveTargets: moveTargetItems(ctxNote, notes, hasChildren),
+    }),
+  )
 
   function openNoteMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, note: { id: number }) {
     if (!note?.id) return
