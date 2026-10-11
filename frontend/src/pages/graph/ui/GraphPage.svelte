@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { computeTiers, RASTER } from '@/entities/graph'
+  import { computeTiers } from '@/entities/graph'
   import { noteCatalog } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
@@ -7,24 +7,13 @@
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+  import { GraphDraftLog, createGraphDraft, createGraphEdits } from '@/features/graph-draft'
+  import { GraphCanvas, createClusterFolds, createGraphGestures, createGraphStage, createLinkMode } from '@/widgets/graph-canvas'
   import { handleGraphKey } from '../model/keys.ts'
-  import { createGraphDraft } from '../model/draft.svelte.ts'
-  import { createGraphEdits } from '../model/edits.svelte.ts'
-  import { createClusterFolds } from '../model/folds.svelte.ts'
-  import { createGraphGestures } from '../model/gestures.svelte.ts'
-  import { createLinkMode } from '../model/linking.svelte.ts'
   import { createGraphMenu } from '../model/menu.svelte.ts'
   import { createGraphPrefs } from '../model/prefs.svelte.ts'
   import { createGraphQuery } from '../model/query.svelte.ts'
-  import { createGraphStage } from '../model/stage.svelte.ts'
-  import GraphCard from './GraphCard.svelte'
-  import GraphDraftLog from './GraphDraftLog.svelte'
-  import GraphEdges from './GraphEdges.svelte'
-  import GraphFoot from './GraphFoot.svelte'
-  import GraphGroups from './GraphGroups.svelte'
-  import GraphMinimap from './GraphMinimap.svelte'
   import GraphToolbar from './GraphToolbar.svelte'
-  import GraphTools from './GraphTools.svelte'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -218,30 +207,19 @@
     menu.close()
   }
 
-  let view = $derived(stage.view)
-  let ready = $derived(stage.ready)
-  let cam = $derived(gest.cam)
-  let marquee = $derived(gest.marquee)
   let linking = $derived(lk.linking)
-  let linkCursor = $derived(lk.cursor)
   let draft = $derived(gd.draft)
-  let selectedKey = $derived(stage.selectedKey)
   let data = $derived(query.data)
   let center = $derived(query.center)
   let error = $derived(query.error)
   let loading = $derived(query.loading)
   let ownerless = $derived(stage.ownerless)
-  let touched = $derived(stage.touched)
-  let picked = $derived(stage.picked)
   let full = $derived(stage.full)
   let selectMode = $derived(stage.selectMode)
   let canClear = $derived(query.canClear)
   let filteredOut = $derived(stage.filteredOut)
   let expanded = $derived(folds.expanded)
   let loose = $derived(folds.loose)
-  let drawEdges = $derived(stage.drawEdges)
-  let nodeMap = $derived(stage.nodeMap)
-  let groups = $derived(stage.groups)
   let prevTier = new Map<string, string>()
   let tier = $derived.by(() => {
     const camNow = gest.cam
@@ -256,11 +234,8 @@
     prevTier = next
     return next
   })
-  let moreMap = $derived(stage.moreMap)
-  let mini = $derived(stage.mini)
   let flashOp = $derived(stage.flashOp)
   let selected = $derived(stage.selected)
-  let editing = $derived(edits.editing)
   let questStatuses = $derived(prefs.questStatuses)
   let statusLabel = $derived(prefs.statusLabel)
   let typesLabel = $derived(prefs.typesLabel)
@@ -273,20 +248,14 @@
   let questModal = $derived(menu.questModal)
   let findModal = $derived(menu.findOpen)
 
-  const { onTouchDown, onBgDown, onCardDown, onGroupDown, onMove, onUp, onWheel } = gest
   const onCtx = menu.onCtx
   const onGroupCtx = menu.onGroupCtx
   const onEdgeCtx = menu.onEdgeCtx
   const onCtxSelect = menu.onCtxSelect
   const onFilesPicked = menu.onFilesPicked
   const edgeActions = menu.edgeActions
-  const collapse = folds.collapse
   const collapseAll = folds.collapseAll
-  const collapseKey = stage.collapseKey
   const titleOf = stage.titleOf
-  const openMore = stage.openMore
-  const miniGo = stage.miniGo
-  const clearPicked = stage.clearPicked
   const fit = stage.fit
   const relayout = stage.relayout
   const toggleFull = stage.toggleFull
@@ -295,8 +264,6 @@
   const addToMap = query.addToMap
   const chooseRoot = query.chooseRoot
   const recenter = query.recenter
-  const openTarget = stage.openTarget
-  const canPick = lk.canPick
   const startEditNote = edits.startEditNote
   const finishEdit = edits.finishEdit
   const toggleStatus = prefs.toggleStatus
@@ -330,11 +297,6 @@
       clear: () => void clearMap(),
     })
   }
-
-  const isDone = (n: { status?: string }) => n.status === 'completed' || n.status === 'done'
-  const isOrphan = (n: { type: string; links: number }) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
-  const rasterOf = (n: { type: string; mime?: string }) =>
-    n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
 
   $effect(() => {
     query.syncRoot()
@@ -390,103 +352,31 @@
     {/if}
   </GraphToolbar>
 
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="graph__stage"
-    class:graph__stage--full={full}
-    data-swipe={view?.nodes?.length ? undefined : 'free'}
-    bind:this={stage.el}
-    onpointerdowncapture={onTouchDown}
-    onpointerdown={onBgDown}
-    onpointermove={onMove}
-    onpointerup={onUp}
-    onpointercancel={onUp}
-    onwheel={onWheel}
-    oncontextmenu={(e) => onCtx(e)}
+  <GraphCanvas
+    {stage}
+    {gest}
+    {folds}
+    {lk}
+    bind:editing={edits.editing}
+    {data}
+    {center}
+    {error}
+    {loading}
+    {canClear}
+    {tier}
+    {edgeActions}
+    {onCtx}
+    {onGroupCtx}
+    {onEdgeCtx}
+    {onOpen}
+    onStartEdit={startEditNote}
+    onFinishEdit={finishEdit}
+    onShowChanges={showChanges}
+    onHidePicked={hidePicked}
+    onToggleSelect={toggleSelectMode}
+    onClear={clearMap}
+    onRecenter={() => selected && recenter(selected)}
   >
-    {#if linking}
-      <p class="glink-hint">
-        {#if linking.mode === 'to'}
-          Выберите, на что ссылаться
-        {:else if linking.mode === 'from'}
-          Выберите, где должна появиться ссылка на «{titleOf(linking.anchor)}»
-        {:else}
-          Выберите, к чему прикрепить «{titleOf(linking.anchor)}»
-        {/if}
-        · ПКМ или Esc — отмена
-      </p>
-    {/if}
-    {#if !center.id && !view?.nodes?.length}
-      <p class="graph__msg">Выберите квест или заметку в поиске выше — или откройте карту из карточки квеста. ПКМ по полю создаёт новые.</p>
-    {:else if error}
-      <p class="graph__msg">{error}</p>
-    {:else if loading && !view}
-      <p class="graph__msg">Загрузка…</p>
-    {/if}
-
-    <div class="gworld" style:transform="translate({cam.x}px, {cam.y}px) scale({cam.k})" class:gworld--hidden={!ready}>
-      <GraphEdges {drawEdges} {linking} {nodeMap} {linkCursor} {edgeActions} {onEdgeCtx} />
-
-      <GraphGroups {groups} {collapseKey} {onGroupDown} {onGroupCtx} onCollapse={collapse} />
-
-      {#each view?.nodes ?? [] as n (n.key)}
-        <GraphCard
-          {n}
-          selected={n.key === selectedKey}
-          root={n.key === data?.root}
-          done={isDone(n)}
-          orphan={isOrphan(n)}
-          dim={!!linking && n.key !== linking.anchor && !canPick(n)}
-          pickable={!!linking && canPick(n)}
-          anchor={linking?.anchor === n.key}
-          ownerless={ownerless.has(n.key)}
-          editingHere={editing?.key === n.key}
-          picked={picked.has(n.key)}
-          {ready}
-          raster={rasterOf(n)}
-          tier={tier.get(n.key)}
-          more={moreMap.get(n.key) ?? []}
-          changed={touched.has(n.key) && !n.draft}
-          bind:editing={edits.editing}
-          {onCardDown}
-          {onCtx}
-          onStartEdit={startEditNote}
-          onFinishEdit={finishEdit}
-          {onOpen}
-          onOpenMore={openMore}
-          onShowChanges={showChanges}
-        />
-      {/each}
-    </div>
-
-    {#if marquee}
-      <div
-        class="gmarquee"
-        style:left="{Math.min(marquee.x0, marquee.x1)}px"
-        style:top="{Math.min(marquee.y0, marquee.y1)}px"
-        style:width="{Math.abs(marquee.x1 - marquee.x0)}px"
-        style:height="{Math.abs(marquee.y1 - marquee.y0)}px"
-      ></div>
-    {/if}
-
-    {#if mini}
-      <GraphMinimap {mini} onGo={miniGo} />
-    {/if}
-
-    <GraphTools
-      {selectMode}
-      pickedCount={picked.size}
-      {full}
-      {canClear}
-      onHidePicked={hidePicked}
-      onClearPicked={clearPicked}
-      onToggleSelect={toggleSelectMode}
-      onFit={fit}
-      onRelayout={relayout}
-      onToggleFull={toggleFull}
-      onClear={clearMap}
-    />
-
     {#if draft.ops.length}
       <GraphDraftLog
         ops={draft.ops}
@@ -501,19 +391,7 @@
         onDrop={gd.askDrop}
       />
     {/if}
-
-    {#if data?.truncated}
-      <p class="graph__trunc">Показаны не все узлы — уменьшите глубину</p>
-    {/if}
-  </div>
-
-  <GraphFoot
-    {selected}
-    target={selected ? openTarget(selected) : null}
-    canRecenter={stage.canRecenter}
-    {onOpen}
-    onRecenter={() => selected && recenter(selected)}
-  />
+  </GraphCanvas>
 </div>
 
 <input bind:this={menu.fileInput} type="file" multiple hidden onchange={onFilesPicked} />
@@ -630,91 +508,9 @@
     border-color: var(--color-accent, #c9a227);
   }
 
-  .graph__stage {
-    position: relative;
-    flex: 1 1 auto;
-    min-height: 16rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--pill-radius, 12px);
-    background: var(--pill-bg, #0f0f0f);
-    overflow: hidden;
-  }
-
-  /* Above the journal chrome, below modals (50) and menus (80). */
-  .graph__stage--full {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    min-height: 0;
-    border: none;
-    border-radius: 0;
-  }
-
-  .graph__msg,
-  .graph__trunc {
-    position: absolute;
-    margin: 0;
-    font-size: var(--text-sm, 0.875rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .graph__msg {
-    inset: 0;
-    display: grid;
-    place-items: center;
-  }
-
-  .graph__trunc {
-    left: 0.8rem;
-    bottom: 0.6rem;
-    font-size: var(--text-xs, 0.75rem);
-  }
-
-  .graph__stage {
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-  }
-
-  .gworld {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 0;
-    height: 0;
-    transform-origin: 0 0;
-  }
-
-  .gworld--hidden {
-    visibility: hidden;
-  }
-
-  .gmarquee {
-    position: absolute;
-    z-index: 7;
-    border: 1px solid #5aa9ff;
-    background: color-mix(in srgb, #5aa9ff 14%, transparent);
-    pointer-events: none;
-  }
-
   :global(.graph__btn--on) {
     border-color: #5aa9ff;
     color: #5aa9ff;
-  }
-
-  .glink-hint {
-    position: absolute;
-    z-index: 4;
-    top: 0.6rem;
-    left: 50%;
-    transform: translateX(-50%);
-    margin: 0;
-    padding: 0.35rem 0.9rem;
-    border: 1px solid var(--color-accent, #c9a227);
-    border-radius: 999px;
-    background: var(--color-bg-raised, #1a1a1a);
-    font-size: var(--text-sm, 0.875rem);
-    pointer-events: none;
   }
 
   :global(.graph__btn--primary) {
@@ -735,11 +531,6 @@
     .graph {
       overflow-y: auto;
       overflow-x: hidden;
-    }
-
-    .graph__stage {
-      flex: 0 0 auto;
-      height: max(26rem, 68vh);
     }
   }
 </style>

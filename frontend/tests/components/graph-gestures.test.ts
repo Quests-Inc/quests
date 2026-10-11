@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { createGraphGestures } from '@/pages/graph/model/gestures.svelte.ts'
+import { createGraphGestures } from '@/widgets/graph-canvas/model/gestures.svelte.ts'
 
 function stage() {
   const el = document.createElement('div')

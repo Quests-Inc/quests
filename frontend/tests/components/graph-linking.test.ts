@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { createLinkMode } from '@/pages/graph/model/linking.svelte.ts'
+import { createLinkMode } from '@/widgets/graph-canvas/model/linking.svelte.ts'
 
 const nodes = new Map<string, any>([
   ['quest:1', { key: 'quest:1', type: 'quest', x: 10, y: 20 }],

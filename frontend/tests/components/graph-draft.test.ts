@@ -34,7 +34,7 @@ mock.module('@/shared/api/graph.ts', () => ({
     serverRoots = roots
   },
 }))
-const { createGraphDraft } = await import('@/pages/graph/model/draft.svelte.ts')
+const { createGraphDraft } = await import('@/features/graph-draft/model/draft.svelte.ts')
 
 function make(center = { type: 'quest', id: 5 }) {
   const state = { center, resets: 0, centers: [] as any[], nodes: [] as any[], saved: new Map<string, any>() }

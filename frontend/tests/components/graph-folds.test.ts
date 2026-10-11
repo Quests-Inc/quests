@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { createClusterFolds } from '@/pages/graph/model/folds.svelte.ts'
+import { createClusterFolds } from '@/widgets/graph-canvas/model/folds.svelte.ts'
 
 function make() {
   const saved = new Map<string, { x: number; y: number }>()

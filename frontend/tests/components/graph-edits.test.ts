@@ -16,7 +16,7 @@ mock.module('@/shared/api/quests.ts', () => ({
   ...realQuests,
   getQuestFull: async (id: number) => ({ id, title: 'Q', steps: [{ id: 5, title: 'шаг' }] }),
 }))
-const { createGraphEdits } = await import('@/pages/graph/model/edits.svelte.ts')
+const { createGraphEdits } = await import('@/features/graph-draft/model/edits.svelte.ts')
 
 let ops: any[] = []
 const added: [string, any][] = []

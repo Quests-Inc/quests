@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 
-import { createClusterFolds } from '@/pages/graph/model/folds.svelte.ts'
-import { createGraphStage } from '@/pages/graph/model/stage.svelte.ts'
 import type { Graph } from '@/shared/api/store.gen'
+import { createClusterFolds } from '@/widgets/graph-canvas/model/folds.svelte.ts'
+import { createGraphStage } from '@/widgets/graph-canvas/model/stage.svelte.ts'
 
 const kinds = new Set(['questline', 'quest', 'step', 'note', 'attachment'])
 
