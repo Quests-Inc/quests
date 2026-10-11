@@ -38,7 +38,7 @@
   import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, canPickTarget, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -996,20 +996,6 @@
   // --- Editing. A saved quest / step opens its usual form (the change goes to
   // the draft); a thing that exists only in the draft is edited in place; a
   // note is edited right on its card, in markdown. ---
-  const sameVal = (a: string|number|Date, b: string|number|Date, key: string) => {
-    if ((a == null || a === '') && (b == null || b === '')) return true
-    if (key === 'description') return String(a ?? '').trim() === String(b ?? '').trim()
-    if (key.endsWith('_at')) return new Date(a).getTime() === new Date(b).getTime()
-    return JSON.stringify(a) === JSON.stringify(b)
-  }
-  const diffFields = (orig: Record<string, any>, payload: Record<string, any>, keys: string[]) => {
-    const out: Record<string, any> = {}
-    for (const k of keys) if (k in payload && !sameVal(orig[k], payload[k], k)) out[k] = payload[k]
-    return out
-  }
-  const QUEST_KEYS = ['title', 'description', 'status', 'significance', 'pinned', 'automated', 'sort_order', 'category_id', 'questline_id', 'deadline_at', 'duration_seconds']
-  const STEP_KEYS = ['title', 'description', 'progress_current', 'progress_total', 'check_command', 'check_interval_seconds', 'wait_previous', 'run_mode', 'run_on']
-
   async function startEdit(n: { type?: any; draft: any; op: any; title: any; id: any; key: any }) {
     if (n.type === 'note') return startEditNote(n)
     if (n.draft) {
@@ -1051,10 +1037,7 @@
   async function draftEditQuest(payload: Record<string, any>) {
     const orig = editQuest.quest
     if (!orig) return
-    const fields = diffFields(orig, payload, QUEST_KEYS)
-    const was = (orig.tags ?? []).map((t: { id: any }) => t.id).sort((a: number, b: number) => a - b)
-    const now = [...(payload.tag_ids ?? [])].sort((a, b) => a - b)
-    if (JSON.stringify(was) !== JSON.stringify(now)) fields.tag_ids = payload.tag_ids
+    const fields = questEditFields(orig, payload)
     if (!Object.keys(fields).length) {
       toast('Ничего не изменилось', { kind: 'info' })
       return
@@ -1065,7 +1048,7 @@
   async function draftEditStep(payload: Record<string,any>) {
     const orig = editStep.step
     if (!orig) return
-    const fields = diffFields(orig, payload, STEP_KEYS)
+    const fields = stepEditFields(orig, payload)
     if (!Object.keys(fields).length) {
       toast('Ничего не изменилось', { kind: 'info' })
       return
@@ -1097,20 +1080,12 @@
     if (op && m.linkFrom) await gd.addOp('add_ref', { from: m.linkFrom, to: `note:t${op.id}` })
   }
 
-  const NEW_NOTE = 'Новая заметка'
-
-  /** "Новая заметка", then "Новая заметка (2)", (3)… — the first free one. */
-  function freshNoteTitle() {
-    const taken = new Set([
+  const freshNoteTitle = () =>
+    freshTitle([
       ...notes.map((x) => x.title),
       ...(view?.nodes ?? []).filter((x) => x.type === 'note').map((x) => x.title),
       ...draft.ops.map((o) => o.payload?.fields?.title),
     ])
-    if (!taken.has(NEW_NOTE)) return NEW_NOTE
-    let i = 2
-    while (taken.has(`${NEW_NOTE} (${i})`)) i += 1
-    return `${NEW_NOTE} (${i})`
-  }
 
   /** A new note appears at the cursor with its title selected, ready to type over. */
   async function createNoteHere(at: { x: number; y: number }, linkFrom: string) {
@@ -1161,9 +1136,7 @@
     const e = editing
     editing = null
     if (!saveIt || !e) return
-    const changed: Record<string, any> = {}
-    if (e.title.trim() && e.title.trim() !== e.orig.title) changed.title = e.title.trim()
-    if (e.text !== e.orig.description) changed.description = e.text
+    const changed = noteEditChanges(e)
     if (!Object.keys(changed).length) return
     if (e.opId != null) {
       try {
