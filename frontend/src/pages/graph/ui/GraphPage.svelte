@@ -1,52 +1,34 @@
 <script lang="ts">
-  import { tick, untrack } from 'svelte'
-  import GraphToolbar from './GraphToolbar.svelte'
-  import GraphEdges from './GraphEdges.svelte'
-  import GraphFoot from './GraphFoot.svelte'
-  import GraphGroups from './GraphGroups.svelte'
-  import GraphCard from './GraphCard.svelte'
-  import GraphMinimap from './GraphMinimap.svelte'
-  import GraphTools from './GraphTools.svelte'
-  import GraphDraftLog from './GraphDraftLog.svelte'
-  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
-  import FlagHints from '@/shared/ui/FlagHints.svelte'
-  import { helpLine } from '@/shared/lib/searchFlags.ts'
-  import { ENTITY_SPEC, findEntities } from '@/entities/quest'
-  import Icon from '@/shared/ui/Icon.svelte'
-  import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
-  import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
-  import { QuestlineIcon } from '@/entities/questline'
-  import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
-  import { QuestModal, StepModal, DraftEntityModal } from '@/features/quest-edit'
+  import { RASTER } from '@/entities/graph'
+  import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
   import { FindEntityModal } from '@/features/find-entity'
-  import {
-    addGraphDraftOp,
-    cancelGraphDraft,
-    commitGraphDraft,
-    deleteGraphDraftOp,
-    getGraph,
-    getGraphDraft,
-    getNote,
-    QUEST_STATUSES,
-    QUEST_STATUS_LABELS,
-    getQuestFull,
-    putGraphDraftOp,
-    putGraphDraftRoots,
-    uploadGraphDraftFile,
-  } from '@/shared/api/client.ts'
-  import { createGraphPrefs } from '../model/prefs.svelte.ts'
-  import { createGraphGestures } from '../model/gestures.svelte.ts'
+  import { putGraphDraftRoots } from '@/shared/api/graph.ts'
+  import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
+  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+  import { handleGraphKey } from '../model/keys.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { createGraphEdits } from '../model/edits.svelte.ts'
   import { createClusterFolds } from '../model/folds.svelte.ts'
+  import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createLinkMode } from '../model/linking.svelte.ts'
-  import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, arrangeView, planHide, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { createGraphMenu } from '../model/menu.svelte.ts'
+  import { createGraphPrefs } from '../model/prefs.svelte.ts'
+  import { createGraphQuery } from '../model/query.svelte.ts'
+  import { createGraphStage } from '../model/stage.svelte.ts'
+  import GraphCard from './GraphCard.svelte'
+  import GraphDraftLog from './GraphDraftLog.svelte'
+  import GraphEdges from './GraphEdges.svelte'
+  import GraphFoot from './GraphFoot.svelte'
+  import GraphGroups from './GraphGroups.svelte'
+  import GraphMinimap from './GraphMinimap.svelte'
+  import GraphToolbar from './GraphToolbar.svelte'
+  import GraphTools from './GraphTools.svelte'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
    * ownership, step order and reference tokens. Nodes are HTML cards (so
    * markdown renders and long text scrolls); the SVG layer only draws edges.
+   * Состояние разнесено по контроллерам model/: загрузка, поле, жесты, черновик, меню.
    */
   let {
     active = true,
@@ -59,875 +41,318 @@
     onCenter,
     onOpen,
   }: {
-    active?: boolean,
-    rootType?: 'quest' | 'note' | 'questline' | null,
-    rootId?: number | null,
-    nonce?: number,
-    quests?: any[],
-    notes?: any[],
-    questlines?: any[],
-    onCenter?: (type: string | null, id: number | null) => void,
-    onOpen?: (kind: string, id: number) => void,
+    active?: boolean
+    rootType?: 'quest' | 'note' | 'questline' | null
+    rootId?: number | null
+    nonce?: number
+    quests?: { id: number; status: string; title?: string }[]
+    notes?: { id: number; title?: string }[]
+    questlines?: { id: number; title?: string }[]
+    onCenter?: (type: string | null, id: number | null) => void
+    onOpen?: (kind: string, id: number) => void
   } = $props()
 
-  let depth = $state(2)
   const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
-  let layoutMode = $state(prefs.layoutMode)
-  let center = $state(({ type: rootType, id: rootId } as { type: string, id: number }))
-  let data = $state((null as any | null))
-  let loading = $state(false)
-  let error = $state('')
-  let selectedKey = $state((null as string | null))
-  let showEdge: Record<string, boolean> = $state({ structure: true, reference: true, dependency: true })
-  /** Owners whose files are laid out one by one: never a folded group or a block. */
-  let seq = 0
+  const saved = new Map<string, { x: number; y: number }>()
+  // Контроллеры ссылаются друг на друга; методы зовутся после того, как все собраны.
+  const late = {
+    query: null as unknown as ReturnType<typeof createGraphQuery>,
+    stage: null as unknown as ReturnType<typeof createGraphStage>,
+    gest: null as unknown as ReturnType<typeof createGraphGestures>,
+    folds: null as unknown as ReturnType<typeof createClusterFolds>,
+    gd: null as unknown as ReturnType<typeof createGraphDraft>,
+    lk: null as unknown as ReturnType<typeof createLinkMode>,
+    edits: null as unknown as ReturnType<typeof createGraphEdits>,
+    menu: null as unknown as ReturnType<typeof createGraphMenu>,
+  }
 
-  // --- Draft: edits made here stay in a server-side log until saved (see model/draft.svelte.ts). ---
-  const gd = createGraphDraft({
-    getCenter: () => center,
-    setCenter: (c) => {
-      center = c
-      onCenter?.(c.type, c.id)
-    },
-    getNodes: () => view?.nodes ?? [],
+  late.gd = createGraphDraft({
+    getCenter: () => late.query.center,
+    setCenter: (c) => late.query.setCenter(c),
+    getNodes: () => late.stage.nodes,
     getSaved: () => saved,
-    resetPositions,
+    resetPositions: () => late.folds.forgetPositions(),
   })
-  let draft = $derived(gd.draft)
+  late.folds = createClusterFolds({
+    saved,
+    getNodes: () => late.stage.nodes,
+    getGroups: () => late.stage.groups,
+  })
+  late.gest = createGraphGestures({
+    getStage: () => late.stage.el,
+    nodes: () => late.stage.nodes,
+    nodeMap: () => late.stage.nodeMap,
+    touchView: () => late.stage.touch(),
+    isLinking: () => !!late.lk.linking,
+    finishLink: (n) => late.lk.finish(n),
+    setLinkCursor: (p) => {
+      late.lk.cursor = p
+    },
+    selectMode: () => late.stage.selectMode,
+    getPicked: () => late.stage.picked,
+    setPicked: (s) => late.stage.setPicked(s),
+    getSaved: () => saved,
+    select: (n) => late.stage.select(n),
+  })
+  late.lk = createLinkMode({
+    getNodeMap: () => late.stage.nodeMap,
+    getEdges: () => late.stage.edges,
+    addOp: (kind, payload) => late.gd.addOp(kind, payload),
+    askDrop: (op) => late.gd.askDrop(op),
+    onStart: () => late.menu.close(),
+  })
+  late.query = createGraphQuery({
+    getActive: () => active,
+    getRootType: () => rootType ?? null,
+    getRootId: () => rootId ?? null,
+    getNonce: () => nonce,
+    getExpandKeys: () => prefs.expandKeys,
+    getReloadTick: () => late.gd.reloadTick,
+    getDraftRoots: () => late.gd.draft.roots,
+    getHiddenSize: () => prefs.hidden.size,
+    getQuests: () => quests,
+    getNotes: () => notes,
+    getQuestlines: () => questlines,
+    onCenter: (type, id) => onCenter?.(type, id),
+    onRetarget: () => {
+      late.stage.selectedKey = null
+      late.folds.reset()
+      prefs.setExpand([])
+      late.folds.forgetPositions()
+    },
+    prepareFresh: () => {
+      late.stage.selectedKey = null
+      late.folds.forgetPositions()
+      prefs.setExpand([])
+    },
+    forgetPositions: () => late.folds.forgetPositions(),
+    resetFolds: () => late.folds.reset(),
+    setExpand: (keys) => prefs.setExpand(keys),
+    saveHidden: (hidden) => prefs.saveHidden(hidden),
+    cancelLink: () => late.lk.cancel(),
+    clearEditing: () => {
+      late.edits.editing = null
+    },
+    clearSelection: () => {
+      late.stage.selectedKey = null
+    },
+    loadDraft: () => late.gd.load(),
+  })
+  late.stage = createGraphStage({
+    getActive: () => active,
+    getData: () => late.query.data,
+    getDraft: () => late.gd.draft,
+    getDepth: () => late.query.depth,
+    getQuests: () => quests,
+    prefs,
+    saved,
+    folds: late.folds,
+    initialLayout: prefs.layoutMode,
+    getCam: () => late.gest.cam,
+    setCam: (cam) => {
+      late.gest.cam = cam
+    },
+    clearMarquee: () => {
+      late.gest.marquee = null
+    },
+    closeMenu: () => late.menu.close(),
+    getEditingKey: () => late.edits.editing?.key,
+    loadDraft: () => late.gd.load(),
+    clearMap: () => late.query.clearMap(),
+    openDraftLog: () => {
+      late.gd.open = true
+    },
+    writeRoots: putGraphDraftRoots,
+  })
+  late.edits = createGraphEdits({
+    ops: () => late.gd.draft.ops,
+    addOp: (kind, payload) => late.gd.addOp(kind, payload),
+    reloadDraft: () => late.gd.load(),
+    edges: () => late.stage.edges,
+    noteTitles: () => [...notes.map((x) => x.title), ...late.stage.nodes.filter((x) => x.type === 'note').map((x) => x.title)],
+  })
+  late.menu = createGraphMenu({
+    worldAt: (e) => late.gest.worldAt(e),
+    isLinking: () => !!late.lk.linking,
+    cancelLink: () => late.lk.cancel(),
+    selectMode: () => late.stage.selectMode,
+    pickedHas: (key) => late.stage.picked.has(key),
+    pickedSize: () => late.stage.picked.size,
+    setSelectedKey: (key) => {
+      late.stage.selectedKey = key
+    },
+    select: (n) => late.stage.select(n),
+    collapseKey: (g) => late.stage.collapseKey(g),
+    getDraftRoots: () => late.gd.draft.roots,
+    getRootKey: () => late.query.data?.root,
+    getNodes: () => late.stage.nodes,
+    getExpandKeys: () => prefs.expandKeys,
+    openTarget: (n) => late.stage.openTarget(n),
+    ownExpand: (key) => prefs.ownExpand(key),
+    outgoingRefs: (n) => late.stage.outgoingRefs(n),
+    childKeys: (n, type) => late.stage.childKeys(n, type),
+    parentNote: (n) => late.stage.parentNote(n),
+    titleOf: (key) => late.stage.titleOf(key),
+    hidePicked: () => late.stage.hidePicked(),
+    toggleSelectMode: () => late.stage.toggleSelectMode(),
+    hideKeys: (keys) => late.stage.hideKeys(keys),
+    createNoteHere: (at, linkFrom) => late.edits.createNoteHere(at, linkFrom),
+    openEntity: (kind, at, extra) => late.edits.openEntity(kind, at, extra),
+    startEdit: (n, at) => late.edits.startEdit(n, at),
+    addOp: (kind, payload) => late.gd.addOp(kind, payload),
+    askDrop: (op) => late.gd.askDrop(op),
+    startLink: (mode, n) => late.lk.start(mode, n),
+    collapse: (key) => late.folds.collapse(key),
+    disband: (owner) => late.folds.disband(owner),
+    unlinkRef: (n, target) => late.lk.unlinkRef(n, target),
+    setExpand: (keys) => prefs.setExpand(keys),
+    loadDraft: () => late.gd.load(),
+    putRoots: putGraphDraftRoots,
+    onOpen,
+    recenter: (n) => late.query.recenter(n),
+    saved,
+  })
 
-  // Camera and gestures (see model/gestures.svelte.ts).
-  const gest = createGraphGestures({
-    getStage: () => stageEl,
-    nodes: () => view?.nodes ?? [],
-    nodeMap: () => nodeMap,
-    touchView: () => {
-      view = view && { ...view }
-    },
-    isLinking: () => !!lk.linking,
-    finishLink: (n) => lk.finish(n),
-    setLinkCursor: (p) => (lk.cursor = p),
-    selectMode: () => selectMode,
-    getPicked: () => picked,
-    setPicked: (s) => (picked = s),
-    getSaved: () => saved,
-    select: (n) => select(n),
-  })
+  const query = late.query
+  const stage = late.stage
+  const gest = late.gest
+  const folds = late.folds
+  const gd = late.gd
+  const lk = late.lk
+  const edits = late.edits
+  const menu = late.menu
+
+  let view = $derived(stage.view)
+  let ready = $derived(stage.ready)
   let cam = $derived(gest.cam)
   let marquee = $derived(gest.marquee)
-  const { worldAt, zoomAt, onTouchDown, onBgDown, onCardDown, onGroupDown, onMove, onUp, onWheel } = gest
-  let stageEl = $state((null as HTMLDivElement | null))
-  /** Laid-out view model: nodes with x/y (centre) and w/h, edges. */
-  let view = $state((null as { nodes: any[], edges: any[], groups?: any[] } | null))
-  /** False while cards are being measured (they are rendered hidden). */
-  let ready = $state(false)
-
-  let lastRootKey = ''
-  let lastDataJson = ''
-  $effect(() => {
-    if (!active || !rootType || !rootId) return
-    // Coming back to the (kept) page with the same centre changes nothing.
-    const rk = `${rootType}:${rootId}:${nonce}`
-    if (rk === lastRootKey) return
-    lastRootKey = rk
-    center = { type: rootType, id: rootId }
-    selectedKey = null
-    folds.reset()
-    setExpand([])
-    resetPositions()
-  })
-
-  $effect(() => {
-    if (active) void gd.load()
-  })
-
-  $effect(() => {
-    if (!active) return
-    // No centre yet: an empty base map, so things made in the draft still show.
-    if (!center.type || !center.id) {
-      lastDataJson = ''
-      data = { root: '', roots: [], nodes: [], edges: [], truncated: false, depth }
-      return
-    }
-    const c = center
-    const d = depth
-    const extra = draft.roots.filter((r) => !(r.type === c.type && r.id === c.id))
-    const open = expandKeys.map((k) => {
-      // "quest:5" opens every link of the card, "quest:5>note" only its notes.
-      const [ref, only] = k.split('>')
-      return { type: ref.split(':')[0], id: Number(ref.split(':')[1]), only }
-    })
-    void nonce
-    void gd.reloadTick
-    const mine = ++seq
-    loading = true
-    error = ''
-    getGraph(c.type, c.id, d, extra, open)
-      .then((g) => {
-        if (mine !== seq) return
-        if (JSON.stringify(g) !== lastDataJson) {
-          lastDataJson = JSON.stringify(g)
-          data = g
-        }
-      })
-      .catch((e) => {
-        if (mine === seq) error = e?.message || String(e)
-      })
-      .finally(() => {
-        if (mine === seq) loading = false
-      })
-  })
-
-  /** Keys that never reach the map: typing in a field, or a dialog on top. */
-  const typing = (e: { key?: string; altKey?: any; ctrlKey?: any; metaKey?: any; code?: string; preventDefault?: () => void; shiftKey?: any; target?: any }) =>
-    e.target instanceof Element && ((e.target as Element).closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('.backdrop [role="dialog"]'))
-
-  /** Map shortcuts (by physical key, so they work in any keyboard layout):
-   * Ctrl+S save, Ctrl+Z undo the last change, V select, F fit, R untangle, Shift+Del clear. */
-  function onKey(e: { key: string; altKey: any; ctrlKey: any; metaKey: any; code: string; preventDefault: () => void; shiftKey: any }) {
-    if (e.key === 'Escape') {
-      if (linking) cancelLink()
-      else if (selectMode) toggleSelectMode()
-      // An open menu or dialog takes this Esc for itself.
-      else if (full && !ctx.open && !typing(e)) toggleFull()
-      return
-    }
-    if (!active || e.altKey) return
-    const mod = e.ctrlKey || e.metaKey
-    if (mod && e.code === 'KeyS') {
-      e.preventDefault()
-      if (!ownerless.size && !document.querySelector('.backdrop [role="dialog"]')) void gd.save()
-      return
-    }
-    if (typing(e)) return
-    if (mod && e.code === 'KeyZ' && !e.shiftKey) {
-      e.preventDefault()
-      const last = draft.ops[draft.ops.length - 1]
-      if (last) void gd.askDrop(last)
-      return
-    }
-    if (mod) return
-    if (e.code === 'KeyV' && !e.shiftKey) toggleSelectMode()
-    else if (e.code === 'KeyF' && !e.shiftKey) fit()
-    else if (e.code === 'KeyR' && !e.shiftKey) relayout()
-    else if (e.code === 'Delete' && e.shiftKey && canClear) void clearMap()
-    else return
-    e.preventDefault()
-  }
-
-  // Full screen: the field covers the window (CSS), and where the browser
-  // allows it the window itself goes full screen too, hiding its chrome.
-  // Leaving the browser's full screen (its own Esc) leaves ours as well.
-  let full = $state(false)
-  let nativeFull = false
-  function toggleFull() {
-    full = !full
-    if (full) {
-      const el = document.documentElement
-      if (!document.fullscreenElement && el.requestFullscreen) {
-        el.requestFullscreen().then(
-          () => (nativeFull = true),
-          () => {},
-        )
-      }
-    } else if (nativeFull) {
-      nativeFull = false
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
-    }
-  }
-  function onFullscreenChange() {
-    if (!document.fullscreenElement && nativeFull) {
-      nativeFull = false
-      full = false
-    }
-  }
-  $effect(() => {
-    if (!active && untrack(() => full)) toggleFull()
-  })
-
-  /** Positions the user has set by hand (dragged cards), kept across rebuilds.
-   * A key like `cluster:<owner>` also remembers where a folded attachment
-   * group sat, so an expanded block lands there and folds back to the same spot. */
-  const saved = new Map()
-
-  /** Where an attachment group stood folded before it was opened; it goes back there. */
-  const folds = createClusterFolds({
-    saved,
-    getNodes: () => view?.nodes ?? [],
-    getGroups: () => groups,
-  })
-  let expanded = $derived(folds.expanded)
-  let loose = $derived(folds.loose)
-  function resetPositions() {
-    folds.forgetPositions()
-  }
-
-  let buildSeq = 0
-  /** Render the cards hidden, measure them, lay out, reveal. */
-  async function rebuild(g: { root: any }, open_: Set<string>) {
-    const mine = ++buildSeq
-    ready = false
-    view = prepare(g, open_, loose)
-    await tick()
-    await tick()
-    if (mine !== buildSeq || !stageEl || !view) return
-    for (const n of view.nodes) {
-      const el = stageEl.querySelector(`[data-gkey="${CSS.escape(n.key)}"]`)
-      if (el instanceof HTMLElement) {
-        n.w = el.offsetWidth
-        n.h = el.offsetHeight
-      }
-    }
-    applyLayout()
-    ready = true
-    await tick()
-    // Re-fit only for a new centre / depth, not when a group is folded or the
-    // data refreshes: the camera must stay where the user left it.
-    const fitKey = `${g.root}|${depth}`
-    if (fitKey !== lastFitKey) {
-      lastFitKey = fitKey
-      fit()
-    }
-  }
-  let lastFitKey = ''
-
-  function applyLayout() {
-    if (!view) return
-    view = { ...view, groups: arrangeView(view, layoutMode, { loose, saved }) }
-  }
-
-  // Local view settings kept in this browser (see model/prefs.svelte.ts).
-  let hidden = $derived(prefs.hidden)
-  let questStatuses = $derived(prefs.questStatuses)
-  let shownTypes = $derived(prefs.shownTypes)
-  let expandKeys = $derived(prefs.expandKeys)
-  let statusLabel = $derived(prefs.statusLabel)
-  let typesLabel = $derived(prefs.typesLabel)
-  const { saveHidden, toggleStatus, toggleType, setExpand, ownExpand } = prefs
-  /** Quests the status filter keeps off the map right now (for the counter). */
-  let filteredOut = $state(0)
-
-  /** A quest the status filter would drop again, so opening it shows nothing. */
-  function statusOff(key: string) {
-    if (!key.startsWith('quest:')) return false
-    const q = quests.find((x) => x.id === Number(key.slice('quest:'.length)))
-    return Boolean(q) && !questStatuses.has(q.status)
-  }
-
-  /** Cards the user took off the map, per neighbour still on it: key → type → keys.
-   * They are links like any other not shown yet, so they count in the circles. */
-  let hiddenAdj = $derived.by(() => {
-    const out = new Map<string, Record<string, string[]>>()
-    if (!hidden.size) return out
-    const add = (from: string, other: string) => {
-      if (!hidden.has(other) || hidden.has(from)) return
-      const type = other.slice(0, other.indexOf(':'))
-      if (!out.has(from)) out.set(from, {})
-      const by = out.get(from)
-      if (!by[type]) by[type] = []
-      if (!by[type].includes(other)) by[type].push(other)
-    }
-    for (const e of data?.edges ?? []) {
-      add(e.from, e.to)
-      add(e.to, e.from)
-    }
-    return out
-  })
-
-  /** Unopened links of a card by entity type, as circles on its border: what the
-   * map has not reached yet plus what was taken off it. Kinds filtered out and
-   * quests outside the status filter are not counted — opening them shows nothing. */
-  function moreOf(n: { draft: any; more: {}; key: any }) {
-    if (n.draft) return []
-    const own: Record<string, string[]> = n.more ?? {}
-    const gone: Record<string, string[]> = hiddenAdj.get(n.key) ?? {}
-    const out = []
-    for (const type of ENTITY_TYPES) {
-      if (!shownTypes.has(type)) continue
-      const keys = [...(own[type] ?? []), ...(gone[type] ?? [])]
-      const count = keys.filter((k) => !statusOff(k)).length
-      if (count) out.push({ type, count })
-    }
-    return out
-  }
-
-  /** Open only the links of one type of a card. */
-  function openMore(n: { key: string; more?: { [x: string]: string|any[] } }, type: string|number) {
-    const back = hiddenAdj.get(n.key)?.[type]
-    if (back?.length) {
-      const next = new Set(hidden)
-      for (const k of back) next.delete(k)
-      saveHidden(next)
-    }
-    if (n.more?.[type]?.length) {
-      const key = `${n.key}>${type}`
-      if (!expandKeys.includes(key) && !expandKeys.includes(n.key)) setExpand([...expandKeys, key])
-    }
-  }
-
-  // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
-  let selectMode = $state(false)
-  let picked: Set<string> = $state(new Set())
-
-  function toggleSelectMode() {
-    selectMode = !selectMode
-    if (!selectMode) picked = new Set()
-    gest.marquee = null
-    ctx = { ...ctx, open: false }
-  }
-
-  /** Takes the picked cards off the map. */
-  async function hidePicked() {
-    const keys = [...picked]
-    picked = new Set()
-    await hideKeys(keys)
-  }
-
-  /**
-   * Takes cards off the map. Only what stays linked to a remaining card is
-   * remembered as "hidden" (so it can be brought back); a card with no link
-   * left to anything that stays simply goes. If nothing is left, the map is
-   * cleared. Draft cards are not hidden (drop them from the log instead).
-   */
-  async function hideKeys(keys: string[]) {
-    const plan = planHide({
-      keys,
-      nodes: view?.nodes ?? [],
-      edges: view?.edges ?? [],
-      rootKey: data?.root,
-      hidden,
-      roots: draft.roots,
-    })
-    if (plan.clearAll) {
-      await clearMap()
-      return
-    }
-    saveHidden(plan.hidden)
-    if (plan.rootsChanged) {
-      try {
-        await putGraphDraftRoots(plan.roots)
-        await gd.load()
-      } catch {
-        /* toast already shown */
-      }
-    }
-    if (plan.skippedDraft) toast('Карточки черновика не скрываются: уберите их из журнала', { kind: 'info' })
-  }
-
-  /** New steps / files with no owner: drawn red, they block saving. */
-  let ownerless = $state((new Set() as Set<string>))
-  /** Saved things that the draft writes into: node key → ops, oldest first. */
-  let touched = $state((new Map() as Map<string, number[]>))
-  /** The log row shown briefly after clicking a card's change marker. */
-  let flashOp = $state((null as number | null))
-  let flashTimer: number = 0
-
-  /** Opens the log on the last change that wrote into this card. */
-  function showChanges(key: string) {
-    const ops = touched.get(key)
-    if (!ops?.length) return
-    gd.open = true
-    flashOp = ops[ops.length - 1]
-    clearTimeout(flashTimer)
-    flashTimer = window.setTimeout((): void => {
-          flashOp = null
-        }, 2800)
-    void tick().then(() => {
-      document.querySelector(`.gdraft__list [data-op="${flashOp}"]`)?.scrollIntoView({ block: 'nearest' })
-    })
-  }
-
-  let buildTick = $state(0)
-  let buildLater = false
-  $effect(() => {
-    if (active && buildLater) {
-      buildLater = false
-      buildTick += 1
-    }
-  })
-
-  // Rebuild when the data, the draft, or the set of expanded groups changes.
-  $effect(() => {
-    const g = data
-    const open_ = expanded
-    void loose
-    const ops = draft.ops
-    if (!g) return
-    const gone = hidden
-    const over = applyDraft(g, ops)
-    ownerless = over.ownerless
-    touched = over.touched
-    // Hidden cards leave the map together with their edges (never the centre).
-    const statuses = questStatuses
-    const rootKeys = new Set([g.root, ...draft.roots.map((r) => `${r.type}:${r.id}`)])
-    let nodes = over.nodes.filter((n) => !gone.has(n.key) || n.key === g.root)
-    // Quests outside the chosen statuses leave the map, with the steps and
-    // files that hang only off them. Centres and draft things always stay.
-    const offQuests = new Set(
-      nodes.filter((n) => n.type === 'quest' && !n.draft && !rootKeys.has(n.key) && !statuses.has(n.status)).map((n) => n.key),
-    )
-    if (offQuests.size) {
-      const withThem = new Set(offQuests)
-      for (const e of over.edges) {
-        if (e.kind === 'structure' && offQuests.has(e.from) && /^(step|attachment):/.test(e.to)) withThem.add(e.to)
-      }
-      nodes = nodes.filter((n) => !withThem.has(n.key))
-    }
-    filteredOut = offQuests.size
-    // What lost its link to every centre (hidden branches, filtered quests)
-    // goes too; draft things stay wherever they are.
-    {
-      const adj = new Map()
-      const link = (a: any, b: any) => {
-        if (!adj.has(a)) adj.set(a, [])
-        adj.get(a).push(b)
-      }
-      const present = new Set(nodes.map((n) => n.key))
-      for (const e of over.edges) {
-        if (present.has(e.from) && present.has(e.to)) {
-          link(e.from, e.to)
-          link(e.to, e.from)
-        }
-      }
-      const reach = new Set([...rootKeys].filter((k) => present.has(k)))
-      for (const k of reach) for (const nb of adj.get(k) ?? []) reach.add(nb)
-      if (reach.size) nodes = nodes.filter((n) => n.draft || reach.has(n.key))
-    }
-    // Kinds switched off in the filter go last, so what is reached only through them stays.
-    const kinds = shownTypes
-    if (kinds.size < ENTITY_TYPES.length) {
-      const off = new Set(
-        nodes.filter((n) => !(n.draft || n.key === g.root || kinds.has(n.type) || !ENTITY_TYPES.includes(n.type))).map((n) => n.key),
-      )
-      // Steps and files go with the quest / note they belong to.
-      const withThem = new Set(off)
-      for (const e of over.edges) {
-        if (e.kind === 'structure' && off.has(e.from) && /^(step|attachment):/.test(e.to)) withThem.add(e.to)
-      }
-      nodes = nodes.filter((n) => n.draft || n.key === g.root || !withThem.has(n.key))
-    }
-    const keep = new Set(nodes.map((n) => n.key))
-    const edges = over.edges.filter((e) => keep.has(e.from) && keep.has(e.to))
-    // Hidden page: cards cannot be measured; build when it is shown again.
-    void buildTick
-    if (!untrack(() => active)) {
-      buildLater = true
-      return
-    }
-    void rebuild({ ...g, nodes, edges }, open_)
-  })
-
-  function relayout() {
-    resetPositions()
-    applyLayout()
-    void tick().then(fit)
-  }
-
-  // --- Minimap: every card as a small rectangle, the visible part as a frame;
-  // click or drag on it to move the view. ---
-  let stageSize = $state({ w: 0, h: 0 })
-  $effect(() => {
-    const el = stageEl
-    if (!el) return
-    const ro = new ResizeObserver(() => {
-      const w = el.clientWidth
-      const h = el.clientHeight
-      // Keep the middle of the view in place when the field grows or shrinks
-      // (full screen, window resize); a hidden page (size 0) changes nothing.
-      const prev = untrack(() => stageSize)
-      if (prev.w && prev.h && w && h) {
-        const c = untrack(() => cam)
-        gest.cam = { ...c, x: c.x + (w - prev.w) / 2, y: c.y + (h - prev.h) / 2 }
-      }
-      if (w && h) stageSize = { w, h }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  })
-  let prevTier = new Map<string, string>()
-  let tier = $derived.by(() => {
-    // Read everything up front so the dependencies are the same on every run.
-    const { k, x, y } = cam
-    const next = computeTiers({ nodes: view?.nodes, cam: { k, x, y }, stage: stageSize, ready, editingKey: editing?.key, prev: prevTier })
-    prevTier = next
-    return next
-  })
-
-  /** Circles per card, worked out once per data/filter change, not per frame. */
-  let moreMap = $derived.by(() => {
-    const m = new Map()
-    for (const n of data?.nodes ?? []) {
-      const r = moreOf(n)
-      if (r.length) m.set(n.key, r)
-    }
-    return m
-  })
-
-  let mini = $derived(minimapModel({ nodes: view?.nodes ?? [], ready, cam, stage: stageSize }))
-  let miniDrag = false
-  /** Centres the view on the world point under the pointer on the minimap. */
-  function miniGo(e: { currentTarget: HTMLElement; clientX: number; clientY: number }) {
-    const m = mini
-    if (!m) return
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const wx = (e.clientX - r.left) / m.sc + m.x0
-    const wy = (e.clientY - r.top) / m.sc + m.y0
-    gest.cam = { ...cam, x: stageSize.w / 2 - wx * cam.k, y: stageSize.h / 2 - wy * cam.k }
-  }
-
-  function fit() {
-    if (!view || !stageEl) return
-    const r = stageEl.getBoundingClientRect()
-    if (!r.width || !view.nodes.length) return
-    let x0 = Infinity,
-      y0 = Infinity,
-      x1 = -Infinity,
-      y1 = -Infinity
-    for (const n of view.nodes) {
-      x0 = Math.min(x0, n.x - n.w / 2)
-      x1 = Math.max(x1, n.x + n.w / 2)
-      y0 = Math.min(y0, n.y - n.h / 2)
-      y1 = Math.max(y1, n.y + n.h / 2)
-    }
-    const k = Math.min(1, (r.width - 40) / Math.max(1, x1 - x0), (r.height - 40) / Math.max(1, y1 - y0))
-    gest.cam = { k, x: r.width / 2 - ((x0 + x1) / 2) * k, y: r.height / 2 - ((y0 + y1) / 2) * k }
-  }
-
-  let nodeMap = $derived(new Map((view?.nodes ?? []).map((n) => [n.key, n])))
-
-  /** Balls follow their members while those are dragged. */
-  let groups = $derived(
-    (view?.groups ?? []).map((g) => {
-      const ms = (view?.nodes ?? []).filter((n) => n.group === g.key)
-      if (!ms.length) return g
-      const x0 = Math.min(...ms.map((n) => n.x - n.w / 2)) - 14
-      const x1 = Math.max(...ms.map((n) => n.x + n.w / 2)) + 14
-      const y0 = Math.min(...ms.map((n) => n.y - n.h / 2)) - 44
-      const y1 = Math.max(...ms.map((n) => n.y + n.h / 2)) + 14
-      return { ...g, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 }
-    }),
-  )
-  /** Cluster key a ball can fold back into (only attachment groups that came from one). */
-  const collapseKey = (g: { type: any; owner: any }) =>
-    g.type === 'attachment' && expanded.has(`cluster:${g.owner}`) ? `cluster:${g.owner}` : null
-  let groupMap = $derived(new Map(groups.map((g) => [g.key, g])))
-  /** Steps that wait for another step hang off that step, not off the quest. */
-  let chained = $derived(
-    new Set(
-      (view?.edges ?? [])
-        .filter((e) => e.kind === 'dependency' && e.from.startsWith('step:') && e.to.startsWith('step:'))
-        .map((e) => e.to),
-    ),
-  )
-  let drawEdges = $derived.by(() => {
-    const items: { e: any, a: any, b: any, oa?: number, ob?: number }[] = []
-    for (const e of view?.edges ?? []) {
-      if (!showEdge[e.kind]) continue
-      const a = nodeMap.get(e.from)
-      const b = nodeMap.get(e.to)
-      if (!a || !b) continue
-      if (e.kind === 'structure' && chained.has(e.to) && a.type === 'quest') continue
-      // Owner → ball member is drawn once, to the ball itself.
-      if (e.kind === 'structure' && b.group && groupMap.get(b.group)?.owner === a.key) continue
-      items.push({ e, a, b })
-    }
-    if (showEdge.structure) {
-      for (const g of groups) {
-        const o = nodeMap.get(g.owner)
-        if (o) items.push({ e: { from: g.owner, to: g.key, kind: 'structure' }, a: o, b: g })
-      }
-    }
-    spreadEnds(items)
-    return items.map((it) => ({ ...it.e, ...edgePath(it.a, it.b, it.oa ?? 0, it.ob ?? 0) }))
-  })
-  let selected = $derived(selectedKey ? (nodeMap.get(selectedKey) ?? null) : null)
-
-  /** Folds an expanded attachment group back into its cluster node. */
-  /** Centre of a group's cards (not of its frame, which has a header strip). */
-  const collapse = folds.collapse
-  const collapseAll = folds.collapseAll
-  const disband = folds.disband
-
-  function select(n: { type: string; key: string; x: any; y: any }) {
-    if (n.type === 'cluster') {
-      folds.expand(n)
-      return
-    }
-    selectedKey = n.key
-  }
-
-  /** Where "Открыть" leads: a step opens its quest. */
-  function openTarget(n: { draft: any; type: string; id: any; key: any }) {
-    if (!n || n.draft) return null
-    if (n.type === 'quest' || n.type === 'note' || n.type === 'attachment') return [n.type, n.id]
-    if (n.type === 'step') {
-      const e = data?.edges.find((x: { to: any; kind: string }) => x.to === n.key && x.kind === 'structure')
-      const q = e && data.nodes.find((m: { key: any }) => m.key === e.from)
-      return q ? ['quest', q.id] : null
-    }
-    return null
-  }
-
-  function recenter(n: { type: string; draft: any; id: number }) {
-    if (!CENTERABLE.has(n.type) || n.draft) return
-    resetPositions()
-    setExpand([])
-    center = { type: n.type, id: n.id }
-    selectedKey = null
-    onCenter?.(n.type, n.id)
-  }
-
-  // Root picker: quests and notes by title.
-  let rootQuery = $state('')
-  let pickOpen = $state(false)
-  let found = $derived(findEntities(rootQuery, { questlines, quests, notes, limit: 12 }))
-  let matches = $derived(found.items)
-  let rootParsed = $derived(found.parsed)
-  function chooseRoot(m: { type: string; id: number }) {
-    rootQuery = ''
-    pickOpen = false
-    resetPositions()
-    setExpand([])
-    center = { type: m.type, id: m.id }
-    selectedKey = null
-    onCenter?.(m.type, m.id)
-  }
-
-  // --- Link mode: a line follows the cursor from a card; click a target to
-  // make the link, right-click or Esc to cancel. Also used for "attach to". ---
-  const lk = createLinkMode({
-    getNodeMap: () => nodeMap,
-    getEdges: () => view?.edges ?? [],
-    addOp: (kind, payload) => gd.addOp(kind, payload),
-    askDrop: (op) => gd.askDrop(op),
-    onStart: () => (ctx = { ...ctx, open: false }),
-  })
   let linking = $derived(lk.linking)
   let linkCursor = $derived(lk.cursor)
+  let draft = $derived(gd.draft)
+  let selectedKey = $derived(stage.selectedKey)
+  let data = $derived(query.data)
+  let center = $derived(query.center)
+  let error = $derived(query.error)
+  let loading = $derived(query.loading)
+  let ownerless = $derived(stage.ownerless)
+  let touched = $derived(stage.touched)
+  let picked = $derived(stage.picked)
+  let full = $derived(stage.full)
+  let selectMode = $derived(stage.selectMode)
+  let canClear = $derived(query.canClear)
+  let filteredOut = $derived(stage.filteredOut)
+  let expanded = $derived(folds.expanded)
+  let loose = $derived(folds.loose)
+  let drawEdges = $derived(stage.drawEdges)
+  let nodeMap = $derived(stage.nodeMap)
+  let groups = $derived(stage.groups)
+  let tier = $derived(stage.tier)
+  let moreMap = $derived(stage.moreMap)
+  let mini = $derived(stage.mini)
+  let flashOp = $derived(stage.flashOp)
+  let selected = $derived(stage.selected)
+  let editing = $derived(edits.editing)
+  let questStatuses = $derived(prefs.questStatuses)
+  let statusLabel = $derived(prefs.statusLabel)
+  let typesLabel = $derived(prefs.typesLabel)
+  let shownTypes = $derived(prefs.shownTypes)
+  let found = $derived(query.found)
+  let matches = $derived(found.items)
+  let rootParsed = $derived(found.parsed)
+  let ctx = $derived(menu.ctx)
+  let ctxItems = $derived(menu.items())
+  let questModal = $derived(menu.questModal)
+  let findModal = $derived(menu.findOpen)
 
-  const edgesNow = () => view?.edges ?? []
+  const { onTouchDown, onBgDown, onCardDown, onGroupDown, onMove, onUp, onWheel } = gest
+  const onCtx = menu.onCtx
+  const onGroupCtx = menu.onGroupCtx
+  const onEdgeCtx = menu.onEdgeCtx
+  const onCtxSelect = menu.onCtxSelect
+  const onFilesPicked = menu.onFilesPicked
+  const edgeActions = menu.edgeActions
+  const collapse = folds.collapse
+  const collapseAll = folds.collapseAll
+  const collapseKey = stage.collapseKey
+  const titleOf = stage.titleOf
+  const openMore = stage.openMore
+  const showChanges = stage.showChanges
+  const miniGo = stage.miniGo
+  const hidePicked = stage.hidePicked
+  const clearPicked = stage.clearPicked
+  const toggleSelectMode = stage.toggleSelectMode
+  const fit = stage.fit
+  const relayout = stage.relayout
+  const toggleFull = stage.toggleFull
+  const onFullscreenChange = stage.onFullscreenChange
+  const clearMap = query.clearMap
+  const addToMap = query.addToMap
+  const chooseRoot = query.chooseRoot
+  const recenter = query.recenter
+  const openTarget = stage.openTarget
   const canPick = lk.canPick
-  const noteDescendants = (key: string) => noteDescendantKeys(edgesNow(), key)
-  /** Cards of one kind that belong to this card (steps of a quest, quests of a questline), as shown. */
-  const childKeys = (n: { key: string }, type: string) => childKeysOf(edgesNow(), nodeMap, n.key, type)
-  /** The note this one hangs under, on the map. */
-  const parentNote = (n: { key: string }) => parentNoteOf(edgesNow(), n.key)
-
-  const startLink = lk.start
-  const cancelLink = lk.cancel
-
-
-  const finishLink = lk.finish
-
-  /** Links written in this card's own text, as targets still visible on the map. */
-  const outgoingRefs = (n: { key: string }) => outgoingRefKeys(edgesNow(), nodeMap, n.key)
-
-  const unlinkRef = lk.unlinkRef
-
-  // Right-click menus: on the empty field (create / upload / add to map) and on a card.
-  let ctx: { open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any } = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
-
-  function onCtx(e: MouseEvent, n: any = null) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (linking) {
-      cancelLink()
-      return
-    }
-    // With a group picked, the menu is just what a group can do.
-    if (selectMode && picked.size && (!n || picked.has(n.key))) {
-      ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: true, cluster: null, edge: null }
-      return
-    }
-    if (n?.type === 'cluster') {
-      const owner = n.key.slice('cluster:'.length)
-      ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: false, cluster: { owner, key: n.key, folded: true, node: n }, edge: null }
-      return
-    }
-    const real = n && n.type !== 'cluster' ? n : null
-    if (real) selectedKey = real.key
-    ctx = { open: true, x: e.clientX, y: e.clientY, node: real, at: worldAt(e), group: false, cluster: null, edge: null }
-  }
-
-  /** Right-click on the frame of an opened file block. */
-  function onGroupCtx(e: { preventDefault: () => void; stopPropagation: () => void; clientX: any; clientY: any }, g: { type: string; owner: any }) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (linking || g.type !== 'attachment') return
-    ctx = { open: true, x: e.clientX, y: e.clientY, node: null, at: worldAt(e), group: false, cluster: { owner: g.owner, key: collapseKey(g), folded: false, node: null }, edge: null }
-  }
-
-  function onEdgeCtx(ev: { preventDefault: () => void; stopPropagation: () => void; clientX: any; clientY: any }, e: any) {
-    ev.preventDefault()
-    ev.stopPropagation()
-    if (linking) {
-      cancelLink()
-      return
-    }
-    ctx = { open: true, x: ev.clientX, y: ev.clientY, node: null, at: worldAt(ev), group: false, cluster: null, edge: e }
-  }
-
-  const isExtraRoot = (n: { draft?: any; key: string }) => n && !n.draft && draft.roots.some((r) => `${r.type}:${r.id}` === n.key)
-
-  let ctxItems = $derived(
-    graphMenuItems(ctx, {
-      selectMode,
-      pickedCount: picked.size,
-      rootKey: data?.root,
-      nodes: view?.nodes ?? [],
-      expandKeys,
-      openTarget,
-      isExtraRoot,
-      ownExpand,
-      outgoingRefs,
-      childKeys,
-      parentNote,
-      titleOf: (k) => titleOf(k),
-    }),
-  )
-  const edgeActions = edgeMenuItems
-
-  // Modals started from the menus.
-  let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: (null as number | null) })
-  let fileOwner = ''
-  let findModal = $state(false)
-  let fileInput = $state((null as HTMLInputElement | null))
-  let fileAt = { x: 0, y: 0 }
-
-  async function onCtxSelect(id: string) {
-    const n = ctx.node
-    const at = ctx.at
-    if (id === 'hide-picked') await hidePicked()
-    else if (id === 'select-mode') toggleSelectMode()
-    else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
-    else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
-    else if (id === 'add-quest-line' && n) questModal = { open: true, desc: '', at, questlineId: n.id }
-    else if (id === 'new-note') await createNoteHere(at, '')
-    else if (id === 'new-questline') edits.openEntity('questline', at)
-    else if (id === 'new-step') edits.openEntity('step', at)
-    else if (id === 'add-step' && n) edits.openEntity('step', at, { owner: n.key })
-    else if (id === 'add-note' && n) await createNoteHere(at, n.key)
-    else if (id === 'edit' && n) await edits.startEdit(n, at)
-    else if (id === 'copy' && n) await gd.addOp('copy', { source: n.key, pos: at })
-    else if (id === 'upload' || id === 'add-file') {
-      fileAt = at
-      fileOwner = id === 'add-file' && n ? n.key : ''
-      fileInput?.click()
-    } else if (id === 'find') findModal = true
-    else if (id === 'link-to' && n) startLink('to', n)
-    else if (id === 'link-from' && n) startLink('from', n)
-    else if (id === 'attach' && n) startLink('attach', n)
-    else if (id === 'cl-open' && ctx.cluster?.node) select(ctx.cluster.node)
-    else if (id === 'cl-fold' && ctx.cluster?.key) collapse(ctx.cluster.key)
-    else if (id === 'cl-disband' && ctx.cluster) disband(ctx.cluster.owner)
-    else if (id === 'edge-unref' && ctx.edge) await unlinkRef({ key: ctx.edge.from }, ctx.edge.to)
-    else if (id === 'edge-nowait' && ctx.edge) await gd.addOp('edit_step', { id: ctx.edge.to, fields: { wait_previous: false } })
-    else if (id === 'edge-unline' && ctx.edge) await gd.addOp('edit_quest', { id: ctx.edge.to, fields: { questline_id: null } })
-    else if (id === 'edge-unparent' && ctx.edge) await gd.addOp('set_parent', { id: ctx.edge.to, parent: '', was: ctx.edge.from })
-    else if (id === 'expand' && n) setExpand([...expandKeys.filter((k) => !k.startsWith(`${n.key}>`)), n.key])
-    else if (id === 'collapse' && n) setExpand(expandKeys.filter((k) => k !== n.key && !k.startsWith(`${n.key}>`)))
-    else if (id === 'drop-steps' && n) await hideKeys(childKeys(n, 'step'))
-    else if (id === 'drop-quests' && n) await hideKeys(childKeys(n, 'quest'))
-    else if (id === 'detach-note' && n) await gd.addOp('set_parent', { id: n.key, parent: '', was: parentNote(n) ?? '' })
-    else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
-    else if (id === 'drop' && n?.op) await gd.askDrop({ id: n.op })
-    else if (id === 'hide' && n) await hideKeys([n.key])
-    else if (id === 'unroot' && n) {
-      const roots = draft.roots.filter((r) => `${r.type}:${r.id}` !== n.key)
-      await putGraphDraftRoots(roots)
-      await gd.load()
-    } else if (id === 'open' && n) {
-      const t = openTarget(n)
-      if (t) onOpen?.(t[0], t[1])
-    } else if (id === 'center' && n) recenter(n)
-  }
-
-  async function onFilesPicked(e: { currentTarget: { files: any; value: string } }) {
-    const files = [...(e.currentTarget.files ?? [])]
-    e.currentTarget.value = ''
-    for (const [i, file] of files.entries()) {
-      try {
-        const op = await uploadGraphDraftFile(file, fileOwner)
-        saved.set(`attachment:t${op.id}`, { x: fileAt.x + i * 110, y: fileAt.y })
-      } catch {
-        /* toast already shown */
-      }
-    }
-    await gd.load()
-  }
-
-  // --- Editing. A saved quest / step opens its usual form (the change goes to
-  // the draft); a thing that exists only in the draft is edited in place; a
-  // note is edited right on its card, in markdown. ---
-  const edits = createGraphEdits({
-    ops: () => draft.ops,
-    addOp: (kind, payload) => gd.addOp(kind, payload),
-    reloadDraft: () => gd.load(),
-    edges: () => view?.edges ?? [],
-    noteTitles: () => [...notes.map((x) => x.title), ...(view?.nodes ?? []).filter((x) => x.type === 'note').map((x) => x.title)],
-  })
-  const editing = $derived(edits.editing)
   const startEditNote = edits.startEditNote
   const finishEdit = edits.finishEdit
-  const createNoteHere = edits.createNoteHere
-
-  const autofocus = (node: { focus: () => void }) => {
-    node.focus()
-  }
-
-
-  /** Empty map: no centre, no extra centres, nothing hidden, layout forgotten.
-   * Pending draft changes stay in the log (they have their own "Отменить всё"). */
-  async function clearMap() {
-    center = { type: null, id: null }
-    selectedKey = null
-    folds.reset()
-    lk.cancel()
-    edits.editing = null
-    resetPositions()
-    setExpand([])
-    saveHidden(new Set())
-    try {
-      await putGraphDraftRoots([])
-      await gd.load()
-    } catch {
-      /* toast already shown */
-    }
-    onCenter?.(null, null)
-  }
-
-  /** There is something to clear: a centre, extra centres, or hidden cards. */
-  let canClear = $derived(Boolean(center.id) || draft.roots.length > 0 || hidden.size > 0)
-
-  async function addToMap(type: string, id: number) {
-    // First thing on an empty map becomes its centre.
-    if (!center.id) {
-      resetPositions()
-      center = { type, id }
-      onCenter?.(type, id)
-      return
-    }
-    if (center.type === type && center.id === id) {
-      toast('Это уже центр карты', { kind: 'info' })
-      return
-    }
-    if (draft.roots.some((r) => r.type === type && r.id === id)) {
-      toast('Уже на карте', { kind: 'info' })
-      return
-    }
-    await putGraphDraftRoots([...draft.roots, { type, id }])
-    await gd.load()
-  }
+  const toggleStatus = prefs.toggleStatus
+  const toggleType = prefs.toggleType
+  const onChooseRoot = chooseRoot
 
   function onLayoutChange() {
-    prefs.layoutMode = layoutMode
+    prefs.layoutMode = stage.layoutMode
     relayout()
   }
 
-  const titleOf = (key: any) => nodeMap.get(key)?.title ?? key
+  function onKey(e: KeyboardEvent) {
+    handleGraphKey(e, {
+      active,
+      linking: !!linking,
+      selectMode,
+      full,
+      menuOpen: ctx.open,
+      ownerless: ownerless.size,
+      canClear,
+      cancelLink: () => lk.cancel(),
+      toggleSelect: () => toggleSelectMode(),
+      toggleFull: () => toggleFull(),
+      save: () => gd.save(),
+      undo: () => {
+        const last = draft.ops[draft.ops.length - 1]
+        if (last) void gd.askDrop(last)
+      },
+      fit: () => fit(),
+      relayout: () => relayout(),
+      clear: () => void clearMap(),
+    })
+  }
 
-  const isDone = (n: { status: string }) => n.status === 'completed' || n.status === 'done'
+  const isDone = (n: { status?: string }) => n.status === 'completed' || n.status === 'done'
   const isOrphan = (n: { type: string; links: number }) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
-  const rasterOf = (n: { type: string; mime: any }) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
+  const rasterOf = (n: { type: string; mime?: string }) =>
+    n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
+
+  $effect(() => {
+    query.syncRoot()
+  })
+  $effect(() => {
+    if (active) void gd.load()
+  })
+  $effect(() => {
+    void query.load()
+  })
+  $effect(() => {
+    stage.leaveIfHidden(active)
+  })
+  $effect(() => {
+    stage.poke()
+  })
+  $effect(() => {
+    stage.compose()
+  })
+  $effect(() => {
+    const node = stage.el
+    if (!node) return
+    return stage.watchSize(node)
+  })
 </script>
 
 <svelte:window
@@ -937,11 +362,11 @@
 
 <div class="graph">
   <GraphToolbar
-    bind:rootQuery
-    bind:pickOpen
-    bind:layoutMode
-    bind:depth
-    bind:showEdge
+    bind:rootQuery={query.rootQuery}
+    bind:pickOpen={query.pickOpen}
+    bind:layoutMode={stage.layoutMode}
+    bind:depth={query.depth}
+    bind:showEdge={stage.showEdge}
     {matches}
     {rootParsed}
     {statusLabel}
@@ -964,7 +389,7 @@
     class="graph__stage"
     class:graph__stage--full={full}
     data-swipe={view?.nodes?.length ? undefined : 'free'}
-    bind:this={stageEl}
+    bind:this={stage.el}
     onpointerdowncapture={onTouchDown}
     onpointerdown={onBgDown}
     onpointermove={onMove}
@@ -1048,7 +473,7 @@
       {full}
       {canClear}
       onHidePicked={hidePicked}
-      onClearPicked={() => (picked = new Set())}
+      onClearPicked={clearPicked}
       onToggleSelect={toggleSelectMode}
       onFit={fit}
       onRelayout={relayout}
@@ -1078,14 +503,14 @@
 
   <GraphFoot
     {selected}
-    target={(selected ? openTarget(selected) : null) as [string, number] | null}
-    canRecenter={!!selected && selected.key !== data?.root && CENTERABLE.has(selected.type) && !selected.draft}
+    target={selected ? openTarget(selected) : null}
+    canRecenter={stage.canRecenter}
     {onOpen}
     onRecenter={() => selected && recenter(selected)}
   />
 </div>
 
-<input bind:this={fileInput} type="file" multiple hidden onchange={onFilesPicked} />
+<input bind:this={menu.fileInput} type="file" multiple hidden onchange={onFilesPicked} />
 
 <QuestModal
   open={questModal.open}
@@ -1094,7 +519,7 @@
   {quests}
   {notes}
   attachments={[]}
-  onClose={() => (questModal = { ...questModal, open: false })}
+  onClose={menu.closeQuest}
   onSaved={() => {}}
   onDraft={(payload) => gd.addOp('create_quest', { fields: payload, pos: questModal.at })}
 />
@@ -1142,7 +567,7 @@
   quests={quests.filter((q) => questStatuses.has(q.status))}
   {notes}
   {questlines}
-  onClose={() => (findModal = false)}
+  onClose={menu.closeFind}
   onPick={addToMap}
 />
 
@@ -1170,7 +595,7 @@
   y={ctx.y}
   items={ctxItems}
   onSelect={onCtxSelect}
-  onClose={() => (ctx = { ...ctx, open: false })}
+  onClose={menu.close}
 />
 
 <style>

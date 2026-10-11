@@ -18,7 +18,7 @@ export interface DraftState {
 }
 
 export function createGraphDraft(deps: {
-  getCenter: () => { type: string; id: number }
+  getCenter: () => { type: string | null; id: number | null }
   /** Центр карты сменился (сохранение создало первую сущность на пустой карте). */
   setCenter: (c: { type: string; id: number }) => void
   getNodes: () => GraphNodeView[]
