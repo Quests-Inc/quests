@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
+  import GraphToolbar from './GraphToolbar.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
@@ -27,7 +28,7 @@
     uploadGraphDraftFile,
   } from '@/shared/api/client.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { CARD, EDGES, LAYOUTS, RASTER, SQUARE, TYPES, applyDraft, clampK, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, applyDraft, clampK, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -464,8 +465,6 @@
   let filteredOut = $state(0)
 
   // Which kinds of things the map shows (the centre and draft things always stay).
-  const ENTITY_TYPES = ['questline', 'quest', 'step', 'note', 'attachment']
-  const ENTITY_LABELS: Record<string, string> = { questline: 'Квестлайны', quest: 'Квесты', step: 'Шаги', note: 'Заметки', attachment: 'Вложения' }
   const TYPES_KEY = 'quests.graph.types'
   const loadTypes = () => {
     try {
@@ -1921,6 +1920,15 @@
     await loadDraft()
   }
 
+  function onLayoutChange() {
+    try {
+      localStorage.setItem(LAYOUT_KEY, layoutMode)
+    } catch {
+      /* the choice just is not remembered */
+    }
+    relayout()
+  }
+
   const titleOf = (key: any) => nodeMap.get(key)?.title ?? key
 
   const isDone = (n: { status: string }) => n.status === 'completed' || n.status === 'done'
@@ -1944,96 +1952,28 @@
 <svelte:document onfullscreenchange={onFullscreenChange} />
 
 <div class="graph">
-  <div class="graph__tools">
-    <div class="graph__pick">
-      <input
-        class="search graph__search"
-        type="search"
-        placeholder="Центр: найти квест или заметку…"
-        bind:value={rootQuery}
-        onfocus={() => (pickOpen = true)}
-        onblur={() => setTimeout(() => (pickOpen = false), 150)}
-        aria-label="Выбрать центр карты"
-        title={`Фильтры: ${helpLine(ENTITY_SPEC)}`}
-      />
-      <FlagHints value={rootQuery} spec={ENTITY_SPEC} parsed={rootParsed} onPick={(v) => (rootQuery = v)} />
-      {#if pickOpen && matches.length}
-        <ul class="graph__matches" role="listbox">
-          {#each matches as m (m.type + m.id)}
-            <li>
-              <button type="button" onmousedown={(e) => e.preventDefault()} onclick={() => chooseRoot(m)}>
-                <span style:color={TYPES[m.type].color}>{TYPES[m.type].glyph}</span>
-                {m.title}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-    <label class="graph__ctl">
-      Раскладка
-      <select
-        bind:value={layoutMode}
-        onchange={() => {
-          try {
-            localStorage.setItem(LAYOUT_KEY, layoutMode)
-          } catch {
-            /* the choice just is not remembered */
-          }
-          relayout()
-        }}
-        aria-label="Раскладка"
-      >
-        {#each Object.entries(LAYOUTS) as [k, label] (k)}
-          <option value={k}>{label}</option>
-        {/each}
-      </select>
-    </label>
-    <details class="graph__filter">
-      <summary title="Какие квесты показывать на карте и предлагать в «Добавить на карту»">
-        Квесты: {statusLabel}{#if filteredOut} · скрыто {filteredOut}{/if}
-      </summary>
-      <div class="graph__filter-pop">
-        {#each QUEST_STATUSES as st (st)}
-          <label>
-            <input type="checkbox" checked={questStatuses.has(st)} onchange={() => toggleStatus(st)} />
-            {QUEST_STATUS_LABELS[st]}
-          </label>
-        {/each}
-      </div>
-    </details>
-    <details class="graph__filter">
-      <summary title="Какие сущности показывать на карте">Сущности: {typesLabel}</summary>
-      <div class="graph__filter-pop">
-        {#each ENTITY_TYPES as t (t)}
-          <label>
-            <input type="checkbox" checked={shownTypes.has(t)} onchange={() => toggleType(t)} />
-            {ENTITY_LABELS[t]}
-          </label>
-        {/each}
-      </div>
-    </details>
-    <label class="graph__ctl">
-      Глубина
-      <select bind:value={depth} aria-label="Глубина">
-        <option value={1}>1</option>
-        <option value={2}>2</option>
-        <option value={3}>3</option>
-      </select>
-    </label>
-    {#each Object.entries(EDGES) as [k, e] (k)}
-      <label class="graph__ctl graph__edge">
-        <input type="checkbox" bind:checked={showEdge[k]} />
-        <svg width="26" height="8" aria-hidden="true">
-          <line x1="0" y1="4" x2="26" y2="4" stroke={e.color} stroke-width="2" stroke-dasharray={e.dash} />
-        </svg>
-        {e.label}
-      </label>
-    {/each}
+  <GraphToolbar
+    bind:rootQuery
+    bind:pickOpen
+    bind:layoutMode
+    bind:depth
+    bind:showEdge
+    {matches}
+    {rootParsed}
+    {statusLabel}
+    {filteredOut}
+    {questStatuses}
+    {typesLabel}
+    {shownTypes}
+    onChooseRoot={chooseRoot}
+    onToggleStatus={toggleStatus}
+    onToggleType={toggleType}
+    onLayoutChange={onLayoutChange}
+  >
     {#if expanded.size || loose.size}
       <button type="button" class="graph__btn" onclick={collapseAll}>Свернуть вложения</button>
     {/if}
-  </div>
+  </GraphToolbar>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
@@ -2590,74 +2530,6 @@
     box-sizing: border-box;
   }
 
-  .graph__tools {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.9rem;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .graph__ctl {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .graph__ctl select {
-    padding: 0.2rem 0.4rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 4px;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-  }
-
-  .graph__pick {
-    position: relative;
-    flex: 1 1 18rem;
-    min-width: 11rem;
-  }
-
-  .graph__search {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .graph__matches {
-    position: absolute;
-    z-index: 5;
-    top: calc(100% + 0.25rem);
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 0.25rem;
-    list-style: none;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 8px;
-    background: var(--color-bg-raised, #1a1a1a);
-    box-shadow: var(--pill-shadow, none);
-  }
-
-  .graph__matches button {
-    display: block;
-    width: 100%;
-    padding: 0.3rem 0.5rem;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--color-fg, #e8e8e8);
-    font: inherit;
-    font-size: var(--text-sm, 0.875rem);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .graph__matches button:hover {
-    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 8%, transparent);
-  }
-
   .graph__btn {
     padding: 0.25rem 0.7rem;
     border: 1px solid var(--color-border, #333);
@@ -3044,48 +2916,6 @@
     color: #5aa9ff;
   }
 
-  .graph__filter {
-    position: relative;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .graph__filter summary {
-    cursor: pointer;
-    padding: 0.25rem 0.6rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 4px;
-    color: var(--color-fg, #e8e8e8);
-    list-style: none;
-  }
-
-  .graph__filter summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .graph__filter-pop {
-    position: absolute;
-    z-index: 8;
-    top: calc(100% + 0.3rem);
-    left: 0;
-    display: grid;
-    gap: 0.25rem;
-    min-width: 11rem;
-    padding: 0.5rem 0.7rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 8px;
-    background: var(--color-bg-raised, #1a1a1a);
-    box-shadow: var(--pill-shadow, none);
-  }
-
-  .graph__filter-pop label {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--color-fg, #e8e8e8);
-    font-size: var(--text-sm, 0.875rem);
-  }
-
   /* Link mode: what can be picked glows, the rest recedes. */
   .gcard--dim {
     opacity: 0.35;
@@ -3437,53 +3267,6 @@
     .graph {
       overflow-y: auto;
       overflow-x: hidden;
-    }
-
-    .graph__tools {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 0.5rem 0.6rem;
-      align-items: stretch;
-      flex: 0 0 auto;
-    }
-
-    .graph__pick {
-      grid-column: 1 / -1;
-    }
-
-    .graph__tools > .graph__ctl,
-    .graph__tools > .graph__filter {
-      grid-column: span 3;
-      min-width: 0;
-    }
-
-    .graph__tools > .graph__edge {
-      grid-column: span 2;
-      justify-content: center;
-      gap: 0.25rem;
-      white-space: nowrap;
-    }
-
-    .graph__edge svg {
-      width: 14px;
-    }
-
-    .graph__tools > .graph__btn {
-      grid-column: span 3;
-    }
-
-    .graph__tools > .graph__ctl {
-      justify-content: space-between;
-    }
-
-    .graph__tools > .graph__ctl select {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-
-    .graph__tools > .graph__filter summary {
-      text-align: center;
-      white-space: nowrap;
     }
 
     .graph__stage {

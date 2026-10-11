@@ -32,3 +32,13 @@ export const LAYOUTS = {
   layers: 'Слоями по типам',
   free: 'Свободно',
 }
+
+/** Виды сущностей, которые можно показывать на карте. */
+export const ENTITY_TYPES = ['questline', 'quest', 'step', 'note', 'attachment']
+export const ENTITY_LABELS: Record<string, string> = {
+  questline: 'Квестлайны',
+  quest: 'Квесты',
+  step: 'Шаги',
+  note: 'Заметки',
+  attachment: 'Вложения',
+}
