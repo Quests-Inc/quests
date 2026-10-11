@@ -9,6 +9,7 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
+  import { createNoteActions } from '../model/noteActions.svelte.ts'
   import { createNoteEditor } from '../model/noteEditor.svelte.ts'
   import { createNoteRename } from '../model/noteRename.svelte.ts'
   import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
@@ -507,83 +508,20 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     }
   }
 
-  async function reparentNote(id: number, nextParent: number) {
-    const n = noteById(id)
-    if (!n) return
-    const current = n.parent_id ?? null
-    if (current === nextParent) return
-    if (nextParent != null && (nextParent === id || isUnder(notes, nextParent, id))) return
-    ed.error = ''
-    try {
-      const savedRow = await updateNote(id, { parent_id: nextParent })
-      ed.patched(id, savedRow, { parentId: nextParent == null ? '' : String(nextParent) })
-      onChanged()
-    } catch (e) {
-      ed.error = e.message || String(e)
-    }
-  }
-
-  async function togglePinNote(id: number) {
-    const n = noteById(id)
-    if (!n) return
-    const next = !n.pinned
-    ed.error = ''
-    try {
-      const savedRow = await updateNote(id, { pinned: next })
-      ed.patched(id, savedRow, { pinned: next })
-      onChanged()
-    } catch (e) {
-      ed.error = e.message || String(e)
-    }
-  }
-
-  /** Shared body for the three status toggles below — same immediate-save
-   * shape as togglePinNote, just parameterised over which field flips. */
-  async function toggleNoteFlag(id: number, apiField: string, stateVar: 'isReadme' | 'isPrivate' | 'isCategory') {
-    const n = noteById(id)
-    if (!n) return
-    const next = !n[apiField]
-    ed.error = ''
-    try {
-      const savedRow = await updateNote(id, { [apiField]: next })
-      ed.patched(id, savedRow, { [stateVar]: next })
-      onChanged()
-    } catch (e) {
-      ed.error = e.message || String(e)
-    }
-  }
-
-  async function toggleOutdatedNote(id: number) {
-    const n = noteById(id)
-    if (!n) return
-    ed.error = ''
-    try {
-      await setNoteOutdated(id, !n.outdated)
-      if (id === selectedId) ed.detail = await getNote(id)
-      onChanged()
-    } catch (e) {
-      ed.error = e.message || String(e)
-    }
-  }
-
-  function toggleReadmeNote(id: number) {
-    return toggleNoteFlag(id, 'is_readme', 'isReadme')
-  }
-
-  function togglePrivateNote(id: number) {
-    return toggleNoteFlag(id, 'is_private', 'isPrivate')
-  }
-
-  function toggleCategoryNote(id: number) {
-    return toggleNoteFlag(id, 'is_category', 'isCategory')
-  }
-
-  async function moveNoteUp(id: number) {
-    const n = noteById(id)
-    if (!n?.parent_id) return
-    const parent = noteById(n.parent_id)
-    await reparentNote(id, parent?.parent_id ?? null)
-  }
+  const actions = createNoteActions({
+    notes: () => notes,
+    selectedId: () => selectedId,
+    editor: ed,
+    onChanged: () => onChanged(),
+    api: { updateNote, setNoteOutdated, getNote },
+  })
+  const reparentNote = actions.reparent
+  const togglePinNote = actions.togglePin
+  const toggleOutdatedNote = actions.toggleOutdated
+  const toggleReadmeNote = (id: number) => actions.toggleFlag(id, 'is_readme')
+  const togglePrivateNote = (id: number) => actions.toggleFlag(id, 'is_private')
+  const toggleCategoryNote = (id: number) => actions.toggleFlag(id, 'is_category')
+  const moveNoteUp = actions.moveUp
 
   const dnd = createTreeDnd({
     notes: () => notes,
