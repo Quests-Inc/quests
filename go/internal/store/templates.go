@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -706,11 +705,6 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 	return tr, nil
 }
 
-type badInput string
-
-func (e badInput) Error() string { return string(e) }
-func errBad(s string) error      { return badInput(s) }
-
 func asString(v any) (string, bool) {
 	s, ok := v.(string)
 	return s, ok
@@ -804,10 +798,4 @@ func emitLimitsColumn(v any) (any, error) {
 		return nil, err
 	}
 	return raw, nil
-}
-
-// IsBadInput reports whether err is a validation message meant for the caller (HTTP 422).
-func IsBadInput(err error) bool {
-	var b badInput
-	return errors.As(err, &b)
 }

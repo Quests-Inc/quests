@@ -3,10 +3,9 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"strings"
 
 	"github.com/valirum/quests/go/internal/identity"
+	"github.com/valirum/quests/go/internal/kernel"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/tokens"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -74,49 +73,12 @@ func (s *Store) RunnerWorkspaceByReg(ctx context.Context, token string) (int64, 
 	return id.Int64, nil
 }
 
-// ErrCommandOwner is returned when a member (not an owner) sets a command.
-var ErrCommandOwner = errors.New("команды проверок и источников могут задавать только владельцы пространства")
-
-// guardAuthor refuses a command written by someone who is not an owner of the
-// workspace. A command runs with the authority of the machine that executes it
-// (the server, or a runner the owner registered), so authoring one is an owner's
-// right. old is the command already stored (nil for a new one): leaving it
-// unchanged is fine, so a member can still edit the rest of a step or template.
+// guardAuthor refuses a command written by someone who is not an owner of the workspace (kernel.CommandAuthor).
 func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
-	if command == nil || strings.TrimSpace(*command) == "" {
-		return nil
-	}
-	if old != nil && strings.TrimSpace(*old) == strings.TrimSpace(*command) {
-		return nil
-	}
-	uid := wsctx.UserFrom(ctx)
-	if uid == 0 {
-		return nil // background work, auth off
-	}
-	if uid == wsctx.ActorAutomation {
-		return ErrCommandOwner
-	}
-	role, err := s.Identity().MemberRole(ctx, wsctx.From(ctx), uid)
-	if err != nil {
-		return err
-	}
-	if role != identity.RoleOwner {
-		return ErrCommandOwner
-	}
-	return nil
+	return kernel.CommandAuthor(ctx, s.Identity(), command, old)
 }
 
-// ErrNoRunner is returned for a command with no runner: commands execute on runners only
-// (quests-runner on any device, the server's own host included).
-var ErrNoRunner = errors.New("команды запускаются только на раннере — выберите устройство (раннер)")
-
-// guardExec refuses a command that has no runner (non-empty command, run_on empty).
-func (s *Store) guardExec(ctx context.Context, command, runOn *string) error {
-	if command == nil || strings.TrimSpace(*command) == "" {
-		return nil
-	}
-	if runOn != nil && strings.TrimSpace(*runOn) != "" {
-		return nil
-	}
-	return ErrNoRunner
+// guardExec refuses a command that has no runner (kernel.CommandExec).
+func (s *Store) guardExec(_ context.Context, command, runOn *string) error {
+	return kernel.CommandExec(command, runOn)
 }

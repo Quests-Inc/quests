@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/kernel"
 	"github.com/valirum/quests/go/internal/platform/db"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/tokens"
@@ -90,17 +90,11 @@ func (j RunnerJob) Open() bool {
 }
 
 var (
-	ErrRunnerExists   = errors.New("runner already exists")
-	ErrRunnerToken    = errors.New("invalid or expired registration token")
-	ErrRunnerAuth     = errors.New("invalid runner token")
-	ErrLeaseLost      = errors.New("lease is no longer valid")
-	ErrBadRunnerLabel = errors.New("label: 1-32 chars of a-z, 0-9, _ or -")
+	ErrRunnerExists = errors.New("runner already exists")
+	ErrRunnerToken  = errors.New("invalid or expired registration token")
+	ErrRunnerAuth   = errors.New("invalid runner token")
+	ErrLeaseLost    = errors.New("lease is no longer valid")
 )
-
-var runnerLabelRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
-
-// ValidRunOn: nil (run here) or a well-formed runner label.
-func ValidRunOn(v *string) bool { return v == nil || runnerLabelRe.MatchString(*v) }
 
 const runnerCols = `id, label, COALESCE(hostname,''), COALESCE(version,''), token_hash IS NOT NULL, revoked, last_seen_at, created_at`
 
@@ -122,7 +116,7 @@ func scanRunner(sc interface{ Scan(...any) error }) (Runner, error) {
 // CreateRunner adds a runner and returns its one-time registration token.
 func (s *Store) CreateRunner(ctx context.Context, label string) (string, error) {
 	label = strings.TrimSpace(label)
-	if !runnerLabelRe.MatchString(label) {
+	if !kernel.ValidRunnerLabel(label) {
 		return "", ErrBadRunnerLabel
 	}
 	secret, hash, err := tokens.New()
@@ -173,14 +167,6 @@ func (s *Store) RegisterRunner(ctx context.Context, regToken, hostname, version 
 	r.Hostname, r.Version, r.Registered = trimTo(hostname, 128), trimTo(version, 32), true
 	r.LastSeenAt = &now
 	return secret, r, nil
-}
-
-func trimTo(s string, n int) string {
-	s = strings.TrimSpace(s)
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
 }
 
 // AuthRunner finds the runner behind a permanent token and records that it was just seen.
@@ -254,17 +240,6 @@ type JobSpec struct {
 const jobCols = `id, runner_label, kind, quest_id, step_id, template_id, title, COALESCE(dedupe_key,''), command, state, attempt_no,
 	timeout_seconds, COALESCE(lease_id,''), lease_until, valid_until, created_at, assigned_at, started_at, finished_at,
 	exit_code, timed_out, stdout, stderr, progress_current, progress_total, log_tail, reason, cancel, note_id`
-
-func parseNullTime(n sql.NullString) *time.Time {
-	if !n.Valid || n.String == "" {
-		return nil
-	}
-	t, err := timeutil.ParseFlexible(n.String)
-	if err != nil {
-		return nil
-	}
-	return &t
-}
 
 func (s *Store) scanJob(sc interface{ Scan(...any) error }) (RunnerJob, error) {
 	var j RunnerJob

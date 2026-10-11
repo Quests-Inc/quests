@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -16,7 +15,6 @@ import (
 
 // ErrNotFound is the shared "no such thing" error (platform/apperr).
 var ErrNotFound = apperr.ErrNotFound
-var ErrConflict = errors.New("conflict")
 
 type Store struct {
 	DB *sql.DB
@@ -162,10 +160,6 @@ func (s *Store) GetQuest(ctx context.Context, id int64) (domain.Quest, error) {
 		return domain.Quest{}, err
 	}
 	return qs[0], nil
-}
-
-type rowScanner interface {
-	Scan(dest ...any) error
 }
 
 func scanQuest(row rowScanner) (domain.Quest, error) {
@@ -667,13 +661,6 @@ func stageChangeComment(tx *sql.Tx, ctx context.Context, kind string, questID *i
 	return err
 }
 
-func boolInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 func nullTime(t *time.Time) any {
 	if t == nil {
 		return nil
@@ -689,13 +676,6 @@ func nullInt(v *int) any {
 }
 
 func nullI64(v *int64) any {
-	if v == nil {
-		return nil
-	}
-	return *v
-}
-
-func nullStr(v *string) any {
 	if v == nil {
 		return nil
 	}
@@ -745,18 +725,6 @@ func NormalizeRunMode(s string) string {
 		return domain.RunModeWatch
 	}
 	return domain.RunModePoll
-}
-
-// NormalizeRunOn trims and lower-cases a runner label; empty means "here".
-func NormalizeRunOn(v *string) *string {
-	if v == nil {
-		return nil
-	}
-	s := strings.ToLower(strings.TrimSpace(*v))
-	if s == "" {
-		return nil
-	}
-	return &s
 }
 
 func NormalizeStepCheck(st *domain.Step) {
