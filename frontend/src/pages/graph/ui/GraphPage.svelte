@@ -37,6 +37,7 @@
   import { createGraphPrefs } from '../model/prefs.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
+  import { createGraphEdits } from '../model/edits.svelte.ts'
   import { createLinkMode } from '../model/linking.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, planHide, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
@@ -856,19 +857,6 @@
 
   // Modals started from the menus.
   let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: (null as number | null) })
-  let entityModal = $state({
-    open: false,
-    kind: ('note' as 'note' | 'step' | 'questline'),
-    at: { x: 0, y: 0 },
-    /** quest key a new step is made for */
-    owner: '',
-    /** key of a card that should link to the new note */
-    linkFrom: '',
-    /** a thing that exists only in the draft, edited in place */
-    edit: (null as { opId: number, payload: any, title: string, description: string, heading: string } | null),
-  })
-  let editQuest = $state({ open: false, quest: (null as any | null) })
-  let editStep = $state({ open: false, questId: (null as number | null), step: (null as any | null) })
   let fileOwner = ''
   let findModal = $state(false)
   let fileInput = $state((null as HTMLInputElement | null))
@@ -877,18 +865,17 @@
   async function onCtxSelect(id: string) {
     const n = ctx.node
     const at = ctx.at
-    const plain: any = { owner: '', linkFrom: '', edit: null }
     if (id === 'hide-picked') await hidePicked()
     else if (id === 'select-mode') toggleSelectMode()
     else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
     else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
     else if (id === 'add-quest-line' && n) questModal = { open: true, desc: '', at, questlineId: n.id }
     else if (id === 'new-note') await createNoteHere(at, '')
-    else if (id === 'new-questline') entityModal = { open: true, kind: 'questline', at, ...plain }
-    else if (id === 'new-step') entityModal = { open: true, kind: 'step', at, ...plain }
-    else if (id === 'add-step' && n) entityModal = { open: true, kind: 'step', at, ...plain, owner: n.key }
+    else if (id === 'new-questline') edits.openEntity('questline', at)
+    else if (id === 'new-step') edits.openEntity('step', at)
+    else if (id === 'add-step' && n) edits.openEntity('step', at, { owner: n.key })
     else if (id === 'add-note' && n) await createNoteHere(at, n.key)
-    else if (id === 'edit' && n) await startEdit(n)
+    else if (id === 'edit' && n) await edits.startEdit(n, at)
     else if (id === 'copy' && n) await gd.addOp('copy', { source: n.key, pos: at })
     else if (id === 'upload' || id === 'add-file') {
       fileAt = at
@@ -940,159 +927,17 @@
   // --- Editing. A saved quest / step opens its usual form (the change goes to
   // the draft); a thing that exists only in the draft is edited in place; a
   // note is edited right on its card, in markdown. ---
-  async function startEdit(n: { type?: any; draft: any; op: any; title: any; id: any; key: any }) {
-    if (n.type === 'note') return startEditNote(n)
-    if (n.draft) {
-      const op = draft.ops.find((o) => o.id === n.op)
-      if (!op) return
-      const f = op.payload?.fields ?? {}
-      entityModal = {
-        open: true,
-        kind: 'step',
-        at: ctx.at,
-        owner: '',
-        linkFrom: '',
-        edit: {
-          opId: op.id,
-          payload: op.payload,
-          title: f.title ?? n.title,
-          description: f.description ?? '',
-          heading: n.type === 'quest' ? 'Изменить квест' : n.type === 'questline' ? 'Изменить квестлайн' : 'Изменить шаг',
-        },
-      }
-      return
-    }
-    try {
-      if (n.type === 'quest') {
-        editQuest = { open: true, quest: await getQuestFull(n.id) }
-      } else if (n.type === 'step') {
-        const owner = (view?.edges ?? []).find((e) => e.kind === 'structure' && e.to === n.key && e.from.startsWith('quest:'))
-        if (!owner) return
-        const qid = Number(owner.from.slice('quest:'.length))
-        const full = await getQuestFull(qid)
-        const step = (full.steps ?? []).find((x) => x.id === n.id)
-        if (step) editStep = { open: true, questId: qid, step }
-      }
-    } catch {
-      /* toast already shown */
-    }
-  }
-
-  async function draftEditQuest(payload: Record<string, any>) {
-    const orig = editQuest.quest
-    if (!orig) return
-    const fields = questEditFields(orig, payload)
-    if (!Object.keys(fields).length) {
-      toast('Ничего не изменилось', { kind: 'info' })
-      return
-    }
-    await gd.addOp('edit_quest', { id: `quest:${orig.id}`, fields })
-  }
-
-  async function draftEditStep(payload: Record<string,any>) {
-    const orig = editStep.step
-    if (!orig) return
-    const fields = stepEditFields(orig, payload)
-    if (!Object.keys(fields).length) {
-      toast('Ничего не изменилось', { kind: 'info' })
-      return
-    }
-    await gd.addOp('edit_step', { id: `step:${orig.id}`, fields })
-  }
-
-  /** Submit of the small title + description form (new note / step, or an in-place edit). */
-  async function onEntitySubmit(fields: any) {
-    const m = entityModal
-    if (m.edit) {
-      try {
-        await putGraphDraftOp(m.edit.opId, { ...m.edit.payload, fields: { ...(m.edit.payload.fields ?? {}), ...fields } })
-        await gd.load()
-      } catch {
-        /* toast already shown */
-      }
-      return
-    }
-    if (m.kind === 'step') {
-      await gd.addOp('create_step', { fields, ...(m.owner ? { quest: m.owner } : {}), pos: m.at })
-      return
-    }
-    if (m.kind === 'questline') {
-      await gd.addOp('create_questline', { fields, pos: m.at })
-      return
-    }
-    const op = await gd.addOp('create_note', { fields, pos: m.at })
-    if (op && m.linkFrom) await gd.addOp('add_ref', { from: m.linkFrom, to: `note:t${op.id}` })
-  }
-
-  const freshNoteTitle = () =>
-    freshTitle([
-      ...notes.map((x) => x.title),
-      ...(view?.nodes ?? []).filter((x) => x.type === 'note').map((x) => x.title),
-      ...draft.ops.map((o) => o.payload?.fields?.title),
-    ])
-
-  /** A new note appears at the cursor with its title selected, ready to type over. */
-  async function createNoteHere(at: { x: number; y: number }, linkFrom: string) {
-    const title = freshNoteTitle()
-    const op = await gd.addOp('create_note', { fields: { title, description: '' }, pos: at })
-    if (!op) return
-    if (linkFrom) await gd.addOp('add_ref', { from: linkFrom, to: `note:t${op.id}` })
-    await startEditNote({ key: `note:t${op.id}`, draft: true, op: op.id, title }, true)
-  }
-
-  /** Note edited on its card: the full text is fetched first (the map shows only the start of long notes). */
-  let editing = $state(
-    (null as { key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any, fresh?: boolean } | null),
-  )
-
-  async function startEditNote(n: { key: any; draft?: any; op?: any; title: any; id?: any }, fresh = false) {
-    if (editing?.key === n.key) return
-    try {
-      if (n.draft) {
-        const op = draft.ops.find((o) => o.id === n.op)
-        if (!op) return
-        const f = op.payload?.fields ?? {}
-        editing = {
-          key: n.key,
-          title: f.title ?? n.title,
-          text: f.description ?? '',
-          orig: { title: f.title ?? '', description: f.description ?? '' },
-          opId: op.id,
-          payload: op.payload,
-          fresh,
-        }
-      } else {
-        const full = await getNote(n.id)
-        editing = {
-          key: n.key,
-          title: full.title ?? n.title,
-          text: full.description ?? '',
-          orig: { title: full.title ?? '', description: full.description ?? '' },
-          opId: null,
-        }
-      }
-    } catch {
-      /* toast already shown */
-    }
-  }
-
-  async function finishEdit(saveIt: any) {
-    const e = editing
-    editing = null
-    if (!saveIt || !e) return
-    const changed = noteEditChanges(e)
-    if (!Object.keys(changed).length) return
-    if (e.opId != null) {
-      try {
-        await putGraphDraftOp(e.opId, { ...e.payload, fields: { ...(e.payload.fields ?? {}), ...changed } })
-        await gd.load()
-      } catch {
-        /* toast already shown */
-      }
-      return
-    }
-    await gd.addOp('edit_note', { id: e.key, fields: changed })
-  }
+  const edits = createGraphEdits({
+    ops: () => draft.ops,
+    addOp: (kind, payload) => gd.addOp(kind, payload),
+    reloadDraft: () => gd.load(),
+    edges: () => view?.edges ?? [],
+    noteTitles: () => [...notes.map((x) => x.title), ...(view?.nodes ?? []).filter((x) => x.type === 'note').map((x) => x.title)],
+  })
+  const editing = $derived(edits.editing)
+  const startEditNote = edits.startEditNote
+  const finishEdit = edits.finishEdit
+  const createNoteHere = edits.createNoteHere
 
   const autofocus = (node: { focus: () => void }) => {
     node.focus()
@@ -1107,7 +952,7 @@
     expanded = new Set()
     loose = new Set()
     lk.cancel()
-    editing = null
+    edits.editing = null
     resetPositions()
     setExpand([])
     saveHidden(new Set())
@@ -1241,7 +1086,7 @@
           tier={tier.get(n.key)}
           more={moreMap.get(n.key) ?? []}
           changed={touched.has(n.key) && !n.draft}
-          bind:editing
+          bind:editing={edits.editing}
           {onCardDown}
           {onCtx}
           onStartEdit={startEditNote}
@@ -1325,39 +1170,39 @@
 />
 
 <DraftEntityModal
-  open={entityModal.open}
-  kind={entityModal.kind}
-  initial={entityModal.edit ? { title: entityModal.edit.title, description: entityModal.edit.description } : null}
-  heading={entityModal.edit?.heading ?? ''}
+  open={edits.entityModal.open}
+  kind={edits.entityModal.kind}
+  initial={edits.entityModal.edit ? { title: edits.entityModal.edit.title, description: edits.entityModal.edit.description } : null}
+  heading={edits.entityModal.edit?.heading ?? ''}
   {quests}
   {notes}
-  onClose={() => (entityModal = { ...entityModal, open: false })}
-  onSubmit={onEntitySubmit}
+  onClose={edits.closeEntity}
+  onSubmit={edits.submitEntity}
 />
 
 <QuestModal
-  open={editQuest.open}
+  open={edits.editQuest.open}
   mode="edit"
-  quest={editQuest.quest}
+  quest={edits.editQuest.quest}
   {quests}
   {notes}
   attachments={[]}
-  onClose={() => (editQuest = { ...editQuest, open: false })}
+  onClose={edits.closeEditQuest}
   onSaved={() => {}}
-  onDraft={draftEditQuest}
+  onDraft={edits.draftEditQuest}
 />
 
 <StepModal
-  open={editStep.open}
-  questId={editStep.questId}
-  step={editStep.step}
+  open={edits.editStep.open}
+  questId={edits.editStep.questId}
+  step={edits.editStep.step}
   {quests}
   {notes}
   questlines={[]}
   attachments={[]}
-  onClose={() => (editStep = { ...editStep, open: false })}
+  onClose={edits.closeEditStep}
   onSaved={() => {}}
-  onDraft={draftEditStep}
+  onDraft={edits.draftEditStep}
 />
 
 <!-- Quests follow the status filter; notes and questlines are offered as they are. -->
