@@ -3,6 +3,7 @@
   import { HistoryPage } from '@/pages/history'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
+  import { createStepProgress, questIdOfStep, stepRef } from '@/app/model/stepProgress.svelte.ts'
   import { createQuestActions } from '@/app/model/questActions.svelte.ts'
   import { contextMenuItems } from '@/app/model/contextMenu.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
@@ -219,10 +220,6 @@ import { RunnersPage } from '@/pages/runners'
     deleteAnimResolve = null
   }
   let pinBusyId = $state((null as number | null))
-  let stepBusyId = $state((null as number | null))
-  let stepEditId = $state((null as number | null))
-  let stepEditQuestId = $state((null as number | null))
-  let stepEditValue = $state('')
   let stepModalOpen = $state(false)
   let stepModalQuestId = $state((null as number | null))
   let stepModalStep = $state((null as any | null))
@@ -710,76 +707,22 @@ import { RunnersPage } from '@/pages/runners'
     }
   }
 
-  async function setStepProgress(step: { progress_current?: any; id?: any; progress_total?: any }, value: string|number, questId: number | null = null) {
-    const qid = questId ?? selected?.id
-    if (qid == null || stepBusyId != null) return
-    const total = Math.max(0, Number(step.progress_total) || 0)
-    const next = Math.max(0, Math.min(total, Math.round(Number(value))))
-    if (!Number.isFinite(next) || next === step.progress_current) {
-      stepEditId = null
-      stepEditQuestId = null
-      return
-    }
-    stepBusyId = step.id
-    error = ''
-    try {
-      const saved = await updateQuestStep(qid, step.id, {
-        progress_current: next,
-      })
-      applyQuest(saved, { select: false })
-    } catch (e) {
-      error = e.message || String(e)
-    } finally {
-      stepBusyId = null
-      stepEditId = null
-      stepEditQuestId = null
-    }
+  const steps = createStepProgress({
+    quests: () => quests,
+    selectedQuestId: () => selected?.id ?? null,
+    updateQuestStep,
+    applyQuest: (quest, opts) => applyQuest(quest, opts),
+    setError: (message) => (error = message),
+  })
+  let stepBusyId = $derived(steps.busyId)
+  let stepEditId = $derived(steps.editId)
+  let stepEditValue = $derived(steps.editValue)
+  const { set: setStepProgress, bump: bumpStep, begin: beginEditStep, onKeydown: onStepEditKeydown, onBlur: onStepEditBlur } = steps
+  function findQuestIdForStep(stepId: number) {
+    return questIdOfStep(quests, stepId)
   }
-
-  async function bumpStep(step: { progress_current: any }, delta: number, questId: number | null = null) {
-    await setStepProgress(step, step.progress_current + delta, questId)
-  }
-
-  function beginEditStep(step: { id: number; progress_current: any }, questId: number | null = null) {
-    if (stepBusyId != null) return
-    stepEditId = step.id
-    stepEditQuestId = questId ?? findQuestIdForStep(step.id) ?? selected?.id ?? null
-    stepEditValue = String(step.progress_current)
-  }
-
-  function cancelEditStep() {
-    stepEditId = null
-    stepEditQuestId = null
-  }
-
-  function findQuestIdForStep(stepId: any) {
-    for (const q of quests) {
-      if (q.steps?.some((s: { id: any }) => s.id === stepId)) return q.id
-    }
-    return null
-  }
-
   function findStepRef(stepId: number) {
-    for (const q of quests) {
-      const step = q.steps?.find((s: { id: any }) => s.id === stepId)
-      if (step) return { step, questId: q.id }
-    }
-    return null
-  }
-
-  function onStepEditKeydown(event: { key: string; preventDefault: () => void }, step: any) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      setStepProgress(step, stepEditValue, stepEditQuestId)
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      cancelEditStep()
-    }
-  }
-
-  function onStepEditBlur(step: { id: number }) {
-    if (stepEditId !== step.id) return
-    setStepProgress(step, stepEditValue, stepEditQuestId)
+    return stepRef(quests, stepId)
   }
 
   function applyQuest(quest: { id: any }, { select = true } = {}) {
@@ -1482,7 +1425,7 @@ import { RunnersPage } from '@/pages/runners'
         onBeginEditStep={beginEditStep}
         onStepEditKeydown={onStepEditKeydown}
         onStepEditBlur={onStepEditBlur}
-        onStepEditInput={(v) => (stepEditValue = v)}
+        onStepEditInput={(v) => (steps.editValue = v)}
         onQuestTitleContextMenu={openQuestContextMenu}
         onLineHeadContextMenu={(e) => {
           const line = questlines.find((l) => l.id === selected?.questline_id)
