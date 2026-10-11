@@ -2,8 +2,7 @@
   "size": {
     "app/App.svelte": 1231,
     "pages/graph/ui/GraphPage.svelte": 1314,
-    "pages/notes/ui/NotesPage.svelte": 1216,
-    "widgets/quest-detail/ui/QuestDetail.svelte": 809
+    "pages/notes/ui/NotesPage.svelte": 1216
   },
   "untested": []
 }

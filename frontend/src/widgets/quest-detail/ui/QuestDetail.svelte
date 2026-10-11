@@ -11,6 +11,7 @@
   import { formatLocal, localTimeZone } from '@/shared/lib/time.ts'
   import { parseRefs } from '@/shared/lib/refs.ts'
   import { OPEN_STATUSES, periodBadge, questTimer, quantifiedProgress, significanceLabel, statusColor, downloadQuestPdfSimple, downloadQuestPdf as downloadQuestPdfRich } from '@/entities/quest'
+  import { createQuestPdf } from '../model/pdfExport.svelte.ts'
   import { toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
   import { animateText } from '@/shared/lib/typewriter.ts'
 
@@ -79,36 +80,12 @@
   } = $props()
 
   const tzLabel = localTimeZone()
-  let pdfBusy = $state(false)
-  let pdfMenu = $state({ open: false, x: 0, y: 0, quest: (null as any) })
-
-  async function exportPdf(q: any, mode = 'rich') {
-    if (!q || pdfBusy) return
-    pdfBusy = true
-    const tid = 'pdf-quest'
-    toastProgress(tid, 'Генерация PDF…')
-    try {
-      if (mode === 'simple') {
-        await downloadQuestPdfSimple(q)
-      } else {
-        await downloadQuestPdfRich(q, { labels, tzLabel })
-      }
-      toastDone(tid, 'PDF сохранён')
-    } catch (e) {
-      console.error(e)
-      toastDone(tid, e?.message || 'Не удалось сохранить PDF', 'error')
-    } finally {
-      pdfBusy = false
-    }
-  }
-
-  function openPdfMenu(event: { clientX: any; clientY: any }, q: any) {
-    pdfMenu = { open: true, x: event.clientX, y: event.clientY, quest: q }
-  }
-
-  function selectPdfMode(id: string) {
-    exportPdf(pdfMenu.quest, id)
-  }
+  const pdf = createQuestPdf({
+    simple: (q) => downloadQuestPdfSimple(q),
+    rich: (q) => downloadQuestPdfRich(q, { labels, tzLabel }),
+    progress: toastProgress,
+    done: toastDone,
+  })
 
   let lineQuests = $derived.by(() => {
     if (!selected?.questline_id) return []
@@ -399,12 +376,12 @@
     <button
       type="button"
       class="btn btn--icon"
-      onclick={(e) => openPdfMenu(e, q)}
-      disabled={pdfBusy}
-      title={pdfBusy ? 'PDF…' : 'В PDF'}
-      aria-label={pdfBusy ? 'Выгрузка PDF…' : 'Выгрузить в PDF'}
+      onclick={(e) => pdf.openMenu(e, q)}
+      disabled={pdf.busy}
+      title={pdf.busy ? 'PDF…' : 'В PDF'}
+      aria-label={pdf.busy ? 'Выгрузка PDF…' : 'Выгрузить в PDF'}
     >
-      {#if pdfBusy}
+      {#if pdf.busy}
         …
       {:else}
         <Icon name="file-download" />
@@ -797,13 +774,13 @@
 </section>
 
 <ContextMenu
-  open={pdfMenu.open}
-  x={pdfMenu.x}
-  y={pdfMenu.y}
+  open={pdf.menu.open}
+  x={pdf.menu.x}
+  y={pdf.menu.y}
   items={[
     { id: 'rich', label: 'PDF' },
     { id: 'simple', label: 'PDF (просто)' },
   ]}
-  onSelect={selectPdfMode}
-  onClose={() => (pdfMenu = { ...pdfMenu, open: false })}
+  onSelect={pdf.select}
+  onClose={pdf.closeMenu}
 />
