@@ -3,6 +3,7 @@
   import { HistoryPage } from '@/pages/history'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
+  import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
   import { createJournalMenu } from '@/app/model/journalMenu.svelte.ts'
   import { createStepProgress, questIdOfStep, stepRef } from '@/app/model/stepProgress.svelte.ts'
   import { createQuestActions } from '@/app/model/questActions.svelte.ts'
@@ -11,11 +12,9 @@ import { RunnersPage } from '@/pages/runners'
     attachmentIdFromUrl,
     healthFrom,
     healthOffline,
-    initialRoute,
     noteIdFromUrl,
     questIdFromUrl,
     replaceSearch,
-    searchForView as searchForRoute,
     tabFromUrl,
   } from '@/app/model/route.ts'
   import { onMount, tick, untrack } from 'svelte'
@@ -84,9 +83,6 @@ import { RunnersPage } from '@/pages/runners'
   let quests = $state([])
   let notes = $state([])
   let attachmentIndex: Record<string, any> | null = $state(null)
-  let selectedId = $state(null)
-  let selectedNoteId = $state((null as number | null))
-  let selectedAttachmentId = $state((null as number | null))
   let loading = $state(true)
   let error = $state('')
   let liveStatus = $state('off')
@@ -98,9 +94,20 @@ import { RunnersPage } from '@/pages/runners'
     db: 'unknown',
   })
   let searchQuery = $state('')
-  let view = $state(
-    ('journal' as 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'),
-  )
+  const nav = createNavigation({
+    quests: () => quests,
+    revealDetail: (tab) => revealDetailOnNarrow(tab),
+    revealList: (tab) => revealListOnNarrow(tab),
+    openTemplate: (id) => {
+      templatesFocusId = id
+      templatesOpen = true
+    },
+  })
+  const { setView, swipeTab, openGraph, onGraphCenter, openHistoryDay, clearQuest: clearSelectedQuest, openRef: onJournalRef } = nav
+  const selectQuestFromUi = nav.selectQuest
+  const selectNoteFromUi = nav.selectNote
+  const selectAttachmentFromUi = nav.selectAttachment
+  const onGraphOpen = nav.openRef
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed: Record<string, boolean> = $state(loadSidebarCollapsed())
 
@@ -147,10 +154,6 @@ import { RunnersPage } from '@/pages/runners'
   function revealListOnNarrow(key: string) {
     if (isNarrowViewport()) setSidebarCollapsed(key, false)
   }
-  /** Centre of the relations map tab; null until picked or opened from a card. */
-  let graphRoot = $state(
-    ({ type: null, id: null } as { type: 'quest' | 'note' | 'questline' | null, id: number | null }),
-  )
   /** Bump to refresh the map after live events. */
   let graphNonce = $state(0)
   /** Bump to refresh the history feed after live events. */
@@ -217,7 +220,6 @@ import { RunnersPage } from '@/pages/runners'
   let stepModalQuestId = $state((null as number | null))
   let stepModalStep = $state((null as any | null))
   /** Prefer this id across in-flight load() (URL / HUD focus). */
-  let pendingSelectId = $state((null as number | null))
   // The sidebar's search text is the single source of truth for its filters: «показывать завершённые»
   // is `status:all`, the category / questline scope are `cat:slug` / `line:id` (searchFlags.js).
   let questQuerySpec = $derived(questSpec({ categories }))
@@ -258,7 +260,7 @@ import { RunnersPage } from '@/pages/runners'
   let byCategory = $derived(groupQuestsByCategory(scopedQuests, categories, questlines))
   /** "Заморожено" — own sidebar tab, independent of showAllQuests/OPEN_STATUSES. */
   let frozenQuests = $derived(inScope(matchedQuests.filter((q) => q.status === 'frozen'), { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
-  let selected = $derived(quests.find((q) => q.id === selectedId) ?? null)
+  let selected = $derived(quests.find((q) => q.id === nav.selectedId) ?? null)
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
   let attachments = $derived(allAttachments.filter((a) => !a.hidden))
@@ -305,25 +307,25 @@ import { RunnersPage } from '@/pages/runners'
           noteIds: notes.map((n) => n.id),
         })
       }
-      const prefer = pendingSelectId ?? selectedId ?? questIdFromUrl()
+      const prefer = nav.pendingSelectId ?? nav.selectedId ?? questIdFromUrl()
       if (prefer != null && next.some((q) => q.id === prefer)) {
-        selectedId = prefer
-        pendingSelectId = null
-      } else if (selectedId != null && !next.some((q) => q.id === selectedId)) {
-        selectedId = null
+        nav.selectedId = prefer
+        nav.pendingSelectId = null
+      } else if (nav.selectedId != null && !next.some((q) => q.id === nav.selectedId)) {
+        nav.selectedId = null
       }
-      const preferNote = selectedNoteId ?? noteIdFromUrl()
+      const preferNote = nav.selectedNoteId ?? noteIdFromUrl()
       if (preferNote != null && notes.some((n) => n.id === preferNote)) {
-        selectedNoteId = preferNote
-      } else if (selectedNoteId != null && !notes.some((n) => n.id === selectedNoteId)) {
-        selectedNoteId = null
+        nav.selectedNoteId = preferNote
+      } else if (nav.selectedNoteId != null && !notes.some((n) => n.id === nav.selectedNoteId)) {
+        nav.selectedNoteId = null
       }
       const flatAtt = flattenAttachmentIndex(attachmentIndex)
-      const preferAtt = selectedAttachmentId ?? attachmentIdFromUrl()
+      const preferAtt = nav.selectedAttachmentId ?? attachmentIdFromUrl()
       if (preferAtt != null && flatAtt.some((a) => a.id === preferAtt)) {
-        selectedAttachmentId = preferAtt
-      } else if (selectedAttachmentId != null && !flatAtt.some((a) => a.id === selectedAttachmentId)) {
-        selectedAttachmentId = null
+        nav.selectedAttachmentId = preferAtt
+      } else if (nav.selectedAttachmentId != null && !flatAtt.some((a) => a.id === nav.selectedAttachmentId)) {
+        nav.selectedAttachmentId = null
       }
     } catch (e) {
       if (!silent) {
@@ -331,7 +333,7 @@ import { RunnersPage } from '@/pages/runners'
         quests = []
         notes = []
         attachmentIndex = null
-        selectedId = null
+        nav.selectedId = null
       }
     } finally {
       if (!silent) loading = false
@@ -387,7 +389,7 @@ import { RunnersPage } from '@/pages/runners'
   function openEdit(quest = selected) {
     const q = quest instanceof Event ? selected : quest || selected
     if (!q?.id) return
-    selectedId = q.id
+    nav.selectedId = q.id
     modalMode = 'edit'
     modalDefaults = null
     modalOpen = true
@@ -462,7 +464,7 @@ import { RunnersPage } from '@/pages/runners'
   function requestDeleteSelected(quest = selected) {
     const q = quest || selected
     if (!q || deleting) return
-    if (q.id !== selectedId) selectedId = q.id
+    if (q.id !== nav.selectedId) nav.selectedId = q.id
     deleteConfirmOpen = true
   }
 
@@ -536,8 +538,8 @@ import { RunnersPage } from '@/pages/runners'
     quests: () => quests,
     questlines: () => questlines,
     findStep: findStepRef,
-    selectQuest: (id) => (selectedId = id),
-    selectedQuestId: () => selectedId,
+    selectQuest: (id) => (nav.selectedId = id),
+    selectedQuestId: () => nav.selectedId,
     copyId: (kind, id) => void copyIdToClipboard(kind, id),
     openSecrets: (owner) => openSecrets(owner),
     openCreate: (defaults) => openCreate(defaults),
@@ -545,7 +547,7 @@ import { RunnersPage } from '@/pages/runners'
     editLine: (line) => openEditQuestline(line),
     askDeleteLine: () => (lineDeleteConfirmOpen = true),
     askDeleteQuest: (q) => {
-      selectedId = q.id
+      nav.selectedId = q.id
       deleteConfirmOpen = true
     },
     editStep: (questId, step) => {
@@ -568,44 +570,36 @@ import { RunnersPage } from '@/pages/runners'
     } else {
       load({ silent: true })
     }
-    if (select) selectedId = quest.id
+    if (select) nav.selectedId = quest.id
   }
 
   function onSaved(quest: { id: any }, meta = ({} as { mode?: string })) {
-    selectedId = quest.id
+    nav.selectedId = quest.id
     load({ silent: true })
     if (meta.mode === 'create') toast('Квест создан', { kind: 'success' })
-    if (view === 'graph') graphNonce += 1
+    if (nav.view === 'graph') graphNonce += 1
   }
 
   function onDeleted(id: any) {
-    if (selectedId === id) selectedId = null
+    if (nav.selectedId === id) nav.selectedId = null
     load({ silent: true })
     toast('Квест удалён', { kind: 'success' })
   }
 
-  const searchForView = (nextView: string) =>
-    searchForRoute(nextView, { quest: selectedId, note: selectedNoteId, attachment: selectedAttachmentId, graph: graphRoot })
-
-  // Header tab order; drives which way a tab switch slides.
-  const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph', 'runners']
-  let navDir = $state(1)
-
-  // The map stays mounted once opened; it is only shown / hidden, with the same
-  // slide the other tabs get (they are re-created per tab, the map is not).
+  // Порядок вкладок задаёт направление слайда: см. model/navigation.svelte.ts
   let graphSeen = $state(false)
-  let graphOn = $state(view === 'graph')
+  let graphOn = $state(nav.view === 'graph')
   let graphEl = $state((null as HTMLDivElement | null))
-  let prevView = view
+  let prevView = nav.view
   const SLIDE_MS = 220
   const SLIDE_EASE = 'cubic-bezier(0.215, 0.61, 0.355, 1)'
   $effect(() => {
-    const v = view
+    const v = nav.view
     if (v === 'graph') graphSeen = true
     const was = prevView
     prevView = v
     if (v === was) return
-    const dir = untrack(() => navDir)
+    const dir = untrack(() => nav.navDir)
     if (v === 'graph') {
       graphOn = true
       void tick().then(() => {
@@ -617,7 +611,7 @@ import { RunnersPage } from '@/pages/runners'
         easing: SLIDE_EASE,
       })
       anim.onfinish = () => {
-        if (view !== 'graph') graphOn = false
+        if (nav.view !== 'graph') graphOn = false
       }
     }
   })
@@ -632,131 +626,6 @@ import { RunnersPage } from '@/pages/runners'
     }
   }
 
-  function setView(next: string) {
-    const from = TAB_ORDER.indexOf(view)
-    const to = TAB_ORDER.indexOf(next)
-    if (from !== -1 && to !== -1 && from !== to) navDir = to > from ? 1 : -1
-    view = next as typeof view
-    replaceSearch(searchForView(next))
-  }
-
-  /** A free horizontal swipe on the page steps to the neighbouring header tab. */
-  function swipeTab(dir: number) {
-    const i = TAB_ORDER.indexOf(view)
-    const next = i === -1 ? null : TAB_ORDER[i + dir]
-    if (next) setView(next)
-  }
-
-  /** Opens the relations map centred on one entity. */
-  function openGraph(type: any, id: any) {
-    const from = TAB_ORDER.indexOf(view)
-    navDir = TAB_ORDER.indexOf('graph') > from ? 1 : -1
-    graphRoot = { type, id: Number(id) }
-    replaceSearch(searchForView('graph'))
-    view = 'graph'
-  }
-
-  function onGraphCenter(type: any, id: null) {
-    // (null, null) = the map was cleared.
-    graphRoot = id == null ? { type: null, id: null } : { type, id: Number(id) }
-    replaceSearch(searchForView('graph'))
-  }
-
-  /** Opens a map node's entity in its own tab. */
-  function onGraphOpen(kind: string, id: number) {
-    onJournalRef(kind, id)
-  }
-
-  /** Calendar → History for one day. The URL is set first: History reads its filters on mount. */
-  function openHistoryDay(dayKey: any) {
-    const from = TAB_ORDER.indexOf(view)
-    navDir = TAB_ORDER.indexOf('history') > from ? 1 : -1
-    replaceSearch({ tab: 'history', day: dayKey })
-    view = 'history'
-  }
-
-  function selectQuestFromUi(id: number, { pushUrl = true } = {}) {
-    const n = Number(id)
-    if (!Number.isFinite(n) || n <= 0) return
-    pendingSelectId = n
-    selectedId = n
-    if (view !== 'journal') view = 'journal'
-    if (pushUrl) replaceSearch({ quest: n })
-    revealDetailOnNarrow('journal')
-    try {
-      window.focus()
-    } catch {
-      /* browsers often block focus from background */
-    }
-  }
-
-  function selectNoteFromUi(id: number, { pushUrl = true } = {}) {
-    const n = Number(id)
-    if (!Number.isFinite(n) || n <= 0) {
-      selectedNoteId = null
-      if (pushUrl) replaceSearch(searchForView(view))
-      revealListOnNarrow('notes')
-      return
-    }
-    selectedNoteId = n
-    if (view !== 'notes') view = 'notes'
-    if (pushUrl) replaceSearch({ note: n })
-    revealDetailOnNarrow('notes')
-  }
-
-  function selectAttachmentFromUi(id: number, { pushUrl = true } = {}) {
-    const n = Number(id)
-    if (!Number.isFinite(n) || n <= 0) {
-      selectedAttachmentId = null
-      if (pushUrl) replaceSearch(searchForView('attachments'))
-      return
-    }
-    selectedAttachmentId = n
-    if (view !== 'attachments') view = 'attachments'
-    if (pushUrl) replaceSearch({ attachment: n })
-  }
-
-  function onJournalRef(kind: string, id: number) {
-    if (kind === 'note') {
-      selectNoteFromUi(id)
-      return
-    }
-    if (kind === 'attachment') {
-      selectAttachmentFromUi(id)
-      return
-    }
-    if (kind === 'quest') {
-      selectQuestFromUi(id)
-      return
-    }
-    if (kind === 'questline') {
-      const first = quests.find((q) => q.questline_id === id)
-      if (first) selectQuestFromUi(first.id)
-      else setView('journal')
-      return
-    }
-    if (kind === 'step') {
-      for (const q of quests) {
-        if (q.steps?.some((s: { id: any }) => s.id === id)) {
-          selectQuestFromUi(q.id)
-          return
-        }
-      }
-      return
-    }
-    if (kind === 'template') {
-      templatesFocusId = id
-      templatesOpen = true
-    }
-  }
-
-  function clearSelectedQuest({ pushUrl = true } = {}) {
-    selectedId = null
-    pendingSelectId = null
-    if (pushUrl) replaceSearch(searchForView(view))
-    revealListOnNarrow('journal')
-  }
-
   async function refreshHealth() {
     try {
       const next = healthFrom(await fetchHealth())
@@ -769,15 +638,7 @@ import { RunnersPage } from '@/pages/runners'
 
   /** Boots data loading and live updates. Only runs once authenticated. */
   function startApp() {
-    const start = initialRoute()
-    if (start.view) view = start.view
-    if (start.attachmentId != null) selectedAttachmentId = start.attachmentId
-    if (start.noteId != null) selectedNoteId = start.noteId
-    if (start.graphRoot) graphRoot = start.graphRoot
-    if (start.questId != null) {
-      pendingSelectId = start.questId
-      selectedId = start.questId
-    }
+    nav.start()
     load()
     refreshHealth()
     const tick = setInterval(() => {
@@ -799,8 +660,8 @@ import { RunnersPage } from '@/pages/runners'
             remoteEdits.set(msg.quest_id, Date.now())
           }
           load({ silent: true })
-          if (view === 'history') historyNonce += 1
-          if (view === 'graph') graphNonce += 1
+          if (nav.view === 'history') historyNonce += 1
+          if (nav.view === 'graph') graphNonce += 1
         }
       },
       {
@@ -810,8 +671,8 @@ import { RunnersPage } from '@/pages/runners'
           void load({ silent: true })
           void refreshTemplates()
           void refreshHealth()
-          if (view === 'history') historyNonce += 1
-          if (view === 'graph') graphNonce += 1
+          if (nav.view === 'history') historyNonce += 1
+          if (nav.view === 'graph') graphNonce += 1
         },
       },
     )
@@ -839,9 +700,9 @@ import { RunnersPage } from '@/pages/runners'
     quests = []
     notes = []
     attachmentIndex = null
-    selectedId = null
-    selectedNoteId = null
-    selectedAttachmentId = null
+    nav.selectedId = null
+    nav.selectedNoteId = null
+    nav.selectedAttachmentId = null
     authed = false
   }
 
@@ -852,7 +713,7 @@ import { RunnersPage } from '@/pages/runners'
     // and lets setView()'s own transition animate the change.
     window.questsNav = {
       setTab: (name: any) => setView(name),
-      currentTab: () => view,
+      currentTab: () => nav.view,
     }
 
     applyTheme(loadSavedTheme())
@@ -903,7 +764,7 @@ import { RunnersPage } from '@/pages/runners'
   // is used (kbStepId stays null for mouse users); then it follows [ ] and +/-.
   let kbStepId = $state((null as number | null))
   $effect(() => {
-    selectedId
+    nav.selectedId
     kbStepId = null
   })
 
@@ -953,7 +814,7 @@ import { RunnersPage } from '@/pages/runners'
         codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
         run: (event: { code: string|any[] }) => {
           const i = Number(event.code.slice(-1)) - 1
-          if (TAB_ORDER[i] === view) return false
+          if (TAB_ORDER[i] === nav.view) return false
           setView(TAB_ORDER[i])
         },
       },
@@ -1012,7 +873,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Следующая строка (квест, группа, заметка)',
         keys: '↓  J',
         codes: ['ArrowDown', 'KeyJ'],
-        when: () => ['journal', 'notes'].includes(view),
+        when: () => ['journal', 'notes'].includes(nav.view),
         run: () => moveRow(1),
       },
       {
@@ -1021,7 +882,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Предыдущая строка',
         keys: '↑  K',
         codes: ['ArrowUp', 'KeyK'],
-        when: () => ['journal', 'notes'].includes(view),
+        when: () => ['journal', 'notes'].includes(nav.view),
         run: () => moveRow(-1),
       },
       {
@@ -1030,7 +891,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Развернуть группу',
         keys: '→',
         codes: ['ArrowRight'],
-        when: () => ['journal', 'notes'].includes(view),
+        when: () => ['journal', 'notes'].includes(nav.view),
         run: () => foldRow(true),
       },
       {
@@ -1039,7 +900,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Свернуть группу',
         keys: '←',
         codes: ['ArrowLeft'],
-        when: () => ['journal', 'notes'].includes(view),
+        when: () => ['journal', 'notes'].includes(nav.view),
         run: () => foldRow(false),
       },
       {
@@ -1048,7 +909,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Предыдущий шаг',
         keys: '[',
         codes: ['BracketLeft'],
-        when: () => view === 'journal' && !!selected?.steps?.length,
+        when: () => nav.view === 'journal' && !!selected?.steps?.length,
         run: () => kbMoveStep(-1),
       },
       {
@@ -1057,7 +918,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Следующий шаг',
         keys: ']',
         codes: ['BracketRight'],
-        when: () => view === 'journal' && !!selected?.steps?.length,
+        when: () => nav.view === 'journal' && !!selected?.steps?.length,
         run: () => kbMoveStep(1),
       },
       {
@@ -1067,7 +928,7 @@ import { RunnersPage } from '@/pages/runners'
         keys: '+',
         codes: ['Equal', 'NumpadAdd'],
         shift: 'any',
-        when: () => view === 'journal' && !!selected?.steps?.length,
+        when: () => nav.view === 'journal' && !!selected?.steps?.length,
         run: () => kbBumpStep(1),
       },
       {
@@ -1076,7 +937,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Прогресс шага −1',
         keys: '−',
         codes: ['Minus', 'NumpadSubtract'],
-        when: () => view === 'journal' && !!selected?.steps?.length,
+        when: () => nav.view === 'journal' && !!selected?.steps?.length,
         run: () => kbBumpStep(-1),
       },
       {
@@ -1085,7 +946,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Завершить шаг (повторно — вернуть на единицу назад)',
         keys: 'Пробел',
         codes: ['Space'],
-        when: () => view === 'journal' && !!selected?.steps?.length,
+        when: () => nav.view === 'journal' && !!selected?.steps?.length,
         run: () => kbToggleStep(),
       },
       {
@@ -1094,7 +955,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Снять выбор квеста',
         keys: 'Esc',
         codes: ['Escape'],
-        when: () => view === 'journal' && selectedId != null,
+        when: () => nav.view === 'journal' && nav.selectedId != null,
         run: () => clearSelectedQuest(),
       },
     ])
@@ -1117,11 +978,11 @@ import { RunnersPage } from '@/pages/runners'
 {:else}
 <div class="journal">
   <JournalHeader
-    {view}
+    view={nav.view}
     {liveStatus}
     {health}
-    sidebarCollapsed={view === 'notes' ? sidebarCollapsed.notes : sidebarCollapsed.journal}
-    onToggleSidebar={() => toggleSidebar(view === 'notes' ? 'notes' : 'journal')}
+    sidebarCollapsed={nav.view === 'notes' ? sidebarCollapsed.notes : sidebarCollapsed.journal}
+    onToggleSidebar={() => toggleSidebar(nav.view === 'notes' ? 'notes' : 'journal')}
     onViewChange={(v) => setView(v)}
     onOpenSettings={openSettings}
     onOpenTemplates={openTemplates}
@@ -1139,13 +1000,13 @@ import { RunnersPage } from '@/pages/runners'
   <ToastHost />
 
   <div class="journal__stage" use:tabSwipe={swipeTab}>
-  {#key view}
+  {#key nav.view}
   <div
     class="journal__viewport"
-    in:slideTab={{ dir: navDir }}
-    out:slideTab={{ dir: navDir, out: true }}
+    in:slideTab={{ dir: nav.navDir }}
+    out:slideTab={{ dir: nav.navDir, out: true }}
   >
-  {#if view === 'calendar'}
+  {#if nav.view === 'calendar'}
     <div class="journal__calendar">
       <ActivityCalendar
         {quests}
@@ -1159,14 +1020,14 @@ import { RunnersPage } from '@/pages/runners'
         }}
       />
     </div>
-  {:else if view === 'notes'}
+  {:else if nav.view === 'notes'}
     <div class="journal__notes">
       <NotesPage
         {notes}
         {quests}
         {questlines}
         {attachments}
-        selectedId={selectedNoteId}
+        selectedId={nav.selectedNoteId}
         labels={refLabels}
         sidebarCollapsed={sidebarCollapsed.notes}
         onSelect={(id) => selectNoteFromUi(id)}
@@ -1175,30 +1036,30 @@ import { RunnersPage } from '@/pages/runners'
         onOpenSecrets={(id) => openSecrets({ kind: 'note', id })}
       />
     </div>
-  {:else if view === 'graph'}
+  {:else if nav.view === 'graph'}
     <!-- drawn below, outside the keyed viewport -->
-  {:else if view === 'runners'}
+  {:else if nav.view === 'runners'}
     <div class="journal__runners">
-      <RunnersPage active={view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
+      <RunnersPage active={nav.view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
-  {:else if view === 'history'}
+  {:else if nav.view === 'history'}
     <div class="journal__history">
       <HistoryPage
-        active={view === 'history'}
+        active={nav.view === 'history'}
         nonce={historyNonce}
         {categories}
         {questlines}
         onOpen={onJournalRef}
       />
     </div>
-  {:else if view === 'attachments'}
+  {:else if nav.view === 'attachments'}
     <div class="journal__attachments">
       <AttachmentsPage
         attachments={allAttachments}
         {quests}
         {questlines}
         {notes}
-        selectedId={selectedAttachmentId}
+        selectedId={nav.selectedAttachmentId}
         onSelect={(id) => selectAttachmentFromUi(id)}
         onOpenOwner={onJournalRef}
         onChanged={() => load({ silent: true })}
@@ -1226,7 +1087,7 @@ import { RunnersPage } from '@/pages/runners'
         onShowAll={setShowAll}
         querySpec={questQuerySpec}
         parsedSearch={parsedQuestSearch}
-        {selectedId}
+        selectedId={nav.selectedId}
         {categoryOpen}
         {lineOpen}
         {nowMs}
@@ -1278,14 +1139,14 @@ import { RunnersPage } from '@/pages/runners'
   {/if}
   </div>
   {/key}
-  <!-- The map stays mounted once opened (just hidden), so coming back is instant and keeps its view. -->
+  <!-- The map stays mounted once opened (just hidden), so coming back is instant and keeps its nav.view. -->
   {#if graphSeen}
     <div class="journal__viewport journal__viewport--keep" bind:this={graphEl} style:display={graphOn ? undefined : 'none'}>
     <div class="journal__graph">
       <GraphPage
-        active={view === 'graph'}
-        rootType={graphRoot.type}
-        rootId={graphRoot.id}
+        active={nav.view === 'graph'}
+        rootType={nav.graphRoot.type}
+        rootId={nav.graphRoot.id}
         nonce={graphNonce}
         {quests}
         {notes}
