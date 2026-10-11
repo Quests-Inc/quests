@@ -36,7 +36,7 @@
   } from '@/shared/api/client.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, applyDraft, clampK, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, applyDraft, canPickTarget, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -1237,48 +1237,17 @@
   let linking: { mode: 'to' | 'from' | 'attach', anchor: string } | null = $state(null)
   let linkCursor = $state({ x: 0, y: 0 })
 
-  const REF_FROM = new Set(['quest', 'note', 'step', 'questline'])
   /** Things the map can be centred on. */
   const CENTERABLE = new Set(['quest', 'note', 'questline'])
-  const REF_TO = new Set(['quest', 'note', 'step', 'attachment', 'questline'])
 
+  const edgesNow = () => view?.edges ?? []
   /** Whether the card can be picked as the other end in the current link mode. */
-  function canPick(n: { key: any; type?: any }) {
-    if (!linking || !n || n.key === linking.anchor || n.type === 'cluster') return false
-    const a = nodeMap.get(linking.anchor)
-    if (!a) return false
-    if (linking.mode === 'to') return REF_TO.has(n.type)
-    if (linking.mode === 'from') return REF_FROM.has(n.type)
-    // a note goes under another note, but never under its own descendant
-    if (a.type === 'note') return n.type === 'note' && !noteDescendants(a.key).has(n.key)
-    // attach: a file goes to a quest / note / questline, a step to a quest
-    return a.type === 'step' ? n.type === 'quest' : n.type === 'quest' || n.type === 'note' || n.type === 'questline'
-  }
-
-  /** Keys of the notes below this one, over the structure edges on the map (draft included). */
-  function noteDescendants(key: any) {
-    const seen = new Set()
-    const walk = (k: any) => {
-      for (const e of view?.edges ?? []) {
-        if (e.kind === 'structure' && e.from === k && e.draft !== 'remove' && e.to.startsWith('note:') && !seen.has(e.to)) {
-          seen.add(e.to)
-          walk(e.to)
-        }
-      }
-    }
-    walk(key)
-    return seen
-  }
-
+  const canPick = (n: { key: string; type?: string }) => canPickTarget(linking, n, nodeMap, edgesNow())
+  const noteDescendants = (key: string) => noteDescendantKeys(edgesNow(), key)
   /** Cards of one kind that belong to this card (steps of a quest, quests of a questline), as shown. */
-  const childKeys = (n: { key: any }, type: string) =>
-    (view?.edges ?? [])
-      .filter((e) => e.kind === 'structure' && e.from === n.key && e.to.startsWith(`${type}:`) && !e.to.includes(':t') && nodeMap.has(e.to))
-      .map((e) => e.to)
-
+  const childKeys = (n: { key: string }, type: string) => childKeysOf(edgesNow(), nodeMap, n.key, type)
   /** The note this one hangs under, on the map. */
-  const parentNote = (n: { key: any }) =>
-    (view?.edges ?? []).find((e) => e.kind === 'structure' && e.to === n.key && e.from.startsWith('note:') && e.draft !== 'remove')?.from ?? null
+  const parentNote = (n: { key: string }) => parentNoteOf(edgesNow(), n.key)
 
   function startLink(mode: 'to' | 'from' | 'attach', n: { key: any }) {
     const a = nodeMap.get(n.key)
@@ -1291,9 +1260,7 @@
     linking = null
   }
 
-  /** A reference from a to b that would survive saving already exists. */
-  const hasRef = (from: any, to: any) =>
-    (view?.edges ?? []).some((e) => e.kind === 'reference' && e.from === from && e.to === to && e.draft !== 'remove')
+  const hasRef = (from: string, to: string) => hasRefEdge(edgesNow(), from, to)
 
   async function finishLink(target: { key: any }) {
     const l = linking
@@ -1322,11 +1289,7 @@
   }
 
   /** Links written in this card's own text, as targets still visible on the map. */
-  function outgoingRefs(n: { key: any }) {
-    return (view?.edges ?? [])
-      .filter((e) => e.kind === 'reference' && e.from === n.key && e.draft !== 'remove' && nodeMap.has(e.to))
-      .map((e) => e.to)
-  }
+  const outgoingRefs = (n: { key: string }) => outgoingRefKeys(edgesNow(), nodeMap, n.key)
 
   async function unlinkRef(n: { key: any }, targetKey: string) {
     const e = (view?.edges ?? []).find(
