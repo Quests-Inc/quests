@@ -1,4 +1,6 @@
-package httpapi
+// Package wsarchive is the workspace archive (export and import as a zip): a cross-cutting slice that reads and writes
+// every context's tables through the store (ADR-0001), kept out of the composition root.
+package wsarchive
 
 import (
 	"archive/zip"
@@ -22,7 +24,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/kernel"
 	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/platform/clamav"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/store"
 )
@@ -35,6 +41,26 @@ import (
 //	icons/<kind>-<id>.<ext>    custom questline / note icons
 //
 // Import always creates a NEW workspace and renumbers everything.
+
+// Handler serves the archive endpoints.
+type Handler struct {
+	Store          *store.Store
+	DataDir        string
+	WebDAV         *webdav.Client // nil/unconfigured: archives carry no files
+	ClamAV         *clamav.Client
+	MaxUploadBytes int64
+	WorkspaceQuota int64
+	// MemberOf resolves {id} to a workspace of the caller and their role (identity decides).
+	MemberOf func(w http.ResponseWriter, r *http.Request) (int64, string, identity.User, bool)
+	// OverQuota reports whether adding bytes would pass the workspace's attachment quota, and the bytes used.
+	OverQuota func(ctx context.Context, incoming int64) (bool, int64, error)
+}
+
+var writeJSON = httpx.WriteJSON
+
+func writeErr(w http.ResponseWriter, status int, detail string) {
+	httpx.WriteErr(w, kernel.StatusFor(status, detail), detail)
+}
 
 const (
 	maxImportBytes   = 2 << 30   // uploaded archive
@@ -52,19 +78,14 @@ type archiveManifest struct {
 	Files      bool   `json:"files"`
 }
 
-func (s *Server) registerWorkspaceArchive(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/workspaces/{id}/export", s.exportWorkspace)
-	mux.HandleFunc("POST /api/workspaces/import", s.importWorkspace)
-}
-
 func fileKey(webdavPath string) string {
 	sum := sha256.Sum256([]byte(webdavPath))
 	return hex.EncodeToString(sum[:16])
 }
 
-// exportWorkspace streams the workspace as a zip (owners only; secrets only with ?secrets=1).
-func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
-	id, role, _, ok := s.identityHTTP().MemberOf(w, r)
+// Export streams the workspace as a zip (owners only; secrets only with ?secrets=1).
+func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
+	id, role, _, ok := h.MemberOf(w, r)
 	if !ok {
 		return
 	}
@@ -74,13 +95,13 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	// Export reads under the workspace being exported, not whichever the session is in.
 	ctx := wsctx.With(r.Context(), id)
-	name, err := s.Store.Identity.WorkspaceName(ctx, id)
+	name, err := h.Store.Identity.WorkspaceName(ctx, id)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "workspace not found")
 		return
 	}
 	withSecrets := r.URL.Query().Get("secrets") == "1"
-	withFiles := r.URL.Query().Get("files") != "0" && s.WebDAV != nil && s.WebDAV.Configured()
+	withFiles := r.URL.Query().Get("files") != "0" && h.WebDAV != nil && h.WebDAV.Configured()
 
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="quests-workspace-%d-%s.zip"`, id, time.Now().UTC().Format("20060102")))
@@ -116,7 +137,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		enc := json.NewEncoder(tw)
-		err = s.Store.ReadTable(ctx, spec, func(row map[string]any) error {
+		err = h.Store.ReadTable(ctx, spec, func(row map[string]any) error {
 			if spec.Name == "attachment" || spec.Name == "attachment_revision" {
 				if p, _ := row["webdav_path"].(string); p != "" {
 					paths[p] = struct{}{}
@@ -141,7 +162,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 		if ic.kind == "note" {
 			dir = "note-icons"
 		}
-		raw, err := os.ReadFile(filepath.Join(s.DataDir, dir, ic.name))
+		raw, err := os.ReadFile(filepath.Join(h.DataDir, dir, ic.name))
 		if err != nil {
 			continue // a missing icon is cosmetic
 		}
@@ -154,7 +175,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	if withFiles {
 		for p := range paths {
-			body, err := s.WebDAV.Get(ctx, p)
+			body, err := h.WebDAV.Get(ctx, p)
 			if err != nil {
 				log.Printf("export workspace %d: skip %s: %v", id, p, err)
 				continue
@@ -179,7 +200,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 // importWorkspace creates a new workspace from an uploaded archive.
-func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "import needs an account")
@@ -250,7 +271,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		name += " (импорт)"
 	}
 	// Create the workspace, import into it; if anything fails the new workspace is dropped again.
-	ws, err := s.Store.Identity.CreateWorkspace(r.Context(), p.User.ID, name)
+	ws, err := h.Store.Identity.CreateWorkspace(r.Context(), p.User.ID, name)
 	if errors.Is(err, identity.ErrWorkspaceLimit) {
 		writeErr(w, http.StatusConflict, err.Error())
 		return
@@ -264,13 +285,13 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 	var importedBytes int64
 	abort := func(status int, msg string) {
 		for _, path := range uploaded {
-			_ = s.WebDAV.Delete(context.WithoutCancel(ctx), path)
+			_ = h.WebDAV.Delete(context.WithoutCancel(ctx), path)
 		}
-		_ = s.Store.Identity.AbortWorkspace(context.WithoutCancel(r.Context()), ws.ID)
+		_ = h.Store.Identity.AbortWorkspace(context.WithoutCancel(r.Context()), ws.ID)
 		writeErr(w, status, msg)
 	}
 
-	maxFile := s.MaxUploadBytes
+	maxFile := h.MaxUploadBytes
 	if maxFile <= 0 {
 		maxFile = 25 << 20
 	}
@@ -284,10 +305,10 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 			if f.UncompressedSize64 > uint64(maxFile) {
 				return "", fmt.Errorf("вложение %q больше %d МБ", filename, maxFile>>20)
 			}
-			if over, used, qerr := s.knowledgeHTTP().OverQuota(ctx, int64(f.UncompressedSize64)+importedBytes); qerr != nil {
+			if over, used, qerr := h.OverQuota(ctx, int64(f.UncompressedSize64)+importedBytes); qerr != nil {
 				return "", qerr
 			} else if over {
-				return "", errors.New(knowledgehttp.QuotaMessage(used+importedBytes, s.WorkspaceQuota))
+				return "", errors.New(knowledgehttp.QuotaMessage(used+importedBytes, h.WorkspaceQuota))
 			}
 			rc, err := f.Open()
 			if err != nil {
@@ -298,7 +319,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 			if err != nil || int64(len(raw)) > maxFile {
 				return "", fmt.Errorf("вложение %q: не читается или слишком большое", filename)
 			}
-			res, err := s.ClamAV.Scan(ctx, bytes.NewReader(raw))
+			res, err := h.ClamAV.Scan(ctx, bytes.NewReader(raw))
 			if err != nil {
 				return "", fmt.Errorf("проверка на вирусы недоступна: %w", err)
 			}
@@ -306,7 +327,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 				return "", fmt.Errorf("вложение %q отклонено антивирусом: %s", filename, res.Signature)
 			}
 			newPath := fmt.Sprintf("attachments/%s-%d/%s-%s", ownerType, ownerID, uuid.NewString(), knowledgehttp.SafeFilename(filename))
-			if err := s.WebDAV.Put(ctx, newPath, "application/octet-stream", bytes.NewReader(raw), int64(len(raw))); err != nil {
+			if err := h.WebDAV.Put(ctx, newPath, "application/octet-stream", bytes.NewReader(raw), int64(len(raw))); err != nil {
 				return "", fmt.Errorf("загрузка на файловый сервер: %w", err)
 			}
 			uploaded = append(uploaded, newPath)
@@ -357,7 +378,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		return sc.Err()
 	}
 
-	rep, err := s.Store.ImportWorkspace(ctx, tables, opt)
+	rep, err := h.Store.ImportWorkspace(ctx, tables, opt)
 	if err != nil {
 		log.Printf("import workspace: %v", err)
 		status := http.StatusUnprocessableEntity
@@ -367,12 +388,12 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		abort(status, "импорт не удался: "+err.Error())
 		return
 	}
-	s.importIcons(ctx, entries, rep.IDs)
+	h.importIcons(ctx, entries, rep.IDs)
 	writeJSON(w, http.StatusCreated, map[string]any{"workspace_id": ws.ID, "name": ws.Name, "report": rep})
 }
 
 // importIcons re-attaches custom icon files under the new ids.
-func (s *Server) importIcons(ctx context.Context, entries map[string]*zip.File, ids map[string]map[int64]int64) {
+func (h *Handler) importIcons(ctx context.Context, entries map[string]*zip.File, ids map[string]map[int64]int64) {
 	okExt := map[string]bool{".png": true, ".jpg": true, ".webp": true, ".gif": true, ".svg": true}
 	for name, f := range entries {
 		rest, found := strings.CutPrefix(name, "icons/")
@@ -405,15 +426,15 @@ func (s *Server) importIcons(ctx context.Context, entries map[string]*zip.File, 
 		if err != nil || len(raw) == 0 || len(raw) > maxIconBytes {
 			continue
 		}
-		_ = os.MkdirAll(filepath.Join(s.DataDir, dir), 0o755)
+		_ = os.MkdirAll(filepath.Join(h.DataDir, dir), 0o755)
 		fname := strconv.FormatInt(newID, 10) + ext
-		if err := os.WriteFile(filepath.Join(s.DataDir, dir, fname), raw, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(h.DataDir, dir, fname), raw, 0o644); err != nil {
 			continue
 		}
 		if table == "questline" {
-			_, _ = s.Store.Journal.SetQuestlineIcon(ctx, newID, fname)
+			_, _ = h.Store.Journal.SetQuestlineIcon(ctx, newID, fname)
 		} else {
-			_, _ = s.Store.Knowledge.SetNoteIcon(ctx, newID, fname)
+			_, _ = h.Store.Knowledge.SetNoteIcon(ctx, newID, fname)
 		}
 	}
 }

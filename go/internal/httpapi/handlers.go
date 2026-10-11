@@ -137,7 +137,8 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
 	s.registerGraphDraft(mux)
-	s.registerWorkspaceArchive(mux)
+	mux.HandleFunc("GET /api/workspaces/{id}/export", func(w http.ResponseWriter, r *http.Request) { s.wsarchiveHandler().Export(w, r) })
+	mux.HandleFunc("POST /api/workspaces/import", func(w http.ResponseWriter, r *http.Request) { s.wsarchiveHandler().Import(w, r) })
 	s.mountSPA(mux)
 	return mux
 }
