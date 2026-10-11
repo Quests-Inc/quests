@@ -3,9 +3,9 @@
   import { HistoryPage } from '@/pages/history'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
+  import { createJournalMenu } from '@/app/model/journalMenu.svelte.ts'
   import { createStepProgress, questIdOfStep, stepRef } from '@/app/model/stepProgress.svelte.ts'
   import { createQuestActions } from '@/app/model/questActions.svelte.ts'
-  import { contextMenuItems } from '@/app/model/contextMenu.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
   import {
     attachmentIdFromUrl,
@@ -187,13 +187,6 @@ import { RunnersPage } from '@/pages/runners'
   let lineModalOpen = $state(false)
   let lineModalMode = $state(('create' as 'create' | 'edit'))
   let lineModalTarget = $state((null as any | null))
-  let ctxOpen = $state(false)
-  let ctxX = $state(0)
-  let ctxY = $state(0)
-  let ctxKind: 'line' | 'quest' | 'step' | null = $state(null)
-  let ctxLineId = $state((null as number | null))
-  let ctxQuestId = $state((null as number | null))
-  let ctxStepId = $state((null as number | null))
   let lineDeleteConfirmOpen = $state(false)
   let lineDeleting = $state(false)
   let deleting = $state(false)
@@ -258,17 +251,6 @@ import { RunnersPage } from '@/pages/runners'
   }
   /** Questlines to narrow to under the current scope category (see scopeQuestlineOptions). */
   let scopeQuestlineOptions = $derived(scopeQuestlineChoices({ scopeCategoryId, questlines, quests, showAll: showAllQuests }))
-
-  let ctxItems = $derived(
-    contextMenuItems({
-      kind: ctxKind,
-      lineId: ctxLineId,
-      quest: quests.find((q) => q.id === ctxQuestId),
-      questId: ctxQuestId,
-      stepId: ctxStepId,
-      step: findStepRef(ctxStepId)?.step,
-    }),
-  )
 
   let matchedQuests = $derived(quests.filter((q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q)))
   let listedQuests = $derived(listOpenOrAll(matchedQuests, { showAll: showAllQuests, statusTokens: tokenValues(parsedQuestSearch, 'status') }))
@@ -411,48 +393,6 @@ import { RunnersPage } from '@/pages/runners'
     modalOpen = true
   }
 
-  function openLineContextMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, line: { id: number }) {
-    event.preventDefault()
-    event.stopPropagation()
-    ctxKind = 'line'
-    ctxLineId = line.id
-    ctxQuestId = null
-    ctxStepId = null
-    ctxX = event.clientX
-    ctxY = event.clientY
-    ctxOpen = true
-  }
-
-  function openQuestContextMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, quest: { id: number }) {
-    event.preventDefault()
-    event.stopPropagation()
-    ctxKind = 'quest'
-    ctxQuestId = quest.id
-    ctxLineId = null
-    ctxStepId = null
-    selectedId = quest.id
-    ctxX = event.clientX
-    ctxY = event.clientY
-    ctxOpen = true
-  }
-
-  function openStepContextMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, step: { id: number }) {
-    event.preventDefault()
-    event.stopPropagation()
-    ctxKind = 'step'
-    ctxStepId = step.id
-    ctxQuestId = findQuestIdForStep(step.id) ?? selectedId
-    ctxLineId = null
-    ctxX = event.clientX
-    ctxY = event.clientY
-    ctxOpen = true
-  }
-
-  function closeContextMenu() {
-    ctxOpen = false
-    ctxKind = null
-  }
-
   async function copyIdToClipboard(kind: string, id: number) {
     if (id == null) return
     try {
@@ -465,33 +405,6 @@ import { RunnersPage } from '@/pages/runners'
     }
   }
 
-  function onLineContextSelect(action: string) {
-    if (action === 'copy-id') {
-      copyIdToClipboard('questline', ctxLineId)
-      return
-    }
-    if (action === 'secrets') {
-      if (ctxLineId != null) openSecrets({ kind: 'questline', id: ctxLineId })
-      return
-    }
-    const line = questlines.find((l) => l.id === ctxLineId)
-    if (!line && action !== 'delete') return
-    if (action === 'add') {
-      openCreate({
-        questline_id: ctxLineId,
-        category_id: line?.category_id ?? null,
-      })
-      return
-    }
-    if (action === 'edit' || action === 'icon') {
-      openEditQuestline(line)
-      return
-    }
-    if (action === 'delete') {
-      lineDeleteConfirmOpen = true
-    }
-  }
-
   const questActions = createQuestActions({
     updateQuest,
     applyQuest: (quest, opts) => applyQuest(quest, opts),
@@ -499,112 +412,6 @@ import { RunnersPage } from '@/pages/runners'
     refLabels: () => refLabels,
   })
   let statusBusy = $derived(questActions.busy)
-  const { patchStatus: patchQuestStatus, postpone: postponeQuest, patchSignificance: patchQuestSignificance, exportQuest: exportQuestFromMenu } = questActions
-
-  function onQuestContextSelect(action: string) {
-    if (action === 'copy-id') {
-      copyIdToClipboard('quest', ctxQuestId)
-      return
-    }
-    if (action === 'secrets') {
-      if (ctxQuestId != null) openSecrets({ kind: 'quest', id: ctxQuestId })
-      return
-    }
-    const quest = quests.find((q) => q.id === ctxQuestId)
-    if (!quest) return
-    if (action === 'edit') {
-      openEdit(quest)
-      return
-    }
-    if (action.startsWith('delay-')) {
-      const minutes = Number(action.slice('delay-'.length))
-      if (minutes > 0) postponeQuest(quest, minutes)
-      return
-    }
-    if (action.startsWith('status:')) {
-      const status = action.slice('status:'.length)
-      if (status && status !== quest.status) patchQuestStatus(quest, status)
-      return
-    }
-    if (action.startsWith('sig:')) {
-      patchQuestSignificance(quest, action.slice('sig:'.length))
-      return
-    }
-    if (action === 'export-md') {
-      exportQuestFromMenu(quest, 'md')
-      return
-    }
-    if (action === 'export-pdf') {
-      exportQuestFromMenu(quest, 'rich')
-      return
-    }
-    if (action === 'export-pdf-simple') {
-      exportQuestFromMenu(quest, 'simple')
-      return
-    }
-    if (action === 'delete') {
-      selectedId = quest.id
-      deleteConfirmOpen = true
-    }
-  }
-
-  function onContextSelect(action: string) {
-    if (ctxKind === 'line') {
-      onLineContextSelect(action)
-      return
-    }
-    if (ctxKind === 'quest') {
-      onQuestContextSelect(action)
-      return
-    }
-    if (ctxKind === 'step') {
-      onStepContextSelect(action)
-    }
-  }
-
-  async function onStepContextSelect(action: string) {
-    if (action === 'copy-id') {
-      copyIdToClipboard('step', ctxStepId)
-      return
-    }
-    if (action === 'secrets') {
-      if (ctxStepId != null) openSecrets({ kind: 'step', id: ctxStepId })
-      return
-    }
-    const found = findStepRef(ctxStepId)
-    if (!found) return
-    const { step, questId } = found
-    if (action === 'inc') {
-      await bumpStep(step, 1, questId)
-      return
-    }
-    if (action === 'dec') {
-      await bumpStep(step, -1, questId)
-      return
-    }
-    if (action === 'complete') {
-      await setStepProgress(step, step.progress_total, questId)
-      return
-    }
-    if (action === 'reset') {
-      await setStepProgress(step, 0, questId)
-      return
-    }
-    if (action === 'edit') {
-      stepModalQuestId = questId
-      stepModalStep = step
-      stepModalOpen = true
-      return
-    }
-    if (action === 'delete') {
-      stepDelete = {
-        questId,
-        stepId: step.id,
-        title: step.title || `step=${step.id}`,
-      }
-      stepDeleteOpen = true
-    }
-  }
 
   async function confirmDeleteStep() {
     if (!stepDelete || stepDeleteBusy) return
@@ -625,13 +432,13 @@ import { RunnersPage } from '@/pages/runners'
   }
 
   async function confirmDeleteQuestline() {
-    if (ctxLineId == null || lineDeleting) return
+    if (menu.lineId == null || lineDeleting) return
     lineDeleting = true
     error = ''
     try {
-      await deleteQuestline(ctxLineId)
+      await deleteQuestline(menu.lineId)
       lineDeleteConfirmOpen = false
-      ctxLineId = null
+      menu.clearLine()
       await load({ silent: true })
       toast('Квестлайн удалён', { kind: 'success' })
     } catch (e) {
@@ -724,6 +531,35 @@ import { RunnersPage } from '@/pages/runners'
   function findStepRef(stepId: number) {
     return stepRef(quests, stepId)
   }
+
+  const menu = createJournalMenu({
+    quests: () => quests,
+    questlines: () => questlines,
+    findStep: findStepRef,
+    selectQuest: (id) => (selectedId = id),
+    selectedQuestId: () => selectedId,
+    copyId: (kind, id) => void copyIdToClipboard(kind, id),
+    openSecrets: (owner) => openSecrets(owner),
+    openCreate: (defaults) => openCreate(defaults),
+    editQuest: (q) => openEdit(q),
+    editLine: (line) => openEditQuestline(line),
+    askDeleteLine: () => (lineDeleteConfirmOpen = true),
+    askDeleteQuest: (q) => {
+      selectedId = q.id
+      deleteConfirmOpen = true
+    },
+    editStep: (questId, step) => {
+      stepModalQuestId = questId
+      stepModalStep = step
+      stepModalOpen = true
+    },
+    askDeleteStep: (d) => {
+      stepDelete = d
+      stepDeleteOpen = true
+    },
+    quest: questActions,
+    step: { bump: (s, d, q) => bumpStep(s, d, q), set: (s, v, q) => setStepProgress(s, v, q) },
+  })
 
   function applyQuest(quest: { id: any }, { select = true } = {}) {
     const idx = quests.findIndex((q) => q.id === quest.id)
@@ -1319,7 +1155,7 @@ import { RunnersPage } from '@/pages/runners'
         onOpenHistory={openHistoryDay}
         onQuestContextMenu={(event, id) => {
           const quest = quests.find((q) => q.id === id)
-          if (quest) openQuestContextMenu(event, quest)
+          if (quest) menu.openQuest(event, quest)
         }}
       />
     </div>
@@ -1396,8 +1232,8 @@ import { RunnersPage } from '@/pages/runners'
         {nowMs}
         onSelect={(id) => selectQuestFromUi(id)}
         onTogglePin={togglePin}
-        onQuestContextMenu={openQuestContextMenu}
-        onLineContextMenu={openLineContextMenu}
+        onQuestContextMenu={menu.openQuest}
+        onLineContextMenu={menu.openLine}
         onToggleCategory={toggleCategory}
         onToggleLine={toggleLine}
         labels={refLabels}
@@ -1426,12 +1262,12 @@ import { RunnersPage } from '@/pages/runners'
         onStepEditKeydown={onStepEditKeydown}
         onStepEditBlur={onStepEditBlur}
         onStepEditInput={(v) => (steps.editValue = v)}
-        onQuestTitleContextMenu={openQuestContextMenu}
+        onQuestTitleContextMenu={menu.openQuest}
         onLineHeadContextMenu={(e) => {
           const line = questlines.find((l) => l.id === selected?.questline_id)
-          if (line) openLineContextMenu(e, line)
+          if (line) menu.openLine(e, line)
         }}
-        onStepContextMenu={openStepContextMenu}
+        onStepContextMenu={menu.openStep}
         onSelectQuest={(id) => selectQuestFromUi(id)}
         labels={refLabels}
         onRef={onJournalRef}
@@ -1561,12 +1397,12 @@ import { RunnersPage } from '@/pages/runners'
 />
 
 <ContextMenu
-  open={ctxOpen}
-  x={ctxX}
-  y={ctxY}
-  items={ctxItems}
-  onSelect={onContextSelect}
-  onClose={closeContextMenu}
+  open={menu.open}
+  x={menu.x}
+  y={menu.y}
+  items={menu.items}
+  onSelect={menu.select}
+  onClose={menu.close}
 />
 
 <ConfirmModal
