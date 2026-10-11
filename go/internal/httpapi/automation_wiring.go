@@ -14,7 +14,7 @@ import (
 func (s *Server) automationHTTP() *automationhttp.Handler {
 	s.automationOnce.Do(func() {
 		s.ah = &automationhttp.Handler{
-			Store:        s.Store.Automation(),
+			Store:        s.Store.Automation,
 			Hub:          s.Hub,
 			RequireOwner: s.identityHTTP().RequireOwner,
 			ResolveRefs:  s.resolveRefs,

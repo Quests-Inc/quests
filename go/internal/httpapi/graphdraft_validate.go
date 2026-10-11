@@ -45,19 +45,19 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 	id, _ := strconv.ParseInt(ref.ID, 10, 64)
 	switch ref.Type {
 	case "quest":
-		_, err := s.Store.Journal().GetQuest(ctx, id)
+		_, err := s.Store.Journal.GetQuest(ctx, id)
 		return err == nil
 	case "note":
-		ok, err := s.Store.Knowledge().NoteExists(ctx, id)
+		ok, err := s.Store.Knowledge.NoteExists(ctx, id)
 		return err == nil && ok
 	case "questline":
-		_, err := s.Store.Journal().GetQuestline(ctx, id)
+		_, err := s.Store.Journal.GetQuestline(ctx, id)
 		return err == nil
 	case "step":
-		_, err := s.Store.Journal().QuestIDForStep(ctx, id)
+		_, err := s.Store.Journal.QuestIDForStep(ctx, id)
 		return err == nil
 	case "attachment":
-		_, err := s.Store.Knowledge().GetAttachment(ctx, id)
+		_, err := s.Store.Knowledge.GetAttachment(ctx, id)
 		return err == nil
 	}
 	return false
@@ -197,16 +197,16 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 		id, _ := strconv.ParseInt(f.ID, 10, 64)
 		switch f.Type {
 		case "quest":
-			if q, err := s.Store.Journal().GetQuest(ctx, id); err == nil {
+			if q, err := s.Store.Journal.GetQuest(ctx, id); err == nil {
 				has = textHas(q.Description)
 			}
 		case "note":
-			if n, err := s.Store.Knowledge().GetNote(ctx, id); err == nil {
+			if n, err := s.Store.Knowledge.GetNote(ctx, id); err == nil {
 				has = textHas(n.Description)
 			}
 		case "step":
-			if qid, err := s.Store.Journal().QuestIDForStep(ctx, id); err == nil {
-				if q, err := s.Store.Journal().GetQuest(ctx, qid); err == nil {
+			if qid, err := s.Store.Journal.QuestIDForStep(ctx, id); err == nil {
+				if q, err := s.Store.Journal.GetQuest(ctx, qid); err == nil {
 					for _, st := range q.Steps {
 						if st.ID == id {
 							has = textHas(st.Description)
@@ -215,7 +215,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 				}
 			}
 		case "questline":
-			if ql, err := s.Store.Journal().GetQuestline(ctx, id); err == nil {
+			if ql, err := s.Store.Journal.GetQuestline(ctx, id); err == nil {
 				has = textHas(ql.Description)
 			}
 		}

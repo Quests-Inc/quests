@@ -33,7 +33,7 @@ func (s *Store) AggregateStats(ctx context.Context) (Stats, error) {
 			firstErr = err
 		}
 	}
-	err := s.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+	err := s.Identity.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
 		st.Workspaces++
 		rows, err := s.DB.QueryContext(wctx, `SELECT status, COUNT(*) FROM quest GROUP BY status`)
 		note(err)
@@ -66,7 +66,7 @@ func (s *Store) AggregateStats(ctx context.Context) (Stats, error) {
 		note(s.DB.QueryRowContext(wctx, `SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM attachment`).Scan(&n, &b))
 		st.Attachments += n
 		st.AttachmentBytes += b.Int64
-		if used, uerr := s.Knowledge().AttachmentUsage(wctx); uerr == nil && used > st.AttachmentBytesMax {
+		if used, uerr := s.Knowledge.AttachmentUsage(wctx); uerr == nil && used > st.AttachmentBytesMax {
 			st.AttachmentBytesMax = used
 		} else {
 			note(uerr)

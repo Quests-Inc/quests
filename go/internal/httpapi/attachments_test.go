@@ -142,7 +142,7 @@ func fakeClamd(t *testing.T, reply string) string {
 func newAttachmentServer(t *testing.T, davURL, clamAddr string, maxUpload int64) *Server {
 	t.Helper()
 	pool, url := pgtest.NewWithURL(t)
-	st := &store.Store{DB: pool, DatabaseURL: url}
+	st := store.New(pool, url, nil)
 	if maxUpload <= 0 {
 		maxUpload = 25 << 20
 	}
@@ -160,7 +160,7 @@ func newAttachmentServer(t *testing.T, davURL, clamAddr string, maxUpload int64)
 func seedQuest(t *testing.T, s *Server) int64 {
 	t.Helper()
 	now := timeutil.NowUTC()
-	q, err := s.Store.Journal().CreateQuest(t.Context(), journal.Quest{
+	q, err := s.Store.Journal.CreateQuest(t.Context(), journal.Quest{
 		Title:        "with files",
 		Status:       journal.StatusActive,
 		Significance: journal.SigCommon,
@@ -435,7 +435,7 @@ func TestAttachmentDeleteQuestPurgesFiles(t *testing.T) {
 	if del.Code != 204 {
 		t.Fatalf("delete quest = %d %s", del.Code, del.Body.String())
 	}
-	rows, err := s.Store.Knowledge().ListAttachments(t.Context(), ownerQuest, qid)
+	rows, err := s.Store.Knowledge.ListAttachments(t.Context(), ownerQuest, qid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,7 +700,7 @@ func TestAttachmentEventsLandInChangeLog(t *testing.T) {
 	if up.Code != 201 {
 		t.Fatalf("upload = %d %s", up.Code, up.Body.String())
 	}
-	rows, err := s.Store.Journal().ListChangeLog(context.Background(), journal.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
+	rows, err := s.Store.Journal.ListChangeLog(context.Background(), journal.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -723,11 +723,11 @@ func TestLogEventCoalesces(t *testing.T) {
 	ctx := context.Background()
 	ev := journal.ChangeEvent{Kind: "note_updated", EntityType: "note", EntityID: 7, Title: "n", Detail: "изменена", Coalesce: 10 * time.Minute}
 	for i := 0; i < 3; i++ {
-		if err := s.Store.Journal().LogEvent(ctx, ev); err != nil {
+		if err := s.Store.Journal.LogEvent(ctx, ev); err != nil {
 			t.Fatal(err)
 		}
 	}
-	rows, _ := s.Store.Journal().ListChangeLog(ctx, journal.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
+	rows, _ := s.Store.Journal.ListChangeLog(ctx, journal.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
 	if len(rows) != 1 {
 		t.Fatalf("want 1 coalesced entry, got %d: %v", len(rows), rows)
 	}
@@ -741,12 +741,12 @@ func TestChangeLogFilters(t *testing.T) {
 		{Kind: "note_deleted", EntityType: "note", EntityID: 2, Title: "Другое", Detail: "удалена"},
 		{Kind: "attachment_added", EntityType: "attachment", EntityID: 3, ParentType: "note", ParentID: 1, Title: "борщ.pdf", Detail: "загружено"},
 	} {
-		if err := s.Store.Journal().LogEvent(ctx, e); err != nil {
+		if err := s.Store.Journal.LogEvent(ctx, e); err != nil {
 			t.Fatal(i, err)
 		}
 	}
 	count := func(f journal.ChangeLogFilter) int {
-		rows, err := s.Store.Journal().ListChangeLog(ctx, f)
+		rows, err := s.Store.Journal.ListChangeLog(ctx, f)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -772,7 +772,7 @@ func TestChangeLogFilters(t *testing.T) {
 	if n := count(journal.ChangeLogFilter{EntityTypes: []string{"note"}, EntityID: &id}); n != 1 {
 		t.Fatalf("entity id = %d", n)
 	}
-	first, _ := s.Store.Journal().ListChangeLog(ctx, journal.ChangeLogFilter{EntityTypes: all, Limit: 1})
+	first, _ := s.Store.Journal.ListChangeLog(ctx, journal.ChangeLogFilter{EntityTypes: all, Limit: 1})
 	bid := first[0]["id"].(int64)
 	bat, _ := timeutil.ParseFlexible(first[0]["at"].(string))
 	if n := count(journal.ChangeLogFilter{EntityTypes: all, BeforeID: &bid, BeforeAt: &bat}); n != 2 {
@@ -787,16 +787,16 @@ func TestGraphEdgesAndOrphans(t *testing.T) {
 	s := newAttachmentServer(t, dav.URL, clam, 0)
 	ctx := context.Background()
 	qid := seedQuest(t, s)
-	linked, err := s.Store.Knowledge().CreateNote(ctx, knowledge.Note{Title: "linked"})
+	linked, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "linked"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphan, err := s.Store.Knowledge().CreateNote(ctx, knowledge.Note{Title: "orphan"})
+	orphan, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "orphan"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// A note pointing at the quest, and the quest text pointing back at "linked".
-	if _, err := s.Store.Knowledge().UpdateNote(ctx, linked.ID, map[string]any{"description": fmt.Sprintf("see quest=%d", qid)}); err != nil {
+	if _, err := s.Store.Knowledge.UpdateNote(ctx, linked.ID, map[string]any{"description": fmt.Sprintf("see quest=%d", qid)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Store.DB.Exec(`UPDATE quest SET description = ? WHERE id = ?`, fmt.Sprintf("uses note=%d", linked.ID), qid); err != nil {
@@ -860,7 +860,7 @@ func TestAttachmentWorkspaceQuota(t *testing.T) {
 	if w := postFile(t, s.Handler(), path, "c.bin", "", bytes.Repeat([]byte("c"), 40)); w.Code != 201 {
 		t.Fatalf("an upload that fits was refused: %d %s", w.Code, w.Body.String())
 	}
-	used, err := s.Store.Knowledge().AttachmentUsage(context.Background())
+	used, err := s.Store.Knowledge.AttachmentUsage(context.Background())
 	if err != nil || used != 100 {
 		t.Fatalf("usage = %d, %v", used, err)
 	}

@@ -21,7 +21,7 @@ func runQueuedJobs(t *testing.T, st *store.Store, r *CheckRunner) int {
 	ctx := bg()
 	n := 0
 	for {
-		job, err := st.Automation().ClaimJob(ctx, testLabel, time.Minute)
+		job, err := st.Automation.ClaimJob(ctx, testLabel, time.Minute)
 		if err != nil {
 			t.Fatalf("claim: %v", err)
 		}
@@ -38,7 +38,7 @@ func runQueuedJobs(t *testing.T, st *store.Store, r *CheckRunner) int {
 				exit = ee.ExitCode()
 			}
 		}
-		done, _, err := st.Automation().CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: exit, Stdout: stdout.String(), Stderr: stderr.String()})
+		done, _, err := st.Automation.CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: exit, Stdout: stdout.String(), Stderr: stderr.String()})
 		if err != nil {
 			t.Fatalf("complete job %d: %v", job.ID, err)
 		}

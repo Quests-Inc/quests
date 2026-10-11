@@ -189,7 +189,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 				path = fmt.Sprintf("/api/notes/%d", id)
 			}
 			if op.Kind == "edit_step" {
-				qid, qerr := s.Store.Journal().QuestIDForStep(ctx, id)
+				qid, qerr := s.Store.Journal.QuestIDForStep(ctx, id)
 				if qerr != nil {
 					fail(op, qerr)
 					return
@@ -237,7 +237,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			aid, _ := strconv.ParseInt(item.ID, 10, 64)
 			if item.Type == "step" {
-				fromQ, qerr := s.Store.Journal().QuestIDForStep(ctx, aid)
+				fromQ, qerr := s.Store.Journal.QuestIDForStep(ctx, aid)
 				if qerr != nil {
 					fail(op, qerr)
 					return
@@ -308,11 +308,11 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		sid, _ := strconv.ParseInt(src.ID, 10, 64)
 		switch src.Type {
 		case "step":
-			if qid, err := s.Store.Journal().QuestIDForStep(ctx, sid); err == nil {
+			if qid, err := s.Store.Journal.QuestIDForStep(ctx, sid); err == nil {
 				owners["step:"+store.TmpID(op.ID)] = fmt.Sprintf("quest:%d", qid)
 			}
 		case "attachment":
-			if a, err := s.Store.Knowledge().GetAttachment(ctx, sid); err == nil {
+			if a, err := s.Store.Knowledge.GetAttachment(ctx, sid); err == nil {
 				owners["attachment:"+store.TmpID(op.ID)] = fmt.Sprintf("%s:%d", a.OwnerType, a.OwnerID)
 			}
 		}
@@ -346,13 +346,13 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		sid, _ := strconv.ParseInt(item.ID, 10, 64)
 		oid, _ := strconv.ParseInt(owner.ID, 10, 64)
 		finalOwner[sid] = oid
-		if origin, err := s.Store.Journal().QuestIDForStep(ctx, sid); err == nil {
+		if origin, err := s.Store.Journal.QuestIDForStep(ctx, sid); err == nil {
 			lastMoveOp[origin] = op.ID
 		}
 	}
 	delta := map[int64]int{}
 	for sid, dest := range finalOwner {
-		origin, err := s.Store.Journal().QuestIDForStep(ctx, sid)
+		origin, err := s.Store.Journal.QuestIDForStep(ctx, sid)
 		if err != nil || origin == dest {
 			continue
 		}
@@ -371,7 +371,7 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		if d >= 0 {
 			continue
 		}
-		q, err := s.Store.Journal().GetQuest(ctx, qid)
+		q, err := s.Store.Journal.GetQuest(ctx, qid)
 		if err == nil && len(q.Steps)+d < 1 {
 			problems = append(problems, draftProblem{lastMoveOp[qid], "квест «" + q.Title + "» останется без шагов"})
 		}
@@ -396,30 +396,30 @@ func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ st
 	var desc, path string
 	switch typ {
 	case "quest":
-		q, err := s.Store.Journal().GetQuest(ctx, id)
+		q, err := s.Store.Journal.GetQuest(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc, path = q.Description, fmt.Sprintf("/api/quests/%d", id)
 	case "note":
-		n, err := s.Store.Knowledge().GetNote(ctx, id)
+		n, err := s.Store.Knowledge.GetNote(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc, path = n.Description, fmt.Sprintf("/api/notes/%d", id)
 	case "questline":
-		ql, err := s.Store.Journal().GetQuestline(ctx, id)
+		ql, err := s.Store.Journal.GetQuestline(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc = ql.Description
 		path = fmt.Sprintf("/api/questlines/%d", id)
 	case "step":
-		qid, err := s.Store.Journal().QuestIDForStep(ctx, id)
+		qid, err := s.Store.Journal.QuestIDForStep(ctx, id)
 		if err != nil {
 			return err
 		}
-		q, err := s.Store.Journal().GetQuest(ctx, qid)
+		q, err := s.Store.Journal.GetQuest(ctx, qid)
 		if err != nil {
 			return err
 		}

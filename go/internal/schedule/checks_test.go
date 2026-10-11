@@ -28,7 +28,7 @@ func openChecksDB(t *testing.T) *store.Store {
 		}
 	}
 	pgtest.FixSequences(t, url)
-	return &store.Store{DB: pool, DatabaseURL: url}
+	return store.New(pool, url, nil)
 }
 
 func TestParseCheckStdout(t *testing.T) {
@@ -100,7 +100,7 @@ func seedQuest(t *testing.T, st *store.Store, steps []journal.Step) journal.Ques
 			steps[i].RunOn = &label
 		}
 	}
-	q, err := st.Journal().CreateQuest(bg(), journal.Quest{
+	q, err := st.Journal.CreateQuest(bg(), journal.Quest{
 		Title: "auto", Status: journal.StatusActive, Significance: journal.SigCommon,
 		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: steps,
 	})
@@ -121,7 +121,7 @@ func TestCheckPollProgress(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestCheckPollJSON(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestCheckPollJSONBrokenKeepsDescription(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestCheckWaitPrevious(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestCheckWaitPrevious(t *testing.T) {
 	}
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err = st.Journal().GetQuest(bg(), q.ID)
+	got, err = st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +231,7 @@ func TestCheckOnceFailQuest(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestFailStaleRunning(t *testing.T) {
 	}
 	r := NewCheckRunner(st, events.New())
 	r.FailStaleRunning(bg())
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func pollStep(t *testing.T, st *store.Store, cmd string, total, current int) jou
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), q.ID)
+	got, err := st.Journal.GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func tickAndGet(t *testing.T, st *store.Store, id int64) journal.Quest {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
 	settle(t, st, r)
-	got, err := st.Journal().GetQuest(bg(), id)
+	got, err := st.Journal.GetQuest(bg(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +386,7 @@ func TestCheckWatchIgnoresInactiveQuests(t *testing.T) {
 	now := timeutil.NowUTC()
 	step := watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, journal.RunModeWatch)
 	step.Done = true
-	q, err := st.Journal().CreateQuest(bg(), journal.Quest{
+	q, err := st.Journal.CreateQuest(bg(), journal.Quest{
 		Title: "done-parent", Status: journal.StatusCompleted, Significance: journal.SigCommon,
 		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: []journal.Step{step},
 	})

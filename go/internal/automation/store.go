@@ -20,12 +20,20 @@ type Store struct {
 	DB *sql.DB
 	// Box seals secret values at rest (nil = stored as given, e.g. in tests).
 	Box *secretbox.Box
+
+	// Journal, Knowledge and Identity are the other contexts this one builds on, over the same database.
+	Journal   *journal.Store
+	Knowledge *knowledge.Store
+	Identity  *identity.Store
 }
 
-// Journal, Knowledge and Identity are the other contexts this one builds on, over the same database.
-func (s *Store) Journal() *journal.Store     { return &journal.Store{DB: s.DB} }
-func (s *Store) Knowledge() *knowledge.Store { return &knowledge.Store{DB: s.DB} }
-func (s *Store) Identity() *identity.Store   { return &identity.Store{DB: s.DB} }
+// New builds the store over db together with the contexts it builds on.
+func New(db *sql.DB, box *secretbox.Box) *Store {
+	return &Store{
+		DB: db, Box: box,
+		Journal: &journal.Store{DB: db}, Knowledge: &knowledge.Store{DB: db}, Identity: &identity.Store{DB: db},
+	}
+}
 
 // Errors and helpers shared with the other contexts (platform/apperr, platform/dbx, kernel).
 var (
@@ -50,7 +58,7 @@ type rowScanner = dbx.Scanner
 
 // guardAuthor refuses a command written by someone who is not an owner of the workspace (kernel.CommandAuthor).
 func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
-	return kernel.CommandAuthor(ctx, s.Identity(), command, old)
+	return kernel.CommandAuthor(ctx, s.Identity, command, old)
 }
 
 // guardExec refuses a command that has no runner (kernel.CommandExec).

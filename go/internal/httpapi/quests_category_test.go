@@ -109,7 +109,7 @@ func TestGetQuestResolvesRefs(t *testing.T) {
 	noteID, _ := res.LastInsertId()
 
 	now := timeutil.NowUTC()
-	q, err := s.Store.Journal().CreateQuest(t.Context(), journal.Quest{
+	q, err := s.Store.Journal.CreateQuest(t.Context(), journal.Quest{
 		Title:        "refs test",
 		Description:  fmt.Sprintf("see note=%d", noteID),
 		Status:       journal.StatusActive,

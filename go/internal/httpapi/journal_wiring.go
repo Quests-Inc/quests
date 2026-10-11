@@ -11,7 +11,7 @@ import (
 func (s *Server) journalHTTP() *journalhttp.Handler {
 	s.journalOnce.Do(func() {
 		s.jh = &journalhttp.Handler{
-			Store:       s.Store.Journal(),
+			Store:       s.Store.Journal,
 			Hub:         s.Hub,
 			DataDir:     s.DataDir,
 			ResolveRefs: s.resolveRefs,
@@ -19,7 +19,7 @@ func (s *Server) journalHTTP() *journalhttp.Handler {
 				s.knowledgeHTTP().PurgeOwnerAttachments(ctx, ownerType, ownerID)
 			},
 			Template: func(ctx context.Context, id int64) (journalhttp.TemplateRef, error) {
-				t, err := s.Store.Automation().GetTemplate(ctx, id)
+				t, err := s.Store.Automation.GetTemplate(ctx, id)
 				if err != nil {
 					return journalhttp.TemplateRef{}, err
 				}

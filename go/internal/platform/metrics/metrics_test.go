@@ -27,7 +27,7 @@ func testMetrics(t *testing.T) *Metrics {
 			t.Fatal(err)
 		}
 	}
-	return New(pool, storeStats{&store.Store{DB: pool, DatabaseURL: url}}, events.New(), health.New())
+	return New(pool, storeStats{store.New(pool, url, nil)}, events.New(), health.New())
 }
 
 // storeStats is what the server does in cmd/quests-server: the real store behind the StatsSource port.

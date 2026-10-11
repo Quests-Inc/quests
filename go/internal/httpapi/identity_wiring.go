@@ -13,7 +13,7 @@ func (s *Server) identityHTTP() *identityhttp.Handler {
 	s.identityOnce.Do(func() {
 		auth := s.Auth
 		if auth == nil && s.Store != nil {
-			auth = s.Store.Identity()
+			auth = s.Store.Identity
 		}
 		s.idh = &identityhttp.Handler{
 			Auth:          auth,
@@ -26,7 +26,7 @@ func (s *Server) identityHTTP() *identityhttp.Handler {
 				return ProvisionWorkspace(ctx, s.Store, userID, name, copyFrom)
 			},
 			Usage: func(ctx context.Context) (int64, int64, bool) {
-				used, err := s.Store.Knowledge().AttachmentUsage(ctx)
+				used, err := s.Store.Knowledge.AttachmentUsage(ctx)
 				return used, s.WorkspaceQuota, err == nil
 			},
 		}

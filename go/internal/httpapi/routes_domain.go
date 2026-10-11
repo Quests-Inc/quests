@@ -124,7 +124,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 	case "questline":
 		lineID = &focusID
 	case "quest":
-		qq, err := s.Store.Journal().GetQuest(r.Context(), focusID)
+		qq, err := s.Store.Journal.GetQuest(r.Context(), focusID)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Quest not found")
 			return
@@ -138,7 +138,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 			quests = []journal.Quest{qq}
 		}
 	case "step":
-		qid, err := s.Store.Journal().QuestIDForStep(r.Context(), focusID)
+		qid, err := s.Store.Journal.QuestIDForStep(r.Context(), focusID)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Step not found")
 			return
@@ -147,7 +147,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		qq, err := s.Store.Journal().GetQuest(r.Context(), qid)
+		qq, err := s.Store.Journal.GetQuest(r.Context(), qid)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
@@ -159,13 +159,13 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 	}
 	var line any
 	if lineID != nil {
-		lr, err := s.Store.Journal().GetQuestline(r.Context(), *lineID)
+		lr, err := s.Store.Journal.GetQuestline(r.Context(), *lineID)
 		if err != nil {
 			writeErr(w, 404, "Questline not found")
 			return
 		}
 		line = lr
-		qs, err := s.Store.Journal().ListQuests(r.Context(), journal.ListFilter{
+		qs, err := s.Store.Journal.ListQuests(r.Context(), journal.ListFilter{
 			QuestlineID: lineID,
 			NewestFirst: true,
 		})
@@ -219,7 +219,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64) {
-	n, err := s.Store.Knowledge().GetNote(r.Context(), id)
+	n, err := s.Store.Knowledge.GetNote(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return

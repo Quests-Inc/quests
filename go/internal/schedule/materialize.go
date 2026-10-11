@@ -51,7 +51,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 	if now.IsZero() {
 		now = timeutil.NowUTC()
 	}
-	templates, err := st.Automation().ListEnabledTemplateRows(ctx)
+	templates, err := st.Automation.ListEnabledTemplateRows(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		}
 		key := localNow.Format("2006-01-02")
 
-		if _, exists, err := st.Journal().QuestIDForPeriod(ctx, tmpl.ID, key); err != nil {
+		if _, exists, err := st.Journal.QuestIDForPeriod(ctx, tmpl.ID, key); err != nil {
 			return created, err
 		} else if exists {
 			continue
@@ -211,7 +211,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		q.Source = &source
 
 		// Create without auto quest_created — we emit quest_appeared.
-		createdQ, err := st.Journal().CreateQuestAppeared(ctx, q)
+		createdQ, err := st.Journal.CreateQuestAppeared(ctx, q)
 		if err != nil {
 			return created, err
 		}
@@ -219,10 +219,10 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			return created, err
 		}
 		if surpriseRollID.Valid {
-			st.Automation().MarkEmitRollMaterialized(ctx, surpriseRollID.Int64, now)
+			st.Automation.MarkEmitRollMaterialized(ctx, surpriseRollID.Int64, now)
 		}
 		if usePool && poolRollID != 0 {
-			st.Automation().MarkEmitRollMaterialized(ctx, poolRollID, now)
+			st.Automation.MarkEmitRollMaterialized(ctx, poolRollID, now)
 		}
 		qid := createdQ.ID
 		detail := "Период " + key
@@ -249,7 +249,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 func strPtr(s string) *string { return &s }
 
 func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, rng *rand.Rand) ([]journal.Step, error) {
-	src, err := st.Automation().TemplateStepRows(ctx, tmpl.ID)
+	src, err := st.Automation.TemplateStepRows(ctx, tmpl.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 var ErrTemplateNotFound = errors.New("template not found")
 
 func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRow, error) {
-	t, err := st.Automation().TemplateRowByID(ctx, id)
+	t, err := st.Automation.TemplateRowByID(ctx, id)
 	if errors.Is(err, automation.ErrNotFound) {
 		return templateRow{}, ErrTemplateNotFound
 	}
@@ -420,7 +420,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 	source := fmt.Sprintf("template:%d", tmpl.ID)
 	q.Source = &source
 
-	createdQ, err := st.Journal().CreateQuestAppeared(ctx, q)
+	createdQ, err := st.Journal.CreateQuestAppeared(ctx, q)
 	if err != nil {
 		return 0, err
 	}
@@ -428,7 +428,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		return 0, err
 	}
 	if usePool && poolRollID != 0 {
-		st.Automation().MarkEmitRollMaterialized(ctx, poolRollID, now)
+		st.Automation.MarkEmitRollMaterialized(ctx, poolRollID, now)
 	}
 	qid := createdQ.ID
 	if hub != nil {

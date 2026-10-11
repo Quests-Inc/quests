@@ -31,13 +31,13 @@ func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, peri
 	key := "emit:" + poolJobKey(tmpl.ID, periodKey, command)
 	info.Status = "error"
 
-	job, found, lerr := st.Automation().LatestJobByKey(ctx, key)
+	job, found, lerr := st.Automation.LatestJobByKey(ctx, key)
 	if lerr != nil {
 		return emitOutput{}, info, lerr, true
 	}
 	if !found {
 		tid := tmpl.ID
-		if _, _, qerr := st.Automation().EnqueueJob(ctx, automation.JobSpec{
+		if _, _, qerr := st.Automation.EnqueueJob(ctx, automation.JobSpec{
 			RunnerLabel:    label,
 			Kind:           automation.JobKindEmitPool,
 			TemplateID:     &tid,
@@ -60,7 +60,7 @@ func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, peri
 	}
 
 	// A result (or a vanished device): take it, once.
-	if derr := st.Automation().DeleteRunnerJob(ctx, job.ID); derr != nil {
+	if derr := st.Automation.DeleteRunnerJob(ctx, job.ID); derr != nil {
 		log.Printf("emit remote: delete job %d: %v", job.ID, derr)
 	}
 	if job.StartedAt != nil && job.FinishedAt != nil {

@@ -13,7 +13,7 @@ import (
 // ProvisionWorkspace creates a workspace and, when copyFrom > 0, gives it that workspace's category set so the
 // new space is usable at once.
 func ProvisionWorkspace(ctx context.Context, st *store.Store, userID int64, name string, copyFrom int64) (identity.Workspace, error) {
-	ws, err := st.Identity().CreateWorkspace(ctx, userID, name)
+	ws, err := st.Identity.CreateWorkspace(ctx, userID, name)
 	if err != nil {
 		return identity.Workspace{}, err
 	}
@@ -27,7 +27,7 @@ func ProvisionWorkspace(ctx context.Context, st *store.Store, userID int64, name
 
 // EnsureUserWorkspace gives a user without any workspace one; a brand-new personal workspace gets the default categories.
 func EnsureUserWorkspace(ctx context.Context, st *store.Store, userID int64, username string) (identity.Workspace, error) {
-	ws, fresh, err := st.Identity().EnsureUserWorkspace(ctx, userID, username)
+	ws, fresh, err := st.Identity.EnsureUserWorkspace(ctx, userID, username)
 	if err != nil || !fresh {
 		return ws, err
 	}

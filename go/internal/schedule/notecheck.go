@@ -91,7 +91,7 @@ func noteKey(id int64) int64 { return -id }
 // TickNotes starts the checks of the notes that are due, in the context's workspace.
 func (r *CheckRunner) TickNotes(ctx context.Context) {
 	now := timeutil.NowUTC()
-	due, err := r.Store.Knowledge().DueNoteChecks(ctx, now)
+	due, err := r.Store.Knowledge.DueNoteChecks(ctx, now)
 	if err != nil {
 		log.Printf("checks: list note checks: %v", err)
 		return
@@ -110,7 +110,7 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now ti
 	if !r.tryLock(noteKey(d.ID)) {
 		return
 	}
-	if err := r.Store.Knowledge().MarkNoteCheckStarted(ctx, d.ID, now); err != nil {
+	if err := r.Store.Knowledge.MarkNoteCheckStarted(ctx, d.ID, now); err != nil {
 		r.unlock(noteKey(d.ID))
 		log.Printf("checks: mark note %d: %v", d.ID, err)
 		return
@@ -121,7 +121,7 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now ti
 
 func (r *CheckRunner) dispatchNote(ctx context.Context, d knowledge.DueNote) {
 	nid := d.ID
-	_, _, err := r.Store.Automation().EnqueueJob(ctx, automation.JobSpec{
+	_, _, err := r.Store.Automation.EnqueueJob(ctx, automation.JobSpec{
 		RunnerLabel:    *d.RunOn,
 		Kind:           automation.JobKindPoll,
 		NoteID:         &nid,
@@ -138,7 +138,7 @@ func (r *CheckRunner) dispatchNote(ctx context.Context, d knowledge.DueNote) {
 
 // applyNote turns a finished run into a verdict, or into an error that changes nothing else.
 func (r *CheckRunner) applyNote(ctx context.Context, noteID int64, exit int, stdout, stderr string, timedOut bool) {
-	n, err := r.Store.Knowledge().GetNote(ctx, noteID)
+	n, err := r.Store.Knowledge.GetNote(ctx, noteID)
 	if err != nil {
 		return // deleted meanwhile
 	}
@@ -159,7 +159,7 @@ func (r *CheckRunner) applyNote(ctx context.Context, noteID int64, exit int, std
 		r.noteError(ctx, n.ID, n.Title, perr.Error())
 		return
 	}
-	changed, err := r.Store.Knowledge().ApplyNoteCheckResult(ctx, n.ID, res, timeutil.NowUTC())
+	changed, err := r.Store.Knowledge.ApplyNoteCheckResult(ctx, n.ID, res, timeutil.NowUTC())
 	if err != nil {
 		log.Printf("checks: note %d verdict: %v", n.ID, err)
 		return
@@ -179,8 +179,8 @@ func (r *CheckRunner) applyNote(ctx context.Context, noteID int64, exit int, std
 
 // noteError records a broken run; the log gets a line only when the message is new.
 func (r *CheckRunner) noteError(ctx context.Context, id int64, title, msg string) {
-	prev, _ := r.Store.Knowledge().GetNoteCheck(ctx, id)
-	if err := r.Store.Knowledge().RecordNoteCheckError(ctx, id, msg, timeutil.NowUTC()); err != nil {
+	prev, _ := r.Store.Knowledge.GetNoteCheck(ctx, id)
+	if err := r.Store.Knowledge.RecordNoteCheckError(ctx, id, msg, timeutil.NowUTC()); err != nil {
 		log.Printf("checks: note %d error: %v", id, err)
 		return
 	}
@@ -190,7 +190,7 @@ func (r *CheckRunner) noteError(ctx context.Context, id int64, title, msg string
 }
 
 func (r *CheckRunner) noteChanged(ctx context.Context, id int64, title, detail string) {
-	_ = r.Store.Journal().LogEvent(context.WithoutCancel(ctx), journal.ChangeEvent{
+	_ = r.Store.Journal.LogEvent(context.WithoutCancel(ctx), journal.ChangeEvent{
 		Kind: "note_updated", EntityType: "note", EntityID: id, Title: title, Detail: detail,
 	})
 	if r.Hub == nil {
@@ -221,7 +221,7 @@ func (r *CheckRunner) noteJobFinished(ctx context.Context, j automation.RunnerJo
 }
 
 func (r *CheckRunner) noteJobError(ctx context.Context, j automation.RunnerJob, msg string) {
-	if n, err := r.Store.Knowledge().GetNote(ctx, *j.NoteID); err == nil {
+	if n, err := r.Store.Knowledge.GetNote(ctx, *j.NoteID); err == nil {
 		r.noteError(ctx, n.ID, n.Title, msg)
 	}
 }

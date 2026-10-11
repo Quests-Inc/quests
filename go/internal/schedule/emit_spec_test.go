@@ -70,7 +70,7 @@ INSERT INTO tag (id, slug, label, created_at) VALUES (1, 'infra', 'infra', now()
 		t.Fatal(err)
 	}
 	pgtest.FixSequences(t, url)
-	return &store.Store{DB: pool, DatabaseURL: url}
+	return store.New(pool, url, nil)
 }
 
 func resolveJSON(t *testing.T, st *store.Store, js string, lim automation.EmitLimits) (*resolvedSpec, error) {
@@ -165,7 +165,7 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 	if err != nil || len(ids) != 1 {
 		t.Fatalf("created %v, err %v", ids, err)
 	}
-	q, err := st.Journal().GetQuest(bg(), ids[0])
+	q, err := st.Journal.GetQuest(bg(), ids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestMaterializeDueQuestlineCategoryWins(t *testing.T) {
 			if err != nil || len(ids) != 1 {
 				t.Fatalf("created %v, err %v", ids, err)
 			}
-			q, err := st.Journal().GetQuest(bg(), ids[0])
+			q, err := st.Journal.GetQuest(bg(), ids[0])
 			if err != nil {
 				t.Fatal(err)
 			}

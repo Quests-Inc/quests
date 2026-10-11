@@ -14,7 +14,7 @@ import (
 )
 
 func ensureSurpriseRoll(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string, localNow time.Time, rng *rand.Rand) (int64, string, *time.Time, error) {
-	roll, found, err := st.Automation().EmitRollFor(ctx, tmpl.ID, periodKey)
+	roll, found, err := st.Automation.EmitRollFor(ctx, tmpl.ID, periodKey)
 	if err != nil {
 		return 0, "", nil, err
 	}
@@ -37,7 +37,7 @@ func ensureSurpriseRoll(ctx context.Context, st *store.Store, tmpl templateRow, 
 	}
 	now := timeutil.NowUTC()
 	if rng.Float64() >= chance {
-		id, err := st.Automation().InsertEmitRoll(ctx, tmpl.ID, periodKey, "miss", 0, nil, nil, "", now)
+		id, err := st.Automation.InsertEmitRoll(ctx, tmpl.ID, periodKey, "miss", 0, nil, nil, "", now)
 		if err != nil {
 			return 0, "", nil, err
 		}
@@ -53,7 +53,7 @@ func ensureSurpriseRoll(ctx context.Context, st *store.Store, tmpl templateRow, 
 	}
 	scheduledLocal := pickScheduledAt(localNow, startRaw, endRaw, rng)
 	schedUTC := scheduledLocal.UTC()
-	id, err := st.Automation().InsertEmitRoll(ctx, tmpl.ID, periodKey, "scheduled", 0, &schedUTC, nil, "", now)
+	id, err := st.Automation.InsertEmitRoll(ctx, tmpl.ID, periodKey, "scheduled", 0, &schedUTC, nil, "", now)
 	if err != nil {
 		return 0, "", nil, err
 	}
@@ -109,7 +109,7 @@ type poolOpts struct {
 // validates the quest it printed against the template's limits and persists the
 // outcome in templateemitroll so repeated ticks don't re-run or re-create.
 func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string, now time.Time, opts poolOpts) (emitResult, error) {
-	roll, found, qerr := st.Automation().EmitRollFor(ctx, tmpl.ID, periodKey)
+	roll, found, qerr := st.Automation.EmitRollFor(ctx, tmpl.ID, periodKey)
 	if qerr != nil {
 		return emitResult{}, qerr
 	}
@@ -148,7 +148,7 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 	}
 	// Logging never fails the roll: it's diagnostics, not state.
 	record := func() {
-		if rerr := st.Automation().RecordEmitAttempt(ctx, rec); rerr != nil {
+		if rerr := st.Automation.RecordEmitAttempt(ctx, rec); rerr != nil {
 			log.Printf("emit attempt log (template %d): %v", tmpl.ID, rerr)
 		}
 	}
@@ -189,10 +189,10 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 		record()
 		if isNew {
 			var err error
-			if id, err = st.Automation().InsertEmitRoll(ctx, tmpl.ID, periodKey, newOutcome, attempts, nil, nextRetry, "", now); err != nil {
+			if id, err = st.Automation.InsertEmitRoll(ctx, tmpl.ID, periodKey, newOutcome, attempts, nil, nextRetry, "", now); err != nil {
 				return emitResult{}, err
 			}
-		} else if err := st.Automation().UpdateEmitRollAttempt(ctx, id, newOutcome, attempts, nextRetry, now); err != nil {
+		} else if err := st.Automation.UpdateEmitRollAttempt(ctx, id, newOutcome, attempts, nextRetry, now); err != nil {
 			return emitResult{}, err
 		}
 		if newOutcome == "error" {
@@ -239,9 +239,9 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 // isNew branching themselves.
 func persistEmitPoolOutcome(ctx context.Context, st *store.Store, id int64, isNew bool, templateID int64, periodKey, outcome string, attempts int, pickedRefsJSON string, now time.Time) (int64, error) {
 	if isNew {
-		return st.Automation().InsertEmitRoll(ctx, templateID, periodKey, outcome, attempts, nil, nil, pickedRefsJSON, now)
+		return st.Automation.InsertEmitRoll(ctx, templateID, periodKey, outcome, attempts, nil, nil, pickedRefsJSON, now)
 	}
-	return id, st.Automation().UpdateEmitRollPicked(ctx, id, outcome, pickedRefsJSON, now)
+	return id, st.Automation.UpdateEmitRollPicked(ctx, id, outcome, pickedRefsJSON, now)
 }
 
 // execInfo is what one emit_pool_command run leaves behind for the attempt

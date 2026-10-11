@@ -30,7 +30,7 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 		}
 		if strings.HasPrefix(path, "/api/runner/") {
 			// Runners authenticate with their own token; it names the workspace.
-			id, err := s.Store.Automation().RunnerWorkspaceByToken(r.Context(), bearerToken(r))
+			id, err := s.Store.Automation.RunnerWorkspaceByToken(r.Context(), bearerToken(r))
 			if err != nil {
 				writeErr(w, http.StatusUnauthorized, "invalid runner token")
 				return

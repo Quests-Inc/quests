@@ -11,7 +11,7 @@ import (
 
 func attemptsFor(t *testing.T, st *store.Store, templateID int64) []map[string]any {
 	t.Helper()
-	rows, err := st.Automation().ListEmitAttempts(bg(), templateID, 50)
+	rows, err := st.Automation.ListEmitAttempts(bg(), templateID, 50)
 	if err != nil {
 		t.Fatalf("ListEmitAttempts: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestEmitAttemptLogIsTrimmed(t *testing.T) {
 		// distinct period keys, each a fresh roll
 		_, _, _, _ = resolveEmitPool(t, ctx, st, tmpl, "p"+time.Duration(i).String(), time.Now(), rand.New(rand.NewSource(1)))
 	}
-	rows, err := st.Automation().ListEmitAttempts(ctx, 12, 1000)
+	rows, err := st.Automation.ListEmitAttempts(ctx, 12, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

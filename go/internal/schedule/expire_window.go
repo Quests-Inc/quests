@@ -33,7 +33,7 @@ func deadlineSetWithOpenWindow(q journal.Quest) bool {
 // ExpireOverdue marks active quests past deadline as expired and publishes events.
 func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int64, error) {
 	now := timeutil.NowUTC()
-	ids, err := st.Journal().ActiveQuestIDsPastDeadline(ctx, now)
+	ids, err := st.Journal.ActiveQuestIDsPastDeadline(ctx, now)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int
 
 	expired := make([]int64, 0, len(ids))
 	for _, id := range ids {
-		q, err := st.Journal().GetQuest(ctx, id)
+		q, err := st.Journal.GetQuest(ctx, id)
 		if err != nil {
 			continue
 		}
@@ -52,7 +52,7 @@ func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int
 		}
 		q.Status = journal.StatusExpired
 		q.UpdatedAt = now
-		updated, err := st.Journal().UpdateQuest(ctx, q, "quest_expired", "просрочено")
+		updated, err := st.Journal.UpdateQuest(ctx, q, "quest_expired", "просрочено")
 		if err != nil {
 			return expired, err
 		}
@@ -91,7 +91,7 @@ func NewWindowNotifier() *WindowNotifier {
 }
 
 func (w *WindowNotifier) Notify(ctx context.Context, st *store.Store, hub *events.Hub) ([]int64, error) {
-	quests, err := st.Journal().ListQuests(ctx, journal.ListFilter{})
+	quests, err := st.Journal.ListQuests(ctx, journal.ListFilter{})
 	if err != nil {
 		return nil, err
 	}

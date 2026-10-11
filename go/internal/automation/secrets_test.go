@@ -23,7 +23,7 @@ func openSecretsDB(t *testing.T) *Store {
 	t.Helper()
 	pool := pgtest.New(t)
 	pgtest.Seed(t, pool, secretsTestSeed)
-	return &Store{DB: pool}
+	return New(pool, nil)
 }
 
 var (
@@ -218,7 +218,7 @@ func TestSecretsAreSealedAtRest(t *testing.T) {
 
 	// Sealed under another key: left out, never handed over as ciphertext.
 	other, _ := secretbox.Load(t.TempDir())
-	st2 := &Store{DB: st.DB, Box: other}
+	st2 := New(st.DB, other)
 	if got, _ := st2.ResolveSecrets(ctx, oQuest); len(got) != 0 {
 		t.Fatalf("values readable under the wrong key: %v", got)
 	}

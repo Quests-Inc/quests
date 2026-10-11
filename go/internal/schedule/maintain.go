@@ -31,7 +31,7 @@ func RunMaintenanceLoop(ctx context.Context, st *store.Store, hub *events.Hub, w
 		return
 	}
 	if checks != nil {
-		_ = st.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) { checks.FailStaleRunning(wctx) })
+		_ = st.Identity.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) { checks.FailStaleRunning(wctx) })
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ticker := time.NewTicker(PollInterval)
@@ -49,7 +49,7 @@ func RunMaintenanceLoop(ctx context.Context, st *store.Store, hub *events.Hub, w
 // runOnce does one maintenance pass over every workspace, each under its own
 // workspace context so row-level security scopes what the pass can see.
 func runOnce(ctx context.Context, st *store.Store, hub *events.Hub, windows *WindowNotifier, rng *rand.Rand, checks *CheckRunner) {
-	if err := st.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+	if err := st.Identity.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
 		runOnceIn(wctx, st, hub, windows, rng, checks)
 	}); err != nil {
 		log.Printf("maintenance: workspaces: %v", err)

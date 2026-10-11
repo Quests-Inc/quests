@@ -17,24 +17,24 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 		row := refs.Resolved{Kind: ref.Kind, ID: ref.ID}
 		switch ref.Kind {
 		case "note":
-			n, err := s.Store.Knowledge().GetNote(r.Context(), ref.ID)
+			n, err := s.Store.Knowledge.GetNote(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &n.Title
 			}
 		case "quest":
-			q, err := s.Store.Journal().GetQuest(r.Context(), ref.ID)
+			q, err := s.Store.Journal.GetQuest(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &q.Title
 			}
 		case "questline":
-			ql, err := s.Store.Journal().GetQuestline(r.Context(), ref.ID)
+			ql, err := s.Store.Journal.GetQuestline(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &ql.Title
 			}
 		case "step":
-			qid, err := s.Store.Journal().QuestIDForStep(r.Context(), ref.ID)
+			qid, err := s.Store.Journal.QuestIDForStep(r.Context(), ref.ID)
 			if err == nil {
-				q, err := s.Store.Journal().GetQuest(r.Context(), qid)
+				q, err := s.Store.Journal.GetQuest(r.Context(), qid)
 				if err == nil {
 					for _, st := range q.Steps {
 						if st.ID == ref.ID {
@@ -46,12 +46,12 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 				}
 			}
 		case "template":
-			t, err := s.Store.Automation().GetTemplate(r.Context(), ref.ID)
+			t, err := s.Store.Automation.GetTemplate(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &t.Title
 			}
 		case "attachment":
-			a, err := s.Store.Knowledge().GetAttachment(r.Context(), ref.ID)
+			a, err := s.Store.Knowledge.GetAttachment(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &a.Filename
 				row.OwnerType = a.OwnerType

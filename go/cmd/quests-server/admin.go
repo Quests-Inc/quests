@@ -97,7 +97,7 @@ func runAdmin(args []string) bool {
 	}
 
 	if args[0] == "runner" {
-		runRunnerCmd(&store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL}, args[1:])
+		runRunnerCmd(store.New(sqlDB, cfg.DatabaseURL, nil), args[1:])
 		return true
 	}
 
@@ -106,7 +106,7 @@ func runAdmin(args []string) bool {
 		fatal("secrets: %v", berr)
 	}
 	st := &identity.Store{DB: sqlDB, Box: box}
-	wst := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL, Box: box}
+	wst := store.New(sqlDB, cfg.DatabaseURL, box)
 
 	switch args[0] {
 	case "useradd":
@@ -158,7 +158,7 @@ func runAdmin(args []string) bool {
 			fmt.Printf("%d\t%s\t%s\n", u.ID, u.Username, state)
 		}
 	case "secrets-check":
-		counts, err := wst.Automation().SealedHealth(context.Background())
+		counts, err := wst.Automation.SealedHealth(context.Background())
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -190,7 +190,7 @@ func runAdmin(args []string) bool {
 }
 
 func runBackups(sqlDB *sql.DB, url string) {
-	st := &store.Store{DB: sqlDB, DatabaseURL: url}
+	st := store.New(sqlDB, url, nil)
 	rows, err := st.ListBackupLogs(context.Background())
 	if err != nil {
 		fatal("backups: %v", err)
@@ -219,7 +219,7 @@ func runBackups(sqlDB *sql.DB, url string) {
 }
 
 func runBackupNow(cfg config.Config, sqlDB *sql.DB) {
-	st := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL}
+	st := store.New(sqlDB, cfg.DatabaseURL, nil)
 	wd := webdav.New(cfg.WebDAVURL, cfg.WebDAVUser, cfg.WebDAVPass)
 	remote := schedule.NewSFTPRemote(schedule.BackupRemote{
 		Host: cfg.BackupRemoteHost,
@@ -389,14 +389,14 @@ func runRunnerCmd(st *store.Store, args []string) {
 		if len(args) < 2 {
 			fatal("usage: quests-server runner add <label>")
 		}
-		token, err := st.Automation().CreateRunner(ctx, args[1])
+		token, err := st.Automation.CreateRunner(ctx, args[1])
 		if err != nil {
 			fatal("%v", err)
 		}
 		fmt.Printf("runner %q created. One-time registration token (valid %d h):\n\n  %s\n\n", args[1], int(automation.RegistrationTTL.Hours()), token)
 		fmt.Println("On the device:  quests-runner register --server https://… --token <the token above>")
 	case "ls":
-		runners, err := st.Automation().ListRunners(ctx)
+		runners, err := st.Automation.ListRunners(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -425,7 +425,7 @@ func runRunnerCmd(st *store.Store, args []string) {
 		if len(args) < 2 {
 			fatal("usage: quests-server runner rm <label>")
 		}
-		if err := st.Automation().RevokeRunner(ctx, args[1]); err != nil {
+		if err := st.Automation.RevokeRunner(ctx, args[1]); err != nil {
 			fatal("%v", err)
 		}
 		fmt.Printf("runner %q revoked\n", args[1])
@@ -461,7 +461,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 		members := map[int64][]string{}
 		seen := map[int64]identity.Workspace{}
 		for _, u := range users {
-			ws, err := wst.Identity().UserWorkspaces(ctx, u.ID)
+			ws, err := wst.Identity.UserWorkspaces(ctx, u.ID)
 			if err != nil {
 				fatal("%v", err)
 			}
@@ -472,11 +472,11 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 				members[w.ID] = append(members[w.ID], u.Username)
 			}
 		}
-		ids, err := wst.Identity().WorkspaceIDs(ctx)
+		ids, err := wst.Identity.WorkspaceIDs(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
-		all, err := wst.Identity().AllWorkspaces(ctx)
+		all, err := wst.Identity.AllWorkspaces(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -487,7 +487,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 		for _, id := range ids {
 			fmt.Printf("%d\t%s\tmembers: %s\n", id, allByID[id].Name, strings.Join(members[id], ", "))
 		}
-		dels, err := wst.Identity().DeletedWorkspaces(ctx)
+		dels, err := wst.Identity.DeletedWorkspaces(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -512,7 +512,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 		if err != nil {
 			fatal("workspace id must be a number")
 		}
-		if err := wst.Identity().RestoreWorkspace(ctx, id); err != nil {
+		if err := wst.Identity.RestoreWorkspace(ctx, id); err != nil {
 			fatal("%v (already purged, or not deleted?)", err)
 		}
 		fmt.Printf("workspace %d restored\n", id)
@@ -532,7 +532,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 			fatal("role must be owner or member, got %q", role)
 		}
 		u := userByName(args[2])
-		was, err := wst.Identity().MemberRole(ctx, id, u.ID)
+		was, err := wst.Identity.MemberRole(ctx, id, u.ID)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -540,7 +540,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 			fmt.Printf("%s is already %s of workspace %d\n", u.Username, role, id)
 			return
 		}
-		if err := wst.Identity().AddWorkspaceMember(ctx, id, u.ID, role); err != nil {
+		if err := wst.Identity.AddWorkspaceMember(ctx, id, u.ID, role); err != nil {
 			fatal("%v", err)
 		}
 		if was == "" {

@@ -145,5 +145,5 @@ func (s *Store) SetAttachmentOwner(ctx context.Context, id int64, ownerType stri
 	if n, _ := res.RowsAffected(); n == 0 {
 		return knowledge.Attachment{}, ErrNotFound
 	}
-	return s.Knowledge().GetAttachment(ctx, id)
+	return s.Knowledge.GetAttachment(ctx, id)
 }

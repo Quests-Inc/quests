@@ -136,7 +136,7 @@ func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRea
 	for i := range out {
 		ids[i] = out[i].ID
 	}
-	tagMap, err := s.Journal().TagsForTemplates(ctx, ids)
+	tagMap, err := s.Journal.TagsForTemplates(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 			tr.EmitPoolLastOutcome = &outcome
 		}
 	}
-	tagMap, err := s.Journal().TagsForTemplates(ctx, []int64{id})
+	tagMap, err := s.Journal.TagsForTemplates(ctx, []int64{id})
 	if err != nil {
 		return TemplateRead{}, err
 	}
@@ -417,7 +417,7 @@ func (s *Store) applyTemplateTagIDs(ctx context.Context, templateID int64, body 
 	if !ok {
 		return nil
 	}
-	return s.Journal().SetTemplateTags(ctx, templateID, ids)
+	return s.Journal.SetTemplateTags(ctx, templateID, ids)
 }
 
 // guardTemplateSteps checks the commands of a template's incoming steps; tid is the

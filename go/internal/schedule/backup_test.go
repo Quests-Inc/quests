@@ -112,7 +112,7 @@ func openBackupDB(t *testing.T) *store.Store {
 	}
 	t.Cleanup(func() { dumpDatabase = orig })
 	pool, url := pgtest.NewWithURL(t)
-	return &store.Store{DB: pool, DatabaseURL: url}
+	return store.New(pool, url, nil)
 }
 
 func TestRunBackupOnceSnapshotsAndRecords(t *testing.T) {

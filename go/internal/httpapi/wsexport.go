@@ -74,7 +74,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	// Export reads under the workspace being exported, not whichever the session is in.
 	ctx := wsctx.With(r.Context(), id)
-	name, err := s.Store.Identity().WorkspaceName(ctx, id)
+	name, err := s.Store.Identity.WorkspaceName(ctx, id)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "workspace not found")
 		return
@@ -250,7 +250,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		name += " (импорт)"
 	}
 	// Create the workspace, import into it; if anything fails the new workspace is dropped again.
-	ws, err := s.Store.Identity().CreateWorkspace(r.Context(), p.User.ID, name)
+	ws, err := s.Store.Identity.CreateWorkspace(r.Context(), p.User.ID, name)
 	if errors.Is(err, identity.ErrWorkspaceLimit) {
 		writeErr(w, http.StatusConflict, err.Error())
 		return
@@ -266,7 +266,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		for _, path := range uploaded {
 			_ = s.WebDAV.Delete(context.WithoutCancel(ctx), path)
 		}
-		_ = s.Store.Identity().AbortWorkspace(context.WithoutCancel(r.Context()), ws.ID)
+		_ = s.Store.Identity.AbortWorkspace(context.WithoutCancel(r.Context()), ws.ID)
 		writeErr(w, status, msg)
 	}
 
@@ -411,9 +411,9 @@ func (s *Server) importIcons(ctx context.Context, entries map[string]*zip.File, 
 			continue
 		}
 		if table == "questline" {
-			_, _ = s.Store.Journal().SetQuestlineIcon(ctx, newID, fname)
+			_, _ = s.Store.Journal.SetQuestlineIcon(ctx, newID, fname)
 		} else {
-			_, _ = s.Store.Knowledge().SetNoteIcon(ctx, newID, fname)
+			_, _ = s.Store.Knowledge.SetNoteIcon(ctx, newID, fname)
 		}
 	}
 }

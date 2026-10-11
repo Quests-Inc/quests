@@ -16,7 +16,7 @@ func TestListEmitAttemptsEndpoint(t *testing.T) {
 	h := s.Handler()
 	pgtest.Seed(t, s.Store.DB, `INSERT INTO questtemplate (id, title, created_at, updated_at) VALUES (7, 't', now(), now())`)
 	for i, status := range []string{"error", "ok"} {
-		if err := s.Store.Automation().RecordEmitAttempt(t.Context(), automation.EmitAttempt{
+		if err := s.Store.Automation.RecordEmitAttempt(t.Context(), automation.EmitAttempt{
 			TemplateID: 7, PeriodKey: "2026-10-02", At: time.Now(), Attempt: i + 1,
 			Status: status, Items: i, PickedRefs: []string{"mail:1"}, Message: "m",
 		}); err != nil {

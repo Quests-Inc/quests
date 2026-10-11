@@ -149,7 +149,7 @@ func (s *Server) postAttachmentOwner(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "owner not found")
 		return
 	}
-	before, err := s.Store.Knowledge().GetAttachment(r.Context(), id)
+	before, err := s.Store.Knowledge.GetAttachment(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "attachment not found")
 		return
@@ -193,7 +193,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 422, "шаг уже в этом квесте")
 		return
 	}
-	from, err := s.Store.Journal().GetQuest(r.Context(), fromID)
+	from, err := s.Store.Journal.GetQuest(r.Context(), fromID)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Quest not found")
 		return
@@ -202,7 +202,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	to, err := s.Store.Journal().GetQuest(r.Context(), in.QuestID)
+	to, err := s.Store.Journal.GetQuest(r.Context(), in.QuestID)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Target quest not found")
 		return
@@ -241,7 +241,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 	journal.SyncStatusFromSteps(&from, now)
 	journal.SyncStatusFromSteps(&to, now)
 	from.UpdatedAt, to.UpdatedAt = now, now
-	if err := s.Store.Journal().MoveStep(r.Context(), stepID, from, to, order); err != nil {
+	if err := s.Store.Journal.MoveStep(r.Context(), stepID, from, to, order); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Step not found")
 			return
@@ -256,8 +256,8 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 			QuestID:   &id, Title: q.Title, Detail: "перенос шага", Source: "web", Significance: string(q.Significance),
 		})
 	}
-	nf, _ := s.Store.Journal().GetQuest(r.Context(), fromID)
-	nt, _ := s.Store.Journal().GetQuest(r.Context(), in.QuestID)
+	nf, _ := s.Store.Journal.GetQuest(r.Context(), fromID)
+	nt, _ := s.Store.Journal.GetQuest(r.Context(), in.QuestID)
 	writeJSON(w, 200, map[string]any{
 		"from": journal.ToQuestRead(nf, timeutil.NowUTC()),
 		"to":   journal.ToQuestRead(nt, timeutil.NowUTC()),

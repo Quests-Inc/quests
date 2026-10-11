@@ -122,7 +122,7 @@ func (h *Handler) emitTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	q, err := h.Store.Journal().GetQuest(r.Context(), qid)
+	q, err := h.Store.Journal.GetQuest(r.Context(), qid)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

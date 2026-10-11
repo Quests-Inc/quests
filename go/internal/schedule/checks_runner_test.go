@@ -37,11 +37,11 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 
 	r.Tick(ctx)
 	r.Wait()
-	jobs, _ := st.Automation().ListRunnerJobs(ctx, automation.JobFilter{Label: "home"})
+	jobs, _ := st.Automation.ListRunnerJobs(ctx, automation.JobFilter{Label: "home"})
 	if len(jobs) != 1 || jobs[0].State != automation.JobQueued || jobs[0].Command != "echo 3" {
 		t.Fatalf("jobs after the first tick: %+v", jobs)
 	}
-	got, _ := st.Journal().GetQuest(ctx, q.ID)
+	got, _ := st.Journal.GetQuest(ctx, q.ID)
 	if got.Steps[0].ProgressCurrent != 0 {
 		t.Fatalf("nothing ran here, progress=%d", got.Steps[0].ProgressCurrent)
 	}
@@ -52,21 +52,21 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 	}
 	r.Tick(ctx)
 	r.Wait()
-	if jobs, _ = st.Automation().ListRunnerJobs(ctx, automation.JobFilter{Label: "home"}); len(jobs) != 1 {
+	if jobs, _ = st.Automation.ListRunnerJobs(ctx, automation.JobFilter{Label: "home"}); len(jobs) != 1 {
 		t.Fatalf("jobs piled up while offline: %d", len(jobs))
 	}
 
 	// The runner comes back, runs it, and the result lands on the step.
-	job, err := st.Automation().ClaimJob(ctx, "home", time.Minute)
+	job, err := st.Automation.ClaimJob(ctx, "home", time.Minute)
 	if err != nil || job == nil {
 		t.Fatalf("claim: %v %v", job, err)
 	}
-	done, _, err := st.Automation().CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: 0, Stdout: "3\n"})
+	done, _, err := st.Automation.CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: 0, Stdout: "3\n"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r.JobFinished(ctx, done)
-	got, _ = st.Journal().GetQuest(ctx, q.ID)
+	got, _ = st.Journal.GetQuest(ctx, q.ID)
 	if got.Steps[0].ProgressCurrent != 3 {
 		t.Fatalf("progress=%d want 3", got.Steps[0].ProgressCurrent)
 	}
@@ -83,7 +83,7 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 	r.Tick(ctx)
 	r.Wait()
 
-	got, _ := st.Journal().GetQuest(ctx, q.ID)
+	got, _ := st.Journal.GetQuest(ctx, q.ID)
 	if got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != journal.RunRunning {
 		t.Fatalf("run_status=%v, want running (queued for the device)", got.Steps[0].RunStatus)
 	}
@@ -92,7 +92,7 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
-	got, _ = st.Journal().GetQuest(ctx, q.ID)
+	got, _ = st.Journal.GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusActive {
 		t.Fatalf("quest status=%s: an unreachable device must not fail it", got.Status)
 	}
@@ -112,7 +112,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 	r.Tick(ctx)
 	r.Wait()
 
-	job, _ := st.Automation().ClaimJob(ctx, "laptop", time.Minute)
+	job, _ := st.Automation.ClaimJob(ctx, "laptop", time.Minute)
 	if job == nil {
 		t.Fatal("no job")
 	}
@@ -121,7 +121,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
-	got, _ := st.Journal().GetQuest(ctx, q.ID)
+	got, _ := st.Journal.GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusActive {
 		t.Fatalf("lost lease alone must not fail the quest, status=%s", got.Status)
 	}
@@ -129,7 +129,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
-	got, _ = st.Journal().GetQuest(ctx, q.ID)
+	got, _ = st.Journal.GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusFailed {
 		t.Fatalf("status=%s want failed (result unknown, not re-run)", got.Status)
 	}
@@ -143,7 +143,7 @@ func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 	step.RunStatus = &running
 	q := seedQuest(t, st, []journal.Step{step})
 	NewCheckRunner(st, events.New()).FailStaleRunning(ctx)
-	got, _ := st.Journal().GetQuest(ctx, q.ID)
+	got, _ := st.Journal.GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusActive {
 		t.Fatalf("a job on a device outlives the server restart, status=%s", got.Status)
 	}
@@ -162,16 +162,16 @@ func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(ctx)
 	r.Wait()
-	if job, _ := st.Automation().ClaimJob(ctx, "home", time.Minute); job == nil {
+	if job, _ := st.Automation.ClaimJob(ctx, "home", time.Minute); job == nil {
 		t.Fatal("no running job")
 	}
 
-	if err := st.Journal().DeleteQuest(ctx, q.ID, q.Title); err != nil {
+	if err := st.Journal.DeleteQuest(ctx, q.ID, q.Title); err != nil {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
 
-	jobs, _ := st.Automation().ListRunnerJobs(ctx, automation.JobFilter{})
+	jobs, _ := st.Automation.ListRunnerJobs(ctx, automation.JobFilter{})
 	if len(jobs) != 2 {
 		t.Fatalf("jobs: %+v", jobs)
 	}

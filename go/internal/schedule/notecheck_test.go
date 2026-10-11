@@ -56,7 +56,7 @@ INSERT INTO note (id, title, workspace_id, created_at, updated_at) VALUES (2, 'e
 	pgtest.FixSequences(t, url)
 	t.Setenv("QUESTS_SECRET_KEY", "")
 	box, _ := secretbox.Load(t.TempDir())
-	st := &store.Store{DB: pool, DatabaseURL: url, Box: box}
+	st := store.New(pool, url, box)
 	r := NewCheckRunner(st, events.New())
 	return r, wsctx.With(context.Background(), 1)
 }
@@ -65,12 +65,12 @@ INSERT INTO note (id, title, workspace_id, created_at, updated_at) VALUES (2, 'e
 func runNoteCheck(t *testing.T, r *CheckRunner, ctx context.Context, cmd string) knowledge.NoteCheck {
 	t.Helper()
 	c, label := cmd, testLabel
-	if _, err := r.Store.Knowledge().SetNoteCheck(ctx, 1, &c, nil, &label); err != nil {
+	if _, err := r.Store.Knowledge.SetNoteCheck(ctx, 1, &c, nil, &label); err != nil {
 		t.Fatalf("set check: %v", err)
 	}
 	r.TickNotes(ctx)
 	settle(t, r.Store, r)
-	got, err := r.Store.Knowledge().GetNoteCheck(ctx, 1)
+	got, err := r.Store.Knowledge.GetNoteCheck(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,17 +110,17 @@ func TestNoteCheckHonoursIntervalAndRunNow(t *testing.T) {
 	r, ctx := noteCheckRig(t)
 	runNoteCheck(t, r, ctx, `echo 0`)
 	now := time.Now().UTC()
-	due, _ := r.Store.Knowledge().DueNoteChecks(ctx, now)
+	due, _ := r.Store.Knowledge.DueNoteChecks(ctx, now)
 	if len(due) != 0 {
 		t.Fatalf("a check that just ran must wait its interval, got %+v", due)
 	}
-	if err := r.Store.Knowledge().RequestNoteCheckNow(ctx, 1); err != nil {
+	if err := r.Store.Knowledge.RequestNoteCheckNow(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
-	if due, _ := r.Store.Knowledge().DueNoteChecks(ctx, now); len(due) != 1 {
+	if due, _ := r.Store.Knowledge.DueNoteChecks(ctx, now); len(due) != 1 {
 		t.Fatalf("\"check now\" must make it due at the next tick, got %+v", due)
 	}
-	if due, _ := r.Store.Knowledge().DueNoteChecks(ctx, now.Add(2*time.Hour)); len(due) != 1 {
+	if due, _ := r.Store.Knowledge.DueNoteChecks(ctx, now.Add(2*time.Hour)); len(due) != 1 {
 		t.Fatal("after the interval it is due again")
 	}
 }
@@ -130,11 +130,11 @@ func TestNoteCheckHonoursIntervalAndRunNow(t *testing.T) {
 func TestNoteCheckNeedsARunner(t *testing.T) {
 	r, ctx := noteCheckRig(t)
 	cmd := "echo 1"
-	if _, err := r.Store.Knowledge().SetNoteCheck(ctx, 1, &cmd, nil, nil); !errors.Is(err, store.ErrNoRunner) {
+	if _, err := r.Store.Knowledge.SetNoteCheck(ctx, 1, &cmd, nil, nil); !errors.Is(err, store.ErrNoRunner) {
 		t.Fatalf("a command without a runner must be refused, got %v", err)
 	}
 	label := testLabel
-	if _, err := r.Store.Knowledge().SetNoteCheck(ctx, 1, &cmd, nil, &label); err != nil {
+	if _, err := r.Store.Knowledge.SetNoteCheck(ctx, 1, &cmd, nil, &label); err != nil {
 		t.Fatalf("a runner command must be accepted: %v", err)
 	}
 	if _, err := r.Store.DB.ExecContext(ctx, `UPDATE note SET run_on = NULL WHERE id = 1`); err != nil {
@@ -142,7 +142,7 @@ func TestNoteCheckNeedsARunner(t *testing.T) {
 	}
 	r.TickNotes(ctx)
 	settle(t, r.Store, r)
-	got, _ := r.Store.Knowledge().GetNoteCheck(ctx, 1)
+	got, _ := r.Store.Knowledge.GetNoteCheck(ctx, 1)
 	if got.Outdated || got.Error == "" {
 		t.Fatalf("it must refuse and say why, without a verdict: %+v", got)
 	}
@@ -152,18 +152,18 @@ func TestNoteCheckInterval(t *testing.T) {
 	r, ctx := noteCheckRig(t)
 	cmd, label := "echo 0", testLabel
 	low := 3
-	c, err := r.Store.Knowledge().SetNoteCheck(ctx, 1, &cmd, &low, &label)
+	c, err := r.Store.Knowledge.SetNoteCheck(ctx, 1, &cmd, &low, &label)
 	if err != nil || c.IntervalSeconds == nil || *c.IntervalSeconds != knowledge.MinCheckInterval {
 		t.Fatalf("below the floor must become %d: %+v %v", knowledge.MinCheckInterval, c, err)
 	}
-	c, _ = r.Store.Knowledge().SetNoteCheck(ctx, 1, &cmd, nil, &label)
+	c, _ = r.Store.Knowledge.SetNoteCheck(ctx, 1, &cmd, nil, &label)
 	if c.IntervalSeconds == nil || *c.IntervalSeconds != knowledge.DefaultNoteCheckInterval {
 		t.Fatalf("no interval → default: %+v", c)
 	}
 	// Removing the check removes its verdict: nobody is renewing it.
 	runNoteCheck(t, r, ctx, `echo 1`)
 	empty := ""
-	c, _ = r.Store.Knowledge().SetNoteCheck(ctx, 1, &empty, nil, nil)
+	c, _ = r.Store.Knowledge.SetNoteCheck(ctx, 1, &empty, nil, nil)
 	if c.Active() || c.Outdated || c.Reason != "" || c.Error != "" {
 		t.Fatalf("removing the check must clear its state: %+v", c)
 	}

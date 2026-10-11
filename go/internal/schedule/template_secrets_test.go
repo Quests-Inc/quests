@@ -14,11 +14,11 @@ func openTemplateSecretsDB(t *testing.T) *store.Store {
 func TestTemplateSecretsNeverListValues(t *testing.T) {
 	st := openTemplateSecretsDB(t)
 	const templateID = int64(1)
-	if err := st.Automation().SetTemplateSecret(bg(), templateID, "PASSWORD", "hunter2"); err != nil {
+	if err := st.Automation.SetTemplateSecret(bg(), templateID, "PASSWORD", "hunter2"); err != nil {
 		t.Fatalf("SetTemplateSecret: %v", err)
 	}
 
-	keys, err := st.Automation().ListTemplateSecretKeys(bg(), templateID)
+	keys, err := st.Automation.ListTemplateSecretKeys(bg(), templateID)
 	if err != nil {
 		t.Fatalf("ListTemplateSecretKeys: %v", err)
 	}
@@ -26,10 +26,10 @@ func TestTemplateSecretsNeverListValues(t *testing.T) {
 		t.Fatalf("want [PASSWORD], got %v", keys)
 	}
 
-	if err := st.Automation().DeleteTemplateSecret(bg(), templateID, "PASSWORD"); err != nil {
+	if err := st.Automation.DeleteTemplateSecret(bg(), templateID, "PASSWORD"); err != nil {
 		t.Fatalf("DeleteTemplateSecret: %v", err)
 	}
-	resolved, err := st.Automation().ResolveTemplateSecrets(bg(), templateID)
+	resolved, err := st.Automation.ResolveTemplateSecrets(bg(), templateID)
 	if err != nil {
 		t.Fatalf("ResolveTemplateSecrets: %v", err)
 	}

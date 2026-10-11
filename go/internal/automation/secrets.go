@@ -115,7 +115,7 @@ func (s *Store) SealLegacySecrets(ctx context.Context) (int, error) {
 	}
 	total := 0
 	var failure error
-	err := s.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+	err := s.Identity.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
 		rows, err := s.DB.QueryContext(wctx, `SELECT id, value FROM secret`)
 		if err != nil {
 			failure = err
@@ -438,7 +438,7 @@ func (s *Store) SealedHealth(ctx context.Context) ([]SealedCounts, error) {
 	}
 	sec, llm, totp := SealedCounts{Table: "secret"}, SealedCounts{Table: "user_llm"}, SealedCounts{Table: "user_totp"}
 	var failure error
-	err := s.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+	err := s.Identity.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
 		rows, err := s.DB.QueryContext(wctx, `SELECT value FROM secret`)
 		if err != nil {
 			failure = err
