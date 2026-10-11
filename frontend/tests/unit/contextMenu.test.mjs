@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { contextMenuItems } from '../../src/app/model/contextMenu.ts'
+import { contextMenuItems } from '../../src/pages/journal/model/contextMenu.ts'
 
 const ids = (items) => items.map((i) => i.id)
 

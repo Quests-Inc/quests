@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { clampProgress, createStepProgress, questIdOfStep, stepRef } from '@/app/model/stepProgress.svelte.ts'
+import { clampProgress, createStepProgress, questIdOfStep, stepRef } from '@/pages/journal/model/stepProgress.svelte.ts'
 
 const quests = [
   { id: 1, steps: [{ id: 10, title: 'a', progress_current: 1, progress_total: 3 }] },

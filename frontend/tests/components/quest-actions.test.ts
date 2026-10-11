@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { createQuestActions, postponePatch } from '@/app/model/questActions.svelte.ts'
+import { createQuestActions, postponePatch } from '@/pages/journal/model/questActions.svelte.ts'
 import { toasts } from '@/shared/lib/toasts.svelte.ts'
 
 function make(update: (id: number, patch: any) => Promise<any> = async (id, patch) => ({ id, ...patch })) {

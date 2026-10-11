@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { createJournalMenu } from '@/app/model/journalMenu.svelte.ts'
+import { createJournalMenu } from '@/pages/journal/model/journalMenu.svelte.ts'
 
 import { inRoot } from './root.svelte.ts'
 

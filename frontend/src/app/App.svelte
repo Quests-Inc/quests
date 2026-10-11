@@ -1,14 +1,11 @@
 <script lang="ts">
   // Quests web UI — orchestrator (state, load, overlays)
+  import { CalendarPage } from '@/pages/calendar'
   import { HistoryPage } from '@/pages/history'
-  import { JournalPage } from '@/pages/journal'
+  import { JournalOverlays, JournalPage, createJournalDesk } from '@/pages/journal'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
-  import { createDeletions } from '@/app/model/deletions.svelte.ts'
-  import { createJournalMenu } from '@/app/model/journalMenu.svelte.ts'
-  import { createStepProgress, questIdOfStep, stepRef } from '@/app/model/stepProgress.svelte.ts'
-  import { createQuestActions } from '@/app/model/questActions.svelte.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
   import {
     attachmentIdFromUrl,
@@ -23,15 +20,7 @@ import { RunnersPage } from '@/pages/runners'
   import { cubicOut } from 'svelte/easing'
   import { tabSwipe } from '@/shared/lib/tabSwipe.ts'
   import {
-    deleteQuest,
-    deleteQuestStep,
-    deleteQuestline,
     listAllAttachments, listCategories, listNotes, listQuestlines, listQuests,
-    updateQuest,
-    updateQuestStep,
-    QUEST_STATUSES,
-    QUEST_STATUS_LABELS,
-    QUEST_SIGNIFICANCES,
     fetchHealth,
     fetchAuthState,
     logout as apiLogout,
@@ -40,26 +29,18 @@ import { RunnersPage } from '@/pages/runners'
   import { subscribeQuestEvents } from '@/shared/lib/live.ts'
   import { attachmentCatalog, clearAttachmentIndex, flattenAttachmentIndex, invalidateAttachmentLiveFlags, seedAttachmentIndex, setAttachmentIndex } from '@/entities/attachment'
   import { clearNotes, noteCatalog, setNotes } from '@/entities/note'
-  import { clearQuests, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple, questCatalog, replaceQuest, setQuests } from '@/entities/quest'
+  import { clearQuests, questCatalog, setQuests } from '@/entities/quest'
   import { applyTheme, loadSavedTheme } from '@/shared/lib/theme.ts'
-  import { copyText } from '@/shared/lib/clipboard.ts'
   import { installHotkeys, registerHotkeys } from '@/shared/lib/hotkeys.ts'
   import { foldRow, moveRow } from '@/shared/lib/listNav.ts'
-    import { statusToastLabel, toast, toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
-  import { localTimeZone } from '@/shared/lib/time.ts'
   import { ActionAssistantModal } from '@/features/assistant'
-  import { QuestModal, StepModal } from '@/features/quest-edit'
-  import { QuestlineModal } from '@/features/questline-edit'
   import { TemplatesModal } from '@/features/templates'
   import { SecretsModal } from '@/features/secrets'
   import { refreshTemplates, templateStore } from '@/entities/template'
   import { TagsModal } from '@/features/tags'
   import { SettingsModal } from '@/features/settings'
-  import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
-  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ToastHost from '@/shared/ui/ToastHost.svelte'
   import { JournalHeader } from '@/widgets/journal-header'
-  import { ActivityCalendar } from '@/widgets/activity-calendar'
   import { NotesPage } from '@/pages/notes'
   import { AttachmentsPage } from '@/pages/attachments'
   import { LoginScreen, InviteScreen, NoWorkspaceScreen } from '@/pages/auth'
@@ -155,12 +136,6 @@ import { RunnersPage } from '@/pages/runners'
   let categories = $state([])
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
 
-  let modalOpen = $state(false)
-  let modalMode = $state(('create' as 'create' | 'edit'))
-  /** Prefill when creating from questline context menu. */
-  let modalDefaults = $state(
-    (null as { questline_id?: number | null, category_id?: number | null, description?: string } | null),
-  )
   let templatesOpen = $state(false)
   let secretsOpen = $state(false)
   /** entity the secrets modal opens on (context menu → «Секреты»), or null */
@@ -172,24 +147,6 @@ import { RunnersPage } from '@/pages/runners'
   /** Section the settings modal scrolls to when opened (e.g. 'hotkeys'). */
   let settingsSection = $state((null as string | null))
   let assistantOpen = $state(false)
-  let lineModalOpen = $state(false)
-  let lineModalMode = $state(('create' as 'create' | 'edit'))
-  let lineModalTarget = $state((null as any | null))
-  /** quest id → when a live event from outside the web UI touched it. The
-   * event lands before the refetched data, so QuestDetail picks the mark up
-   * when the text actually changes and decides to type it in. */
-  const remoteEdits = new Map()
-  const REMOTE_EDIT_TTL_MS = 8000
-  function consumeRemoteEdit(questId: any) {
-    const at = remoteEdits.get(questId)
-    if (at == null) return false
-    remoteEdits.delete(questId)
-    return Date.now() - at < REMOTE_EDIT_TTL_MS
-  }
-  let pinBusyId = $state((null as number | null))
-  let stepModalOpen = $state(false)
-  let stepModalQuestId = $state((null as number | null))
-  let stepModalStep = $state((null as any | null))
   let nowMs = $state(Date.now())
   let selected = $derived(quests.find((q) => q.id === nav.selectedId) ?? null)
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
@@ -253,186 +210,40 @@ import { RunnersPage } from '@/pages/runners'
     }
   }
 
-  function openCreate(defaults: any = null) {
-    modalMode = 'create'
-    modalDefaults =
-      defaults && !(defaults instanceof Event)
-        ? {
-            questline_id: defaults.questline_id ?? null,
-            category_id: defaults.category_id ?? null,
-            description: defaults.description ?? '',
-          }
-        : null
-    modalOpen = true
-  }
-
   function openTemplates() {
     templatesOpen = true
   }
-
-  function openSecrets(owner: { kind: string, id: number } | null = null) {
+  function openSecrets(owner: { kind: string; id: number } | null = null) {
     secretsOwner = owner
     secretsOpen = true
   }
-
   function openTags() {
     tagsOpen = true
   }
-
   function openSettings(opts: { section?: string } | Event | null = null) {
     settingsSection = opts && !(opts instanceof Event) ? (opts.section ?? null) : null
     settingsOpen = true
   }
 
-  function openCreateQuestline() {
-    lineModalMode = 'create'
-    lineModalTarget = null
-    lineModalOpen = true
-  }
-
-  function openEditQuestline(line: any) {
-    const row =
-      typeof line === 'number' ? questlines.find((l) => l.id === line) : line
-    if (!row) return
-    lineModalMode = 'edit'
-    lineModalTarget = row
-    lineModalOpen = true
-  }
-
-  function openEdit(quest: { id?: number } | Event | null = selected) {
-    const q = quest instanceof Event ? selected : quest || selected
-    if (!q?.id) return
-    nav.selectedId = q.id
-    modalMode = 'edit'
-    modalDefaults = null
-    modalOpen = true
-  }
-
-  async function copyIdToClipboard(kind: string, id: number) {
-    if (id == null) return
-    try {
-      const text = `${kind}=${id}`
-      await copyText(text)
-      toast(`Скопировано ${text}`, { kind: 'success', ttl: 1600 })
-    } catch (e) {
-      error = e?.message || String(e)
-      toast(error, { kind: 'error' })
-    }
-  }
-
-  const questActions = createQuestActions({
-    updateQuest,
-    applyQuest: (quest, opts) => applyQuest(quest, opts),
-    setError: (message) => (error = message),
-    refLabels: () => refLabels,
-  })
-  let statusBusy = $derived(questActions.busy)
-
-  function onQuestlineSaved(_line: any, meta = ({} as { mode?: string })) {
-    load({ silent: true })
-    if (meta.mode === 'create') toast('Квестлайн создан', { kind: 'success' })
-  }
-
-  function onQuestlineDeleted() {
-    load({ silent: true })
-    toast('Квестлайн удалён', { kind: 'success' })
-  }
-
-  const toggleCompleted = (quest = selected) => questActions.toggleCompleted(quest || selected)
-
-  async function togglePin(quest: { id: number; pinned: any; overlay_hidden: any }, event: { stopPropagation: () => void; preventDefault: () => void }) {
-    event?.stopPropagation?.()
-    event?.preventDefault?.()
-    if (!quest || pinBusyId != null) return
-    pinBusyId = quest.id
-    error = ''
-    try {
-      // default → always in the HUD → never in the HUD → default
-      const patch = quest.pinned
-        ? { overlay_hidden: true }
-        : quest.overlay_hidden
-          ? { overlay_hidden: false }
-          : { pinned: true }
-      const saved = await updateQuest(quest.id, patch)
-      applyQuest(saved, { select: false })
-      selectQuestFromUi(saved.id, { pushUrl: false })
-    } catch (e) {
-      error = e.message || String(e)
-    } finally {
-      pinBusyId = null
-    }
-  }
-
-  const steps = createStepProgress({
-    quests: () => quests,
-    selectedQuestId: () => selected?.id ?? null,
-    updateQuestStep,
-    applyQuest: (quest, opts) => applyQuest(quest, opts),
-    setError: (message) => (error = message),
-  })
-  let stepBusyId = $derived(steps.busyId)
-  let stepEditId = $derived(steps.editId)
-  let stepEditValue = $derived(steps.editValue)
-  const { set: setStepProgress, bump: bumpStep, begin: beginEditStep, onKeydown: onStepEditKeydown, onBlur: onStepEditBlur } = steps
-  function findQuestIdForStep(stepId: number) {
-    return questIdOfStep(quests, stepId)
-  }
-  function findStepRef(stepId: number) {
-    return stepRef(quests, stepId)
-  }
-
-  const del = createDeletions({
-    selected: () => selected,
-    selectQuest: (id) => (nav.selectedId = id),
-    lineId: () => menu.lineId,
-    clearLine: () => menu.clearLine(),
-    reload: () => load({ silent: true }),
-    onQuestDeleted: (id) => onDeleted(id),
-    setError: (message) => (error = message),
-    api: { deleteQuest, deleteQuestStep, deleteQuestline },
-  })
-  const requestDeleteSelected = del.askQuest
-
-  const menu = createJournalMenu({
-    quests: () => quests,
-    questlines: () => questlines,
-    findStep: findStepRef,
-    selectQuest: (id) => (nav.selectedId = id),
-    selectedQuestId: () => nav.selectedId,
-    copyId: (kind, id) => void copyIdToClipboard(kind, id),
-    openSecrets: (owner) => openSecrets(owner),
-    openCreate: (defaults) => openCreate(defaults),
-    editQuest: (q) => openEdit(q),
-    editLine: (line) => openEditQuestline(line),
-    askDeleteLine: () => del.askLine(),
-    askDeleteQuest: (q) => del.askQuest(q),
-    editStep: (questId, step) => {
-      stepModalQuestId = questId
-      stepModalStep = step
-      stepModalOpen = true
+  const desk = createJournalDesk({
+    getQuests: () => quests,
+    getQuestlines: () => questlines,
+    getSelected: () => selected,
+    getSelectedId: () => nav.selectedId,
+    setSelectedId: (id) => {
+      nav.selectedId = id
     },
-    askDeleteStep: (d) => del.askStep(d),
-    quest: questActions,
-    step: { bump: (s, d, q) => bumpStep(s, d, q), set: (s, v, q) => setStepProgress(s, v, q) },
+    selectQuest: (id, opts) => selectQuestFromUi(id, opts),
+    reload: () => load({ silent: true }),
+    setError: (message) => {
+      error = message
+    },
+    getRefLabels: () => refLabels,
+    openSecrets: (owner) => openSecrets(owner),
+    onGraphDirty: () => {
+      if (nav.view === 'graph') graphNonce += 1
+    },
   })
-
-  function applyQuest(quest: { id: any }, { select = true } = {}) {
-    if (!replaceQuest(quest)) load({ silent: true })
-    if (select) nav.selectedId = quest.id
-  }
-
-  function onSaved(quest: { id: any }, meta = ({} as { mode?: string })) {
-    nav.selectedId = quest.id
-    load({ silent: true })
-    if (meta.mode === 'create') toast('Квест создан', { kind: 'success' })
-    if (nav.view === 'graph') graphNonce += 1
-  }
-
-  function onDeleted(id: any) {
-    if (nav.selectedId === id) nav.selectedId = null
-    load({ silent: true })
-    toast('Квест удалён', { kind: 'success' })
-  }
 
   // Порядок вкладок задаёт направление слайда: см. model/navigation.svelte.ts
   let graphSeen = $state(false)
@@ -505,7 +316,7 @@ import { RunnersPage } from '@/pages/runners'
         }
         if (msg?.type === 'quests_changed') {
           if (msg.quest_id != null && msg.source && msg.source !== 'web') {
-            remoteEdits.set(msg.quest_id, Date.now())
+            desk.noteRemote(msg.quest_id)
           }
           load({ silent: true })
           if (nav.view === 'history') historyNonce += 1
@@ -608,47 +419,10 @@ import { RunnersPage } from '@/pages/runners'
     }
   })
 
-  // Keyboard cursor on the steps of the open quest. Invisible until a step key
-  // is used (kbStepId stays null for mouse users); then it follows [ ] and +/-.
-  let kbStepId = $state((null as number | null))
   $effect(() => {
     nav.selectedId
-    kbStepId = null
+    desk.kbStepId = null
   })
-
-  function kbCursor() {
-    const steps = selected?.steps ?? []
-    if (!steps.length) return null
-    return steps.find((s: { id: number }) => s.id === kbStepId) ?? steps.find((s: { done: any }) => !s.done) ?? steps[steps.length - 1]
-  }
-
-  function kbMoveStep(delta: number) {
-    const steps = selected?.steps ?? []
-    const cur = kbCursor()
-    if (!cur) return
-    if (kbStepId == null) {
-      kbStepId = cur.id // first press only reveals the cursor
-      return
-    }
-    const i = steps.findIndex((s: { id: any }) => s.id === cur.id)
-    kbStepId = steps[Math.min(steps.length - 1, Math.max(0, i + delta))].id
-  }
-
-  function kbBumpStep(delta: number) {
-    const cur = kbCursor()
-    if (!cur || !selected) return false
-    kbStepId = cur.id
-    void bumpStep(cur, delta, selected.id)
-  }
-
-  function kbToggleStep() {
-    const cur = kbCursor()
-    if (!cur || !selected) return false
-    kbStepId = cur.id
-    const total = Math.max(0, Number(cur.progress_total) || 0)
-    const done = cur.progress_current >= total
-    void setStepProgress(cur, done ? Math.max(0, total - 1) : total, selected.id)
-  }
 
   // Keyboard control (design: note=76). The dispatcher itself stays silent in
   // text fields, modals and context menus, so these only run on the bare page.
@@ -672,7 +446,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Новый квест',
         keys: 'N',
         codes: ['KeyN'],
-        run: () => openCreate(),
+        run: () => desk.openCreate(),
       },
       {
         id: 'open-questline',
@@ -680,7 +454,7 @@ import { RunnersPage } from '@/pages/runners'
         label: 'Новый квестлайн',
         keys: 'L',
         codes: ['KeyL'],
-        run: () => openCreateQuestline(),
+        run: () => desk.openCreateQuestline(),
       },
       {
         id: 'open-templates',
@@ -758,7 +532,7 @@ import { RunnersPage } from '@/pages/runners'
         keys: '[',
         codes: ['BracketLeft'],
         when: () => nav.view === 'journal' && !!selected?.steps?.length,
-        run: () => kbMoveStep(-1),
+        run: () => desk.kbMoveStep(-1),
       },
       {
         id: 'step-next',
@@ -767,7 +541,7 @@ import { RunnersPage } from '@/pages/runners'
         keys: ']',
         codes: ['BracketRight'],
         when: () => nav.view === 'journal' && !!selected?.steps?.length,
-        run: () => kbMoveStep(1),
+        run: () => desk.kbMoveStep(1),
       },
       {
         id: 'step-plus',
@@ -777,7 +551,7 @@ import { RunnersPage } from '@/pages/runners'
         codes: ['Equal', 'NumpadAdd'],
         shift: 'any',
         when: () => nav.view === 'journal' && !!selected?.steps?.length,
-        run: () => kbBumpStep(1),
+        run: () => desk.kbBumpStep(1),
       },
       {
         id: 'step-minus',
@@ -786,7 +560,7 @@ import { RunnersPage } from '@/pages/runners'
         keys: '−',
         codes: ['Minus', 'NumpadSubtract'],
         when: () => nav.view === 'journal' && !!selected?.steps?.length,
-        run: () => kbBumpStep(-1),
+        run: () => desk.kbBumpStep(-1),
       },
       {
         id: 'step-toggle',
@@ -795,7 +569,7 @@ import { RunnersPage } from '@/pages/runners'
         keys: 'Пробел',
         codes: ['Space'],
         when: () => nav.view === 'journal' && !!selected?.steps?.length,
-        run: () => kbToggleStep(),
+        run: () => desk.kbToggleStep(),
       },
       {
         id: 'clear-selection',
@@ -836,8 +610,8 @@ import { RunnersPage } from '@/pages/runners'
     onOpenTemplates={openTemplates}
     onOpenSecrets={() => openSecrets()}
     onOpenTags={openTags}
-    onOpenCreateQuestline={openCreateQuestline}
-    onOpenCreateQuest={() => openCreate()}
+    onOpenCreateQuestline={desk.openCreateQuestline}
+    onOpenCreateQuest={() => desk.openCreate()}
     onOpenAssistant={() => (assistantOpen = true)}
   />
 
@@ -856,15 +630,14 @@ import { RunnersPage } from '@/pages/runners'
   >
   {#if nav.view === 'calendar'}
     <div class="journal__calendar">
-      <ActivityCalendar
-        {quests}
+      <CalendarPage
         labels={refLabels}
         onRef={onJournalRef}
         onSelectQuest={selectQuestFromUi}
         onOpenHistory={openHistoryDay}
         onQuestContextMenu={(event, id) => {
           const quest = quests.find((q) => q.id === id)
-          if (quest) menu.openQuest(event, quest)
+          if (quest) desk.menu.openQuest(event, quest)
         }}
       />
     </div>
@@ -917,29 +690,29 @@ import { RunnersPage } from '@/pages/runners'
       sidebarCollapsed={sidebarCollapsed.journal}
       {nowMs}
       labels={refLabels}
-      {kbStepId}
-      {statusBusy}
-      deleting={del.questBusy}
-      deleteAnimActive={del.animActive}
-      {stepBusyId}
-      {stepEditId}
-      {stepEditValue}
+      kbStepId={desk.kbStepId}
+      statusBusy={desk.statusBusy}
+      deleting={desk.del.questBusy}
+      deleteAnimActive={desk.del.animActive}
+      stepBusyId={desk.stepBusyId}
+      stepEditId={desk.stepEditId}
+      stepEditValue={desk.stepEditValue}
       onSelect={(id) => selectQuestFromUi(id)}
-      onTogglePin={togglePin}
-      onQuestContextMenu={menu.openQuest}
-      onLineContextMenu={menu.openLine}
-      onStepContextMenu={menu.openStep}
+      onTogglePin={desk.togglePin}
+      onQuestContextMenu={desk.menu.openQuest}
+      onLineContextMenu={desk.menu.openLine}
+      onStepContextMenu={desk.menu.openStep}
       onOpenGraph={openGraph}
-      onToggleCompleted={toggleCompleted}
-      onOpenEdit={(q) => openEdit(q)}
-      onRequestDelete={requestDeleteSelected}
-      onBumpStep={bumpStep}
-      onBeginEditStep={beginEditStep}
-      onStepEditKeydown={onStepEditKeydown}
-      onStepEditBlur={onStepEditBlur}
-      onStepEditInput={(v) => (steps.editValue = v)}
-      onDeleteAnimDone={del.animDone}
-      {consumeRemoteEdit}
+      onToggleCompleted={desk.toggleCompleted}
+      onOpenEdit={(q) => desk.openEdit(q)}
+      onRequestDelete={desk.requestDeleteSelected}
+      onBumpStep={desk.bumpStep}
+      onBeginEditStep={desk.beginEditStep}
+      onStepEditKeydown={desk.onStepEditKeydown}
+      onStepEditBlur={desk.onStepEditBlur}
+      onStepEditInput={(v) => (desk.stepEditValue = v)}
+      onDeleteAnimDone={desk.del.animDone}
+      consumeRemoteEdit={desk.consumeRemoteEdit}
       onRef={onJournalRef}
     />
   {/if}
@@ -965,137 +738,7 @@ import { RunnersPage } from '@/pages/runners'
   </div>
 </div>
 
-<QuestModal
-  open={modalOpen}
-  mode={modalMode}
-  quest={modalMode === 'edit' ? selected : null}
-  defaults={modalMode === 'create' ? modalDefaults : null}
-  {quests}
-  {notes}
-  {attachments}
-  onClose={() => {
-    modalOpen = false
-    modalDefaults = null
-  }}
-  onSaved={onSaved}
-  onDeleted={onDeleted}
-/>
-
-<StepModal
-  open={stepModalOpen}
-  questId={stepModalQuestId}
-  step={stepModalStep}
-  {quests}
-  {questlines}
-  {notes}
-  {attachments}
-  onClose={() => {
-    stepModalOpen = false
-    stepModalStep = null
-    stepModalQuestId = null
-  }}
-  onSaved={(q) => applyQuest(q, { select: false })}
-/>
-
-<QuestlineModal
-  open={lineModalOpen}
-  mode={lineModalMode}
-  line={lineModalMode === 'edit' ? lineModalTarget : null}
-  {quests}
-  {questlines}
-  {notes}
-  {attachments}
-  onClose={() => {
-    lineModalOpen = false
-    lineModalTarget = null
-  }}
-  onSaved={onQuestlineSaved}
-  onDeleted={onQuestlineDeleted}
-/>
-
-<TemplatesModal
-  open={templatesOpen}
-  {quests}
-  {notes}
-  {attachments}
-  focusId={templatesFocusId}
-  onClose={() => {
-    templatesOpen = false
-    templatesFocusId = null
-  }}
-  onChanged={() => {
-    void load({ silent: true })
-    void refreshTemplates()
-  }}
-  onOpenSecrets={(id) => openSecrets({ kind: 'template', id })}
-/>
-
-<SecretsModal
-  open={secretsOpen}
-  owner={secretsOwner}
-  {quests}
-  {questlines}
-  labels={refLabels}
-  onClose={() => (secretsOpen = false)}
-/>
-
-<TagsModal open={tagsOpen} onClose={() => (tagsOpen = false)} />
-
-<SettingsModal
-  open={settingsOpen}
-  onClose={() => (settingsOpen = false)}
-  {health}
-  {liveStatus}
-  {username}
-  section={settingsSection}
-  onLogout={authRequired ? doLogout : null}
-/>
-
-<ActionAssistantModal
-  open={assistantOpen}
-  {quests}
-  {questlines}
-  notes={notes}
-  {attachments}
-  onClose={() => (assistantOpen = false)}
-  onApplied={() => load({ silent: true })}
-/>
-
-<ContextMenu
-  open={menu.open}
-  x={menu.x}
-  y={menu.y}
-  items={menu.items}
-  onSelect={menu.select}
-  onClose={menu.close}
-/>
-
-<ConfirmModal
-  open={del.questAsk}
-  title="Удалить квест?"
-  message={selected ? `Удалить квест «${selected.title}»?` : ''}
-  busy={del.questBusy}
-  onCancel={del.cancelQuest}
-  onConfirm={del.confirmQuest}
-/>
-
-<ConfirmModal
-  open={del.stepOpen}
-  title="Удалить шаг?"
-  message={del.step ? `Удалить шаг «${del.step.title}»?` : ''}
-  busy={del.stepBusy}
-  onCancel={del.cancelStep}
-  onConfirm={del.confirmStep}
-/>
-
-<ConfirmModal
-  open={del.lineAsk}
-  title="Удалить квестлайн?"
-  message="Квесты останутся, но отвяжутся от линии."
-  busy={del.lineBusy}
-  onCancel={del.cancelLine}
-  onConfirm={del.confirmLine}
-/>
+<JournalOverlays {desk} {questlines} {selected} />
 {/if}
 
 <style>

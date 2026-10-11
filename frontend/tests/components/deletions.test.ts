@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 
 import { flushSync } from 'svelte'
 
-import { createDeletions } from '@/app/model/deletions.svelte.ts'
+import { createDeletions } from '@/pages/journal/model/deletions.svelte.ts'
 
 function make(over: Partial<Parameters<typeof createDeletions>[0]['api']> = {}) {
   const log: any[] = []

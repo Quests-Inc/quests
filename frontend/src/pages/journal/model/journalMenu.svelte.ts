@@ -1,6 +1,6 @@
 // Контекстное меню журнала (квестлайн, квест, шаг): где открыто, для чего, и что делает выбранный пункт.
 // Сами действия (правка, удаление, статус…) приходят снаружи — здесь только разбор пункта меню.
-import { contextMenuItems } from '@/app/model/contextMenu.ts'
+import { contextMenuItems } from './contextMenu.ts'
 
 type Kind = 'line' | 'quest' | 'step'
 type Pt = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }
