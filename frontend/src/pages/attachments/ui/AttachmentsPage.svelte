@@ -5,6 +5,7 @@
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
+  import { ATT_SPEC, extOf, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments, thumbSrc } from '@/entities/attachment'
   import { EntityHistory } from '@/entities/history'
   import {
     attachmentDownloadUrl,

@@ -18,7 +18,12 @@ export function extOf(a: any) {
 
 /** Filters typed into the search box; the segment buttons below read and write the same tokens. */
 export const ATT_SPEC = {
-  flag: { label: 'флаг', all: true, values: [{ id: 'hidden', label: 'скрыто' }], test: (a: { hidden: any }) => !!a.hidden },
+  flag: {
+    label: 'флаг',
+    all: true,
+    values: [{ id: 'hidden', label: 'скрыто' }],
+    test: (a: { hidden: any }) => !!a.hidden,
+  },
   show: { label: 'показать', values: [{ id: 'all', label: 'и скрытые тоже' }], test: () => true },
   owner: {
     label: 'владелец',
@@ -66,7 +71,7 @@ export function formatWhen(iso: string, full: boolean = false) {
       'ru-RU',
       full
         ? { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }
-        : { day: '2-digit', month: 'short', year: '2-digit' },
+        : { day: '2-digit', month: 'short', year: '2-digit' }
     )
   } catch {
     return iso
