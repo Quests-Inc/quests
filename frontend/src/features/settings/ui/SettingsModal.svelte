@@ -9,7 +9,7 @@
   import AccountSection from './sections/AccountSection.svelte'
   import ConnectionsSection from './sections/ConnectionsSection.svelte'
   import AssistantSection from './sections/AssistantSection.svelte'
-  import { wsx, loadWorkspaceState } from './sections/workspaceState.svelte.ts'
+  import { wsx, loadWorkspaceState } from '../model/workspaceState.svelte.ts'
 
   let {
     open = false,

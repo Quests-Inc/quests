@@ -11,10 +11,11 @@
     "lint": "oxlint --quiet src tests",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "verify": "bun run lint && bun run format:check && bun run check && bun run check:any && bun run check:fsd && bun run test && bun run build",
+    "verify": "bun run lint && bun run format:check && bun run check && bun run check:any && bun run check:fsd && bun run check:arch && bun run test && bun run build",
     "check": "bun scripts/check-types.mjs",
     "check:any": "bun scripts/check-any.mjs",
-    "check:fsd": "bun scripts/check-fsd.mjs"
+    "check:fsd": "bun scripts/check-fsd.mjs",
+    "check:arch": "bun scripts/check-arch.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.15",

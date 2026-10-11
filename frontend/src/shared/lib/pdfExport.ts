@@ -1,3 +1,5 @@
+import { renderPdf } from '@/shared/api/exportPdf.ts'
+
 /**
  * PDF export: the page describes the document (title, markdown, steps…) and the
  * server lays it out (Go, internal/pdfdoc) — no HTML, no styles, no images in the
@@ -61,17 +63,7 @@ export async function downloadPdf(
   },
   filename: string
 ) {
-  const resp = await fetch('/api/export/pdf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
-    body: JSON.stringify({ document: document_, filename }),
-  })
-  if (!resp.ok) {
-    const detail = await resp.text().catch(() => '')
-    throw new Error(`PDF render failed (${resp.status}): ${detail.slice(0, 500)}`)
-  }
-  const blob = await resp.blob()
+  const blob = await renderPdf(document_, filename)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

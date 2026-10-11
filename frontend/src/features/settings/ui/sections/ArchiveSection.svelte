@@ -2,7 +2,7 @@
   import SettingsBlock from './SettingsBlock.svelte'
   import Toggle from '@/shared/ui/Toggle.svelte'
   import { workspaceExportUrl } from '@/shared/api/client.ts'
-  import { wsx, doImport } from './workspaceState.svelte.ts'
+  import { wsx, doImport } from '../../model/workspaceState.svelte.ts'
 
   let exportSecrets = $state(false)
   let importSecrets = $state(false)
