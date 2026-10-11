@@ -4,7 +4,6 @@
     "features/templates/ui/TemplatesModal.svelte": 849,
     "pages/graph/ui/GraphPage.svelte": 1314,
     "pages/notes/ui/NotesPage.svelte": 1216,
-    "pages/attachments/ui/AttachmentsPage.svelte": 881,
     "widgets/quest-detail/ui/QuestDetail.svelte": 809
   },
   "untested": []

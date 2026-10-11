@@ -18,6 +18,7 @@
     updateAttachmentComment,
     uploadAttachmentRevision,
   } from '@/shared/api/client.ts'
+  import { createAttachmentOps } from '../model/attachmentOps.svelte.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
 
@@ -63,16 +64,7 @@
   let search = $state('')
   let sort = $state('new')
   let grouped = $state(true)
-  let busyId = $state((null as number | null))
-  let commentDraft = $state('')
-  let commentFor = $state((null as number | null))
-  let revs = $state(([] as any[]))
-  let revsFor = $state((null as number | null))
-  let revsBusy = $state(false)
-  let pendingDelete: { att: any, revision: number | null } | null = $state(null)
-  let deleteBusy = $state(false)
   let versionInput = $state((null as HTMLInputElement | null))
-  let versionFor = $state((null as any | null))
 
   let ctxOpen = $state(false)
   let ctxX = $state(0)
@@ -124,25 +116,25 @@
   })
 
   let selected = $derived(attachments.find((a) => a.id === selectedId) ?? null)
-
-  // Comment draft follows the selection; revisions load lazily per selection.
-  $effect(() => {
-    const a = selected
-    if (!a) {
-      commentFor = null
-      revsFor = null
-      revs = []
-      return
-    }
-    if (commentFor !== a.id) {
-      commentFor = a.id
-      commentDraft = a.comment || ''
-    }
-    if (revsFor !== a.id) {
-      revsFor = a.id
-      loadRevs(a)
-    }
+  const ops = createAttachmentOps({
+    selected: () => selected,
+    selectedId: () => selectedId,
+    onSelect: (id) => onSelect?.(id),
+    onChanged: () => onChanged?.(),
+    api: {
+      listRevisions: listAttachmentRevisions,
+      setHidden: setAttachmentHidden,
+      setCurrent: setAttachmentCurrentRevision,
+      updateComment: updateAttachmentComment,
+      remove: deleteAttachment,
+      removeRevision: deleteAttachmentRevision,
+      uploadRevision: uploadAttachmentRevision,
+    },
   })
+  const toggleHidden = ops.toggleHidden
+  const makeCurrent = ops.makeCurrent
+  const saveComment = ops.saveComment
+  const confirmDelete = ops.confirmDelete
 
   $effect(() => {
     const id = selectedId
@@ -153,92 +145,15 @@
     })
   })
 
-  async function loadRevs(a: any) {
-    revsBusy = true
-    try {
-      const data = await listAttachmentRevisions(ownerKind(a), a.owner_id, a.id)
-      if (revsFor === a.id) revs = (data?.revisions || []).slice().reverse()
-    } catch (e) {
-      toast(e?.message || String(e), { kind: 'error' })
-    } finally {
-      revsBusy = false
-    }
-  }
-
-  /** Run a mutation, then refresh the index (and the open card's versions). */
-  async function run(a: { id: number }, fn: () => Promise<unknown>, okMessage?: string) {
-    busyId = a.id
-    try {
-      await fn()
-      if (okMessage) toast(okMessage, { kind: 'success', ttl: 1800 })
-      onChanged?.()
-      if (selectedId === a.id) await loadRevs(a)
-    } catch (e) {
-      toast(e?.message || String(e), { kind: 'error' })
-    } finally {
-      busyId = null
-    }
-  }
-
-  function toggleHidden(a: any) {
-    return run(
-      a,
-      () => setAttachmentHidden(ownerKind(a), a.owner_id, a.id, !a.hidden),
-      a.hidden ? 'Вложение возвращено' : 'Вложение скрыто',
-    )
-  }
-
-  function makeCurrent(a: any, revision: number) {
-    return run(
-      a,
-      () => setAttachmentCurrentRevision(ownerKind(a), a.owner_id, a.id, revision),
-      `Версия ${revision} — текущая`,
-    )
-  }
-
-  function saveComment(a: any) {
-    const next = commentDraft.trim()
-    if (next === (a.comment || '')) return
-    return run(a, () => updateAttachmentComment(ownerKind(a), a.owner_id, a.id, next))
-  }
-
-  async function confirmDelete() {
-    const p = pendingDelete
-    if (!p) return
-    deleteBusy = true
-    try {
-      const { att, revision } = p
-      const kind = ownerKind(att)
-      if (revision == null) {
-        await deleteAttachment(kind, att.owner_id, att.id)
-        if (selectedId === att.id) onSelect?.(null)
-        toast('Вложение удалено', { kind: 'success', ttl: 1800 })
-      } else {
-        await deleteAttachmentRevision(kind, att.owner_id, att.id, revision)
-        toast(`Версия ${revision} удалена`, { kind: 'success', ttl: 1800 })
-        if (selectedId === att.id) await loadRevs(att)
-      }
-      onChanged?.()
-    } catch (e) {
-      toast(e?.message || String(e), { kind: 'error' })
-    } finally {
-      deleteBusy = false
-      pendingDelete = null
-    }
-  }
-
   function pickVersion(a: any) {
-    versionFor = a
+    ops.expectVersion(a)
     versionInput?.click()
   }
 
-  async function onVersionPick(event: Event & { currentTarget: HTMLInputElement }) {
+  function onVersionPick(event: Event & { currentTarget: HTMLInputElement }) {
     const file = event.currentTarget.files?.[0]
-    const a = versionFor
-    versionFor = null
     event.currentTarget.value = ''
-    if (!file || !a) return
-    await run(a, () => uploadAttachmentRevision(ownerKind(a), a.owner_id, a.id, file), 'Новая версия загружена')
+    return ops.uploadVersion(file)
   }
 
   function downloadAtt(a: any, revision: number | null = null) {
@@ -294,11 +209,11 @@
     else if (action === 'hide') toggleHidden(a)
     else if (action === 'open') onOpenOwner?.(ownerKind(a), Number(a.owner_id))
     else if (action === 'copy-id') copyRef(a)
-    else if (action === 'delete') pendingDelete = { att: a, revision: null }
+    else if (action === 'delete') ops.pending = { att: a, revision: null }
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape' && selectedId != null && !pendingDelete) {
+    if (e.key === 'Escape' && selectedId != null && !ops.pending) {
       const t = e.target
       if (t instanceof Element && t.closest('input, textarea')) return
       onSelect?.(null)
@@ -401,21 +316,21 @@
       {@const a = selected}
       <AttachmentPanel
         {a}
-        busy={busyId === a.id}
-        {revs}
-        {revsBusy}
-        bind:commentDraft
+        busy={ops.busyId === a.id}
+        revs={ops.revs}
+        revsBusy={ops.revsBusy}
+        bind:commentDraft={ops.commentDraft}
         ownerKindLabel={KIND_ONE[ownerKind(a)]}
         ownerLabel={ownerLabel(a)}
         onClose={() => onSelect?.(null)}
         onDownload={(revision = null) => downloadAtt(a, revision)}
         onToggleHidden={() => toggleHidden(a)}
         onPickVersion={() => pickVersion(a)}
-        onDelete={() => (pendingDelete = { att: a, revision: null })}
+        onDelete={() => (ops.pending = { att: a, revision: null })}
         onOpenOwner={() => onOpenOwner?.(ownerKind(a), Number(a.owner_id))}
         onSaveComment={() => saveComment(a)}
         onMakeCurrent={(revision) => makeCurrent(a, revision)}
-        onDeleteRevision={(revision) => (pendingDelete = { att: a, revision })}
+        onDeleteRevision={(revision) => (ops.pending = { att: a, revision })}
         onCopyRef={() => copyRef(a)}
       />
 
@@ -483,7 +398,7 @@
         class="attpage__ico"
         title={a.hidden ? 'Вернуть' : 'Скрыть'}
         aria-label={a.hidden ? 'Вернуть' : 'Скрыть'}
-        disabled={busyId === a.id}
+        disabled={ops.busyId === a.id}
         onclick={(e) => {
           e.stopPropagation()
           toggleHidden(a)
@@ -498,7 +413,7 @@
         aria-label="Удалить"
         onclick={(e) => {
           e.stopPropagation()
-          pendingDelete = { att: a, revision: null }
+          ops.pending = { att: a, revision: null }
         }}
       >
         <Icon name="delete" size={16} />
@@ -510,16 +425,16 @@
 <input bind:this={versionInput} class="attpage__file-input" type="file" onchange={onVersionPick} />
 
 <ConfirmModal
-  open={pendingDelete != null}
-  title={pendingDelete?.revision == null ? 'Удалить вложение?' : 'Удалить версию?'}
-  message={pendingDelete
-    ? pendingDelete.revision == null
-      ? `Удалить «${pendingDelete.att.filename}» вместе со всеми версиями? Это необратимо. Если файл просто не нужен — лучше скрыть его.`
-      : `Удалить версию ${pendingDelete.revision} файла «${pendingDelete.att.filename}»? Это необратимо.`
+  open={ops.pending != null}
+  title={ops.pending?.revision == null ? 'Удалить вложение?' : 'Удалить версию?'}
+  message={ops.pending
+    ? ops.pending.revision == null
+      ? `Удалить «${ops.pending.att.filename}» вместе со всеми версиями? Это необратимо. Если файл просто не нужен — лучше скрыть его.`
+      : `Удалить версию ${ops.pending.revision} файла «${ops.pending.att.filename}»? Это необратимо.`
     : ''}
-  busy={deleteBusy}
+  busy={ops.deleteBusy}
   onCancel={() => {
-    if (!deleteBusy) pendingDelete = null
+    if (!ops.deleteBusy) ops.pending = null
   }}
   onConfirm={confirmDelete}
 />
