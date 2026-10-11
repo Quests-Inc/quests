@@ -21,7 +21,7 @@
 ## Данные
 
 PostgreSQL 17 — единственная БД (`docs/postgres.md`). Изоляция пространств — row-level security, роль `quests_app`
-(`docs/security.md`). Схема — встроенные SQL-миграции `go/internal/db/sql/pg`; версия лежит в таблице `alembic_version`
+(`docs/security.md`). Схема — встроенные SQL-миграции `go/internal/platform/db/sql/pg`; версия лежит в таблице `alembic_version`
 (имя осталось от Alembic, которым когда-то создавалась боевая БД; самого Alembic в репозитории нет).
 
 ## Образы и выкатка

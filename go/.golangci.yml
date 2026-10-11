@@ -12,16 +12,17 @@ linters:
       rules:
         leaf:
           files:
-            - "**/internal/secretbox/**"
-            - "**/internal/timeutil/**"
-            - "**/internal/refs/**"
-            - "**/internal/webdav/**"
-            - "**/internal/clamav/**"
+            - "**/internal/platform/secretbox/**"
+            - "**/internal/platform/timeutil/**"
+            - "**/internal/platform/webdav/**"
+            - "**/internal/platform/clamav/**"
+            - "**/internal/platform/wsctx/**"
+            - "**/internal/platform/config/**"
+            - "**/internal/platform/health/**"
+            - "**/internal/platform/hooks/**"
+            - "**/internal/platform/events/**"
             - "**/internal/pdfdoc/**"
-            - "**/internal/wsctx/**"
-            - "**/internal/config/**"
-            - "**/internal/health/**"
-            - "**/internal/hooks/**"
+            - "**/internal/refs/**"
             - "**/internal/domain/**"
             - "!**/*_test.go"
           deny:
@@ -37,39 +38,62 @@ linters:
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/domain
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+        platform:
+          files:
+            - "**/internal/platform/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/valirum/quests/go/internal/httpapi
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/store
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/auth
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/llmassist
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/refs
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/domain
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
         db:
           files:
-            - "**/internal/db/**"
+            - "**/internal/platform/db/**"
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
@@ -84,75 +108,163 @@ linters:
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/domain
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
               desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "db зависит только от wsctx (ADR-0001)"
+        pgtest:
+          files:
+            - "**/internal/platform/pgtest/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/valirum/quests/go/internal/httpapi
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/store
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/auth
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/llmassist
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/refs
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/domain
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "pgtest зависит только от db"
+        metrics:
+          files:
+            - "**/internal/platform/metrics/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/valirum/quests/go/internal/httpapi
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/store
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/auth
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/llmassist
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/refs
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/domain
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/db
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
         auth:
           files:
             - "**/internal/auth/**"
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/store
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/auth
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/refs
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
             - pkg: github.com/valirum/quests/go/internal/domain
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/config
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
-              desc: "auth зависит только от db, secretbox и timeutil (identity, #19)"
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "auth зависит только от платформы: db, secretbox, timeutil (identity, #19)"
         store:
           files:
             - "**/internal/store/**"
@@ -168,23 +280,23 @@ linters:
               desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "store не знает про обработчики, планировщик и клиентов; store → auth исключение, снимается в #19"
         schedule:
           files:
@@ -201,69 +313,24 @@ linters:
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
               desc: "schedule не зависит от httpapi, cli, llmassist, auth"
-        events:
-          files:
-            - "**/internal/events/**"
-            - "!**/*_test.go"
-          deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/store
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/auth
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/refs
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/domain
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/config
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
-              desc: "events → hooks исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
-              desc: "events → hooks исключение, снимается в #18"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "schedule не зависит от httpapi, cli, llmassist, auth"
         cli:
           files:
             - "**/internal/cli/**"
@@ -281,33 +348,33 @@ linters:
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/domain
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
         llmassist:
           files:
@@ -324,77 +391,36 @@ linters:
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/domain
               desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
               desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
               desc: "llmassist → cli исключение, снимается в #23"
-        metrics:
-          files:
-            - "**/internal/metrics/**"
-            - "!**/*_test.go"
-          deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/auth
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/refs
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/domain
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/config
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
-              desc: "metrics → store исключение, снимается в #18"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
-              desc: "metrics → store исключение, снимается в #18"
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "llmassist → cli исключение, снимается в #23"
         runner:
           files:
             - "**/cmd/quests-runner/**"
@@ -412,37 +438,36 @@ linters:
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/metrics
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/events
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/hooks
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/health
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/db
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/wsctx
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/webdav
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/clamav
-              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/domain
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/config
+            - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/secretbox
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/timeutil
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/pgtest
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
     errcheck:
       # Best-effort cleanup: nothing useful can be done with these errors.
       exclude-functions:

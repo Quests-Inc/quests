@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/auth"
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 var (

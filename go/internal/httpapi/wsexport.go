@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // Workspace archive (quest=349): a zip with

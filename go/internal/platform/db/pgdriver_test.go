@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
 
 func TestRebind(t *testing.T) {

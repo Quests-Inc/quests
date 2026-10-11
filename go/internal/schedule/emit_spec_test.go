@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/events"
-	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 )
 

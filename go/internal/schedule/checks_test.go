@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/events"
-	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // bg is the context tests run in: workspace 1, the one the helpers below set up.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -13,16 +13,16 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/auth"
-	"github.com/valirum/quests/go/internal/clamav"
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/events"
-	"github.com/valirum/quests/go/internal/health"
-	"github.com/valirum/quests/go/internal/metrics"
+	"github.com/valirum/quests/go/internal/platform/clamav"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/health"
+	"github.com/valirum/quests/go/internal/platform/metrics"
+	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/refs"
-	"github.com/valirum/quests/go/internal/secretbox"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/webdav"
 )
 
 type Server struct {

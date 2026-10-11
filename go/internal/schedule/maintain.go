@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/store"
 )
 

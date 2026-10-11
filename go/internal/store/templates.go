@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // TemplateRead is a quest template as the API sends it.

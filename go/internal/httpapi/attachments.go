@@ -16,9 +16,9 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/webdav"
 )
 
 const (

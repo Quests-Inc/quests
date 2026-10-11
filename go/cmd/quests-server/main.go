@@ -11,17 +11,18 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/auth"
-	"github.com/valirum/quests/go/internal/clamav"
-	"github.com/valirum/quests/go/internal/config"
-	"github.com/valirum/quests/go/internal/db"
-	"github.com/valirum/quests/go/internal/events"
-	"github.com/valirum/quests/go/internal/health"
 	"github.com/valirum/quests/go/internal/httpapi"
-	"github.com/valirum/quests/go/internal/metrics"
+	"github.com/valirum/quests/go/internal/platform/clamav"
+	"github.com/valirum/quests/go/internal/platform/config"
+	"github.com/valirum/quests/go/internal/platform/db"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/health"
+	"github.com/valirum/quests/go/internal/platform/hooks"
+	"github.com/valirum/quests/go/internal/platform/metrics"
+	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/schedule"
-	"github.com/valirum/quests/go/internal/secretbox"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/webdav"
 )
 
 // version is the release this binary was built from (set with -ldflags "-X main.version=1.2.3");
@@ -107,6 +108,8 @@ func main() {
 	}
 
 	hub := events.New()
+	// User hooks (data/hooks.json) listen to events; events itself does not know about them.
+	hub.OnPublish(func(p events.Payload) { hooks.Dispatch(p) })
 	st := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL, Box: secrets}
 	if n, err := st.SealLegacySecrets(context.Background()); err != nil {
 		log.Printf("secrets: sealing existing values: %v", err)
@@ -133,7 +136,7 @@ func main() {
 		SecureCookies: cfg.SecureCookies,
 		InternalToken: internalToken,
 		Health:        reg,
-		Metrics:       metrics.New(sqlDB, st, hub, reg),
+		Metrics:       metrics.New(sqlDB, statsSource{st}, hub, reg),
 		MetricsToken:  cfg.MetricsToken,
 		Hub:           hub,
 		CORS:          cfg.CORS,

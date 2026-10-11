@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/llmassist"
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
 
 // registerLLMActions wires the web-form path for the LLM action-batch

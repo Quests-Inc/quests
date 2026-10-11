@@ -19,7 +19,7 @@ admin CLI and in the event hooks.
 ## Where each rule lives
 
 - **Row isolation** — PostgreSQL row-level security (`workspace_id = app.workspace_id`), the API role `quests_app` has no
-  BYPASSRLS. A request without a workspace sees nothing. Tests: `go/internal/db` (`QUESTS_TEST_PG_URL=…`).
+  BYPASSRLS. A request without a workspace sees nothing. Tests: `go/internal/platform/db` (`QUESTS_TEST_PG_URL=…`).
 - **Workspace per request** — `withWorkspace` in `go/internal/httpapi/workspaces.go`: sessions/tokens are pinned, the
   `X-Quests-Workspace` header is checked against membership. The assistant's loopback token must name the workspace
   (it used to fall into the default one — an invited user could rewrite the owner's quests through it).
@@ -63,7 +63,7 @@ an upload, a new revision, a staged draft file or an import that would pass it g
 ## The assistant's LLM key (quest=356)
 
 The text → quests assistant runs on the **account's own provider and key** (Settings → Ассистент): Groq, OpenAI,
-OpenRouter or any OpenAI-compatible HTTPS endpoint. The key is stored sealed (AES-256-GCM, `go/internal/secretbox`;
+OpenRouter or any OpenAI-compatible HTTPS endpoint. The key is stored sealed (AES-256-GCM, `go/internal/platform/secretbox`;
 key from `QUESTS_SECRET_KEY` or generated once into `data/secret.key`, mode 0600 — **keep that file with the data
 volume; without it saved keys cannot be opened and are simply re-entered**), shown back only as a hint (`…a1b2`),
 and changed only from a browser session (not with an API token).

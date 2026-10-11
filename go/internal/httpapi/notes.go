@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"io"
 	"log"
 	"net/http"
@@ -16,10 +16,10 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 func (s *Server) registerNotes(mux *http.ServeMux) {

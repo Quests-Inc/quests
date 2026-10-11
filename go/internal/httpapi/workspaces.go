@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // WorkspaceHeader lets a client pick one of its workspaces per request. Tokens

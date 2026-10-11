@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // MaxAttachmentRevisions caps history per card. Uploading beyond this drops

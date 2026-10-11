@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
 )
 
 func secretsServer(t *testing.T) (http.Handler, *Server) {

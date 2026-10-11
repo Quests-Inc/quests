@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/secretbox"
+	"github.com/valirum/quests/go/internal/platform/secretbox"
 	"strings"
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 var ErrNotFound = errors.New("not found")

@@ -17,9 +17,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/valirum/quests/go/internal/events"
-	"github.com/valirum/quests/go/internal/health"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/health"
 )
 
 type Metrics struct {
@@ -31,7 +30,7 @@ type Metrics struct {
 }
 
 // New builds the registry. db may be nil (no connection-pool metrics).
-func New(db *sql.DB, st *store.Store, hub *events.Hub, hr *health.Registry) *Metrics {
+func New(db *sql.DB, st StatsSource, hub *events.Hub, hr *health.Registry) *Metrics {
 	m := &Metrics{reg: prometheus.NewRegistry()}
 	m.requests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "quests_http_requests_total", Help: "HTTP requests by route pattern and status."},
@@ -112,16 +111,36 @@ func (m *Metrics) Handler(token string) http.Handler {
 	})
 }
 
+// Stats are the application-level counters the collector exports. The server fills them from its
+// data store; the fields mirror what the store's aggregate query returns.
+type Stats struct {
+	Workspaces         int
+	QuestsByStatus     map[string]int
+	Notes              int
+	RunnerJobsState    map[string]int
+	RunnersActive      int
+	Attachments        int
+	AttachmentBytes    int64
+	AttachmentBytesMax int64 // the largest single workspace, revisions included
+	LastBackupAt       int64 // unix seconds of the newest successful backup (0 = none)
+	LastBackupBytes    int64
+}
+
+// StatsSource reports the counters; metrics does not know where they come from.
+type StatsSource interface {
+	AggregateStats(ctx context.Context) (Stats, error)
+}
+
 // appCollector reports application-level gauges. The database aggregates are cached for
 // a short while: a scrape every 15 s must not turn into a query per workspace per scrape.
 type appCollector struct {
-	st     *store.Store
+	st     StatsSource
 	hub    *events.Hub
 	health *health.Registry
 
 	mu     sync.Mutex
 	at     time.Time
-	cached store.Stats
+	cached Stats
 	ok     bool
 }
 
@@ -147,7 +166,7 @@ func (c *appCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-func (c *appCollector) stats() (store.Stats, bool) {
+func (c *appCollector) stats() (Stats, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if time.Since(c.at) < 30*time.Second {

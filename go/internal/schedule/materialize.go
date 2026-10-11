@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"log"
 	"math/rand"
 	"os"
@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 // emitPoolTimeout bounds how long emit_pool_command may run per attempt.

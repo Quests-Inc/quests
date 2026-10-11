@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // A note's check (quest=370) mirrors a step's: a command, an interval, where it runs (the server in

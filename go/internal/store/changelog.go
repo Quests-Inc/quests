@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 func (s *Store) QuestIDForStep(ctx context.Context, stepID int64) (int64, error) {

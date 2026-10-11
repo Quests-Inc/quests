@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/health"
+	"github.com/valirum/quests/go/internal/platform/health"
 )
 
 func TestProbeRecordsWebDAVAndDisabledClam(t *testing.T) {

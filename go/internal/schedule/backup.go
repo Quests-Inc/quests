@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/valirum/quests/go/internal/health"
+	"github.com/valirum/quests/go/internal/platform/health"
+	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/webdav"
 )
 
 // dumpDatabase writes the snapshot of the database at url to outPath (pg_dump; tests replace it).

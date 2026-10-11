@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // A note's check (quest=370) runs through the same machinery as a step's: the server in a trusted

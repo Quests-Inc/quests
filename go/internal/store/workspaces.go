@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/auth"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
 
 // DefaultWorkspaceID is where everything lived before workspaces existed.

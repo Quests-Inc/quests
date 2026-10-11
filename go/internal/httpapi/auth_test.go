@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/valirum/quests/go/internal/auth"
-	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
 )
 
 // newTestServer wires just enough of Server to exercise requireAuth + the

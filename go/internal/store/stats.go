@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // Stats are instance-wide aggregates for monitoring. They deliberately carry no

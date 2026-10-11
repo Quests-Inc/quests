@@ -10,7 +10,7 @@ import (
 	"unicode"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 const MaxTagsPerOwner = 5

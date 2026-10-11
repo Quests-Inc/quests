@@ -853,7 +853,7 @@ export interface TemplateStepRead {
 
 /**
  * UserLLM is an account's assistant provider choice. The key is stored sealed
- * (see internal/secretbox); KeyHint is the visible tail, e.g. "…a1b2".
+ * (see internal/platform/secretbox); KeyHint is the visible tail, e.g. "…a1b2".
  */
 export interface UserLLM {
   Provider: string;

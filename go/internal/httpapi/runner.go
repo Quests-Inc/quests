@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // Runner protocol. A runner only makes outgoing requests:

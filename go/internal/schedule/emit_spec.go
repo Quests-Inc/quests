@@ -11,8 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 // What an emit_pool_command prints: one quest, as a JSON object shaped like the

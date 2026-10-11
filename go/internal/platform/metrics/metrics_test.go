@@ -1,15 +1,16 @@
 package metrics
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/events"
-	"github.com/valirum/quests/go/internal/health"
-	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/health"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
 	"github.com/valirum/quests/go/internal/store"
 )
 
@@ -26,7 +27,15 @@ func testMetrics(t *testing.T) *Metrics {
 			t.Fatal(err)
 		}
 	}
-	return New(pool, &store.Store{DB: pool, DatabaseURL: url}, events.New(), health.New())
+	return New(pool, storeStats{&store.Store{DB: pool, DatabaseURL: url}}, events.New(), health.New())
+}
+
+// storeStats is what the server does in cmd/quests-server: the real store behind the StatsSource port.
+type storeStats struct{ st *store.Store }
+
+func (s storeStats) AggregateStats(ctx context.Context) (Stats, error) {
+	st, err := s.st.AggregateStats(ctx)
+	return Stats(st), err
 }
 
 func get(h http.Handler, token string) (int, string) {

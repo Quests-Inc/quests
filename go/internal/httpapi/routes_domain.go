@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/schedule"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 func (s *Server) registerDomainRoutes(mux *http.ServeMux) {

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/valirum/quests/go/internal/hooks"
 )
 
 const FocusTTL = 45 * time.Second
@@ -63,6 +62,15 @@ type Hub struct {
 	pendingFocus   *int64
 	pendingFocusAt time.Time
 	pendingFocusWS int64
+	observers      []func(Payload)
+}
+
+// OnPublish registers fn to be called, in its own goroutine, with a copy of every published event
+// (the server wires user hooks this way, so that events does not know about them).
+func (h *Hub) OnPublish(fn func(Payload)) {
+	h.mu.Lock()
+	h.observers = append(h.observers, fn)
+	h.mu.Unlock()
 }
 
 func New() *Hub {
@@ -246,16 +254,19 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 		h.recent = h.recent[len(h.recent)-HistorySize:]
 	}
 	raw, _ := json.Marshal(payload)
+	observers := append([]func(Payload){}, h.observers...)
 	h.mu.Unlock()
 	h.send(raw, target)
-	// Fire-and-forget user hooks (script/webhook/socket).
-	go func(p Payload) {
-		ev := map[string]any{}
-		for k, v := range p {
-			ev[k] = v
-		}
-		_ = hooks.Dispatch(ev)
-	}(payload)
+	// Fire-and-forget observers (user hooks and the like): each gets its own copy.
+	for _, fn := range observers {
+		go func(fn func(Payload), p Payload) {
+			cp := make(Payload, len(p))
+			for k, v := range p {
+				cp[k] = v
+			}
+			fn(cp)
+		}(fn, payload)
+	}
 	return payload
 }
 

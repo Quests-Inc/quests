@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // TestPatchQuestCategoryFollowsQuestline covers the drift bug: manually

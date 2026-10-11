@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/refs"
-	"github.com/valirum/quests/go/internal/timeutil"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // Workspace export / import (quest=349).

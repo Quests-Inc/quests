@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 func TestAutoDurationCapsAt24h(t *testing.T) {

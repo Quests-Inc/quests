@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/wsctx"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,10 +19,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/valirum/quests/go/internal/domain"
-	"github.com/valirum/quests/go/internal/events"
+	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 // The relations map is edited through a draft: an ordered log of operations

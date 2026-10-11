@@ -12,10 +12,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/health"
-	"github.com/valirum/quests/go/internal/pgtest"
+	"github.com/valirum/quests/go/internal/platform/health"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/webdav"
 )
 
 // newFakeDAV is a minimal in-memory WebDAV stand-in — Put/Get/Delete for backup.

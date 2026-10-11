@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/pgtest"
-	"github.com/valirum/quests/go/internal/secretbox"
+	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/valirum/quests/go/internal/platform/secretbox"
 )
 
 const secretsTestSeed = `

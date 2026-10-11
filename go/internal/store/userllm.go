@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // UserLLM is an account's assistant provider choice. The key is stored sealed
-// (see internal/secretbox); KeyHint is the visible tail, e.g. "…a1b2".
+// (see internal/platform/secretbox); KeyHint is the visible tail, e.g. "…a1b2".
 type UserLLM struct {
 	Provider  string
 	BaseURL   string

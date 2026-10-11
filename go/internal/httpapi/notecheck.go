@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/timeutil"
 )
 
 // A note's check (quest=370): set and trigger. The verdict itself comes from the scheduler.

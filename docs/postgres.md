@@ -9,13 +9,13 @@ without `pg_dump` skips this with a warning, a `pg_dump` that fails stops the st
 ## Schema migrations
 
 Migrations are plain SQL files embedded in the binary and applied by the server at start
-(`go/internal/db/migrate.go`): `go/internal/db/sql/pg/NNNN_*.sql`, each in its own transaction under an advisory lock.
+(`go/internal/platform/db/migrate.go`): `go/internal/platform/db/sql/pg/NNNN_*.sql`, each in its own transaction under an advisory lock.
 
 The applied revision is kept in `alembic_version` (same table and format Alembic used), so databases
 migrated by Alembic continue from where they are. Files `0001`–`0011` carry their Alembic revision id
 (`NNNN_<12 hex>_<name>.sql`); new ones are `NNNN_<name>.sql` and their revision is just `NNNN`.
 
-**Adding a migration:** create `go/internal/db/sql/pg/NNNN_<name>.sql` with the next number (PG only, no
+**Adding a migration:** create `go/internal/platform/db/sql/pg/NNNN_<name>.sql` with the next number (PG only, no
 Python wrapper, no list to update — the head is derived from the files). Several servers starting at once queue on an
 advisory lock. A database newer than the binary (a rollback) is left alone with a warning; `quests-server schema` prints the
 revision. Roll back only to a release whose schema the data still fits: add columns first, drop them a release later.
@@ -37,7 +37,7 @@ just run-server
 
 Go tests need a server too (`QUESTS_TEST_PG_URL`; the role must be able to CREATE DATABASE and CREATE ROLE).
 `just test-go` starts a throwaway one (`quests-pg-test`) when the variable is unset. Each test gets its own
-database, cloned from a template migrated once (`qt_tpl_<revision>`, see `go/internal/pgtest`); old templates
+database, cloned from a template migrated once (`qt_tpl_<revision>`, see `go/internal/platform/pgtest`); old templates
 and crashed runs' `qt_*` databases can be dropped freely.
 
 ## Backups
@@ -103,5 +103,5 @@ even through a query that forgot a filter.
   leaves nothing behind, neither rows nor files.
 - Category slugs, tag slugs and runner labels are unique per workspace.
 
-Tests: `QUESTS_TEST_PG_URL=… go test ./go/internal/db` includes `TestPGWorkspaceIsolation` (needs a login
+Tests: `QUESTS_TEST_PG_URL=… go test ./go/internal/platform/db` includes `TestPGWorkspaceIsolation` (needs a login
 role that may `CREATE ROLE`).

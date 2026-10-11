@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/valirum/quests/go/internal/platform/webdav"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
-	"github.com/valirum/quests/go/internal/webdav"
-	"github.com/valirum/quests/go/internal/wsctx"
 )
 
 // RunWorkspacePurgeLoop removes workspaces whose deletion grace period is over:

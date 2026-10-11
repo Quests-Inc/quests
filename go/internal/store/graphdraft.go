@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/timeutil"
+	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
 // DraftOp is one pending edit made on the relations map. Nothing it describes
