@@ -3,7 +3,9 @@ import { afterEach, expect, test } from 'bun:test'
 import { flushSync, mount, unmount } from 'svelte'
 
 import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
+import DateInput from '@/shared/ui/DateInput.svelte'
 import OptionPills from '@/shared/ui/OptionPills.svelte'
+import Picker from '@/shared/ui/Picker.svelte'
 import Toggle from '@/shared/ui/Toggle.svelte'
 
 let cleanup: Array<() => void> = []
@@ -81,4 +83,33 @@ test('ConfirmModal: открыт — показывает сообщение и 
 test('ConfirmModal: закрыт — ничего не рисует', () => {
   render(ConfirmModal, { open: false, message: 'Спрятано' })
   expect(document.body.textContent).not.toContain('Спрятано')
+})
+
+test('Picker: показывает текущий вариант, открывается и отдаёт выбор', () => {
+  const picked: string[] = []
+  const el = render(Picker, {
+    options: [
+      { id: '1', label: 'Раздел А' },
+      { id: '2', label: 'Раздел Б' },
+    ],
+    value: '2',
+    onChange: (id: string) => picked.push(id),
+  })
+  expect(el.querySelector('.picker__label')?.textContent).toBe('Раздел Б')
+  ;(el.querySelector('button.picker') as HTMLElement).click()
+  flushSync()
+  const item = [...document.querySelectorAll('.picker__opt')].find((n) =>
+    n.textContent?.includes('Раздел А')
+  ) as HTMLElement
+  expect(item).toBeTruthy()
+  item.click()
+  flushSync()
+  expect(picked).toEqual(['1'])
+})
+
+test('DateInput: форматирует дату как дд.мм.гггг, пустая — подсказка', () => {
+  const filled = render(DateInput, { value: '2026-03-07' })
+  expect(filled.textContent).toContain('07.03.2026')
+  const empty = render(DateInput, { value: '' })
+  expect(empty.textContent).toContain('дд.мм.гггг')
 })
