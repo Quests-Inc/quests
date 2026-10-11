@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/identity"
 	"io"
 	"log"
 	"net/http"
@@ -66,13 +67,13 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if role != store.RoleOwner {
+	if role != identity.RoleOwner {
 		writeErr(w, http.StatusForbidden, "only an owner can export a workspace")
 		return
 	}
 	// Export reads under the workspace being exported, not whichever the session is in.
 	ctx := wsctx.With(r.Context(), id)
-	name, err := s.Store.WorkspaceName(ctx, id)
+	name, err := s.Store.Identity().WorkspaceName(ctx, id)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "workspace not found")
 		return
@@ -248,8 +249,8 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		name += " (импорт)"
 	}
 	// Create the workspace, import into it; if anything fails the new workspace is dropped again.
-	ws, err := s.Store.CreateWorkspace(r.Context(), p.User.ID, name, 0)
-	if errors.Is(err, store.ErrWorkspaceLimit) {
+	ws, err := s.Store.Identity().CreateWorkspace(r.Context(), p.User.ID, name)
+	if errors.Is(err, identity.ErrWorkspaceLimit) {
 		writeErr(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -264,7 +265,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 		for _, path := range uploaded {
 			_ = s.WebDAV.Delete(context.WithoutCancel(ctx), path)
 		}
-		_ = s.Store.AbortWorkspace(context.WithoutCancel(r.Context()), ws.ID)
+		_ = s.Store.Identity().AbortWorkspace(context.WithoutCancel(r.Context()), ws.ID)
 		writeErr(w, status, msg)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/httpapi"
 	"os"
 	"strconv"
 	"strings"
@@ -120,7 +121,7 @@ func runAdmin(args []string) bool {
 			fatal("%v", err)
 		}
 		fmt.Printf("created account %q (id=%d)\n", u.Username, u.ID)
-		w, err := wst.EnsureUserWorkspace(context.Background(), u.ID, u.Username)
+		w, err := httpapi.EnsureUserWorkspace(context.Background(), wst, u.ID, u.Username)
 		if err != nil {
 			fatal("workspace: %v", err)
 		}
@@ -369,7 +370,7 @@ func fatal(format string, a ...any) {
 func runRunnerCmd(st *store.Store, args []string) {
 	ctx := context.Background()
 	// Runners belong to a workspace: QUESTS_WORKSPACE picks it (default 1).
-	ws := int64(store.DefaultWorkspaceID)
+	ws := int64(identity.DefaultWorkspaceID)
 	if raw := strings.TrimSpace(os.Getenv("QUESTS_WORKSPACE")); raw != "" {
 		n, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || n <= 0 {
@@ -457,9 +458,9 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 			fatal("%v", err)
 		}
 		members := map[int64][]string{}
-		seen := map[int64]store.Workspace{}
+		seen := map[int64]identity.Workspace{}
 		for _, u := range users {
-			ws, err := wst.UserWorkspaces(ctx, u.ID)
+			ws, err := wst.Identity().UserWorkspaces(ctx, u.ID)
 			if err != nil {
 				fatal("%v", err)
 			}
@@ -470,22 +471,22 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 				members[w.ID] = append(members[w.ID], u.Username)
 			}
 		}
-		ids, err := wst.WorkspaceIDs(ctx)
+		ids, err := wst.Identity().WorkspaceIDs(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
-		all, err := wst.AllWorkspaces(ctx)
+		all, err := wst.Identity().AllWorkspaces(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
-		allByID := map[int64]store.Workspace{}
+		allByID := map[int64]identity.Workspace{}
 		for _, w := range all {
 			allByID[w.ID] = w
 		}
 		for _, id := range ids {
 			fmt.Printf("%d\t%s\tmembers: %s\n", id, allByID[id].Name, strings.Join(members[id], ", "))
 		}
-		dels, err := wst.DeletedWorkspaces(ctx)
+		dels, err := wst.Identity().DeletedWorkspaces(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -497,7 +498,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 			fatal("usage: quests-server workspace add <name> <user>")
 		}
 		u := userByName(args[2])
-		w, err := wst.CreateWorkspace(ctx, u.ID, args[1], store.DefaultWorkspaceID)
+		w, err := httpapi.ProvisionWorkspace(ctx, wst, u.ID, args[1], identity.DefaultWorkspaceID)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -510,7 +511,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 		if err != nil {
 			fatal("workspace id must be a number")
 		}
-		if err := wst.RestoreWorkspace(ctx, id); err != nil {
+		if err := wst.Identity().RestoreWorkspace(ctx, id); err != nil {
 			fatal("%v (already purged, or not deleted?)", err)
 		}
 		fmt.Printf("workspace %d restored\n", id)
@@ -522,15 +523,15 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 		if err != nil {
 			fatal("workspace id must be a number")
 		}
-		role := store.RoleMember
+		role := identity.RoleMember
 		if len(args) == 4 {
 			role = args[3]
 		}
-		if role != store.RoleOwner && role != store.RoleMember {
+		if role != identity.RoleOwner && role != identity.RoleMember {
 			fatal("role must be owner or member, got %q", role)
 		}
 		u := userByName(args[2])
-		was, err := wst.MemberRole(ctx, id, u.ID)
+		was, err := wst.Identity().MemberRole(ctx, id, u.ID)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -538,7 +539,7 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 			fmt.Printf("%s is already %s of workspace %d\n", u.Username, role, id)
 			return
 		}
-		if err := wst.AddWorkspaceMember(ctx, id, u.ID, role); err != nil {
+		if err := wst.Identity().AddWorkspaceMember(ctx, id, u.ID, role); err != nil {
 			fatal("%v", err)
 		}
 		if was == "" {

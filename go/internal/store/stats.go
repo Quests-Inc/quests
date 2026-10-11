@@ -33,7 +33,7 @@ func (s *Store) AggregateStats(ctx context.Context) (Stats, error) {
 			firstErr = err
 		}
 	}
-	err := s.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+	err := s.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
 		st.Workspaces++
 		rows, err := s.DB.QueryContext(wctx, `SELECT status, COUNT(*) FROM quest GROUP BY status`)
 		note(err)

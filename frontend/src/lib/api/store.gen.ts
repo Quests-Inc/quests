@@ -296,23 +296,6 @@ export interface DraftOp {
 }
 
 //////////
-// source: invites.go
-
-/**
- * Workspace roles.
- */
-export const RoleOwner = "owner";
-/**
- * Workspace roles.
- */
-export const RoleMember = "member";
-export interface Member {
-  user_id: number /* int64 */;
-  username: string;
-  role: string;
-}
-
-//////////
 // source: notecheck.go
 
 /**
@@ -866,25 +849,3 @@ export interface UserLLM {
 //////////
 // source: workspaces.go
 
-/**
- * DefaultWorkspaceID is where everything lived before workspaces existed.
- */
-export const DefaultWorkspaceID: number /* int64 */ = 1;
-export interface Workspace {
-  id: number /* int64 */;
-  name: string;
-  created_at: string;
-  role?: string;
-}
-/**
- * CreateWorkspace makes a new workspace owned by userID. Its category set is
- * copied from copyFrom (0 = start empty) so the new space is usable at once.
- * MaxOwnedWorkspaces bounds how many live workspaces one account may own, so an account
- * (invited ones included) cannot fill the database with workspaces and imports.
- */
-export const MaxOwnedWorkspaces = 10;
-export interface DeletedWorkspace {
-  ID: number /* int64 */;
-  Name: string;
-  PurgeAt: string;
-}

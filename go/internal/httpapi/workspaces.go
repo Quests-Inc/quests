@@ -42,7 +42,7 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 			return
 		}
 
-		ws := int64(store.DefaultWorkspaceID)
+		ws := int64(identity.DefaultWorkspaceID)
 		p, hasUser := PrincipalFrom(r.Context())
 		if p.TokenName == "internal" && strings.TrimSpace(r.Header.Get(WorkspaceHeader)) == "" {
 			// The loopback token is not a person: falling back to the default workspace would
@@ -101,12 +101,12 @@ func (s *Server) requireOwner(w http.ResponseWriter, r *http.Request, what strin
 	if !ok || p.User.ID == 0 {
 		return true
 	}
-	role, err := s.Store.MemberRole(r.Context(), wsctx.From(r.Context()), p.User.ID)
+	role, err := s.Store.Identity().MemberRole(r.Context(), wsctx.From(r.Context()), p.User.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return false
 	}
-	if role != store.RoleOwner {
+	if role != identity.RoleOwner {
 		writeErr(w, http.StatusForbidden, "only an owner can "+what)
 		return false
 	}
@@ -136,7 +136,7 @@ func (s *Server) memberOf(w http.ResponseWriter, r *http.Request) (int64, string
 		writeErr(w, http.StatusBadRequest, "needs an account and a workspace id")
 		return 0, "", identity.User{}, false
 	}
-	role, err := s.Store.MemberRole(r.Context(), id, p.User.ID)
+	role, err := s.Store.Identity().MemberRole(r.Context(), id, p.User.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return 0, "", identity.User{}, false
@@ -154,7 +154,7 @@ func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	members, err := s.Store.WorkspaceMembers(r.Context(), id)
+	members, err := s.Store.Identity().WorkspaceMembers(r.Context(), id)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -173,14 +173,14 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
-	if uid != me.ID && role != store.RoleOwner {
+	if uid != me.ID && role != identity.RoleOwner {
 		writeErr(w, http.StatusForbidden, "only an owner can remove other members")
 		return
 	}
-	switch err := s.Store.RemoveWorkspaceMember(r.Context(), id, uid); {
+	switch err := s.Store.Identity().RemoveWorkspaceMember(r.Context(), id, uid); {
 	case errors.Is(err, store.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not a member")
-	case errors.Is(err, store.ErrLastOwner):
+	case errors.Is(err, identity.ErrLastOwner):
 		writeErr(w, http.StatusConflict, err.Error())
 	case err != nil:
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -195,11 +195,11 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if role != store.RoleOwner {
+	if role != identity.RoleOwner {
 		writeErr(w, http.StatusForbidden, "only an owner can invite")
 		return
 	}
-	secret, exp, err := s.Store.CreateInvite(r.Context(), id, me.ID)
+	secret, exp, err := s.Store.Identity().CreateInvite(r.Context(), id, me.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -216,8 +216,8 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов")
 		return
 	}
-	name, exp, err := s.Store.InviteInfo(r.Context(), r.PathValue("token"))
-	if errors.Is(err, store.ErrInviteInvalid) {
+	name, exp, err := s.Store.Identity().InviteInfo(r.Context(), r.PathValue("token"))
+	if errors.Is(err, identity.ErrInviteInvalid) {
 		writeErr(w, http.StatusNotFound, err.Error())
 		return
 	}
@@ -250,8 +250,8 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	secret := r.PathValue("token")
-	if _, _, err := s.Store.InviteInfo(r.Context(), secret); err != nil {
-		writeErr(w, http.StatusNotFound, store.ErrInviteInvalid.Error())
+	if _, _, err := s.Store.Identity().InviteInfo(r.Context(), secret); err != nil {
+		writeErr(w, http.StatusNotFound, identity.ErrInviteInvalid.Error())
 		return
 	}
 
@@ -283,12 +283,12 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 		user, created = u, true
 	}
 
-	wsID, err := s.Store.ClaimInvite(r.Context(), secret, user.ID)
+	wsID, err := s.Store.Identity().ClaimInvite(r.Context(), secret, user.ID)
 	if err != nil {
 		if created {
 			_ = s.Auth.DeleteUser(user.ID) // lost a race for the invitation: undo the signup
 		}
-		if errors.Is(err, store.ErrInviteInvalid) {
+		if errors.Is(err, identity.ErrInviteInvalid) {
 			writeErr(w, http.StatusNotFound, err.Error())
 			return
 		}
@@ -310,30 +310,30 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 
 // WorkspacesView is the account's workspaces and what the current one has stored (absent when the usage is unknown).
 type WorkspacesView struct {
-	Current          int64             `json:"current"`
-	Workspaces       []store.Workspace `json:"workspaces"`
-	AttachmentsUsed  *int64            `json:"attachments_used,omitempty"`
-	AttachmentsQuota *int64            `json:"attachments_quota,omitempty"`
+	Current          int64                `json:"current"`
+	Workspaces       []identity.Workspace `json:"workspaces"`
+	AttachmentsUsed  *int64               `json:"attachments_used,omitempty"`
+	AttachmentsQuota *int64               `json:"attachments_quota,omitempty"`
 }
 
 func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	cur := wsctx.From(r.Context())
 	if p, ok := PrincipalFrom(r.Context()); cur == 0 && (!ok || p.User.ID == 0) {
-		cur = store.DefaultWorkspaceID
+		cur = identity.DefaultWorkspaceID
 	}
-	var list []store.Workspace
+	var list []identity.Workspace
 	var err error
 	if p, ok := PrincipalFrom(r.Context()); ok && p.User.ID != 0 {
-		list, err = s.Store.UserWorkspaces(r.Context(), p.User.ID)
+		list, err = s.Store.Identity().UserWorkspaces(r.Context(), p.User.ID)
 	} else {
-		list, err = s.Store.AllWorkspaces(r.Context())
+		list, err = s.Store.Identity().AllWorkspaces(r.Context())
 	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if list == nil {
-		list = []store.Workspace{}
+		list = []identity.Workspace{}
 	}
 	view := WorkspacesView{Current: cur, Workspaces: list}
 	if used, err := s.Store.AttachmentUsage(r.Context()); err == nil {
@@ -355,12 +355,12 @@ func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	ws, err := s.Store.CreateWorkspace(r.Context(), p.User.ID, body.Name, wsctx.From(r.Context()))
-	if errors.Is(err, store.ErrWorkspaceName) {
+	ws, err := ProvisionWorkspace(r.Context(), s.Store, p.User.ID, body.Name, wsctx.From(r.Context()))
+	if errors.Is(err, identity.ErrWorkspaceName) {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	if errors.Is(err, store.ErrWorkspaceLimit) {
+	if errors.Is(err, identity.ErrWorkspaceLimit) {
 		writeErr(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -405,7 +405,7 @@ func (s *Server) renameWorkspace(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if role != store.RoleOwner {
+	if role != identity.RoleOwner {
 		writeErr(w, http.StatusForbidden, "only an owner can rename")
 		return
 	}
@@ -416,8 +416,8 @@ func (s *Server) renameWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	switch err := s.Store.RenameWorkspace(r.Context(), id, body.Name); {
-	case errors.Is(err, store.ErrWorkspaceName):
+	switch err := s.Store.Identity().RenameWorkspace(r.Context(), id, body.Name); {
+	case errors.Is(err, identity.ErrWorkspaceName):
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, store.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "workspace not found")
@@ -434,7 +434,7 @@ func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if role != store.RoleOwner {
+	if role != identity.RoleOwner {
 		writeErr(w, http.StatusForbidden, "only an owner can delete a workspace")
 		return
 	}
@@ -445,7 +445,7 @@ func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	name, err := s.Store.WorkspaceName(r.Context(), id)
+	name, err := s.Store.Identity().WorkspaceName(r.Context(), id)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "workspace not found")
 		return
@@ -454,9 +454,9 @@ func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, "введите название пространства для подтверждения")
 		return
 	}
-	purgeAt, err := s.Store.DeleteWorkspace(r.Context(), id)
+	purgeAt, err := s.Store.Identity().DeleteWorkspace(r.Context(), id)
 	switch {
-	case errors.Is(err, store.ErrMainWorkspace):
+	case errors.Is(err, identity.ErrMainWorkspace):
 		writeErr(w, http.StatusConflict, err.Error())
 	case errors.Is(err, store.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "workspace not found")

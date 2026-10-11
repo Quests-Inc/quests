@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/valirum/quests/go/internal/platform/apperr"
 	"strings"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
-var ErrNotFound = errors.New("not found")
+// ErrNotFound is the shared "no such thing" error (platform/apperr).
+var ErrNotFound = apperr.ErrNotFound
 var ErrConflict = errors.New("conflict")
 
 type Store struct {

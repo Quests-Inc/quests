@@ -5,6 +5,14 @@ packages:
     output_path: "../frontend/src/lib/api/domain.gen.ts"
     type_mappings:
       time.Time: "string"
+  - path: "github.com/valirum/quests/go/internal/identity"
+    output_path: "../frontend/src/lib/api/identity.gen.ts"
+    include_files:
+      - "workspaces.go"
+      - "invites.go"
+    type_mappings:
+      time.Time: "string"
+      time.Duration: "number"
   - path: "github.com/valirum/quests/go/internal/store"
     output_path: "../frontend/src/lib/api/store.gen.ts"
     exclude_files:
@@ -27,7 +35,8 @@ packages:
       - "workspaces.go"
     frontmatter: |
       import type { ResolvedRef } from "./domain.gen";
-      import type { AttachmentRead, DraftOp, NoteBriefRead, NotePopularity, NoteRead, Runner, RevisionRead, Workspace } from "./store.gen";
+      import type { AttachmentRead, DraftOp, NoteBriefRead, NotePopularity, NoteRead, Runner, RevisionRead } from "./store.gen";
+      import type { Workspace } from "./identity.gen";
       import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
@@ -37,7 +46,7 @@ packages:
       store.Runner: "Runner"
       store.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
-      store.Workspace: "Workspace"
+      identity.Workspace: "Workspace"
       store.RevisionRead: "RevisionRead"
       store.NoteRead: "NoteRead"
       store.NoteBriefRead: "NoteBriefRead"

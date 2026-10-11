@@ -34,7 +34,7 @@ func listAllWebDAVPaths(ctx context.Context, st *store.Store) ([]string, error) 
 	var out []string
 	var firstErr error
 	seen := map[string]struct{}{}
-	err := st.ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
+	err := st.Identity().ForEachWorkspace(ctx, func(wctx context.Context, _ int64) {
 		paths, err := listWebDAVPaths(wctx, st.DB)
 		if err != nil {
 			if firstErr == nil {

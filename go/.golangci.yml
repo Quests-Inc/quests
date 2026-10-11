@@ -239,76 +239,54 @@ linters:
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/store
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/identity
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/refs
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/domain
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
-              desc: "identity зависит только от платформы: db, secretbox, timeutil, tokens (ADR-0001)"
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
         store:
           files:
             - "**/internal/store/**"
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/store
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/identity
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/webdav
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/clamav
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/metrics
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/health
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/events
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/config
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/pgtest
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
-              desc: "store не знает про обработчики, планировщик, клиентов и identity (пока) (ADR-0001)"
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
         schedule:
           files:
             - "**/internal/schedule/**"

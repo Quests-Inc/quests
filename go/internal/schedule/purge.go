@@ -28,7 +28,7 @@ func RunWorkspacePurgeLoop(ctx context.Context, st *store.Store, wd *webdav.Clie
 
 // PurgeDueWorkspaces purges every workspace past its grace period.
 func PurgeDueWorkspaces(ctx context.Context, st *store.Store, wd *webdav.Client) {
-	ids, err := st.DueForPurge(ctx)
+	ids, err := st.Identity().DueForPurge(ctx)
 	if err != nil {
 		log.Printf("purge: list: %v", err)
 		return
@@ -52,7 +52,7 @@ func PurgeDueWorkspaces(ctx context.Context, st *store.Store, wd *webdav.Client)
 				continue // retry next hour rather than orphan files
 			}
 		}
-		if err := st.PurgeWorkspace(ctx, id); err != nil {
+		if err := st.Identity().PurgeWorkspace(ctx, id); err != nil {
 			log.Printf("purge: workspace %d: %v", id, err)
 			continue
 		}
