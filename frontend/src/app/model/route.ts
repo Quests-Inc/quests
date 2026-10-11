@@ -64,6 +64,33 @@ export function searchForView(
   return { tab: nextView }
 }
 
+export type ViewName = 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'
+
+/** Where the app opens from the address: which tab, which object is selected, the map's centre. */
+export function initialRoute(): {
+  view?: ViewName
+  attachmentId?: number
+  noteId?: number
+  questId?: number
+  graphRoot?: { type: 'quest' | 'note' | 'questline'; id: number }
+} {
+  const fromNote = noteIdFromUrl()
+  const fromAtt = attachmentIdFromUrl()
+  const fromTab = tabFromUrl()
+  if (fromAtt != null) return { view: 'attachments', attachmentId: fromAtt }
+  if (fromNote != null) return { view: 'notes', noteId: fromNote }
+  if (fromTab) {
+    if (fromTab !== 'graph') return { view: fromTab }
+    const gid = Number(param('gid'))
+    const gt = param('gt')
+    if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline'))
+      return { view: 'graph', graphRoot: { type: gt, id: gid } }
+    return { view: 'graph' }
+  }
+  const fromQuest = questIdFromUrl()
+  return fromQuest != null ? { questId: fromQuest } : {}
+}
+
 export function probeStatus(status: string) {
   if (status === 'ok') return 'ok'
   if (status === 'offline') return 'offline'
@@ -75,3 +102,37 @@ export function dbStatus(status: string) {
   if (status === 'warn') return 'warn'
   return 'unknown'
 }
+
+export interface Health {
+  api: string
+  overlay: string
+  telegram: string
+  webdav: string
+  db?: string
+  detail?: unknown
+}
+
+/** What the header chips show, from the server's /api/health answer. */
+type ProbeStatus = { status?: string }
+export function healthFrom(
+  data: { api?: ProbeStatus; components?: Record<string, ProbeStatus | undefined> } | null | undefined
+): Health {
+  const comps = data?.components || {}
+  return {
+    api: data?.api?.status === 'ok' ? 'ok' : 'offline',
+    overlay: comps.overlay?.status === 'ok' ? 'ok' : 'offline',
+    telegram: comps.telegram?.status === 'ok' ? 'ok' : 'offline',
+    webdav: probeStatus(comps.webdav?.status),
+    db: dbStatus(comps.db?.status),
+    detail: data,
+  }
+}
+
+/** The server does not answer: only the API chip is known. */
+export const healthOffline = (): Health => ({
+  api: 'offline',
+  overlay: 'unknown',
+  telegram: 'unknown',
+  webdav: 'unknown',
+  db: 'unknown',
+})

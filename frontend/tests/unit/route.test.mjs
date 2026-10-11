@@ -1,6 +1,15 @@
 import { beforeEach, expect, test } from 'bun:test'
 
-import { noteIdFromUrl, questIdFromUrl, replaceSearch, searchForView, tabFromUrl } from '../../src/app/model/route.ts'
+import {
+  healthFrom,
+  healthOffline,
+  initialRoute,
+  noteIdFromUrl,
+  questIdFromUrl,
+  replaceSearch,
+  searchForView,
+  tabFromUrl,
+} from '../../src/app/model/route.ts'
 
 let replaced = []
 function at(search) {
@@ -46,4 +55,47 @@ test('searchForView: адрес по выбранному объекту вкл�
   expect(searchForView('graph', sel)).toEqual({ tab: 'graph', gt: 'note', gid: 3 })
   expect(searchForView('history', sel)).toEqual({ tab: 'history' })
   expect(searchForView('journal', { ...sel, quest: null })).toEqual({})
+})
+
+test('initialRoute: вложение важнее заметки, заметка — вкладки, вкладка — квеста', () => {
+  at('?attachment=4&note=2&tab=graph&quest=9')
+  expect(initialRoute()).toEqual({ view: 'attachments', attachmentId: 4 })
+  at('?note=2&tab=graph&quest=9')
+  expect(initialRoute()).toEqual({ view: 'notes', noteId: 2 })
+  at('?tab=history&quest=9')
+  expect(initialRoute()).toEqual({ view: 'history' })
+  at('?quest=9')
+  expect(initialRoute()).toEqual({ questId: 9 })
+  at('')
+  expect(initialRoute()).toEqual({})
+})
+
+test('initialRoute: центр карты берётся из gt и gid только если они корректны', () => {
+  at('?tab=graph&gt=note&gid=7')
+  expect(initialRoute()).toEqual({ view: 'graph', graphRoot: { type: 'note', id: 7 } })
+  at('?tab=graph&gt=evil&gid=7')
+  expect(initialRoute()).toEqual({ view: 'graph' })
+  at('?tab=graph&gt=quest&gid=0')
+  expect(initialRoute()).toEqual({ view: 'graph' })
+})
+
+test('healthFrom и healthOffline: чипы шапки', () => {
+  const h = healthFrom({
+    api: { status: 'ok' },
+    components: {
+      overlay: { status: 'ok' },
+      telegram: { status: 'offline' },
+      webdav: { status: 'weird' },
+      db: { status: 'warn' },
+    },
+  })
+  expect(h).toMatchObject({ api: 'ok', overlay: 'ok', telegram: 'offline', webdav: 'unknown', db: 'warn' })
+  expect(healthFrom(null)).toMatchObject({ api: 'offline', overlay: 'offline', webdav: 'unknown', db: 'unknown' })
+  expect(healthOffline()).toEqual({
+    api: 'offline',
+    overlay: 'unknown',
+    telegram: 'unknown',
+    webdav: 'unknown',
+    db: 'unknown',
+  })
 })

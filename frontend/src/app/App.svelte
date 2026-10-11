@@ -7,9 +7,10 @@ import { RunnersPage } from '@/pages/runners'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
   import {
     attachmentIdFromUrl,
-    dbStatus,
+    healthFrom,
+    healthOffline,
+    initialRoute,
     noteIdFromUrl,
-    probeStatus,
     questIdFromUrl,
     replaceSearch,
     searchForView as searchForRoute,
@@ -1068,61 +1069,24 @@ import { RunnersPage } from '@/pages/runners'
 
   async function refreshHealth() {
     try {
-      const data = await fetchHealth()
-      const comps = data?.components || {}
-      const webdav = probeStatus(comps.webdav?.status)
-      if (health.webdav !== 'unknown' && health.webdav !== webdav) {
-        invalidateAttachmentLiveFlags()
-      }
-      health = {
-        api: data?.api?.status === 'ok' ? 'ok' : 'offline',
-        overlay: comps.overlay?.status === 'ok' ? 'ok' : 'offline',
-        telegram: comps.telegram?.status === 'ok' ? 'ok' : 'offline',
-        webdav,
-        db: dbStatus(comps.db?.status),
-        detail: data,
-      }
+      const next = healthFrom(await fetchHealth())
+      if (health.webdav !== 'unknown' && health.webdav !== next.webdav) invalidateAttachmentLiveFlags()
+      health = next
     } catch {
-      health = {
-        api: 'offline',
-        overlay: 'unknown',
-        telegram: 'unknown',
-        webdav: 'unknown',
-        db: 'unknown',
-      }
+      health = healthOffline()
     }
   }
 
   /** Boots data loading and live updates. Only runs once authenticated. */
   function startApp() {
-    const fromNote = noteIdFromUrl()
-    const fromAtt = attachmentIdFromUrl()
-    const fromTab = tabFromUrl()
-    if (fromAtt != null) {
-      selectedAttachmentId = fromAtt
-      view = 'attachments'
-    } else if (fromNote != null) {
-      selectedNoteId = fromNote
-      view = 'notes'
-    } else if (fromTab) {
-      view = fromTab
-      if (fromTab === 'graph') {
-        try {
-          const sp = new URL(location.href).searchParams
-          const gid = Number(sp.get('gid'))
-          const gt = sp.get('gt')
-          if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline')) {
-            graphRoot = { type: gt, id: gid }
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    const fromUrl = questIdFromUrl()
-    if (fromUrl != null && fromNote == null && fromAtt == null && fromTab == null) {
-      pendingSelectId = fromUrl
-      selectedId = fromUrl
+    const start = initialRoute()
+    if (start.view) view = start.view
+    if (start.attachmentId != null) selectedAttachmentId = start.attachmentId
+    if (start.noteId != null) selectedNoteId = start.noteId
+    if (start.graphRoot) graphRoot = start.graphRoot
+    if (start.questId != null) {
+      pendingSelectId = start.questId
+      selectedId = start.questId
     }
     load()
     refreshHealth()
