@@ -34,6 +34,7 @@
     putGraphDraftRoots,
     uploadGraphDraftFile,
   } from '@/shared/api/client.ts'
+  import { createGraphPrefs } from '../model/prefs.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
@@ -67,19 +68,8 @@
   } = $props()
 
   let depth = $state(2)
-  const LAYOUT_KEY = 'quests.graph.layout'
-  let layoutMode = $state(
-    (
-      (() => {
-        try {
-          const v = localStorage.getItem(LAYOUT_KEY)
-          return v && v in LAYOUTS ? v : 'tree'
-        } catch {
-          return 'tree'
-        }
-      })() as keyof typeof LAYOUTS
-    ),
-  )
+  const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
+  let layoutMode = $state(prefs.layoutMode)
   let center = $state(({ type: rootType, id: rootId } as { type: string, id: number }))
   let data = $state((null as any | null))
   let loading = $state(false)
@@ -333,113 +323,16 @@
     view = { ...view, groups }
   }
 
-  /** Cards the user took off the map (kept in this browser; nothing is deleted). */
-  const HIDDEN_KEY = 'quests.graph.hidden'
-  const loadHidden = () => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')
-      return new Set(Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : [])
-    } catch {
-      return new Set()
-    }
-  }
-  let hidden = $state(loadHidden())
-  const saveHidden = (next: Set<unknown>) => {
-    hidden = next
-    try {
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]))
-    } catch {
-      /* storage may be unavailable; hiding still works until reload */
-    }
-  }
-
-  // Which quests the map shows (and offers in "add to the map"). Default: active only.
-  const STATUS_KEY = 'quests.graph.statuses'
-  const loadStatuses = () => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(STATUS_KEY) || 'null')
-      if (Array.isArray(raw)) {
-        const ok = raw.filter((x) => QUEST_STATUSES.includes(x))
-        if (ok.length) return new Set(ok)
-      }
-    } catch {
-      /* fall through to the default */
-    }
-    return new Set(['active'])
-  }
-  let questStatuses = $state(loadStatuses())
-  const toggleStatus = (st: any) => {
-    const next = new Set(questStatuses)
-    if (next.has(st)) next.delete(st)
-    else next.add(st)
-    if (!next.size) return // at least one status stays on
-    questStatuses = next
-    try {
-      localStorage.setItem(STATUS_KEY, JSON.stringify([...next]))
-    } catch {
-      /* the filter still works until reload */
-    }
-  }
-  let statusLabel = $derived(
-    questStatuses.size === QUEST_STATUSES.length
-      ? 'все'
-      : questStatuses.size === 1
-        ? QUEST_STATUS_LABELS[[...questStatuses][0]]
-        : `${questStatuses.size} статуса`,
-  )
+  // Local view settings kept in this browser (see model/prefs.svelte.ts).
+  let hidden = $derived(prefs.hidden)
+  let questStatuses = $derived(prefs.questStatuses)
+  let shownTypes = $derived(prefs.shownTypes)
+  let expandKeys = $derived(prefs.expandKeys)
+  let statusLabel = $derived(prefs.statusLabel)
+  let typesLabel = $derived(prefs.typesLabel)
+  const { saveHidden, toggleStatus, toggleType, setExpand, ownExpand } = prefs
   /** Quests the status filter keeps off the map right now (for the counter). */
   let filteredOut = $state(0)
-
-  // Which kinds of things the map shows (the centre and draft things always stay).
-  const TYPES_KEY = 'quests.graph.types'
-  const loadTypes = () => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(TYPES_KEY) || 'null')
-      if (Array.isArray(raw)) {
-        const ok = raw.filter((x) => ENTITY_TYPES.includes(x))
-        if (ok.length) return new Set(ok)
-      }
-    } catch {
-      /* fall through to everything */
-    }
-    return new Set(ENTITY_TYPES)
-  }
-  let shownTypes = $state(loadTypes())
-  const toggleType = (t: any) => {
-    const next = new Set(shownTypes)
-    if (next.has(t)) next.delete(t)
-    else next.add(t)
-    if (!next.size) return
-    shownTypes = next
-    try {
-      localStorage.setItem(TYPES_KEY, JSON.stringify([...next]))
-    } catch {
-      /* the filter still works until reload */
-    }
-  }
-  let typesLabel = $derived(shownTypes.size === ENTITY_TYPES.length ? 'все' : `${shownTypes.size} из ${ENTITY_TYPES.length}`)
-
-  // Cards whose direct links were asked for ("Показать связи"): kept in this browser.
-  const EXPAND_KEY = 'quests.graph.expand'
-  const loadExpand = () => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(EXPAND_KEY) || '[]')
-      return Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : []
-    } catch {
-      return []
-    }
-  }
-  let expandKeys = $state((loadExpand() as string[]))
-  const setExpand = (next: any[]) => {
-    expandKeys = next
-    try {
-      localStorage.setItem(EXPAND_KEY, JSON.stringify(next))
-    } catch {
-      /* works until reload */
-    }
-  }
-
-  const ownExpand = (key: string) => expandKeys.filter((k) => k === key || k.startsWith(`${key}>`))
 
   /** A quest the status filter would drop again, so opening it shows nothing. */
   function statusOff(key: string) {
@@ -1334,11 +1227,7 @@
   }
 
   function onLayoutChange() {
-    try {
-      localStorage.setItem(LAYOUT_KEY, layoutMode)
-    } catch {
-      /* the choice just is not remembered */
-    }
+    prefs.layoutMode = layoutMode
     relayout()
   }
 
