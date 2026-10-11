@@ -3,7 +3,7 @@
   import { CalendarPage } from '@/pages/calendar'
   import { HistoryPage } from '@/pages/history'
   import { JournalOverlays, JournalPage, createJournalDesk } from '@/pages/journal'
-import { RunnersPage } from '@/pages/runners'
+  import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
@@ -151,7 +151,6 @@ import { RunnersPage } from '@/pages/runners'
   let selected = $derived(quests.find((q) => q.id === nav.selectedId) ?? null)
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
-  let attachments = $derived(allAttachments.filter((a) => !a.hidden))
   let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments }))
 
   async function load({ silent = false } = {}) {
@@ -629,18 +628,13 @@ import { RunnersPage } from '@/pages/runners'
     out:slideTab={{ dir: nav.navDir, out: true }}
   >
   {#if nav.view === 'calendar'}
-    <div class="journal__calendar">
-      <CalendarPage
-        labels={refLabels}
-        onRef={onJournalRef}
-        onSelectQuest={selectQuestFromUi}
-        onOpenHistory={openHistoryDay}
-        onQuestContextMenu={(event, id) => {
-          const quest = quests.find((q) => q.id === id)
-          if (quest) desk.menu.openQuest(event, quest)
-        }}
-      />
-    </div>
+    <CalendarPage
+      labels={refLabels}
+      onRef={onJournalRef}
+      onSelectQuest={selectQuestFromUi}
+      onOpenHistory={openHistoryDay}
+      onQuestContextMenu={(event, id) => desk.menu.openQuest(event, { id })}
+    />
   {:else if nav.view === 'notes'}
     <div class="journal__notes">
       <NotesPage
@@ -739,6 +733,47 @@ import { RunnersPage } from '@/pages/runners'
 </div>
 
 <JournalOverlays {desk} {questlines} {selected} />
+
+<TemplatesModal
+  open={templatesOpen}
+  focusId={templatesFocusId}
+  onClose={() => {
+    templatesOpen = false
+    templatesFocusId = null
+  }}
+  onChanged={() => {
+    void load({ silent: true })
+    void refreshTemplates()
+  }}
+  onOpenSecrets={(id) => openSecrets({ kind: 'template', id })}
+/>
+
+<SecretsModal
+  open={secretsOpen}
+  owner={secretsOwner}
+  {questlines}
+  labels={refLabels}
+  onClose={() => (secretsOpen = false)}
+/>
+
+<TagsModal open={tagsOpen} onClose={() => (tagsOpen = false)} />
+
+<SettingsModal
+  open={settingsOpen}
+  onClose={() => (settingsOpen = false)}
+  {health}
+  {liveStatus}
+  {username}
+  section={settingsSection}
+  onLogout={authRequired ? doLogout : null}
+/>
+
+<ActionAssistantModal
+  open={assistantOpen}
+  {questlines}
+  onClose={() => (assistantOpen = false)}
+  onApplied={() => load({ silent: true })}
+/>
 {/if}
 
 <style>

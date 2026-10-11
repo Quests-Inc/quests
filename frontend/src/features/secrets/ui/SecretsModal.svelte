@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SECRET_OWNER_KINDS, listSecrets, setSecret, deleteSecret } from '@/shared/api/client.ts'
+  import { questCatalog } from '@/entities/quest'
   import { parseRefs } from '@/shared/lib/refs.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import { MentionTextarea } from '@/entities/template'
@@ -15,14 +16,15 @@
    * `owner` pre-fills it (context menu → «Секреты»); only entities that can
    * own secrets are offered (a note owns its own, which nothing inherits).
    */
-  let { open = false, onClose, owner = null, quests = [], questlines = [], labels = {} }: {
+  let { open = false, onClose, owner = null, questlines = [], labels = {} }: {
     open: boolean,
     onClose: () => void,
     owner?: { kind: string, id: number } | null,
-    quests?: any[],
     questlines?: any[],
     labels?: Record<string, string>,
   } = $props()
+
+  let quests = $derived(questCatalog.list)
 
   const KIND_LABEL: Record<string, string> = { questline: 'квестлайн', template: 'шаблон', quest: 'квест', step: 'шаг', note: 'заметка' }
 

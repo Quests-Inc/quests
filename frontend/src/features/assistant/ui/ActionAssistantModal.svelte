@@ -1,5 +1,8 @@
 <script lang="ts">
   import { previewActionBatch, applyActionBatch } from '@/shared/api/client.ts'
+  import { attachmentCatalog, flattenAttachmentIndex } from '@/entities/attachment'
+  import { noteCatalog } from '@/entities/note'
+  import { questCatalog } from '@/entities/quest'
   import { buildPreviewTree } from '@/shared/lib/actionsPreview.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import { MentionTextarea } from '@/entities/template'
@@ -7,15 +10,16 @@
   import ModalHead from '@/shared/ui/ModalHead.svelte'
   import ModalFoot from '@/shared/ui/ModalFoot.svelte'
 
-  let { open = false, quests = [], questlines = [], notes = [], attachments = [], onClose, onApplied }: {
+  let { open = false, questlines = [], onClose, onApplied }: {
     open: boolean,
-    quests: any[],
-    questlines: any[],
-    notes?: any[],
-    attachments?: any[],
+    questlines?: any[],
     onClose: () => void,
     onApplied: () => void,
   } = $props()
+
+  let quests = $derived(questCatalog.list)
+  let notes = $derived(noteCatalog.list)
+  let attachments = $derived(flattenAttachmentIndex(attachmentCatalog.index).filter((a: { hidden?: boolean }) => !a.hidden))
 
   let text = $state('')
   let phase = $state(('input' as 'input' | 'loading' | 'preview' | 'applying'))

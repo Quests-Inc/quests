@@ -23,12 +23,14 @@ bun run verify       # lint + format:check + check + test + build — то же,
 src/
   main.ts        точка входа (монтирует app/App.svelte)
   app/           оболочка: App.svelte, глобальные стили и темы (app/styles)
-  pages/         экраны: graph, notes, attachments, history, runners, auth
-  widgets/       крупные блоки страницы: journal-header, quest-sidebar, quest-detail, activity-calendar
-  features/      пользовательские сценарии (модалки): quest-edit, questline-edit, templates, secrets, tags, settings, assistant, find-entity, note-icon
+  pages/         экраны: journal, calendar, graph, notes, attachments, history, runners, auth
+  widgets/       крупные блоки: graph-canvas, journal-header, quest-sidebar, quest-detail, activity-calendar
+  features/      сценарии: graph-draft, quest-edit, questline-edit, templates, secrets, tags, settings, assistant, find-entity, note-icon
   entities/      предметные сущности: quest, note, attachment, template, runner, questline, tag, history, graph (ui/ + model/)
   shared/        ui, api (клиент и сгенерированные типы), lib (утилиты без предметной области)
 ```
+
+Оболочка после совместной загрузки пишет каталоги квестов, заметок и вложений. Страницы и фичи читают их сами; квестлайнов в каталоге пока нет, их по-прежнему передаёт оболочка.
 
 Импорт — только вниз по слоям (`app → pages → widgets → features → entities → shared`), в слайс заходят через его `index.ts`,
 слайсы одного слоя друг друга не знают; между сущностями — только через `@x` (`entities/runner/@x/note.ts`).

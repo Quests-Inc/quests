@@ -17,7 +17,9 @@
   import { createTemplateActions } from '../model/templateActions.ts'
   import { defaultLocalDeadlineParts, localTimeZone } from '@/shared/lib/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '@/shared/lib/duration.ts'
-  import { templateStepDraft, templateStepsPayload, StepsEditor } from '@/entities/quest'
+  import { attachmentCatalog, flattenAttachmentIndex } from '@/entities/attachment'
+  import { noteCatalog } from '@/entities/note'
+  import { questCatalog, templateStepDraft, templateStepsPayload, StepsEditor } from '@/entities/quest'
   import type { TemplateRead } from '@/shared/api/automation.gen'
   import Icon from '@/shared/ui/Icon.svelte'
   import { MentionTextarea, WORKDAYS, daysLabel, parseClock, parseLimits, parseWeekdays } from '@/entities/template'
@@ -45,7 +47,11 @@
    * `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
    */
-  let { open = false, quests = [], notes = [], attachments = [], focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, quests?: any[], notes?: any[], attachments?: any[], focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
+  let { open = false, focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
+
+  let quests = $derived(questCatalog.list)
+  let notes = $derived(noteCatalog.list)
+  let attachments = $derived(flattenAttachmentIndex(attachmentCatalog.index).filter((a: { hidden?: boolean }) => !a.hidden))
 
   const LOCAL_TZ = localTimeZone() || 'Europe/Moscow'
 
