@@ -4,6 +4,7 @@
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
+  import { createDeletions } from '@/app/model/deletions.svelte.ts'
   import { createJournalMenu } from '@/app/model/journalMenu.svelte.ts'
   import { createStepProgress, questIdOfStep, stepRef } from '@/app/model/stepProgress.svelte.ts'
   import { createQuestActions } from '@/app/model/questActions.svelte.ts'
@@ -190,16 +191,6 @@ import { RunnersPage } from '@/pages/runners'
   let lineModalOpen = $state(false)
   let lineModalMode = $state(('create' as 'create' | 'edit'))
   let lineModalTarget = $state((null as any | null))
-  let lineDeleteConfirmOpen = $state(false)
-  let lineDeleting = $state(false)
-  let deleting = $state(false)
-  let deleteConfirmOpen = $state(false)
-  let stepDeleteOpen = $state(false)
-  let stepDeleteBusy = $state(false)
-  let stepDelete: { questId: number, stepId: number, title: string } | null = $state(null)
-  /** True while QuestDetail is playing its erase-before-delete animation. */
-  let deleteAnimActive = $state(false)
-  let deleteAnimResolve: ((v?: unknown) => void) | null = null
   /** quest id → when a live event from outside the web UI touched it. The
    * event lands before the refetched data, so QuestDetail picks the mark up
    * when the text actually changes and decides to type it in. */
@@ -210,10 +201,6 @@ import { RunnersPage } from '@/pages/runners'
     if (at == null) return false
     remoteEdits.delete(questId)
     return Date.now() - at < REMOTE_EDIT_TTL_MS
-  }
-  function onDeleteAnimDone() {
-    deleteAnimResolve?.()
-    deleteAnimResolve = null
   }
   let pinBusyId = $state((null as number | null))
   let stepModalOpen = $state(false)
@@ -415,42 +402,6 @@ import { RunnersPage } from '@/pages/runners'
   })
   let statusBusy = $derived(questActions.busy)
 
-  async function confirmDeleteStep() {
-    if (!stepDelete || stepDeleteBusy) return
-    stepDeleteBusy = true
-    error = ''
-    try {
-      await deleteQuestStep(stepDelete.questId, stepDelete.stepId)
-      stepDeleteOpen = false
-      stepDelete = null
-      await load({ silent: true })
-      toast('Шаг удалён', { kind: 'success' })
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      stepDeleteBusy = false
-    }
-  }
-
-  async function confirmDeleteQuestline() {
-    if (menu.lineId == null || lineDeleting) return
-    lineDeleting = true
-    error = ''
-    try {
-      await deleteQuestline(menu.lineId)
-      lineDeleteConfirmOpen = false
-      menu.clearLine()
-      await load({ silent: true })
-      toast('Квестлайн удалён', { kind: 'success' })
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      lineDeleting = false
-    }
-  }
-
   function onQuestlineSaved(_line: any, meta = ({} as { mode?: string })) {
     load({ silent: true })
     if (meta.mode === 'create') toast('Квестлайн создан', { kind: 'success' })
@@ -459,36 +410,6 @@ import { RunnersPage } from '@/pages/runners'
   function onQuestlineDeleted() {
     load({ silent: true })
     toast('Квестлайн удалён', { kind: 'success' })
-  }
-
-  function requestDeleteSelected(quest = selected) {
-    const q = quest || selected
-    if (!q || deleting) return
-    if (q.id !== nav.selectedId) nav.selectedId = q.id
-    deleteConfirmOpen = true
-  }
-
-  async function confirmDeleteSelected() {
-    if (!selected || deleting) return
-    deleting = true
-    error = ''
-    try {
-      const id = selected.id
-      deleteAnimActive = true
-      await new Promise((resolve) => {
-        deleteAnimResolve = resolve
-      })
-      deleteAnimActive = false
-      await deleteQuest(id)
-      deleteConfirmOpen = false
-      onDeleted(id)
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      deleting = false
-      deleteAnimActive = false
-    }
   }
 
   const toggleCompleted = (quest = selected) => questActions.toggleCompleted(quest || selected)
@@ -534,6 +455,18 @@ import { RunnersPage } from '@/pages/runners'
     return stepRef(quests, stepId)
   }
 
+  const del = createDeletions({
+    selected: () => selected,
+    selectQuest: (id) => (nav.selectedId = id),
+    lineId: () => menu.lineId,
+    clearLine: () => menu.clearLine(),
+    reload: () => load({ silent: true }),
+    onQuestDeleted: (id) => onDeleted(id),
+    setError: (message) => (error = message),
+    api: { deleteQuest, deleteQuestStep, deleteQuestline },
+  })
+  const requestDeleteSelected = del.askQuest
+
   const menu = createJournalMenu({
     quests: () => quests,
     questlines: () => questlines,
@@ -545,20 +478,14 @@ import { RunnersPage } from '@/pages/runners'
     openCreate: (defaults) => openCreate(defaults),
     editQuest: (q) => openEdit(q),
     editLine: (line) => openEditQuestline(line),
-    askDeleteLine: () => (lineDeleteConfirmOpen = true),
-    askDeleteQuest: (q) => {
-      nav.selectedId = q.id
-      deleteConfirmOpen = true
-    },
+    askDeleteLine: () => del.askLine(),
+    askDeleteQuest: (q) => del.askQuest(q),
     editStep: (questId, step) => {
       stepModalQuestId = questId
       stepModalStep = step
       stepModalOpen = true
     },
-    askDeleteStep: (d) => {
-      stepDelete = d
-      stepDeleteOpen = true
-    },
+    askDeleteStep: (d) => del.askStep(d),
     quest: questActions,
     step: { bump: (s, d, q) => bumpStep(s, d, q), set: (s, v, q) => setStepProgress(s, v, q) },
   })
@@ -1108,10 +1035,10 @@ import { RunnersPage } from '@/pages/runners'
         {showAllQuests}
         {nowMs}
         {statusBusy}
-        {deleting}
-        {deleteAnimActive}
+        deleting={del.questBusy}
+        deleteAnimActive={del.animActive}
         {consumeRemoteEdit}
-        onDeleteAnimDone={onDeleteAnimDone}
+        onDeleteAnimDone={del.animDone}
         {stepBusyId}
         {stepEditId}
         {stepEditValue}
@@ -1267,39 +1194,30 @@ import { RunnersPage } from '@/pages/runners'
 />
 
 <ConfirmModal
-  open={deleteConfirmOpen}
+  open={del.questAsk}
   title="Удалить квест?"
   message={selected ? `Удалить квест «${selected.title}»?` : ''}
-  busy={deleting}
-  onCancel={() => {
-    if (!deleting) deleteConfirmOpen = false
-  }}
-  onConfirm={confirmDeleteSelected}
+  busy={del.questBusy}
+  onCancel={del.cancelQuest}
+  onConfirm={del.confirmQuest}
 />
 
 <ConfirmModal
-  open={stepDeleteOpen}
+  open={del.stepOpen}
   title="Удалить шаг?"
-  message={stepDelete ? `Удалить шаг «${stepDelete.title}»?` : ''}
-  busy={stepDeleteBusy}
-  onCancel={() => {
-    if (!stepDeleteBusy) {
-      stepDeleteOpen = false
-      stepDelete = null
-    }
-  }}
-  onConfirm={confirmDeleteStep}
+  message={del.step ? `Удалить шаг «${del.step.title}»?` : ''}
+  busy={del.stepBusy}
+  onCancel={del.cancelStep}
+  onConfirm={del.confirmStep}
 />
 
 <ConfirmModal
-  open={lineDeleteConfirmOpen}
+  open={del.lineAsk}
   title="Удалить квестлайн?"
   message="Квесты останутся, но отвяжутся от линии."
-  busy={lineDeleting}
-  onCancel={() => {
-    if (!lineDeleting) lineDeleteConfirmOpen = false
-  }}
-  onConfirm={confirmDeleteQuestline}
+  busy={del.lineBusy}
+  onCancel={del.cancelLine}
+  onConfirm={del.confirmLine}
 />
 {/if}
 
