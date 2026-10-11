@@ -68,6 +68,6 @@ PostgreSQL 17 — единственная БД (`docs/postgres.md`). Изоля
 | `check:fsd` | слои FSD, импорты только через `index.ts`, кросс-импорты сущностей только через `@x` |
 | `check:arch` (+ `frontend/.arch-baseline.json`) | файл не растёт сверх планки, новый — ≤ 800 строк; `model/` и `lib/` не знают про компоненты, контроллеры `.svelte.ts` — только в них; сеть — только в `shared/api`; **каждый файл `model/` и `shared/lib/` подключён тестом** |
 | `check` (svelte-check) и `check:any` | число ошибок типов и явных `any` не растёт |
-| `tests/unit`, `tests/components`, `tests/security` | чистая логика; компоненты и контроллеры на happy-dom; санитайзер markdown на jsdom |
+| `tests/unit`, `tests/components`, `tests/security` | чистая логика; компоненты, контроллеры и сквозной обход всего приложения над фальшивым бэкендом (ловит зацикленные эффекты и «битые» вкладки); санитайзер markdown на jsdom |
 
 Новые планки ставятся командами `--update` (`check:any`, `check:arch`, `coverage_gate.py`) и только вниз: долг можно гасить, наращивать — нет.

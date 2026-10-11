@@ -8,13 +8,14 @@ bun run dev          # Vite с HMR на :5173, /api проксируется н�
 bun run verify       # lint + format:check + check + test + build — то же, что гоняет CI
 ```
 
-| Команда                           | Что делает                                                                                                                  |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `bun run lint`                    | oxlint (`correctness` и `suspicious` как ошибки), правила в `.oxlintrc.json`                                                |
-| `bun run format` / `format:check` | oxfmt, настройки в `.oxfmtrc.jsonc` (`.svelte` он не форматирует)                                                           |
-| `bun run check`                   | svelte-check (`noImplicitAny`); число ошибок не должно расти относительно `.svelte-check-baseline` (сейчас 0)               |
-| `bun run check:any`               | число явных `any` не должно расти относительно `.any-baseline`                                                              |
-| `bun run test`                    | `tests/unit` (чистая логика) и `tests/components` (Svelte-компоненты на happy-dom, загрузчик — `tests/components/setup.ts`) |
+| Команда                           | Что делает                                                                                                                                                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`                    | oxlint (`correctness` и `suspicious` как ошибки), правила в `.oxlintrc.json`                                                                                                                                                                                   |
+| `bun run format` / `format:check` | oxfmt, настройки в `.oxfmtrc.jsonc` (`.svelte` он не форматирует)                                                                                                                                                                                              |
+| `bun run check`                   | svelte-check (`noImplicitAny`); число ошибок не должно расти относительно `.svelte-check-baseline` (сейчас 0)                                                                                                                                                  |
+| `bun run check:any`               | число явных `any` не должно расти относительно `.any-baseline`                                                                                                                                                                                                 |
+| `bun run test`                    | `tests/unit` (чистая логика), `tests/components` (компоненты, контроллеры и **сквозной обход приложения над фальшивым бэкендом** `app-smoke.test.ts` + `fakeApi.ts`; happy-dom, каждый файл в своём процессе), `tests/security` (санитайзер markdown на jsdom) |
+| `bun run check:arch`              | архитектурные гейты: размер файлов, сегменты, сеть только в `shared/api`, каждый файл `model/` и `shared/lib/` покрыт тестом (`.arch-baseline.json`)                                                                                                           |
 
 ## Структура (FSD, ADR-0001)
 

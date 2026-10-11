@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "bun test tests/unit && bun test --conditions browser --preload ./tests/components/setup.ts tests/components && bun test --conditions browser --preload ./tests/security/setup.ts tests/security",
+    "test": "bun scripts/run-tests.mjs",
     "lint": "oxlint --quiet src tests",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

@@ -191,8 +191,11 @@
     return () => clearTimeout(t)
   })
 
+  // Once per page: an account without tags answers [], and "no tags yet" must not read as "not loaded yet".
+  let tagsAsked = false
   $effect(() => {
-    if (!active || tags.length) return
+    if (!active || tagsAsked) return
+    tagsAsked = true
     listTags()
       .then((t) => (tags = Array.isArray(t) ? t : []))
       .catch(() => {})
