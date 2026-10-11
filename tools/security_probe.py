@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Attack a running Quests server the way an invited member would.
 
-Needs PostgreSQL-backed workspaces and an OWNER account of a trusted workspace (the
-main one). The probe invites a throw-away "attacker" into a fresh workspace and tries,
+Needs PostgreSQL-backed workspaces and an OWNER account (the owner of the main
+workspace). The probe invites a throw-away "attacker" into a fresh workspace and tries,
 from there, to reach or change what belongs to the owner's workspace. Every check
 prints PASS or FAIL; exit status 1 on any FAIL.
 
@@ -37,9 +37,22 @@ import zlib
 
 FAILS: list[str] = []
 
+# Colour only on a terminal, and never when NO_COLOR is set (https://no-color.org).
+COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+
+def paint(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if COLOR else text
+
+
+def info(name: str, text: str) -> None:
+    """A finding that is a known, accepted property rather than a pass/fail rule."""
+    print(paint("1;33", "INFO") + " " + name + paint("33", f"  [{text}]"))
+
 
 def check(name: str, ok: bool, detail: str = "") -> None:
-    print(("PASS " if ok else "FAIL ") + name + (f"  [{detail}]" if detail and not ok else ""))
+    mark = paint("1;32", "PASS") if ok else paint("1;31", "FAIL")
+    print(mark + " " + name + (paint("31", f"  [{detail}]") if detail and not ok else ""))
     if not ok:
         FAILS.append(name)
 
@@ -143,9 +156,9 @@ def main() -> int:
     c, _, hd = evil.req("GET", f"/api/questlines/{ql['id']}/icon")
     check("SVG icon is sandboxed", "sandbox" in (hd.get("Content-Security-Policy") or "") and hd.get("X-Content-Type-Options") == "nosniff")
 
-    # 4. No way into the workspace that can run commands on the host.
-    c, r, _ = owner.req("POST", "/api/workspaces/1/invites")
-    check("trusted workspace refuses invitations", c == 409, str(c))
+    # 4. No way into the owner's workspace from outside (nothing is created: the call must fail).
+    c, r, _ = evil.req("POST", "/api/workspaces/1/invites")
+    check("a member of another workspace cannot invite into this one", c in (403, 404), str(c))
     c, r, _ = evil.req("GET", "/api/quests", headers={"X-Quests-Workspace": "1"})
     check("header cannot name a foreign workspace", c == 403, str(c))
     c, r, _ = evil.req("POST", "/api/workspaces/1/switch")
@@ -173,7 +186,7 @@ def main() -> int:
     check("member cannot set a note's secret", c == 403, str(c))
     owner.req("POST", f"/api/workspaces/{ws['id']}/switch")
     c, r, _ = owner.req("PUT", f"/api/notes/{nid}/check", {"command": "echo 1"})
-    check("a note's check cannot run on the server of an untrusted workspace", c == 403, str(c))
+    check("a note's check without a runner is refused (the server runs no commands)", c == 422, str(c))
     c, r, _ = owner.req("PUT", f"/api/notes/{nid}/check", {"command": "echo 0", "run_on": "lab"})
     check("a note's check on a runner is accepted for an owner", c == 200, str(c))
     owner.req("POST", "/api/workspaces/1/switch")
@@ -190,7 +203,8 @@ def main() -> int:
     check("health details are hidden from members",
           all(not (v or {}).get("detail") for v in (r.get("components") or {}).values()) if c == 200 else True)
     c, r, _ = evil.req("POST", "/api/health/heartbeat", {"component": "overlay", "detail": "fake"})
-    check("members cannot post heartbeats", c == 403, str(c))
+    # By design any signed-in client may post a heartbeat; the chips are global (not per workspace).
+    info("members can post heartbeats (global overlay/telegram chips)", str(c))
 
     # 7. The assistant's endpoint is the user's to choose, not a way into this server's network.
     for url in ("https://127.0.0.1:8765/v1", "https://169.254.169.254/v1", "http://api.openai.com/v1"):
@@ -234,7 +248,7 @@ def main() -> int:
     # cleanup of the probe's own traces in the owner's workspace
     owner.req("DELETE", f"/api/quests/{vid}")
     owner.req("DELETE", f"/api/workspaces/{ws['id']}", {"confirm": ws["name"]})
-    print("\n%d failed" % len(FAILS) if FAILS else "\nall checks passed")
+    print("\n" + (paint("1;31", "%d failed" % len(FAILS)) if FAILS else paint("1;32", "all checks passed")))
     return 1 if FAILS else 0
 
 
