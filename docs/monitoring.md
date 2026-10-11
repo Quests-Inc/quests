@@ -5,30 +5,28 @@ already see their runners / HUD / bot in Settings → Сервисы.
 
 | What | Where | Gives |
 |---|---|---|
-| **Uptime Kuma** | the home server (`arch`), `docker-compose.monitoring.yml` (deploy repository) | probes, uptime graph and %, alerts |
-| **Edge watchdog** | the gateway VPS, `monitoring/edge-probe.sh` (deploy repository) | availability seen from outside the home server, **log only** (covers the case where `arch` itself is down — Kuma would be down with it) |
-| **Prometheus + Grafana** | the home server, same overlay | trends: API latency/errors, quests and runner queue, DB pool and size, host CPU/RAM/disk, backup age |
+| **Prometheus + Grafana** | the home server (`arch`), `docker-compose.monitoring.yml` (deploy repository) | probes and their uptime / incident history, trends: API latency/errors, quests and runner queue, DB pool and size, host CPU/RAM/disk, backup age |
+| **Edge watchdog** | the gateway VPS, `monitoring/edge-probe.sh` (deploy repository) | availability seen from outside the home server, **log only** (covers the case where `arch` itself is down — Prometheus and Grafana would be down with it) |
 
-## Uptime Kuma
+## Probes and availability
 
-1. The stack ships with every release: `docker-compose.monitoring.yml` of the deploy repository (`Quests-Inc/quests-deploy`) is listed in its `.doco-cd.yml`
-   (drop it from `compose_files` to switch monitoring off); optional `KUMA_PORT` (default 3001) goes to `config.env`.
-2. Open `http://<server>:3001` and create the admin account (done by hand on purpose).
-3. Add the probes (needs `pip install uptime-kuma-api`; the password comes from the environment):
-   ```bash
-   KUMA_PASSWORD=… python3 monitoring/kuma-monitors.py --url http://<server>:3001 --user <admin> \
-       --public https://quests.84-38-180-123.sslip.io
-   ```
-   It creates API, nginx, Postgres, ClamAV (+ the public address through the gateway, + WebDAV with `--webdav`);
-   re-running updates instead of duplicating.
-4. Alerts: Kuma → Settings → Notifications → add Telegram (bot token + chat id) and tick "Default enabled" so every probe uses it.
-   Kuma in a plain container has no Telegram proxy; if `api.telegram.org` is blocked from the host, use a channel that
-   works there (e-mail, a webhook, …).
+The stack ships with every release: `docker-compose.monitoring.yml` of the deploy repository (`Quests-Inc/quests-deploy`) is listed in
+its `.doco-cd.yml` (drop it from `compose_files` to switch monitoring off). Uptime Kuma used to do the probing; it was replaced by
+Prometheus (blackbox exporter) and Grafana, which already had the metrics.
 
-Kuma's data lives in the `kuma-data` volume. `deploy/docker/backup-monitoring.sh` (cron, daily 04:30) tars the Kuma and Grafana
-volumes (14 kept) into `~/QuestsBackups-monitoring/` and mirrors them to the PC (`~/QuestsBackups/monitoring/`) when it is on.
-Each service is stopped for the seconds the tar takes so the SQLite files are consistent. Prometheus is not backed up (large, rebuilds
-itself; dashboards and data source come from the repo). Restore steps are in the script header.
+- **HTTP probes** (job `blackbox`, module `http_2xx`): `api` (`api:8765/api/ping`), `nginx` (`frontend/api/ping`, the front door) and `public`
+  (the public address through the gateway). The last one also gives the gateway certificate expiry (`probe_ssl_earliest_cert_expiry`).
+- **TCP probes** (job `blackbox_tcp`, module `tcp_connect`): `clamav` (`clamav:3310`).
+- Postgres comes from `postgres-exporter` (`pg_up`, size, connections).
+- The «Quests — обзор» dashboard shows them in the «Доступность» section: current state, 30-day uptime % per probe, a state timeline
+  (red = down: that is the incident list) and the days left on the gateway certificate.
+- Alerts are **not configured** (a deliberate choice). If they are wanted: Grafana → Alerting → a contact point (Telegram, e-mail, a webhook)
+  and a rule on `probe_success == 0`. `api.telegram.org` may need a proxy from the host.
+
+`deploy/docker/backup-monitoring.sh` (cron, daily 04:30) tars the Grafana volume (14 kept) into `~/QuestsBackups-monitoring/` and mirrors
+it to the PC (`~/QuestsBackups/monitoring/`) when it is on. Grafana is stopped for the seconds the tar takes so its SQLite file is
+consistent. Prometheus is not backed up (large, rebuilds itself; dashboards and data source come from the repo). Restore steps are in the
+script header.
 
 ## Metrics: Prometheus + Grafana
 
