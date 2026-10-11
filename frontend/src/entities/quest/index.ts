@@ -1,3 +1,4 @@
+export * from './model/catalog.svelte.ts'
 export * from './model/entityFlags.ts'
 export * from './model/journalView.ts'
 export * from './model/questExport.ts'

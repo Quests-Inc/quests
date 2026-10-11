@@ -27,9 +27,6 @@ import { RunnersPage } from '@/pages/runners'
     deleteQuestline,
     listCategories,
     listQuestlines,
-    listQuests,
-    listNotes,
-    listAllAttachments,
     updateQuest,
     updateQuestStep,
     QUEST_STATUSES,
@@ -41,11 +38,12 @@ import { RunnersPage } from '@/pages/runners'
     setUnauthorizedHandler,
   } from '@/shared/api/client.ts'
   import { subscribeQuestEvents } from '@/shared/lib/live.ts'
-  import { seedAttachmentIndex, invalidateAttachmentLiveFlags, flattenAttachmentIndex } from '@/entities/attachment'
+  import { attachmentCatalog, clearAttachmentIndex, fetchAttachmentIndex, flattenAttachmentIndex, invalidateAttachmentLiveFlags, seedAttachmentIndex, setAttachmentIndex } from '@/entities/attachment'
+  import { clearNotes, fetchNoteList, noteCatalog, setNotes } from '@/entities/note'
+  import { clearQuests, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple, fetchQuestList, groupQuestsByCategory, inScope, listOpenOrAll, questCatalog, questSpec, scopeQuestlineChoices, setQuests, upsertQuest } from '@/entities/quest'
   import { applyTheme, loadSavedTheme } from '@/shared/lib/theme.ts'
   import { questMatchesQuery } from '@/shared/lib/search.ts'
   import { parseQuery, passes, tokenValues, setToken } from '@/shared/lib/searchFlags.ts'
-  import { questSpec, groupQuestsByCategory, inScope, listOpenOrAll, scopeQuestlineChoices, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple } from '@/entities/quest'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { installHotkeys, registerHotkeys } from '@/shared/lib/hotkeys.ts'
   import { foldRow, moveRow } from '@/shared/lib/listNav.ts'
@@ -81,9 +79,9 @@ import { RunnersPage } from '@/pages/runners'
   /** Cleanup for the live subscription + timers, so logout can tear them down. */
   let stopApp: () => void = null
 
-  let quests = $state([])
-  let notes = $state([])
-  let attachmentIndex: Record<string, any> | null = $state(null)
+  let quests = $derived(questCatalog.list)
+  let notes = $derived(noteCatalog.list)
+  let attachmentIndex = $derived(attachmentCatalog.index)
   let loading = $state(true)
   let error = $state('')
   let liveStatus = $state('off')
@@ -276,15 +274,15 @@ import { RunnersPage } from '@/pages/runners'
     if (!silent) error = ''
     try {
       const [next, cats, lines, nextNotes, attIndex] = await Promise.all([
-        listQuests({}),
+        fetchQuestList(),
         listCategories(),
         listQuestlines(),
-        listNotes().catch((): any[] => []),
-        listAllAttachments().catch((): any => null),
+        fetchNoteList().catch((): any[] => []),
+        fetchAttachmentIndex().catch((): any => null),
       ])
-      quests = next
-      notes = Array.isArray(nextNotes) ? nextNotes : []
-      attachmentIndex = attIndex && typeof attIndex === 'object' ? attIndex : null
+      setQuests(next)
+      setNotes(Array.isArray(nextNotes) ? nextNotes : [])
+      setAttachmentIndex(attIndex && typeof attIndex === 'object' ? attIndex : null)
       categories = Array.isArray(cats) ? cats : []
       questlines = Array.isArray(lines) ? lines : []
       if (attIndex) {
@@ -317,9 +315,9 @@ import { RunnersPage } from '@/pages/runners'
     } catch (e) {
       if (!silent) {
         error = e.message || String(e)
-        quests = []
-        notes = []
-        attachmentIndex = null
+        clearQuests()
+        clearNotes()
+        clearAttachmentIndex()
         nav.selectedId = null
       }
     } finally {
@@ -373,7 +371,7 @@ import { RunnersPage } from '@/pages/runners'
     lineModalOpen = true
   }
 
-  function openEdit(quest = selected) {
+  function openEdit(quest: { id?: number } | Event | null = selected) {
     const q = quest instanceof Event ? selected : quest || selected
     if (!q?.id) return
     nav.selectedId = q.id
@@ -491,12 +489,7 @@ import { RunnersPage } from '@/pages/runners'
   })
 
   function applyQuest(quest: { id: any }, { select = true } = {}) {
-    const idx = quests.findIndex((q) => q.id === quest.id)
-    if (idx >= 0) {
-      quests = quests.map((q) => (q.id === quest.id ? quest : q))
-    } else {
-      load({ silent: true })
-    }
+    if (!upsertQuest(quest)) load({ silent: true })
     if (select) nav.selectedId = quest.id
   }
 
@@ -624,9 +617,9 @@ import { RunnersPage } from '@/pages/runners'
     }
     if (stopApp) stopApp()
     stopApp = null
-    quests = []
-    notes = []
-    attachmentIndex = null
+    clearQuests()
+    clearNotes()
+    clearAttachmentIndex()
     nav.selectedId = null
     nav.selectedNoteId = null
     nav.selectedAttachmentId = null
