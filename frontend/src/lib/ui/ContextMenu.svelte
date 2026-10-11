@@ -11,6 +11,9 @@
    *   disabled?: boolean,
    *   children?: CtxItem[],
    * }} CtxItem
+   */
+
+  /**
    * @type {{ open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void }}
    */
   let { open = false, x = 0, y = 0, items = [], onSelect, onClose } = $props()

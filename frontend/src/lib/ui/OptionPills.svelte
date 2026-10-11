@@ -12,6 +12,9 @@
    *   color?: string,
    *   none?: boolean,
    * }} PillOption
+   */
+
+  /**
    * @type {{
    *   options: PillOption[],
    *   value?: string,

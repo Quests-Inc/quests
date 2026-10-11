@@ -43,6 +43,7 @@
    *   quests?: any[],
    *   questlines?: any[],
    *   attachments?: any[],
+   *   sidebarCollapsed?: boolean,
    *   onSelect: (id: number | null) => void,
    *   onChanged: () => void,
    *   onRef?: (kind: string, id: number) => void,

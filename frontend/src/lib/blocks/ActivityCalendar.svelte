@@ -679,7 +679,7 @@
                   <span
                     class="day-load-chart__col"
                     style:height="{n === 0 ? 0 : Math.max(8, (n / dayLoad.loadMax) * 100)}%"
-                    title="{n}"
+                    title={String(n)}
                   ></span>
                 {/each}
               </div>

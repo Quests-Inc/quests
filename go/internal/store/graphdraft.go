@@ -14,7 +14,7 @@ import (
 type DraftOp struct {
 	ID        int64           `json:"id"`
 	Kind      string          `json:"kind"`
-	Payload   json.RawMessage `json:"payload"`
+	Payload   json.RawMessage `json:"payload" tstype:"any"`
 	CreatedAt time.Time       `json:"created_at"`
 }
 

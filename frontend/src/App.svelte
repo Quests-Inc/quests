@@ -92,8 +92,9 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     db: 'unknown',
   })
   let searchQuery = $state('')
-  /** @type {'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'} */
-  let view = $state('journal')
+  let view = $state(
+    /** @type {'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'} */ ('journal'),
+  )
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
 
@@ -142,7 +143,9 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
   /** @type {{ id: number, slug: string, label: string, sort_order: number, color?: string }[]} */
   /** Centre of the relations map tab; null until picked or opened from a card. */
-  let graphRoot = $state(/** @type {{ type: string | null, id: number | null }} */ ({ type: null, id: null }))
+  let graphRoot = $state(
+    /** @type {{ type: 'quest' | 'note' | 'questline' | null, id: number | null }} */ ({ type: null, id: null }),
+  )
   /** Bump to refresh the map after live events. */
   let graphNonce = $state(0)
   /** Bump to refresh the history feed after live events. */
@@ -164,7 +167,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let modalMode = $state(/** @type {'create' | 'edit'} */ ('create'))
   /** Prefill when creating from questline context menu. */
   let modalDefaults = $state(
-    /** @type {{ questline_id?: number | null, category_id?: number | null } | null} */ (null),
+    /** @type {{ questline_id?: number | null, category_id?: number | null, description?: string } | null} */ (null),
   )
   let templatesOpen = $state(false)
   let secretsOpen = $state(false)
@@ -199,6 +202,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   /** True while QuestDetail is playing its erase-before-delete animation. */
   let deleteAnimActive = $state(false)
   /** @type {(() => void) | null} */
+  /** @type {((v?: unknown) => void) | null} */
   let deleteAnimResolve = null
   /** quest id → when a live event from outside the web UI touched it. The
    * event lands before the refetched data, so QuestDetail picks the mark up

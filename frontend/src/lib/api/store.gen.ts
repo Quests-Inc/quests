@@ -291,7 +291,7 @@ export interface GraphRoot {
 export interface DraftOp {
   id: number /* int64 */;
   kind: string;
-  payload: unknown;
+  payload: any;
   created_at: string;
 }
 

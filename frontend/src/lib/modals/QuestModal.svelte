@@ -40,7 +40,7 @@
   import ModalFoot from './ModalFoot.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{ open: boolean, mode: 'create' | 'edit', quest?: any, defaults?: { questline_id?: number | null, category_id?: number | null, description?: string }, quests?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (q: any) => void, onDeleted?: (id: number) => void, onDraft?: (payload: any) => void }} */
+  /** @type {{ open: boolean, mode: 'create' | 'edit', quest?: any, defaults?: { questline_id?: number | null, category_id?: number | null, description?: string } | null, quests?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (q: any, meta?: { mode: string }) => void, onDeleted?: (id: number) => void, onDraft?: (payload: any) => void }} */
   let {
     open = false,
     mode = 'create',

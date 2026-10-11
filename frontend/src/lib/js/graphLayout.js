@@ -8,7 +8,7 @@ const LEN = { structure: 110, dependency: 150, reference: 210 }
  * Lays out nodes in place (sets x/y). Root sits at the origin.
  * @param {{ key: string, depth: number, x?: number, y?: number }[]} nodes
  * @param {{ from: string, to: string, kind: string }[]} edges
- * @param {{ iterations?: number }} [opts]
+ * @param {{ iterations?: number, sizeOf?: (n: any) => { w: number, h: number } }} [opts]
  */
 export function layoutGraph(nodes, edges, { iterations = 320, sizeOf = () => ({ w: 120, h: 26 }) } = {}) {
   const n = nodes.length
@@ -336,6 +336,7 @@ export function layoutTreeDown(nodes, edges) {
  */
 export function layoutLayers(nodes, { hgap = 90, vgap = 14 } = {}) {
   const ORDER = ['questline', 'quest', 'step', 'note', 'attachment', 'template']
+  /** @type {Map<string, any>} */
   const cols = new Map(ORDER.map((t) => [t, []]))
   for (const n of nodes) (cols.get(n.type) ?? cols.get('template')).push(n)
   let x = 0

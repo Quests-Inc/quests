@@ -104,7 +104,7 @@
       })()
     ),
   )
-  let center = $state({ type: rootType, id: rootId })
+  let center = $state(/** @type {{ type: string, id: number }} */ ({ type: rootType, id: rootId }))
   let data = $state(/** @type {any | null} */ (null))
   let loading = $state(false)
   let error = $state('')
@@ -181,6 +181,7 @@
       await loadDraft()
       reloadTick += 1
     } catch (e) {
+      /** @type {Record<number, string>} */
       const problems = {}
       // @ts-ignore
       for (const p of e.problems ?? []) problems[p.op] = p.message
@@ -1586,7 +1587,8 @@
   }
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
-  let ctx = $state({ open: false, x: 0, y: 0, node: /** @type {any | null} */ (null), at: { x: 0, y: 0 }, group: false })
+  /** @type {{ open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any }} */
+  let ctx = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
 
   /** Screen point → world coordinates (where a new thing should land). */
   function worldAt(e) {

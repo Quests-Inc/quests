@@ -65,8 +65,7 @@
 
   let showLowActions = $derived(view === 'journal' || view === 'notes')
 
-  /** @type {'full' | 'icons' | 'icons-core' | 'icons-primary'} */
-  let actionsMode = $state('full')
+  let actionsMode = $state(/** @type {'full' | 'icons' | 'icons-core' | 'icons-primary'} */ ('full'))
 
   /** Overflow menu lists only actions hidden behind ⋮ for the current stage. */
   let menuItems = $derived.by(() => {

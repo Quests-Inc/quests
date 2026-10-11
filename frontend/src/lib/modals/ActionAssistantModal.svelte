@@ -19,8 +19,7 @@
   let { open = false, quests = [], questlines = [], notes = [], attachments = [], onClose, onApplied } = $props()
 
   let text = $state('')
-  /** @type {'input' | 'loading' | 'preview' | 'applying'} */
-  let phase = $state('input')
+  let phase = $state(/** @type {'input' | 'loading' | 'preview' | 'applying'} */ ('input'))
   let clarifyQuestion = $state('')
   let batch = $state(/** @type {any | null} */ (null))
   let preview = $state(/** @type {any[]} */ ([]))
@@ -113,7 +112,7 @@
         <p class="modal__error">{errorMsg}</p>
       {/if}
 
-      {#if phase !== 'preview'}
+      {#if phase !== 'preview' && phase !== 'applying'}
         <div class="modal__body">
           {#if clarifyQuestion}
             <p class="clarify">{clarifyQuestion}</p>

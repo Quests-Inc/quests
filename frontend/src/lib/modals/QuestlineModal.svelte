@@ -18,7 +18,7 @@
   import AttachmentsBlock from '../blocks/AttachmentsBlock.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{ open: boolean, mode: 'create' | 'edit', line?: any, quests?: any[], questlines?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (line: any) => void, onDeleted?: (id: number) => void }} */
+  /** @type {{ open: boolean, mode: 'create' | 'edit', line?: any, quests?: any[], questlines?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (line: any, meta?: { mode: string }) => void, onDeleted?: (id: number) => void }} */
   let {
     open = false,
     mode = 'create',

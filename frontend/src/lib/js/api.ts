@@ -2,13 +2,14 @@ import type { Category, QuestRead, Tag } from '../api/domain.gen'
 import type {
   AttachmentRevisions,
   AttachmentView,
+  GraphDraftView,
   LLMView,
   NoteCheckView,
   NoteListItem,
   NotePayload,
   RunnerView,
 } from '../api/http.gen'
-import type { QuestlineRead, RunnerJob, TemplateRead } from '../api/store.gen'
+import type { Graph, QuestlineRead, RunnerJob, TemplateRead } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
 const BASE = ''
@@ -714,10 +715,16 @@ export function getQuestLog(params = {}) {
  * @param {{ type: string, id: number }[]} [extra]
  * @param {{ type: string, id: number }[]} [expand] cards whose direct neighbours are added whatever the depth
  */
-export function getGraph(type, id, depth = 2, extra = [], expand = []) {
+export function getGraph(
+  type: string,
+  id: number,
+  depth = 2,
+  extra: { type: string; id: number }[] = [],
+  expand: { type: string; id: number; only?: string }[] = []
+) {
   const more = extra.map((r) => `${r.type}:${r.id}`).join(',')
   const open = expand.map((r) => `${r.type}:${r.id}${r.only ? `>${r.only}` : ''}`).join(',')
-  return request(
+  return request<Graph>(
     `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}${open ? `&expand=${encodeURIComponent(open)}` : ''}`
   )
 }
@@ -725,7 +732,7 @@ export function getGraph(type, id, depth = 2, extra = [], expand = []) {
 // --- Map draft: edits made on the relations map, kept on the server until saved.
 
 export function getGraphDraft() {
-  return request('/api/graph-draft')
+  return request<GraphDraftView>('/api/graph-draft')
 }
 
 /** @param {string} kind @param {any} payload */

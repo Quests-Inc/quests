@@ -49,8 +49,7 @@
   let templates = $state(/** @type {any[]} */ ([]))
   let loading = $state(false)
   let error = $state('')
-  /** @type {'list' | 'create' | 'edit'} */
-  let view = $state('list')
+  let view = $state(/** @type {'list' | 'create' | 'edit'} */ ('list'))
   let editing = $state(/** @type {any | null} */ (null))
 
   let title = $state('')
