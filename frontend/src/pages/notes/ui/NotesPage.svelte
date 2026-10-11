@@ -9,6 +9,7 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
+  import { createNoteRename } from '../model/noteRename.svelte.ts'
   import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
   import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
@@ -110,9 +111,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let iconModalOpen = $state(false)
   let iconModalNoteId = $state((null as number | null))
   /** Inline rename in the tree — id of the row being renamed, or null. */
-  let renamingId = $state((null as number | null))
-  let renamingValue = $state('')
-  let renameInputEl = $state((null as HTMLInputElement | null))
   let dirty = $derived(
     title !== saved.title ||
       description !== saved.description ||
@@ -236,43 +234,19 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   function rowTitle(n: { id: number; title: any }) {
-    if (n.id === renamingId) return renamingValue
+    if (n.id === rename.id) return rename.value
     return noteDrafts[String(n.id)]?.title || n.title
   }
 
-  function startRename(id: number) {
-    const n = noteById(id)
-    if (!n) return
-    renamingId = id
-    renamingValue = rowTitleRaw(n)
-    tick().then(() => {
-      renameInputEl?.focus()
-      renameInputEl?.select()
-    })
-  }
+  const rowTitleRaw = (n: { id: number; title: string }) => noteDrafts[String(n.id)]?.title || n.title
 
-  function rowTitleRaw(n: { id: any; title: any }) {
-    return noteDrafts[String(n.id)]?.title || n.title
-  }
-
-  function cancelRename() {
-    renamingId = null
-    renamingValue = ''
-  }
-
-  async function commitRename() {
-    const id = renamingId
-    if (id == null) return
-    const t = renamingValue.trim()
-    const n = noteById(id)
-    cancelRename()
-    if (!t || !n || t === n.title) return
-    try {
-      const savedRow = await updateNote(id, { title: t })
+  const rename = createNoteRename({
+    noteById: (id) => noteById(id),
+    rawTitle: rowTitleRaw,
+    updateNote,
+    /** Переименование из дерева не должно затереть заголовок, который в открытой заметке сейчас правят руками. */
+    onSaved: (id, t, savedRow) => {
       if (id === selectedId) {
-        // Only overwrite the open editor's own title field if it wasn't
-        // independently mid-edit — otherwise a rename from the tree would
-        // clobber text the user is still typing in the detail pane.
         const titleWasUntouched = title === saved.title
         detail = savedRow
         saved = { ...saved, title: t }
@@ -281,11 +255,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
         if (draft) putNoteDraft(id, { ...draft, title: t })
       }
       onChanged()
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    }
-  }
+    },
+    setError: (message) => (error = message),
+  })
+  const startRename = rename.start
+  const cancelRename = rename.cancel
+  const commitRename = rename.commit
 
   /** Title commits on blur/Enter, independent of the description draft. */
   async function commitTitle() {
@@ -316,17 +291,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       event.preventDefault()
       titleEl?.blur()
     }
-  }
-
-  function onRenameKeydown(event: { key: string; preventDefault: () => void; stopPropagation: () => void }) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      renameInputEl?.blur()
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      cancelRename()
-    }
-    event.stopPropagation()
   }
 
   function rowDirty(n: { id: number }) {
@@ -866,7 +830,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   const dnd = createTreeDnd({
     notes: () => notes,
-    renaming: () => renamingId != null,
+    renaming: () => rename.id != null,
     move: (id, newParentId) => reparentNote(id, newParentId),
   })
 
@@ -965,9 +929,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     {roots}
     {selectedId}
     dragOverKey={dnd.dragOverKey}
-    {renamingId}
-    bind:renamingValue
-    bind:renameInputEl
+    renamingId={rename.id}
+    bind:renamingValue={rename.value}
+    bind:renameInputEl={rename.input}
     {readmeBubbleIds}
     {labels}
     {onRef}
@@ -980,7 +944,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onToggleTree={toggleTree}
     {rowTitle}
     {rowDirty}
-    {onRenameKeydown}
+    onRenameKeydown={rename.onKeydown}
     onCommitRename={commitRename}
     onListDragOver={dnd.onListDragOver}
     onListDragLeave={dnd.onListDragLeave}
