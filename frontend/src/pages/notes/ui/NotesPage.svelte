@@ -9,9 +9,10 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
+  import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
   import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
-  import { NOTE_SPEC, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { NOTE_SPEC, noteFormFromRow, noteFormsEqual, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { parseQuery, passes, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   type NoteForm = NoteDraft & { isReadme?: boolean; isPrivate?: boolean; isCategory?: boolean }
@@ -99,7 +100,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     isPrivate: false,
     isCategory: false,
   })
-  let viewMode: 'raw' | 'combined' | 'formatted' = $state(loadViewMode())
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
@@ -198,55 +198,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let loadedId = $state((null as number | null))
 
-  const VIEW_MODES = ([
-    { id: 'raw', label: 'Текст' },
-    { id: 'combined', label: 'Оба' },
-    { id: 'formatted', label: 'Просмотр' },
-  ] as const)
+  const view = createViewMode()
+  const VIEW_MODES = VIEW_MODE_OPTIONS
+  let viewMode = $derived(view.mode)
+  const setViewMode = view.set
 
-  function loadViewMode() {
-    try {
-      const v = localStorage.getItem('quests.notes.viewMode')
-      if (v === 'raw' || v === 'combined' || v === 'formatted') return v
-    } catch {
-      /* ignore */
-    }
-    return 'combined'
-  }
-
-  function setViewMode(mode: 'raw' | 'combined' | 'formatted') {
-    viewMode = mode
-    try {
-      localStorage.setItem('quests.notes.viewMode', mode)
-    } catch {
-      /* ignore */
-    }
-  }
-
-  // "Оба" needs a side-by-side split that doesn't fit the full-screen single
-  // pane below 480px — drop out of it there (the option itself is hidden by
-  // CSS too) so a note never opens into a mode with no toggle back to it.
-  $effect(() => {
-    const mq = window.matchMedia('(max-width: 480px)')
-    const apply = () => {
-      if (mq.matches && viewMode === 'combined') setViewMode('formatted')
-    }
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  })
-
-  function fromRow(row: NotePayload) {
-    return {
-      title: row.title || '',
-      description: row.description || '',
-      parentId: row.parent_id != null ? String(row.parent_id) : '',
-      pinned: !!row.pinned,
-      isReadme: !!row.is_readme,
-      isPrivate: !!row.is_private,
-      isCategory: !!row.is_category,
-    }
-  }
+  const fromRow = noteFormFromRow
 
   function applyForm(src: NoteForm) {
     title = src.title
@@ -263,17 +220,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     return { title, description, parentId, pinned, isReadme, isPrivate, isCategory }
   }
 
-  function draftsEqual(a: { title: any; description: any; parentId: any; pinned: any; isReadme: any; isPrivate: any; isCategory: any }, b: { title: any; description: any; parentId: any; pinned: any; isReadme: any; isPrivate: any; isCategory: any }) {
-    return (
-      a.title === b.title &&
-      a.description === b.description &&
-      a.parentId === b.parentId &&
-      a.pinned === b.pinned &&
-      a.isReadme === b.isReadme &&
-      a.isPrivate === b.isPrivate &&
-      a.isCategory === b.isCategory
-    )
-  }
+  const draftsEqual = noteFormsEqual
 
   function syncDraft(id: number) {
     if (id == null) return
