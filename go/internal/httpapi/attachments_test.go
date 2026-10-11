@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/clamav"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/pgtest"
@@ -434,7 +435,7 @@ func TestAttachmentDeleteQuestPurgesFiles(t *testing.T) {
 	if del.Code != 204 {
 		t.Fatalf("delete quest = %d %s", del.Code, del.Body.String())
 	}
-	rows, err := s.Store.ListAttachments(t.Context(), ownerQuest, qid)
+	rows, err := s.Store.Knowledge().ListAttachments(t.Context(), ownerQuest, qid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -786,16 +787,16 @@ func TestGraphEdgesAndOrphans(t *testing.T) {
 	s := newAttachmentServer(t, dav.URL, clam, 0)
 	ctx := context.Background()
 	qid := seedQuest(t, s)
-	linked, err := s.Store.CreateNote(ctx, store.Note{Title: "linked"})
+	linked, err := s.Store.Knowledge().CreateNote(ctx, knowledge.Note{Title: "linked"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphan, err := s.Store.CreateNote(ctx, store.Note{Title: "orphan"})
+	orphan, err := s.Store.Knowledge().CreateNote(ctx, knowledge.Note{Title: "orphan"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// A note pointing at the quest, and the quest text pointing back at "linked".
-	if _, err := s.Store.UpdateNote(ctx, linked.ID, map[string]any{"description": fmt.Sprintf("see quest=%d", qid)}); err != nil {
+	if _, err := s.Store.Knowledge().UpdateNote(ctx, linked.ID, map[string]any{"description": fmt.Sprintf("see quest=%d", qid)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Store.DB.Exec(`UPDATE quest SET description = ? WHERE id = ?`, fmt.Sprintf("uses note=%d", linked.ID), qid); err != nil {
@@ -859,7 +860,7 @@ func TestAttachmentWorkspaceQuota(t *testing.T) {
 	if w := postFile(t, s.Handler(), path, "c.bin", "", bytes.Repeat([]byte("c"), 40)); w.Code != 201 {
 		t.Fatalf("an upload that fits was refused: %d %s", w.Code, w.Body.String())
 	}
-	used, err := s.Store.AttachmentUsage(context.Background())
+	used, err := s.Store.Knowledge().AttachmentUsage(context.Background())
 	if err != nil || used != 100 {
 		t.Fatalf("usage = %d, %v", used, err)
 	}

@@ -186,7 +186,7 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 		if !ok {
 			return 0, errors.New("copied file has no owner")
 		}
-		a, err := s.Store.GetAttachment(ctx, sid)
+		a, err := s.Store.Knowledge().GetAttachment(ctx, sid)
 		if err != nil {
 			return 0, err
 		}

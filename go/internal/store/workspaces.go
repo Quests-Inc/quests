@@ -6,6 +6,7 @@ import (
 
 	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/kernel"
+	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/tokens"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -82,3 +83,7 @@ func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
 func (s *Store) guardExec(_ context.Context, command, runOn *string) error {
 	return kernel.CommandExec(command, runOn)
 }
+
+// Knowledge gives access to notes, attachments and search (the knowledge context) over the same database.
+// Transitional, like Identity: until the composition root injects each context's service (ADR-0001).
+func (s *Store) Knowledge() *knowledge.Store { return &knowledge.Store{DB: s.DB} }

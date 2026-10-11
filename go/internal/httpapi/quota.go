@@ -16,7 +16,7 @@ func (s *Server) overQuota(ctx context.Context, incoming int64) (bool, int64, er
 	if s.WorkspaceQuota <= 0 {
 		return false, 0, nil
 	}
-	used, err := s.Store.AttachmentUsage(ctx)
+	used, err := s.Store.Knowledge().AttachmentUsage(ctx)
 	if err != nil {
 		return false, 0, err
 	}

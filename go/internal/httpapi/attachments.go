@@ -16,6 +16,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/store"
@@ -71,7 +72,7 @@ func (s *Server) ownerExists(ctx context.Context, ownerType string, id int64) (b
 		return s.Store.QuestlineExists(ctx, id)
 	}
 	if ownerType == ownerNote {
-		return s.Store.NoteExists(ctx, id)
+		return s.Store.Knowledge().NoteExists(ctx, id)
 	}
 	_, err := s.Store.GetQuest(ctx, id)
 	if errors.Is(err, store.ErrNotFound) {
@@ -82,21 +83,21 @@ func (s *Server) ownerExists(ctx context.Context, ownerType string, id int64) (b
 
 // attachmentFor resolves {id}/{aid} and refuses an attachment that belongs to a
 // different owner, so a valid id under the wrong quest is a 404, not a leak.
-func (s *Server) attachmentFor(r *http.Request, ownerType string) (store.Attachment, error) {
+func (s *Server) attachmentFor(r *http.Request, ownerType string) (knowledge.Attachment, error) {
 	ownerID, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	aid, _ := strconv.ParseInt(r.PathValue("aid"), 10, 64)
-	a, err := s.Store.GetAttachment(r.Context(), aid)
+	a, err := s.Store.Knowledge().GetAttachment(r.Context(), aid)
 	if err != nil {
-		return store.Attachment{}, err
+		return knowledge.Attachment{}, err
 	}
 	if a.OwnerType != ownerType || a.OwnerID != ownerID {
-		return store.Attachment{}, store.ErrNotFound
+		return knowledge.Attachment{}, store.ErrNotFound
 	}
 	return a, nil
 }
 
 // logAttachment records an attachment event against the attachment and its owner.
-func (s *Server) logAttachment(ctx context.Context, kind string, a store.Attachment, detail string) {
+func (s *Server) logAttachment(ctx context.Context, kind string, a knowledge.Attachment, detail string) {
 	_ = s.Store.LogEvent(context.WithoutCancel(ctx), store.ChangeEvent{
 		Kind: kind, EntityType: "attachment", EntityID: a.ID,
 		ParentType: a.OwnerType, ParentID: a.OwnerID, Title: a.Filename, Detail: detail,
@@ -108,7 +109,7 @@ func (s *Server) clamavOK() bool { return s.ClamAV != nil && s.ClamAV.Configured
 
 func (s *Server) listAttachments(w http.ResponseWriter, r *http.Request, ownerType string) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	rows, err := s.Store.ListAttachments(r.Context(), ownerType, id)
+	rows, err := s.Store.Knowledge().ListAttachments(r.Context(), ownerType, id)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -124,7 +125,7 @@ func (s *Server) listAttachments(w http.ResponseWriter, r *http.Request, ownerTy
 // listAllAttachments is the journal cache seed: one database round-trip, grouped
 // by owner. ?stat=1 opts into WebDAV probes (expensive with many files).
 func (s *Server) listAllAttachments(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.Store.ListAllAttachments(r.Context())
+	rows, err := s.Store.Knowledge().ListAllAttachments(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -152,9 +153,9 @@ const sourceUpdatedSlack = time.Minute
 
 // AttachmentRevisions is the version history of one attachment.
 type AttachmentRevisions struct {
-	AttachmentID    int64                `json:"attachment_id"`
-	CurrentRevision int                  `json:"current_revision"`
-	Revisions       []store.RevisionRead `json:"revisions"`
+	AttachmentID    int64                    `json:"attachment_id"`
+	CurrentRevision int                      `json:"current_revision"`
+	Revisions       []knowledge.RevisionRead `json:"revisions"`
 }
 
 // AttachmentLive is what the file server says about the file right now; absent from a listing that did not ask.
@@ -166,8 +167,8 @@ type AttachmentLive struct {
 
 // AttachmentView is an attachment with its live file-server facts, when they were asked for.
 type AttachmentView struct {
-	store.AttachmentRead `tstype:",extends"`
-	*AttachmentLive      `tstype:"Partial<AttachmentLive>,extends"`
+	knowledge.AttachmentRead `tstype:",extends"`
+	*AttachmentLive          `tstype:"Partial<AttachmentLive>,extends"`
 }
 
 // decorateAttachment adds live file-server facts. available is false (and the
@@ -175,8 +176,8 @@ type AttachmentView struct {
 // source_updated is the "актуализируй" marker: the file's Last-Modified is
 // newer than the moment the current revision was uploaded, i.e. the source
 // file changed on the file server after we took it.
-func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, probe bool) AttachmentView {
-	out := AttachmentView{AttachmentRead: store.AttachmentToRead(a)}
+func (s *Server) decorateAttachment(ctx context.Context, a knowledge.Attachment, probe bool) AttachmentView {
+	out := AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a)}
 	if !probe {
 		// Leave available/source_updated off: unknown is not "missing", and a
 		// bulk index must not paint every file as unavailable before Stat.
@@ -201,7 +202,7 @@ func (s *Server) decorateAttachment(ctx context.Context, a store.Attachment, pro
 }
 
 func (s *Server) attachmentsForOwner(ctx context.Context, ownerType string, ownerID int64, probe bool) []AttachmentView {
-	rows, err := s.Store.ListAttachments(ctx, ownerType, ownerID)
+	rows, err := s.Store.Knowledge().ListAttachments(ctx, ownerType, ownerID)
 	if err != nil {
 		return []AttachmentView{}
 	}
@@ -218,12 +219,12 @@ func (s *Server) attachmentsForOwner(ctx context.Context, ownerType string, owne
 // purgeOwnerAttachments drops metadata first, then the bytes. A leftover file
 // on WebDAV is inert; a row pointing at nothing is a broken link.
 func (s *Server) purgeOwnerAttachments(ctx context.Context, ownerType string, ownerID int64) {
-	paths, err := s.Store.AttachmentPathsForOwner(ctx, ownerType, ownerID)
+	paths, err := s.Store.Knowledge().AttachmentPathsForOwner(ctx, ownerType, ownerID)
 	if err != nil {
 		fmt.Printf("attachments: list paths for %s-%d: %v\n", ownerType, ownerID, err)
 		return
 	}
-	if err := s.Store.DeleteAttachmentsForOwner(ctx, ownerType, ownerID); err != nil {
+	if err := s.Store.Knowledge().DeleteAttachmentsForOwner(ctx, ownerType, ownerID); err != nil {
 		fmt.Printf("attachments: delete rows for %s-%d: %v\n", ownerType, ownerID, err)
 		return
 	}
@@ -342,7 +343,7 @@ func (s *Server) postAttachment(w http.ResponseWriter, r *http.Request, ownerTyp
 	}
 
 	now := timeutil.NowUTC()
-	a, err := s.Store.CreateAttachment(r.Context(), store.Attachment{
+	a, err := s.Store.Knowledge().CreateAttachment(r.Context(), knowledge.Attachment{
 		OwnerType:           ownerType,
 		OwnerID:             ownerID,
 		Filename:            filename,
@@ -361,7 +362,7 @@ func (s *Server) postAttachment(w http.ResponseWriter, r *http.Request, ownerTyp
 		writeErr(w, 500, err.Error())
 		return
 	}
-	out := AttachmentView{AttachmentRead: store.AttachmentToRead(a), AttachmentLive: &AttachmentLive{Available: true}}
+	out := AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a), AttachmentLive: &AttachmentLive{Available: true}}
 	s.logAttachment(r.Context(), "attachment_added", a, "загружено")
 	s.publishSilent(r.Context(), "attachment_created", a.Filename, map[string]any{
 		"attachment_id": a.ID,
@@ -394,7 +395,7 @@ func (s *Server) getAttachmentContent(w http.ResponseWriter, r *http.Request, ow
 			writeErr(w, 422, "revision must be a positive integer")
 			return
 		}
-		rev, err := s.Store.GetAttachmentRevision(r.Context(), a.ID, revN)
+		rev, err := s.Store.Knowledge().GetAttachmentRevision(r.Context(), a.ID, revN)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "revision not found")
 			return
@@ -447,7 +448,7 @@ var inlineImageTypes = map[string]bool{
 // client-declared one) and anything outside inlineImageTypes is refused.
 func (s *Server) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	aid, _ := strconv.ParseInt(r.PathValue("aid"), 10, 64)
-	a, err := s.Store.GetAttachment(r.Context(), aid)
+	a, err := s.Store.Knowledge().GetAttachment(r.Context(), aid)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "attachment not found")
 		return
@@ -476,7 +477,7 @@ func (s *Server) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 422, "revision must be a positive integer")
 			return
 		}
-		rev, err := s.Store.GetAttachmentRevision(r.Context(), a.ID, revN)
+		rev, err := s.Store.Knowledge().GetAttachmentRevision(r.Context(), a.ID, revN)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "revision not found")
 			return
@@ -567,7 +568,7 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 	}
 	updated := a
 	if body.CurrentRevision != nil {
-		updated, err = s.Store.SetCurrentAttachmentRevision(r.Context(), a.ID, *body.CurrentRevision)
+		updated, err = s.Store.Knowledge().SetCurrentAttachmentRevision(r.Context(), a.ID, *body.CurrentRevision)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "revision not found")
 			return
@@ -578,14 +579,14 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 		}
 	}
 	if body.Comment != nil {
-		updated, err = s.Store.SetAttachmentComment(r.Context(), a.ID, strings.TrimSpace(*body.Comment))
+		updated, err = s.Store.Knowledge().SetAttachmentComment(r.Context(), a.ID, strings.TrimSpace(*body.Comment))
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}
 	}
 	if body.Hidden != nil {
-		updated, err = s.Store.SetAttachmentHidden(r.Context(), a.ID, *body.Hidden)
+		updated, err = s.Store.Knowledge().SetAttachmentHidden(r.Context(), a.ID, *body.Hidden)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
@@ -602,7 +603,7 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 		}
 	}
 	if body.Comment == nil && body.CurrentRevision == nil && body.Hidden == nil {
-		writeJSON(w, 200, store.AttachmentToRead(a))
+		writeJSON(w, 200, knowledge.AttachmentToRead(a))
 		return
 	}
 	s.publishSilent(r.Context(), "attachment_updated", updated.Filename, map[string]any{
@@ -610,7 +611,7 @@ func (s *Server) patchAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 		"owner_type":    updated.OwnerType,
 		"owner_id":      updated.OwnerID,
 	})
-	writeJSON(w, 200, store.AttachmentToRead(updated))
+	writeJSON(w, 200, knowledge.AttachmentToRead(updated))
 }
 
 func (s *Server) listAttachmentRevisions(w http.ResponseWriter, r *http.Request, ownerType string) {
@@ -623,14 +624,14 @@ func (s *Server) listAttachmentRevisions(w http.ResponseWriter, r *http.Request,
 		writeErr(w, 500, err.Error())
 		return
 	}
-	revs, err := s.Store.ListAttachmentRevisions(r.Context(), a.ID)
+	revs, err := s.Store.Knowledge().ListAttachmentRevisions(r.Context(), a.ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	out := make([]store.RevisionRead, 0, len(revs))
+	out := make([]knowledge.RevisionRead, 0, len(revs))
 	for _, rev := range revs {
-		out = append(out, store.RevisionToRead(rev, a.CurrentRevision))
+		out = append(out, knowledge.RevisionToRead(rev, a.CurrentRevision))
 	}
 	writeJSON(w, 200, AttachmentRevisions{AttachmentID: a.ID, CurrentRevision: a.CurrentRevision, Revisions: out})
 }
@@ -720,7 +721,7 @@ func (s *Server) postAttachmentRevision(w http.ResponseWriter, r *http.Request, 
 	if comment == "" {
 		comment = a.Comment
 	}
-	updated, dropPaths, err := s.Store.AddAttachmentRevision(r.Context(), a.ID, store.AttachmentRevision{
+	updated, dropPaths, err := s.Store.Knowledge().AddAttachmentRevision(r.Context(), a.ID, knowledge.AttachmentRevision{
 		Filename:            filename,
 		WebDAVPath:          webdavPath,
 		SizeBytes:           int64(len(raw)),
@@ -741,7 +742,7 @@ func (s *Server) postAttachmentRevision(w http.ResponseWriter, r *http.Request, 
 			fmt.Printf("attachment %d: rotated file left on webdav: %v\n", a.ID, err)
 		}
 	}
-	out := AttachmentView{AttachmentRead: store.AttachmentToRead(updated), AttachmentLive: &AttachmentLive{Available: true}}
+	out := AttachmentView{AttachmentRead: knowledge.AttachmentToRead(updated), AttachmentLive: &AttachmentLive{Available: true}}
 	s.logAttachment(r.Context(), "attachment_version", updated, fmt.Sprintf("новая версия v%d", updated.CurrentRevision))
 	s.publishSilent(r.Context(), "attachment_updated", updated.Filename, map[string]any{
 		"attachment_id": updated.ID,
@@ -767,7 +768,7 @@ func (s *Server) deleteAttachmentRevision(w http.ResponseWriter, r *http.Request
 		writeErr(w, 422, "revision must be a positive integer")
 		return
 	}
-	davPath, err := s.Store.DeleteAttachmentRevision(r.Context(), a.ID, revN)
+	davPath, err := s.Store.Knowledge().DeleteAttachmentRevision(r.Context(), a.ID, revN)
 	if errors.Is(err, store.ErrConflict) {
 		writeErr(w, 422, "cannot delete the current revision")
 		return
@@ -804,7 +805,7 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request, ownerT
 		writeErr(w, 500, err.Error())
 		return
 	}
-	revs, err := s.Store.ListAttachmentRevisions(r.Context(), a.ID)
+	revs, err := s.Store.Knowledge().ListAttachmentRevisions(r.Context(), a.ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -822,7 +823,7 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request, ownerT
 	}
 	// Drop the row first: a leftover file on WebDAV is inert, a row pointing at
 	// nothing is a broken link in the UI.
-	if err := s.Store.DeleteAttachment(r.Context(), a.ID); err != nil {
+	if err := s.Store.Knowledge().DeleteAttachment(r.Context(), a.ID); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}

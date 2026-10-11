@@ -103,11 +103,11 @@ func TestGraphDraftCommitFlow(t *testing.T) {
 	if !strings.Contains(q.Description, fmt.Sprintf("note=%d", noteID)) || !strings.Contains(q.Description, fmt.Sprintf("quest=%d", oldQ)) {
 		t.Fatalf("refs not appended: %q", q.Description)
 	}
-	atts, _ := s.Store.ListAttachments(t.Context(), "note", noteID)
+	atts, _ := s.Store.Knowledge().ListAttachments(t.Context(), "note", noteID)
 	if len(atts) != 2 {
 		t.Fatalf("note attachments = %d, want the moved file and the staged one", len(atts))
 	}
-	moved, _ := s.Store.GetAttachment(t.Context(), oldAttID)
+	moved, _ := s.Store.Knowledge().GetAttachment(t.Context(), oldAttID)
 	if moved.OwnerType != "note" || moved.OwnerID != noteID {
 		t.Fatalf("attachment not re-parented: %+v", moved)
 	}
@@ -367,7 +367,7 @@ func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
 	if len(orig.Steps) != 3 || orig.Steps[2].Title != "первый"+copySuffix {
 		t.Fatalf("step copy missing: %+v", orig.Steps)
 	}
-	if atts, _ := s.Store.ListAttachments(t.Context(), "quest", qid); len(atts) != 2 {
+	if atts, _ := s.Store.Knowledge().ListAttachments(t.Context(), "quest", qid); len(atts) != 2 {
 		t.Fatalf("file copy missing: %d attachments", len(atts))
 	}
 	created := out["created"].(map[string]any)
@@ -391,7 +391,7 @@ func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
 	if code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil); code != 200 {
 		t.Fatalf("commit note edit = %d %v", code, out)
 	}
-	if n, _ := s.Store.GetNote(t.Context(), nid); n.Description != noteBody || n.Title != "Заметка" {
+	if n, _ := s.Store.Knowledge().GetNote(t.Context(), nid); n.Description != noteBody || n.Title != "Заметка" {
 		t.Fatalf("note edit not applied (len %d)", len(n.Description))
 	}
 

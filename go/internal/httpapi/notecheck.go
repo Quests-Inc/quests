@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -31,7 +32,7 @@ type NoteCheckView struct {
 	ErrorAt         *string `json:"error_at"`
 }
 
-func checkView(c store.NoteCheck) NoteCheckView {
+func checkView(c knowledge.NoteCheck) NoteCheckView {
 	return NoteCheckView{
 		Command: c.Command, IntervalSeconds: c.IntervalSeconds, RunOn: c.RunOn,
 		LastRunAt: timeutil.ToUTCISO(c.LastRunAt), Outdated: c.Outdated,
@@ -54,7 +55,7 @@ func (s *Server) putNoteCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	c, err := s.Store.SetNoteCheck(r.Context(), id, body.Command, body.IntervalSeconds, body.RunOn)
+	c, err := s.Store.Knowledge().SetNoteCheck(r.Context(), id, body.Command, body.IntervalSeconds, body.RunOn)
 	switch {
 	case err == nil:
 	case store.IsBadInput(err):
@@ -84,7 +85,7 @@ func (s *Server) runNoteCheck(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.Store.RequestNoteCheckNow(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+	if err := s.Store.Knowledge().RequestNoteCheckNow(r.Context(), id); errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusConflict, "у заметки нет проверки")
 		return
 	} else if err != nil {
@@ -112,7 +113,7 @@ func (s *Server) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
 	if *body.Outdated && reason == "" {
 		reason = "Отмечена вручную"
 	}
-	if err := s.Store.SetNoteOutdated(r.Context(), id, *body.Outdated, reason, time.Now().UTC()); err != nil {
+	if err := s.Store.Knowledge().SetNoteOutdated(r.Context(), id, *body.Outdated, reason, time.Now().UTC()); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

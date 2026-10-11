@@ -89,7 +89,7 @@ func (s *Server) attachmentImageLoader(ctx context.Context) pdfdoc.ImageLoader {
 		if !s.webdavOK() {
 			return nil, errors.New("attachment storage is not configured")
 		}
-		a, err := s.Store.GetAttachment(ctx, id)
+		a, err := s.Store.Knowledge().GetAttachment(ctx, id)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				return nil, errors.New("attachment not found")

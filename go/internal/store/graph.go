@@ -313,7 +313,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 	}
 
 	// References from text.
-	corpus, err := s.ListLinkCorpus(ctx)
+	corpus, err := s.Knowledge().ListLinkCorpus(ctx)
 	if err != nil {
 		return Graph{}, err
 	}

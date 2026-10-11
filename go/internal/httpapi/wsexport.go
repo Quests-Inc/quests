@@ -412,7 +412,7 @@ func (s *Server) importIcons(ctx context.Context, entries map[string]*zip.File, 
 		if table == "questline" {
 			_, _ = s.Store.SetQuestlineIcon(ctx, newID, fname)
 		} else {
-			_, _ = s.Store.SetNoteIcon(ctx, newID, fname)
+			_, _ = s.Store.Knowledge().SetNoteIcon(ctx, newID, fname)
 		}
 	}
 }

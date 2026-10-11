@@ -1,4 +1,4 @@
-package store
+package knowledge
 
 import (
 	"context"
@@ -46,12 +46,12 @@ func TestBoostIsBoundedAndSaturates(t *testing.T) {
 
 func openStatDB(t *testing.T) *Store {
 	t.Helper()
-	pool, url := pgtest.NewWithURL(t)
+	pool := pgtest.New(t)
 	if _, err := pool.Exec(`INSERT INTO note (id, title, created_at, updated_at) VALUES
  (1, 'a', '2026-01-01', '2026-01-01'), (2, 'b', '2026-01-01', '2026-01-01')`); err != nil {
 		t.Fatal(err)
 	}
-	return &Store{DB: pool, DatabaseURL: url}
+	return &Store{DB: pool}
 }
 
 func TestReadSignalsDedupeAndWeigh(t *testing.T) {

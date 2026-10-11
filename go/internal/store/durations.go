@@ -7,6 +7,4 @@ import "time"
 const (
 	// RegistrationTTL is how long a fresh registration token stays valid.
 	RegistrationTTL = 24 * time.Hour
-	// ReadDedupe is the window in which repeated opens of a note count once.
-	ReadDedupe = 10 * time.Minute
 )

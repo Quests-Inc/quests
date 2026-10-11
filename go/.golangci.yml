@@ -38,6 +38,8 @@ linters:
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/identity
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
@@ -97,6 +99,8 @@ linters:
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/valirum/quests/go/internal/identity
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
@@ -121,6 +125,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/schedule
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/identity
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "db зависит только от wsctx (ADR-0001)"
@@ -179,6 +185,8 @@ linters:
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/identity
               desc: "dbx зависит только от timeutil"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/llmassist
@@ -235,6 +243,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/schedule
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/identity
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "pgtest зависит только от db"
@@ -293,6 +303,8 @@ linters:
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/identity
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/llmassist
@@ -345,6 +357,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/store
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
@@ -440,6 +454,25 @@ linters:
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
+        knowledge:
+          files:
+            - "**/internal/knowledge/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/valirum/quests/go/internal/httpapi
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/store
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/llmassist
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/domain
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
         kernel:
           files:
             - "**/internal/kernel/**"
@@ -450,6 +483,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/store
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
@@ -473,6 +508,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/schedule
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/identity
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
@@ -531,6 +568,8 @@ linters:
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/identity
               desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/llmassist
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
@@ -587,6 +626,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/schedule
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/identity
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/cli
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"

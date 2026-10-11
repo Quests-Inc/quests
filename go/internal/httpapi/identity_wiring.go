@@ -26,7 +26,7 @@ func (s *Server) identityHTTP() *identityhttp.Handler {
 				return ProvisionWorkspace(ctx, s.Store, userID, name, copyFrom)
 			},
 			Usage: func(ctx context.Context) (int64, int64, bool) {
-				used, err := s.Store.AttachmentUsage(ctx)
+				used, err := s.Store.Knowledge().AttachmentUsage(ctx)
 				return used, s.WorkspaceQuota, err == nil
 			},
 		}

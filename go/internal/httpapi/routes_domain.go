@@ -629,7 +629,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64) {
-	n, err := s.Store.GetNote(r.Context(), id)
+	n, err := s.Store.Knowledge().GetNote(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return

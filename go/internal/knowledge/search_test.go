@@ -1,4 +1,4 @@
-package store
+package knowledge
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func TestPrefixTerm(t *testing.T) {
 
 func seedSearchNotes(t *testing.T) *Store {
 	t.Helper()
-	pool, url := pgtest.NewWithURL(t)
+	pool := pgtest.New(t)
 	_, err := pool.Exec(`INSERT INTO note (id, title, description, is_private, created_at, updated_at) VALUES
  (1, 'Деплой на прод', 'Как выкатить сервис: ci-deploy.sh, затем проверить здоровье.', 0, '2026-10-01 10:00:00', '2026-10-01 10:00:00'),
  (2, 'Мониторинг', 'Kuma, Prometheus, Grafana. Деплой не нужен.', 0, '2026-10-02 10:00:00', '2026-10-02 10:00:00'),
@@ -42,7 +42,7 @@ func seedSearchNotes(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Store{DB: pool, DatabaseURL: url}
+	return &Store{DB: pool}
 }
 
 func TestSearchRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {

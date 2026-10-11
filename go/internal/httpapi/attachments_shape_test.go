@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/valirum/quests/go/internal/knowledge"
 )
 
 // The web client reads these keys by name: the shape of an attachment on the wire is part of the API.
 func TestAttachmentJSONShape(t *testing.T) {
-	a := store.Attachment{ID: 1, OwnerType: "note", OwnerID: 2, Filename: "f.txt", UploadedAt: time.Unix(0, 0)}
+	a := knowledge.Attachment{ID: 1, OwnerType: "note", OwnerID: 2, Filename: "f.txt", UploadedAt: time.Unix(0, 0)}
 	keys := func(v any) []string {
 		raw, err := json.Marshal(v)
 		if err != nil {
@@ -34,16 +34,16 @@ func TestAttachmentJSONShape(t *testing.T) {
 	live := slices.Concat(base, []string{"available", "last_modified", "source_updated"})
 	sort.Strings(live)
 
-	if got := keys(AttachmentView{AttachmentRead: store.AttachmentToRead(a)}); !slices.Equal(got, base) {
+	if got := keys(AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a)}); !slices.Equal(got, base) {
 		t.Errorf("unprobed keys = %v\nwant %v", got, base)
 	}
-	probed := AttachmentView{AttachmentRead: store.AttachmentToRead(a), AttachmentLive: &AttachmentLive{}}
+	probed := AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a), AttachmentLive: &AttachmentLive{}}
 	if got := keys(probed); !slices.Equal(got, live) {
 		t.Errorf("probed keys = %v\nwant %v", got, live)
 	}
 	rev := []string{"comment", "content_type_declared", "content_type_detected", "filename", "is_current", "revision",
 		"scan_status", "scanned_at", "size_bytes", "uploaded_at"}
-	if got := keys(store.RevisionToRead(store.AttachmentRevision{Revision: 1}, 1)); !slices.Equal(got, rev) {
+	if got := keys(knowledge.RevisionToRead(knowledge.AttachmentRevision{Revision: 1}, 1)); !slices.Equal(got, rev) {
 		t.Errorf("revision keys = %v\nwant %v", got, rev)
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -175,7 +176,7 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 		_, err := s.Store.GetQuest(ctx, id)
 		return err == nil
 	case "note":
-		ok, err := s.Store.NoteExists(ctx, id)
+		ok, err := s.Store.Knowledge().NoteExists(ctx, id)
 		return err == nil && ok
 	case "questline":
 		_, err := s.Store.GetQuestline(ctx, id)
@@ -184,7 +185,7 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 		_, err := s.Store.QuestIDForStep(ctx, id)
 		return err == nil
 	case "attachment":
-		_, err := s.Store.GetAttachment(ctx, id)
+		_, err := s.Store.Knowledge().GetAttachment(ctx, id)
 		return err == nil
 	}
 	return false
@@ -358,7 +359,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 				has = textHas(q.Description)
 			}
 		case "note":
-			if n, err := s.Store.GetNote(ctx, id); err == nil {
+			if n, err := s.Store.Knowledge().GetNote(ctx, id); err == nil {
 				has = textHas(n.Description)
 			}
 		case "step":
@@ -721,7 +722,7 @@ func (s *Server) postAttachmentOwner(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "owner not found")
 		return
 	}
-	before, err := s.Store.GetAttachment(r.Context(), id)
+	before, err := s.Store.Knowledge().GetAttachment(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "attachment not found")
 		return
@@ -739,7 +740,7 @@ func (s *Server) postAttachmentOwner(w http.ResponseWriter, r *http.Request) {
 	s.publishSilent(r.Context(), "attachment_updated", a.Filename, map[string]any{
 		"attachment_id": a.ID, "owner_type": a.OwnerType, "owner_id": a.OwnerID,
 	})
-	writeJSON(w, 200, store.AttachmentToRead(a))
+	writeJSON(w, 200, knowledge.AttachmentToRead(a))
 }
 
 // postStepMove moves a step to another quest (end of its steps). A quest keeps
@@ -1133,7 +1134,7 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 				owners["step:"+store.TmpID(op.ID)] = fmt.Sprintf("quest:%d", qid)
 			}
 		case "attachment":
-			if a, err := s.Store.GetAttachment(ctx, sid); err == nil {
+			if a, err := s.Store.Knowledge().GetAttachment(ctx, sid); err == nil {
 				owners["attachment:"+store.TmpID(op.ID)] = fmt.Sprintf("%s:%d", a.OwnerType, a.OwnerID)
 			}
 		}
@@ -1223,7 +1224,7 @@ func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ st
 		}
 		desc, path = q.Description, fmt.Sprintf("/api/quests/%d", id)
 	case "note":
-		n, err := s.Store.GetNote(ctx, id)
+		n, err := s.Store.Knowledge().GetNote(ctx, id)
 		if err != nil {
 			return err
 		}
