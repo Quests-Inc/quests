@@ -8,11 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "bun test tests",
-    "lint": "oxlint src tests",
+    "lint": "oxlint --quiet src tests",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "verify": "bun run lint && bun run format:check && bun run check && bun run test && bun run build",
-    "check": "bun scripts/check-types.mjs"
+    "verify": "bun run lint && bun run format:check && bun run check && bun run check:any && bun run test && bun run build",
+    "check": "bun scripts/check-types.mjs",
+    "check:any": "bun scripts/check-any.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.15",

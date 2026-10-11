@@ -8,12 +8,13 @@ bun run dev          # Vite с HMR на :5173, /api проксируется н�
 bun run verify       # lint + format:check + check + test + build — то же, что гоняет CI
 ```
 
-| Команда | Что делает |
-|---|---|
-| `bun run lint` | oxlint (`correctness` и `suspicious` как ошибки), правила в `.oxlintrc.json` |
-| `bun run format` / `format:check` | oxfmt, настройки в `.oxfmtrc.jsonc` (`.svelte` он не форматирует) |
-| `bun run check` | svelte-check (`noImplicitAny`); число ошибок не должно расти относительно `.svelte-check-baseline` (сейчас 0) |
-| `bun run test` | `bun test tests` |
+| Команда                           | Что делает                                                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`                    | oxlint (`correctness` и `suspicious` как ошибки), правила в `.oxlintrc.json`                                  |
+| `bun run format` / `format:check` | oxfmt, настройки в `.oxfmtrc.jsonc` (`.svelte` он не форматирует)                                             |
+| `bun run check`                   | svelte-check (`noImplicitAny`); число ошибок не должно расти относительно `.svelte-check-baseline` (сейчас 0) |
+| `bun run check:any`               | число явных `any` не должно расти относительно `.any-baseline`                                                |
+| `bun run test`                    | `bun test tests`                                                                                              |
 
 ## Типы API
 
@@ -31,4 +32,4 @@ json-тегами (не `map[string]any`), потом `just gen-types`, пото
 - Скрипты компонентов — `<script lang="ts">`; JSDoc-типов в коде не осталось, только аннотации TS.
 - `esrap` закреплён на 2.3.0 в `overrides` (`package.json`): 2.4.0 ломает разбор приведений типов в шаблонах Svelte.
 - svelte-check работает на TypeScript 5.9; нативный TS 7 его API пока не поддерживает.
-- Явные `any` (сейчас около 728 вхождений) — известный долг: ищутся поиском `: any`, будут сужаться по мере правок.
+- Явные `any` — известный долг; их число зажато гейтом `check:any` (планка в `.any-baseline`), сужайте по мере правок и опускайте планку.
