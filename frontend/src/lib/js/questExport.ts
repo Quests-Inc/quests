@@ -1,4 +1,4 @@
-import type { AttachmentView } from '../api/http.gen.ts'
+import type { AttachmentView } from '../api/knowledge_http.gen.ts'
 import { listAttachments } from './api.ts'
 import { downloadPdf } from './pdfExport.ts'
 import { significanceLabel, periodBadge, quantifiedProgress } from './questFormat.ts'

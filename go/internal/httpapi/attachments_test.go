@@ -677,7 +677,7 @@ func TestAttachmentHidden(t *testing.T) {
 		t.Fatalf("hidden download = %d", dw.Code)
 	}
 	// Context payloads (MCP) skip hidden cards.
-	if got := s.attachmentsForOwner(t.Context(), ownerQuest, qid, false); len(got) != 0 {
+	if got := s.knowledgeHTTP().AttachmentsForOwner(t.Context(), ownerQuest, qid, false); len(got) != 0 {
 		t.Fatalf("attachmentsForOwner returned %d hidden cards", len(got))
 	}
 

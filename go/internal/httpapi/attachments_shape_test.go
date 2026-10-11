@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/knowledge"
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 )
 
 // The web client reads these keys by name: the shape of an attachment on the wire is part of the API.
@@ -34,10 +35,10 @@ func TestAttachmentJSONShape(t *testing.T) {
 	live := slices.Concat(base, []string{"available", "last_modified", "source_updated"})
 	sort.Strings(live)
 
-	if got := keys(AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a)}); !slices.Equal(got, base) {
+	if got := keys(knowledgehttp.AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a)}); !slices.Equal(got, base) {
 		t.Errorf("unprobed keys = %v\nwant %v", got, base)
 	}
-	probed := AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a), AttachmentLive: &AttachmentLive{}}
+	probed := knowledgehttp.AttachmentView{AttachmentRead: knowledge.AttachmentToRead(a), AttachmentLive: &knowledgehttp.AttachmentLive{}}
 	if got := keys(probed); !slices.Equal(got, live) {
 		t.Errorf("probed keys = %v\nwant %v", got, live)
 	}

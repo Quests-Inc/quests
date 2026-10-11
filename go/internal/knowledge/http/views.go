@@ -51,3 +51,23 @@ type NoteCheckView struct {
 	Error           string  `json:"error"`
 	ErrorAt         *string `json:"error_at"`
 }
+
+// AttachmentRevisions is the version history of one attachment.
+type AttachmentRevisions struct {
+	AttachmentID    int64                    `json:"attachment_id"`
+	CurrentRevision int                      `json:"current_revision"`
+	Revisions       []knowledge.RevisionRead `json:"revisions"`
+}
+
+// AttachmentLive is what the file server says about the file right now; absent from a listing that did not ask.
+type AttachmentLive struct {
+	Available     bool    `json:"available"`
+	SourceUpdated bool    `json:"source_updated"`
+	LastModified  *string `json:"last_modified"`
+}
+
+// AttachmentView is an attachment with its live file-server facts, when they were asked for.
+type AttachmentView struct {
+	knowledge.AttachmentRead `tstype:",extends"`
+	*AttachmentLive          `tstype:"Partial<AttachmentLive>,extends"`
+}

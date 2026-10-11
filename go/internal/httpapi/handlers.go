@@ -140,14 +140,12 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("PATCH /api/quests/{id}/steps/{step_id}", s.patchStep)
 	mux.HandleFunc("DELETE /api/quests/{id}/steps/{step_id}", s.deleteStep)
 	s.identityHTTP().Register(mux)
-	s.registerAttachments(mux)
-	s.knowledgeHTTP().RegisterNotes(mux)
+	s.knowledgeHTTP().Register(mux)
 	s.registerPDF(mux)
 	s.registerDomainRoutes(mux)
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
-	s.knowledgeHTTP().RegisterNoteCheck(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
 	s.registerWorkspaceArchive(mux)
@@ -628,7 +626,7 @@ func (s *Server) deleteQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.purgeOwnerAttachments(r.Context(), ownerQuest, id)
+	s.knowledgeHTTP().PurgeOwnerAttachments(r.Context(), ownerQuest, id)
 	if err := s.Store.DeleteQuest(r.Context(), id, q.Title); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

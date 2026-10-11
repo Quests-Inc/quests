@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/refs"
 )
@@ -74,19 +73,10 @@ func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []refs.Re
 	return s.resolveRefs(r, noteRefs)
 }
 
-// publishSilent wakes journal tabs (they reload on any quests_changed) without
-// a HUD toast or sound. Same contract as note events.
+// publishSilent wakes journal tabs (they reload on any quests_changed) without a HUD toast or sound.
 func (s *Server) publishSilent(ctx context.Context, kind, title string, extra map[string]any) {
 	if s.Hub == nil {
 		return
 	}
-	silent := ""
-	s.Hub.Publish(kind, events.PublishOpts{
-		Workspace: wsctx.From(ctx),
-		Title:     title,
-		Toast:     false,
-		Source:    "api",
-		Sound:     &silent,
-		Extra:     extra,
-	})
+	s.Hub.PublishSilent(wsctx.From(ctx), kind, title, extra)
 }

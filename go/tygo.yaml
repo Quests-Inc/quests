@@ -37,11 +37,13 @@ packages:
     include_files:
       - "views.go"
     frontmatter: |
-      import type { NoteBriefRead, NotePopularity, NoteRead } from "./knowledge.gen";
+      import type { AttachmentRead, NoteBriefRead, NotePopularity, NoteRead, RevisionRead } from "./knowledge.gen";
       import type { Resolved } from "./refs.gen";
     type_mappings:
       time.Time: "string"
       knowledge.NoteRead: "NoteRead"
+      knowledge.AttachmentRead: "AttachmentRead"
+      knowledge.RevisionRead: "RevisionRead"
       knowledge.NoteBriefRead: "NoteBriefRead"
       knowledge.NotePopularity: "NotePopularity"
       refs.Resolved: "Resolved"
@@ -69,12 +71,10 @@ packages:
     include_files:
       - "runner.go"
       - "llm_settings.go"
-      - "attachments.go"
       - "graphdraft.go"
     frontmatter: |
       import type { DraftOp, Runner } from "./store.gen";
-      import type { AttachmentRead, RevisionRead } from "./knowledge.gen";
-      import type { Provider } from "./llm.gen";
+            import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
       time.Duration: "number"

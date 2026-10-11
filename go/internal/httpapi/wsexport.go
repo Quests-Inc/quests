@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/valirum/quests/go/internal/identity"
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -283,10 +284,10 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 			if f.UncompressedSize64 > uint64(maxFile) {
 				return "", fmt.Errorf("вложение %q больше %d МБ", filename, maxFile>>20)
 			}
-			if over, used, qerr := s.overQuota(ctx, int64(f.UncompressedSize64)+importedBytes); qerr != nil {
+			if over, used, qerr := s.knowledgeHTTP().OverQuota(ctx, int64(f.UncompressedSize64)+importedBytes); qerr != nil {
 				return "", qerr
 			} else if over {
-				return "", errors.New(quotaMessage(used+importedBytes, s.WorkspaceQuota))
+				return "", errors.New(knowledgehttp.QuotaMessage(used+importedBytes, s.WorkspaceQuota))
 			}
 			rc, err := f.Open()
 			if err != nil {
@@ -304,7 +305,7 @@ func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
 			if res.Infected {
 				return "", fmt.Errorf("вложение %q отклонено антивирусом: %s", filename, res.Signature)
 			}
-			newPath := fmt.Sprintf("attachments/%s-%d/%s-%s", ownerType, ownerID, uuid.NewString(), safeFilename(filename))
+			newPath := fmt.Sprintf("attachments/%s-%d/%s-%s", ownerType, ownerID, uuid.NewString(), knowledgehttp.SafeFilename(filename))
 			if err := s.WebDAV.Put(ctx, newPath, "application/octet-stream", bytes.NewReader(raw), int64(len(raw))); err != nil {
 				return "", fmt.Errorf("загрузка на файловый сервер: %w", err)
 			}

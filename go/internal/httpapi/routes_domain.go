@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/refs"
@@ -125,7 +126,7 @@ func (s *Server) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title := questlineTitle(row)
-	s.purgeOwnerAttachments(r.Context(), ownerQuestline, id)
+	s.knowledgeHTTP().PurgeOwnerAttachments(r.Context(), ownerQuestline, id)
 	if err := s.Store.DeleteQuestline(r.Context(), id, s.DataDir); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Questline not found")
@@ -583,16 +584,16 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 		reads = append(reads, domain.ToQuestRead(qq, timeutil.NowUTC()))
 	}
 	attachments := map[string]any{
-		"questline": []AttachmentView{},
-		"by_quest":  map[string][]AttachmentView{},
-		"note":      []AttachmentView{},
+		"questline": []knowledgehttp.AttachmentView{},
+		"by_quest":  map[string][]knowledgehttp.AttachmentView{},
+		"note":      []knowledgehttp.AttachmentView{},
 	}
 	if lineID != nil {
-		attachments["questline"] = s.attachmentsForOwner(r.Context(), ownerQuestline, *lineID, true)
+		attachments["questline"] = s.knowledgeHTTP().AttachmentsForOwner(r.Context(), ownerQuestline, *lineID, true)
 	}
-	byQuest := map[string][]AttachmentView{}
+	byQuest := map[string][]knowledgehttp.AttachmentView{}
 	for _, qq := range quests {
-		byQuest[strconv.FormatInt(qq.ID, 10)] = s.attachmentsForOwner(r.Context(), ownerQuest, qq.ID, true)
+		byQuest[strconv.FormatInt(qq.ID, 10)] = s.knowledgeHTTP().AttachmentsForOwner(r.Context(), ownerQuest, qq.ID, true)
 	}
 	attachments["by_quest"] = byQuest
 	var texts []string
@@ -632,7 +633,7 @@ func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64
 		return
 	}
 	payload := s.knowledgeHTTP().NotePayloadFiltered(r, n)
-	attachments := s.attachmentsForOwner(r.Context(), ownerNote, n.ID, true)
+	attachments := s.knowledgeHTTP().AttachmentsForOwner(r.Context(), ownerNote, n.ID, true)
 	payload.Attachments = attachments
 	writeJSON(w, 200, map[string]any{
 		"focus":       map[string]any{"type": "note", "id": n.ID},

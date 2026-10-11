@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/pdfdoc"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -75,7 +76,7 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 		filename = uuid.NewString() + ".pdf"
 	}
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", contentDisposition(sanitizeFilename(filename)))
+	w.Header().Set("Content-Disposition", knowledgehttp.ContentDisposition(sanitizeFilename(filename)))
 	w.Header().Set("Content-Length", fmt.Sprint(out.Len()))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(out.Bytes())
@@ -86,7 +87,7 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 // upload scan recorded — never the client's claim.
 func (s *Server) attachmentImageLoader(ctx context.Context) pdfdoc.ImageLoader {
 	return func(id int64) ([]byte, error) {
-		if !s.webdavOK() {
+		if !s.knowledgeHTTP().WebDAVOK() {
 			return nil, errors.New("attachment storage is not configured")
 		}
 		a, err := s.Store.Knowledge().GetAttachment(ctx, id)
@@ -100,7 +101,7 @@ func (s *Server) attachmentImageLoader(ctx context.Context) pdfdoc.ImageLoader {
 			return nil, errors.New("attachment not found")
 		}
 		ctype, _, _ := strings.Cut(a.ContentTypeDetected, ";")
-		if !inlineImageTypes[strings.ToLower(strings.TrimSpace(ctype))] {
+		if !knowledgehttp.InlineImageTypes[strings.ToLower(strings.TrimSpace(ctype))] {
 			return nil, errors.New("attachment is not a raster image")
 		}
 		body, err := s.WebDAV.Get(ctx, a.WebDAVPath)

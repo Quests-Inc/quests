@@ -270,6 +270,19 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 	return payload
 }
 
+// PublishSilent wakes journal tabs (they reload on any quests_changed) without a HUD toast or sound.
+func (h *Hub) PublishSilent(workspace int64, kind, title string, extra map[string]any) {
+	silent := ""
+	h.Publish(kind, PublishOpts{
+		Workspace: workspace,
+		Title:     title,
+		Toast:     false,
+		Source:    "api",
+		Sound:     &silent,
+		Extra:     extra,
+	})
+}
+
 type PublishOpts struct {
 	// Workspace routes the event to that workspace's peers (0 = everyone).
 	Workspace int64

@@ -13,15 +13,23 @@ import (
 func (s *Server) knowledgeHTTP() *knowledgehttp.Handler {
 	s.knowledgeOnce.Do(func() {
 		s.kh = &knowledgehttp.Handler{
-			Store:            s.Store.Knowledge(),
-			Hub:              s.Hub,
-			DataDir:          s.DataDir,
-			ResolveRefs:      s.resolveRefs,
-			PurgeAttachments: s.purgeOwnerAttachments,
+			Store:       s.Store.Knowledge(),
+			Hub:         s.Hub,
+			DataDir:     s.DataDir,
+			ResolveRefs: s.resolveRefs,
+			PurgeAttachments: func(ctx context.Context, ownerType string, ownerID int64) {
+				s.knowledgeHTTP().PurgeOwnerAttachments(ctx, ownerType, ownerID)
+			},
+			OwnerExists:    s.ownerExists,
+			WebDAV:         s.WebDAV,
+			ClamAV:         s.ClamAV,
+			MaxUploadBytes: s.MaxUploadBytes,
+			Quota:          func() int64 { return s.WorkspaceQuota },
 			LogEvent: func(ctx context.Context, e knowledgehttp.ChangeEvent) {
 				_ = s.Store.LogEvent(ctx, store.ChangeEvent{
 					Kind: e.Kind, EntityType: e.EntityType, EntityID: e.EntityID,
 					Title: e.Title, Detail: e.Detail, Coalesce: e.Coalesce,
+					ParentType: e.ParentType, ParentID: e.ParentID,
 				})
 			},
 		}

@@ -19,6 +19,7 @@ import (
 
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/knowledge"
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -556,7 +557,7 @@ func (s *Server) deleteGraphDraftOp(w http.ResponseWriter, r *http.Request) {
 
 // dropStagedFiles deletes the WebDAV copies of uploads among ids.
 func (s *Server) dropStagedFiles(ctx context.Context, ops []store.DraftOp, ids []int64) {
-	if !s.webdavOK() {
+	if !s.knowledgeHTTP().WebDAVOK() {
 		return
 	}
 	del := map[int64]bool{}
@@ -619,11 +620,11 @@ func (s *Server) cancelGraphDraft(w http.ResponseWriter, r *http.Request) {
 // postGraphDraftFile stages an upload: scanned now, kept on WebDAV under
 // drafts/, attached to its owner only when the draft is saved.
 func (s *Server) postGraphDraftFile(w http.ResponseWriter, r *http.Request) {
-	if !s.webdavOK() {
+	if !s.knowledgeHTTP().WebDAVOK() {
 		writeErr(w, 503, "attachment storage is not configured (QUESTS_WEBDAV_URL)")
 		return
 	}
-	if !s.clamavOK() {
+	if !s.knowledgeHTTP().ClamAVOK() {
 		writeErr(w, 503, "virus scanning is not configured (QUESTS_CLAMAV_ADDR)")
 		return
 	}
@@ -651,7 +652,7 @@ func (s *Server) postGraphDraftFile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 413, fmt.Sprintf("file exceeds %d MB", maxBytes>>20))
 		return
 	}
-	if !s.checkQuota(w, r.Context(), int64(len(raw))) {
+	if !s.knowledgeHTTP().CheckQuota(w, r.Context(), int64(len(raw))) {
 		return
 	}
 	declared := strings.TrimSpace(hdr.Header.Get("Content-Type"))
@@ -665,7 +666,7 @@ func (s *Server) postGraphDraftFile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 422, "file rejected by virus scan: "+res.Signature)
 		return
 	}
-	filename := safeFilename(hdr.Filename)
+	filename := knowledgehttp.SafeFilename(hdr.Filename)
 	path := fmt.Sprintf("drafts/%s-%s", uuid.NewString(), filename)
 	ctype := declared
 	if ctype == "" {
@@ -736,7 +737,7 @@ func (s *Server) postAttachmentOwner(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logAttachment(r.Context(), "attachment_moved", a, fmt.Sprintf("перенесено: %s %d → %s %d", before.OwnerType, before.OwnerID, a.OwnerType, a.OwnerID))
+	s.knowledgeHTTP().LogAttachment(r.Context(), "attachment_moved", a, fmt.Sprintf("перенесено: %s %d → %s %d", before.OwnerType, before.OwnerID, a.OwnerType, a.OwnerID))
 	s.publishSilent(r.Context(), "attachment_updated", a.Filename, map[string]any{
 		"attachment_id": a.ID, "owner_type": a.OwnerType, "owner_id": a.OwnerID,
 	})
