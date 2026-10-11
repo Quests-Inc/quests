@@ -116,4 +116,22 @@
     color: var(--color-fg-subtle, #6e6e6e);
     font-family: var(--font-mono, monospace);
     font-size: 0.7rem;
-  }</style>
+  }
+
+  .block__label--toggle {
+    display: flex;
+    width: fit-content;
+    align-items: center;
+    gap: 0.3rem;
+    border: 0;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .block__label--toggle:hover {
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+</style>

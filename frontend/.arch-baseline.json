@@ -1,7 +1,6 @@
 {
   "size": {
-    "app/App.svelte": 1231,
-    "pages/notes/ui/NotesPage.svelte": 1216
+    "app/App.svelte": 1231
   },
   "untested": []
 }

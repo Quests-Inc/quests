@@ -248,6 +248,63 @@
     opacity: 1;
   }
 
+  .notes__unsaved {
+    color: var(--color-accent, #c9a227);
+    font-weight: 700;
+    line-height: 1;
+    animation: notes-unsaved-glow 1.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  }
+
+  .notes__status-btn--readme.notes__status-btn--on {
+    color: #d14343;
+    animation: notes-readme-blink 1.4s steps(1, end) infinite;
+  }
+
+  .notes__status-btn--private.notes__status-btn--on {
+    color: #9a9a9a;
+  }
+
+  .notes__status-btn--category.notes__status-btn--on {
+    color: #b5651d;
+  }
+
+  .notes__status-btn--outdated.notes__status-btn--on {
+    color: #d14343;
+  }
+
+  @keyframes notes-readme-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0.25;
+    }
+  }
+
+  @keyframes notes-unsaved-glow {
+    0%,
+    100% {
+      opacity: 0.28;
+      text-shadow: 0 0 0.05em color-mix(in srgb, var(--color-accent, #c9a227) 15%, transparent);
+    }
+    50% {
+      opacity: 1;
+      text-shadow:
+        0 0 0.12em var(--color-accent, #c9a227),
+        0 0 0.45em color-mix(in srgb, var(--color-accent, #c9a227) 85%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .notes__unsaved,
+    .notes__status-btn--readme.notes__status-btn--on {
+      animation: none;
+      opacity: 1;
+    }
+  }
+
   .notes__head {
     /* No bottom margin: the page's flex gap alone sets the distance from the
        header divider to the note body, matching the gap below the body so the

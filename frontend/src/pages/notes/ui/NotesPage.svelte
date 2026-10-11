@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack, tick } from 'svelte'
+  import { tick } from 'svelte'
   import {
     createNote,
     deleteNote,
@@ -8,17 +8,14 @@
     searchNotes,
     setNoteOutdated,
   } from '@/shared/api/client.ts'
-  import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
   import { createNoteActions } from '../model/noteActions.svelte.ts'
   import { createNoteEditor } from '../model/noteEditor.svelte.ts'
   import { createNoteRename } from '../model/noteRename.svelte.ts'
   import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
   import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
-  import { NOTE_SPEC, noteFormFromRow, noteFormsEqual, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
-  import { parseQuery, passes, helpLine } from '@/shared/lib/searchFlags.ts'
-  import FlagHints from '@/shared/ui/FlagHints.svelte'
-  type NoteForm = NoteDraft & { isReadme?: boolean; isPrivate?: boolean; isCategory?: boolean }
+  import { NOTE_SPEC, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { parseQuery, passes } from '@/shared/lib/searchFlags.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import {
     caretOffsetFromPoint,
@@ -27,20 +24,12 @@
     placeTextareaCaret,
     scrollRootToTextOffset,
   } from '@/shared/lib/mdCaretMap.ts'
-  import { toast, toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
-  import Icon from '@/shared/ui/Icon.svelte'
-  import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
-  import RefText from '@/shared/ui/RefText.svelte'
-  import { MentionTextarea } from '@/entities/template'
-  import { AttachmentsBlock } from '@/entities/attachment'
-  import { EntityHistory } from '@/entities/history'
+  import { toast } from '@/shared/lib/toasts.svelte.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import { NoteIconModal } from '@/features/note-icon'
+  import NoteCanvas from './NoteCanvas.svelte'
   import NotesTree from './NotesTree.svelte'
-  import NoteHead from './NoteHead.svelte'
-  import NoteLinks from './NoteLinks.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
-  import { QuestlineIcon } from '@/entities/questline'
 import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let {
@@ -652,122 +641,48 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   />
 
   <section class="notes__page" bind:this={pageEl}>
-    {#if ed.error}
-      <p class="notes__error">{ed.error}</p>
-    {/if}
-    {#if selectedId == null}
-      <p class="notes__empty">Выберите заметку или создайте новую</p>
-    {:else}
-      {#if ed.external}
-        <div class="notes__external" role="status">
-          <span>Заметку изменили снаружи, а у вас есть несохранённые правки.</span>
-          <button type="button" class="notes__external-btn" onclick={() => ed.adoptExternal(selectedId)}>
-            Загрузить новую версию
-          </button>
-          <button type="button" class="notes__external-btn" onclick={() => (ed.external = null)}>
-            Оставить мою
-          </button>
-        </div>
-      {/if}
-      <NoteHead
-        bind:title={ed.title}
-        bind:titleEl
-        {titleReadonly}
-        dirty={ed.dirty}
-        pinned={ed.pinned}
-        isReadme={ed.isReadme}
-        isPrivate={ed.isPrivate}
-        isCategory={ed.isCategory}
-        outdated={noteIsOutdated}
-        outdatedReason={ed.detail?.outdated_reason ?? ''}
-        saving={ed.saving}
-        {exportBusy}
-        {crumbs}
-        {labels}
-        {onRef}
-        bind:findOpen
-        {viewMode}
-        viewModes={VIEW_MODES}
-        onContextMenu={(e) => {
-          const n = noteById(selectedId)
-          if (n) openNoteMenu(e, n)
-        }}
-        onTitleDblClick={startTitleEdit}
-        onTitleBlur={commitTitle}
-        {onTitleKeydown}
-        onTogglePin={() => selectedId != null && togglePinNote(selectedId)}
-        onToggleReadme={() => selectedId != null && toggleReadmeNote(selectedId)}
-        onTogglePrivate={() => selectedId != null && togglePrivateNote(selectedId)}
-        onToggleCategory={() => selectedId != null && toggleCategoryNote(selectedId)}
-        onToggleOutdated={() => selectedId != null && toggleOutdatedNote(selectedId)}
-        onRevert={revert}
-        onSave={save}
-        onExport={openExportMenu}
-        onDelete={() => requestDelete(selectedId)}
-        onCrumb={setParentCrumb}
-        onParentPicker={openParentPicker}
-        onViewMode={setViewMode}
-      />
-      {#if ed.isPrivate && !ed.privateRevealed}
-        <div class="notes__private-gate">
-          <Icon name="lock" size={20} />
-          <p>Приватная заметка — содержимое скрыто от случайного взгляда.</p>
-          <button type="button" class="btn" onclick={() => (ed.privateRevealed = true)}>
-            Показать
-          </button>
-        </div>
-      {:else}
-      {#if findOpen}
-        <NoteFind noteId={selectedId} container={viewMode === 'raw' ? null : previewEl} dep={ed.description} onClose={() => (findOpen = false)} />
-      {/if}
-      <div
-        class="notes__split"
-        class:notes__split--raw={viewMode === 'raw'}
-        class:notes__split--combined={viewMode === 'combined'}
-        class:notes__split--formatted={viewMode === 'formatted'}
-        class:notes__split--flash={ed.flashing}
-      >
-        {#if viewMode !== 'formatted'}
-          <MentionTextarea
-            class="notes__edit"
-            placement="inside"
-            bind:value={ed.description}
-            bind:el={editEl}
-            {quests}
-            {questlines}
-            {notes}
-            {attachments}
-            rows={16}
-            placeholder="Markdown. @название — ссылка. Код и конфиг — в блоках ``` … ```"
-            onkeydown={onEditKeydown}
-          />
-        {/if}
-        {#if viewMode !== 'raw'}
-          <div
-            class="notes__preview block--prose"
-            class:notes__preview--doc={viewMode === 'formatted'}
-            bind:this={previewEl}
-            title={viewMode === 'formatted' ? 'Двойной клик — править' : undefined}
-            ondblclick={startBodyEdit}
-          >
-            <MarkdownBody source={ed.description} {labels} {onRef} />
-          </div>
-        {/if}
-      </div>
-      {/if}
-      <NoteLinks refs={ed.detail?.refs ?? []} backlinks={ed.detail?.backlinks ?? []} bind:refsOpen bind:backlinksOpen {onRef} />
-      {#if selectedId}
-        <div class="block notes__attach">
-          <NoteCheck noteId={selectedId} onChanged={onChanged} onOpenSecrets={() => onOpenSecrets?.(selectedId)} />
-        </div>
-        <div class="block notes__attach">
-          <AttachmentsBlock ownerType="note" ownerId={selectedId} onOpenOwner={onRef} />
-        </div>
-        <div class="block notes__attach">
-          <EntityHistory entityType="note" entityId={selectedId} version={ed.detail?.updated_at} />
-        </div>
-      {/if}
-    {/if}
+    <NoteCanvas
+      {ed}
+      {selectedId}
+      bind:titleEl
+      bind:editEl
+      bind:previewEl
+      bind:findOpen
+      bind:refsOpen
+      bind:backlinksOpen
+      {titleReadonly}
+      {noteIsOutdated}
+      {exportBusy}
+      {crumbs}
+      {labels}
+      {onRef}
+      {viewMode}
+      viewModes={VIEW_MODES}
+      {quests}
+      {questlines}
+      {notes}
+      {attachments}
+      onOpenNoteMenu={openNoteMenu}
+      onTitleDblClick={startTitleEdit}
+      onTitleBlur={commitTitle}
+      {onTitleKeydown}
+      onTogglePin={() => selectedId != null && togglePinNote(selectedId)}
+      onToggleReadme={() => selectedId != null && toggleReadmeNote(selectedId)}
+      onTogglePrivate={() => selectedId != null && togglePrivateNote(selectedId)}
+      onToggleCategory={() => selectedId != null && toggleCategoryNote(selectedId)}
+      onToggleOutdated={() => selectedId != null && toggleOutdatedNote(selectedId)}
+      onRevert={revert}
+      onSave={save}
+      onExport={openExportMenu}
+      onDelete={() => selectedId != null && requestDelete(selectedId)}
+      onCrumb={setParentCrumb}
+      onParentPicker={openParentPicker}
+      onViewMode={setViewMode}
+      {onEditKeydown}
+      onStartBodyEdit={startBodyEdit}
+      {onChanged}
+      {onOpenSecrets}
+    />
   </section>
   <NoteOutline scroller={pageEl} content={previewEl} enabled={viewMode === 'formatted'} dep={`${selectedId}:${ed.description}`} />
 </div>
@@ -843,151 +758,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     border-right: 0;
   }
 
-  .notes__fold--spacer {
-    pointer-events: none;
-  }
-
-  .notes__row--on {
-    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, var(--color-bg-raised, #1a1a1a));
-    border-left-color: var(--color-fg, #e8e8e8);
-  }
-
-  .notes__row--dragover {
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 16%, transparent);
-    border-left-color: var(--color-accent, #c9a227);
-  }
-
-  .notes__list--dragover {
-    box-shadow: inset 0 0 0 1px var(--color-accent, #c9a227);
-  }
-
-  .notes__row-icon {
-    flex-shrink: 0;
-    display: inline-flex;
-    color: var(--line-color, #9a9a9a);
-  }
-
-  .notes__row-label {
-    display: inline-flex;
-    align-items: baseline;
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  :global(.notes__row-title) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .notes__row-rename {
-    width: 100%;
-    min-width: 0;
-    padding: 0.1rem 0.3rem;
-    border: 1px solid var(--color-accent, #c9a227);
-    border-radius: var(--radius-sm, 2px);
-    background: var(--color-bg, #121212);
-    color: var(--color-fg, #e8e8e8);
-    font: inherit;
-  }
-
-  :global(.notes__unsaved) {
-    flex-shrink: 0;
-    color: var(--color-accent, #c9a227);
-    font-weight: 700;
-    line-height: 1;
-    animation: notes-unsaved-glow 1.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
-  }
-
-  .notes__row-status {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.15rem;
-  }
-
-  :global(.notes__status-btn--readme.notes__status-btn--on),
-  :global(.notes__status-dot--readme) {
-    color: #d14343;
-    animation: notes-readme-blink 1.4s steps(1, end) infinite;
-  }
-
-  /* Same alert icon, but on a note whose README is a hidden (collapsed)
-   * descendant, not the note itself — yellow keeps it from being mistaken
-   * for "this note is the README". */
-  :global(.notes__status-dot--readme-bubble) {
-    color: #d1a33a;
-    animation: notes-readme-blink 1.4s steps(1, end) infinite;
-  }
-
-  :global(.notes__status-btn--private.notes__status-btn--on),
-  :global(.notes__status-dot--private) {
-    color: #9a9a9a;
-  }
-
-  :global(.notes__status-btn--category.notes__status-btn--on),
-  :global(.notes__status-dot--category) {
-    color: #b5651d;
-  }
-
-  :global(.notes__status-btn--outdated.notes__status-btn--on),
-  :global(.notes__status-dot--outdated) {
-    color: #d14343;
-  }
-
-  :global(.notes__status-dot) {
-    display: inline-flex;
-  }
-
-  @keyframes notes-readme-blink {
-    0%,
-    49% {
-      opacity: 1;
-    }
-    50%,
-    100% {
-      opacity: 0.25;
-    }
-  }
-
-  .notes__private-gate {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2, 0.5rem);
-    padding: var(--space-5, 2rem) var(--space-3, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-    text-align: center;
-  }
-
-  .notes__private-gate p {
-    margin: 0;
-    font-size: 0.9rem;
-  }
-
-  @keyframes notes-unsaved-glow {
-    0%,
-    100% {
-      opacity: 0.28;
-      text-shadow: 0 0 0.05em color-mix(in srgb, var(--color-accent, #c9a227) 15%, transparent);
-    }
-    50% {
-      opacity: 1;
-      text-shadow:
-        0 0 0.12em var(--color-accent, #c9a227),
-        0 0 0.45em color-mix(in srgb, var(--color-accent, #c9a227) 85%, transparent);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.notes__unsaved) {
-      animation: none;
-      opacity: 1;
-    }
-  }
-
   .notes__page {
     min-height: 0;
     overflow: auto;
@@ -997,199 +767,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     gap: var(--space-4, 1rem);
   }
 
-  .notes__empty,
-  :global(.empty) {
-    color: var(--color-fg-muted, #9a9a9a);
-    padding: 1rem;
-  }
-
-  .notes__error {
-    margin: 0;
-    color: var(--color-danger, #b54a3a);
-  }
-
-  .notes__external {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem 0.75rem;
-    margin: 0;
-    padding: 0.4rem 0.6rem;
-    border-left: 3px solid var(--color-accent, #c9a227);
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 12%, transparent);
-    font-size: 0.85rem;
-  }
-
-  .notes__external-btn {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--color-accent, #c9a227);
-    font: inherit;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
-  .notes__split--flash {
-    animation: notes-flash 1.5s ease-out;
-  }
-
-  @keyframes notes-flash {
-    from {
-      background: color-mix(in srgb, var(--color-accent, #c9a227) 22%, transparent);
-    }
-    to {
-      background: transparent;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .notes__split--flash {
-      animation: none;
-    }
-  }
-
-  .notes__split {
-    display: grid;
-    gap: 0;
-    /* Content-driven in every mode: the body flows full-length and the page
-       scrolls, nothing is boxed to the viewport. The editor is kept from
-       being squashed not by a fixed height but by auto-growing to its text
-       (autoGrow below), so opening ссылки/ссылаются can't eat into it. */
-    min-height: 0;
-    flex: 0 0 auto;
-  }
-
-  .notes__split--combined {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0 1.1rem;
-    background: linear-gradient(
-      to right,
-      transparent calc(50% - 0.5px),
-      var(--color-border, #333) calc(50% - 0.5px),
-      var(--color-border, #333) calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    );
-  }
-
-  .notes__split--combined :global(textarea.notes__edit) {
-    border-right: 0;
-    padding-right: 0.25rem;
-  }
-
-  .notes__split--combined .notes__preview {
-    padding-left: 0.25rem;
-  }
-
-  /* minmax(0, …), not a bare 1fr: 1fr's floor is the content's min-content
-     width, so one unbreakable line (a path, a URL, a long inline code) grew
-     the track — and the whole note — to thousands of px on a phone. */
-  .notes__split--raw,
-  .notes__split--formatted {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* Reading mode: preview flows with its content instead of scrolling inside
-     its own box, so the body ends where the text ends. */
-  .notes__split--formatted .notes__preview {
-    min-height: 0;
-    overflow: visible;
-  }
-
-  .notes__split :global(textarea.notes__edit) {
-    width: 100%;
-    min-height: 18rem;
-    /* Height is set from content by autoGrow so the editor flows like the
-       reading view — no inner scroll, the page scrolls instead. */
-    resize: none;
-    overflow: hidden;
-    padding: 0.15rem 0.1rem;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: inherit;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.85rem;
-    line-height: 1.5;
-  }
-
-  .notes__preview {
-    /* block--prose carries margin-bottom: 2rem for typography; here the flex
-       gap already spaces the body, so drop it — otherwise it re-opens the
-       bottom gap once the box grows with content in reading mode. */
-    margin: 0;
-    padding: 0.15rem 0.25rem 0.15rem 0.85rem;
-    overflow: auto;
-    min-height: 18rem;
-    min-width: 0;
-    overflow-wrap: break-word;
-  }
-
-  .notes__split--formatted .notes__preview {
-    padding-left: 0.1rem;
-  }
-
-  .notes__preview--doc {
-    cursor: text;
-  }
-
-  .notes__split--raw :global(textarea.notes__edit) {
-    padding-left: 0.1rem;
-  }
-
-  .block__label--toggle {
-    /* Block-level flex, not inline-flex: an inline box would sit on the
-       parent's text baseline and carry its line-height strut as dead space. */
-    display: flex;
-    width: fit-content;
-    align-items: center;
-    gap: 0.3rem;
-    border: 0;
-    background: transparent;
-    /* .block__label is written for an <h3> and carries margin-bottom 0.5rem —
-       8px of invisible space under the label that made it look glued to the
-       divider above. As a toggle row its box must be exactly the label. */
-    margin: 0;
-    padding: 0;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .block__label--toggle:hover {
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .notes__attach {
-    /* Same rhythm as the links divider: one flex-gap above the divider, one
-       flex-gap of padding below it, so «Вложения» clears its divider by the
-       same amount the links label clears the divider above. */
-    margin-top: 0;
-    margin-bottom: 0;
-    padding-top: var(--space-4, 1rem);
-    border-top: 1px solid var(--color-border, #333);
-  }
-
   @media (max-width: 720px) {
-    /* Stay side-by-side and just shrink — no stacking, which pushed the
-       note detail below a full-height tree and made it feel lost. */
     .notes {
       grid-template-columns: minmax(7rem, 30%) 1fr;
     }
     .notes__page {
       padding: 1rem 1rem 2rem;
-    }
-    .notes__split--combined {
-      grid-template-columns: 1fr;
-      gap: 0.85rem;
-      background: none;
-    }
-    .notes__split--combined :global(textarea.notes__edit) {
-      border-bottom: 1px solid var(--color-border, #333);
-      padding-bottom: 0.85rem;
-      padding-right: 0.1rem;
-    }
-    .notes__split--combined .notes__preview {
-      padding-left: 0.1rem;
     }
   }
 

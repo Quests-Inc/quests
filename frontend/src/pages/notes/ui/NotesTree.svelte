@@ -346,4 +346,136 @@
   .notes__hit-flag {
     margin-left: 0.35rem;
     vertical-align: middle;
-  }</style>
+  }
+
+  .empty {
+    color: var(--color-fg-muted, #9a9a9a);
+    padding: 1rem;
+  }
+
+  .notes__fold--spacer {
+    pointer-events: none;
+  }
+
+  .notes__row--on {
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, var(--color-bg-raised, #1a1a1a));
+    border-left-color: var(--color-fg, #e8e8e8);
+  }
+
+  .notes__row--dragover {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 16%, transparent);
+    border-left-color: var(--color-accent, #c9a227);
+  }
+
+  .notes__list--dragover {
+    box-shadow: inset 0 0 0 1px var(--color-accent, #c9a227);
+  }
+
+  .notes__row-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    color: var(--line-color, #9a9a9a);
+  }
+
+  .notes__row-label {
+    display: inline-flex;
+    align-items: baseline;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  :global(.notes__row-title) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .notes__row-rename {
+    width: 100%;
+    min-width: 0;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--color-accent, #c9a227);
+    border-radius: var(--radius-sm, 2px);
+    background: var(--color-bg, #121212);
+    color: var(--color-fg, #e8e8e8);
+    font: inherit;
+  }
+
+  .notes__unsaved {
+    flex-shrink: 0;
+    color: var(--color-accent, #c9a227);
+    font-weight: 700;
+    line-height: 1;
+    animation: notes-unsaved-glow 1.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  }
+
+  .notes__row-status {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .notes__status-dot {
+    display: inline-flex;
+  }
+
+  .notes__status-dot--readme {
+    color: #d14343;
+    animation: notes-readme-blink 1.4s steps(1, end) infinite;
+  }
+
+  /* Жёлтый: README не у этой заметки, а у скрытого потомка. */
+  .notes__status-dot--readme-bubble {
+    color: #d1a33a;
+    animation: notes-readme-blink 1.4s steps(1, end) infinite;
+  }
+
+  .notes__status-dot--private {
+    color: #9a9a9a;
+  }
+
+  .notes__status-dot--category {
+    color: #b5651d;
+  }
+
+  .notes__status-dot--outdated {
+    color: #d14343;
+  }
+
+  @keyframes notes-readme-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0.25;
+    }
+  }
+
+  @keyframes notes-unsaved-glow {
+    0%,
+    100% {
+      opacity: 0.28;
+      text-shadow: 0 0 0.05em color-mix(in srgb, var(--color-accent, #c9a227) 15%, transparent);
+    }
+    50% {
+      opacity: 1;
+      text-shadow:
+        0 0 0.12em var(--color-accent, #c9a227),
+        0 0 0.45em color-mix(in srgb, var(--color-accent, #c9a227) 85%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .notes__unsaved,
+    .notes__status-dot--readme,
+    .notes__status-dot--readme-bubble {
+      animation: none;
+      opacity: 1;
+    }
+  }
+</style>
