@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { untrack } from 'svelte'
   import Icon from '../ui/Icon.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
@@ -86,13 +86,44 @@
     labels = {},
     onRef,
     onOpenGraph,
+  }: {
+    selected: any | null,
+    quests?: any[],
+    showAllQuests?: boolean,
+    nowMs: number,
+    statusBusy: boolean,
+    deleting: boolean,
+    deleteAnimActive?: boolean,
+    consumeRemoteEdit?: (questId: number | null) => boolean,
+    onDeleteAnimDone?: () => void,
+    stepBusyId: number | null,
+    stepEditId: number | null,
+    stepEditValue: string,
+    onToggleCompleted: (quest?: any) => void,
+    onOpenEdit: (quest?: any) => void,
+    onRequestDelete: (quest?: any) => void,
+    kbStepId?: number | null,   // step the keyboard cursor is on (highlight only)
+    onBumpStep: (step: any, delta: number, questId?: number | null) => void,
+    onBeginEditStep: (step: any, questId?: number | null) => void,
+    onStepEditKeydown: (event: KeyboardEvent, step: any) => void,
+    onStepEditBlur: (step: any) => void,
+    onStepEditInput: (value: string) => void,
+    onQuestTitleContextMenu?: (event: MouseEvent, quest: any) => void,
+    onLineHeadContextMenu?: (event: MouseEvent) => void,
+    onStepContextMenu?: (event: MouseEvent, step: any) => void,
+    onSelectQuest?: (id: number) => void,
+    notes?: any[],
+    questlines?: any[],
+    labels?: Record<string, string>,
+    onRef?: (kind: string, id: number) => void,
+    onOpenGraph?: (type: string, id: number) => void,
   } = $props()
 
   const tzLabel = localTimeZone()
   let pdfBusy = $state(false)
-  let pdfMenu = $state({ open: false, x: 0, y: 0, quest: /** @type {any} */ (null) })
+  let pdfMenu = $state({ open: false, x: 0, y: 0, quest: (null as any) })
 
-  async function exportPdf(q, mode = 'rich') {
+  async function exportPdf(q: any, mode = 'rich') {
     if (!q || pdfBusy) return
     pdfBusy = true
     const tid = 'pdf-quest'
@@ -112,11 +143,11 @@
     }
   }
 
-  function openPdfMenu(event, q) {
+  function openPdfMenu(event: { clientX: any; clientY: any }, q: any) {
     pdfMenu = { open: true, x: event.clientX, y: event.clientY, quest: q }
   }
 
-  function selectPdfMode(id) {
+  function selectPdfMode(id: string) {
     exportPdf(pdfMenu.quest, id)
   }
 
@@ -165,7 +196,7 @@
     const blob = [
       selected.title,
       selected.description,
-      ...(selected.steps || []).flatMap((s) => [s.title, s.description]),
+      ...(selected.steps || []).flatMap((s: { title: any; description: any }) => [s.title, s.description]),
     ].join('\n')
     const ids = parseRefs(blob)
       .filter((r) => r.kind === 'note')
@@ -181,23 +212,23 @@
     return out
   })
 
-  function selectLineQuest(id) {
+  function selectLineQuest(id: number) {
     if (id == null || id === selected?.id) return
     onSelectQuest?.(id)
   }
 
   /** Only jump to top when switching quests — not on every silent refresh / step bump. */
-  let lastDetailQuestId = /** @type {number | null} */ (null)
+  let lastDetailQuestId = (null as number | null)
 
   /** What's actually rendered — equals selected.title/description except mid-animation. */
   let displayTitle = $state('')
   let displayDescription = $state('')
-  let prevAutomatedTitle = /** @type {string | null} */ (null)
-  let prevAutomatedDescription = /** @type {string | null} */ (null)
+  let prevAutomatedTitle = (null as string | null)
+  let prevAutomatedDescription = (null as string | null)
   /** @type {AbortController | null} */
-  let titleAnim = null
+  let titleAnim: AbortController | null = null
   /** @type {AbortController | null} */
-  let descAnim = null
+  let descAnim: AbortController | null = null
 
   /** Same idea as displayTitle/displayDescription, per step.id — step
    * descriptions (comments) get typed in too, not just the quest's own. */
@@ -212,7 +243,7 @@
   /** Erase the old text (if any) then type the new one — only for a change
    * that arrived from outside the web UI (consumeRemoteEdit); never for the
    * user's own edits. */
-  async function retype(oldText, newText, granularity, setDisplay, getCtrl, setCtrl, setTyping) {
+  async function retype(oldText: string, newText: string, granularity: string, setDisplay: { (t: string): string; (t: string): string; (t: any): Map<any,any> }, getCtrl: { (): AbortController; (): AbortController; (): any; (): AbortController }, setCtrl: { (c: AbortController): AbortController; (c: AbortController): AbortController; (c: any): void; (arg0: AbortController): void }, setTyping: { (v: boolean): boolean; (v: boolean): boolean; (v: any): void; (arg0: boolean): void }) {
     getCtrl()?.abort()
     const ac = new AbortController()
     setCtrl(ac)
@@ -266,7 +297,7 @@
     if (!q) return
 
     const stepsChanged = steps.some(
-      (s) => prevStepAutomatedDesc.has(s.id) && (s.description || '') !== prevStepAutomatedDesc.get(s.id),
+      (s: { id: any; description: any }) => prevStepAutomatedDesc.has(s.id) && (s.description || '') !== prevStepAutomatedDesc.get(s.id),
     )
     // Animate by who made the change, not by the quest: only an update that
     // came in from outside the web UI (mcp, cli, scheduler…) is typed in.
@@ -278,14 +309,14 @@
 
     if (remote) {
       if (prevAutomatedTitle != null && title !== prevAutomatedTitle) {
-        void retype(prevAutomatedTitle, title, 'char', (t) => (displayTitle = t),
-          () => titleAnim, (c) => (titleAnim = c), (v) => (typingTitle = v))
+        void retype(prevAutomatedTitle, title, 'char', (t: string) => (displayTitle = t),
+          () => titleAnim, (c: AbortController) => (titleAnim = c), (v: boolean) => (typingTitle = v))
       } else if (!titleAnim) {
         displayTitle = title
       }
       if (prevAutomatedDescription != null && description !== prevAutomatedDescription) {
-        void retype(prevAutomatedDescription, description, 'word', (t) => (displayDescription = t),
-          () => descAnim, (c) => (descAnim = c), (v) => (typingDesc = v))
+        void retype(prevAutomatedDescription, description, 'word', (t: string) => (displayDescription = t),
+          () => descAnim, (c: AbortController) => (descAnim = c), (v: boolean) => (typingDesc = v))
       } else if (!descAnim) {
         displayDescription = description
       }
@@ -294,13 +325,13 @@
         const prev = prevStepAutomatedDesc.has(s.id) ? prevStepAutomatedDesc.get(s.id) : null
         if (prev != null && sDesc !== prev) {
           void retype(prev, sDesc, 'word',
-            (t) => (stepDisplayDesc = new Map(stepDisplayDesc).set(s.id, t)),
+            (t: any) => (stepDisplayDesc = new Map(stepDisplayDesc).set(s.id, t)),
             () => stepDescAnims.get(s.id) ?? null,
-            (c) => {
+            (c: any) => {
               if (c) stepDescAnims.set(s.id, c)
               else stepDescAnims.delete(s.id)
             },
-            (v) => {
+            (v: any) => {
               const next = new Set(typingSteps)
               if (v) next.add(s.id)
               else next.delete(s.id)

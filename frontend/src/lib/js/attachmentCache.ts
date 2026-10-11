@@ -52,7 +52,11 @@ function keepLiveFlags(prevItems: any[] | undefined, incoming: any[] | undefined
  * does not look like a cache miss and refetch. */
 export function seedAttachmentIndex(
   index: Record<string, Record<string, any[]>>,
-  { questIds = [], questlineIds = [], noteIds = [] } = {}
+  {
+    questIds = [],
+    questlineIds = [],
+    noteIds = [],
+  }: { questIds?: number[]; questlineIds?: number[]; noteIds?: number[] } = {}
 ) {
   const byQuest = index?.quest ?? {}
   const byLine = index?.questline ?? {}

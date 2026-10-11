@@ -2,7 +2,7 @@
 export type NoteDraft = { title: string; description: string; parentId: string; pinned: boolean }
 
 /** Unsaved note edits keyed by note id. Missing key = last saved server copy. */
-export const noteDrafts = $state(/** @type {Record<string, NoteDraft>} */ ({}))
+export const noteDrafts: Record<string, NoteDraft> = $state({})
 
 /** @param {number | string | null | undefined} id */
 export function noteDraftKey(id: number | string | null | undefined) {

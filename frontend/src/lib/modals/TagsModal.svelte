@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { listTags, createTag, updateTag, deleteTag } from '../js/api.ts'
   import Icon from '../ui/Icon.svelte'
   import ModalShell from './ModalShell.svelte'
@@ -7,11 +7,11 @@
   import { untrack } from 'svelte'
 
   /** @type {{ open: boolean, onClose: () => void }} */
-  let { open = false, onClose } = $props()
+  let { open = false, onClose }: { open: boolean, onClose: () => void } = $props()
 
   let loading = $state(false)
   let error = $state('')
-  let tags = $state(/** @type {{ id: number, slug: string, label: string, color?: string }[]} */ ([]))
+  let tags = $state(([] as { id: number, slug: string, label: string, color?: string }[]))
   let saving = $state(false)
 
   let newSlug = $state('')
@@ -19,15 +19,15 @@
   let newColor = $state('')
 
   /** @type {number | null} */
-  let editingId = $state(null)
+  let editingId: number | null = $state(null)
   let editLabel = $state('')
   let editColor = $state('')
 
   let deleteOpen = $state(false)
   /** @type {{ id: number, slug: string, label: string } | null} */
-  let deleteTarget = $state(null)
+  let deleteTarget: { id: number, slug: string, label: string } | null = $state(null)
 
-  function normalizeSlug(raw) {
+  function normalizeSlug(raw: string) {
     return String(raw || '')
       .trim()
       .toLowerCase()
@@ -65,7 +65,7 @@
     })
   })
 
-  async function onCreate(event) {
+  async function onCreate(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (saving) return
     const slug = normalizeSlug(newSlug)
@@ -94,7 +94,7 @@
     }
   }
 
-  function startEdit(tag) {
+  function startEdit(tag: { id: number; label: string; color: string }) {
     editingId = tag.id
     editLabel = tag.label || ''
     editColor = tag.color || ''
@@ -107,7 +107,7 @@
     editColor = ''
   }
 
-  async function saveEdit(id) {
+  async function saveEdit(id: number) {
     if (saving) return
     const label = editLabel.trim()
     if (!label) {
@@ -132,7 +132,7 @@
     }
   }
 
-  function askDelete(tag) {
+  function askDelete(tag: { id: number; slug: string; label: string }) {
     deleteTarget = tag
     deleteOpen = true
   }

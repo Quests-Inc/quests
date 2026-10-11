@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick, untrack } from 'svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import FlagHints from '../ui/FlagHints.svelte'
@@ -29,8 +29,8 @@
     uploadGraphDraftFile,
   } from '../js/api.ts'
   import { toast } from '../js/toasts.svelte.ts'
-  import { applyDraft, describeOp } from '../js/graphDraft.js'
-  import { layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown } from '../js/graphLayout.js'
+  import { applyDraft, describeOp } from '../js/graphDraft.ts'
+  import { layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown } from '../js/graphLayout.ts'
 
   /** Relations map tab: what a quest/note is connected to, drawn from existing
    * ownership, step order and reference tokens. Nodes are HTML cards (so
@@ -56,6 +56,16 @@
     questlines = [],
     onCenter,
     onOpen,
+  }: {
+    active?: boolean,
+    rootType?: 'quest' | 'note' | 'questline' | null,
+    rootId?: number | null,
+    nonce?: number,
+    quests?: any[],
+    notes?: any[],
+    questlines?: any[],
+    onCenter?: (type: string | null, id: number | null) => void,
+    onOpen?: (kind: string, id: number) => void,
   } = $props()
 
   const TYPES = {
@@ -93,7 +103,7 @@
   }
   const LAYOUT_KEY = 'quests.graph.layout'
   let layoutMode = $state(
-    /** @type {keyof typeof LAYOUTS} */ (
+    (
       (() => {
         try {
           const v = localStorage.getItem(LAYOUT_KEY)
@@ -101,28 +111,28 @@
         } catch {
           return 'tree'
         }
-      })()
+      })() as keyof typeof LAYOUTS
     ),
   )
-  let center = $state(/** @type {{ type: string, id: number }} */ ({ type: rootType, id: rootId }))
-  let data = $state(/** @type {any | null} */ (null))
+  let center = $state(({ type: rootType, id: rootId } as { type: string, id: number }))
+  let data = $state((null as any | null))
   let loading = $state(false)
   let error = $state('')
-  let selectedKey = $state(/** @type {string | null} */ (null))
+  let selectedKey = $state((null as string | null))
   let showEdge = $state({ structure: true, reference: true, dependency: true })
-  let expanded = $state(/** @type {Set<string>} */ (new Set()))
+  let expanded = $state((new Set() as Set<string>))
   /** Owners whose files are laid out one by one: never a folded group or a block. */
-  let loose = $state(/** @type {Set<string>} */ (new Set()))
+  let loose = $state((new Set() as Set<string>))
   let seq = 0
 
   // --- Draft: edits made here stay in a server-side log until saved. ---
-  let draft = $state({ ops: /** @type {any[]} */ ([]), roots: /** @type {{ type: string, id: number }[]} */ ([]) })
+  let draft = $state({ ops: ([] as any[]), roots: ([] as { type: string, id: number }[]) })
   let draftOpen = $state(true)
   let committing = $state(false)
   /** op id → message, from a refused or failed save */
-  let opProblems = $state(/** @type {Record<number, string>} */ ({}))
+  let opProblems = $state(({} as Record<number, string>))
   let cancelAsk = $state(false)
-  let dropAsk = $state(/** @type {{ id: number, ids: number[] } | null} */ (null))
+  let dropAsk = $state((null as { id: number, ids: number[] } | null))
   let reloadTick = $state(0)
 
   async function loadDraft() {
@@ -137,7 +147,7 @@
   }
 
   /** Adds an operation; resolves to the op, or null when the server refused it. */
-  async function addOp(kind, payload) {
+  async function addOp(kind: string, payload: { id?: any; parent?: any; was?: any; item?: string; owner?: any; from?: any; to?: any; source?: any; pos?: { x: number; y: number }|{ x: number; y: number }|{ x: number; y: number }; fields?: any; quest?: any }) {
     try {
       const op = await addGraphDraftOp(kind, payload)
       await loadDraft()
@@ -182,7 +192,7 @@
       reloadTick += 1
     } catch (e) {
       /** @type {Record<number, string>} */
-      const problems = {}
+      const problems: Record<number, string> = {}
       // @ts-ignore
       for (const p of e.problems ?? []) problems[p.op] = p.message
       // @ts-ignore
@@ -210,7 +220,7 @@
   }
 
   /** Ask which ops would go with this one, then drop them. */
-  async function askDrop(op) {
+  async function askDrop(op: { id: any }) {
     try {
       const r = await deleteGraphDraftOp(op.id, true)
       const ids = r?.would_remove ?? [op.id]
@@ -220,7 +230,7 @@
       /* toast already shown */
     }
   }
-  async function doDrop(id) {
+  async function doDrop(id: number) {
     dropAsk = null
     try {
       await deleteGraphDraftOp(id)
@@ -232,9 +242,9 @@
 
   // Camera: pan (x, y) and zoom (k) of the world.
   let cam = $state({ x: 0, y: 0, k: 1 })
-  let stageEl = $state(/** @type {HTMLDivElement | null} */ (null))
+  let stageEl = $state((null as HTMLDivElement | null))
   /** Laid-out view model: nodes with x/y (centre) and w/h, edges. */
-  let view = $state(/** @type {{ nodes: any[], edges: any[], groups?: any[] } | null} */ (null))
+  let view = $state((null as { nodes: any[], edges: any[], groups?: any[] } | null))
   /** False while cards are being measured (they are rendered hidden). */
   let ready = $state(false)
 
@@ -296,12 +306,12 @@
   })
 
   /** Keys that never reach the map: typing in a field, or a dialog on top. */
-  const typing = (e) =>
+  const typing = (e: { key?: string; altKey?: any; ctrlKey?: any; metaKey?: any; code?: string; preventDefault?: () => void; shiftKey?: any; target?: any }) =>
     e.target instanceof Element && (e.target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('.backdrop [role="dialog"]'))
 
   /** Map shortcuts (by physical key, so they work in any keyboard layout):
    * Ctrl+S save, Ctrl+Z undo the last change, V select, F fit, R untangle, Shift+Del clear. */
-  function onKey(e) {
+  function onKey(e: { key: string; altKey: any; ctrlKey: any; metaKey: any; code: string; preventDefault: () => void; shiftKey: any }) {
     if (e.key === 'Escape') {
       if (linking) cancelLink()
       else if (selectMode) toggleSelectMode()
@@ -363,10 +373,10 @@
   })
 
   /** Collapses bulky attachment lists into one cluster node. */
-  function prepare(g, open_) {
-    const nodes = g.nodes.map((n) => ({ ...n, x: 0, y: 0, w: 0, h: 0 }))
-    const edges = g.edges.map((e) => ({ ...e }))
-    const byKey = new Map(nodes.map((n) => [n.key, n]))
+  function prepare(g: { root?: any; nodes?: any; edges?: any }, open_: Set<string>) {
+    const nodes = g.nodes.map((n: any) => ({ ...n, x: 0, y: 0, w: 0, h: 0 }))
+    const edges = g.edges.map((e: any) => ({ ...e }))
+    const byKey = new Map(nodes.map((n: { key: any }) => [n.key, n]))
     const owners = new Map()
     for (const e of edges) {
       const to = byKey.get(e.to)
@@ -395,8 +405,8 @@
       edges.push({ from: owner, to: ck, kind: 'structure' })
     }
     return {
-      nodes: nodes.filter((n) => !drop.has(n.key)),
-      edges: edges.filter((e) => !drop.has(e.from) && !drop.has(e.to)),
+      nodes: nodes.filter((n: { key: unknown }) => !drop.has(n.key)),
+      edges: edges.filter((e: { from: unknown; to: unknown }) => !drop.has(e.from) && !drop.has(e.to)),
     }
   }
 
@@ -414,7 +424,7 @@
 
   let buildSeq = 0
   /** Render the cards hidden, measure them, lay out, reveal. */
-  async function rebuild(g, open_) {
+  async function rebuild(g: { root: any }, open_: Set<string>) {
     const mine = ++buildSeq
     ready = false
     view = prepare(g, open_)
@@ -454,7 +464,7 @@
     else if (layoutMode === 'radial') groups = layoutRadial(attached, edges)
     else if (layoutMode === 'layers') groups = layoutLayers(attached)
     else {
-      layoutGraph(attached, edges, { sizeOf: (n) => ({ w: n.w, h: n.h }) })
+      layoutGraph(attached, edges, { sizeOf: (n: { w: any; h: any }) => ({ w: n.w, h: n.h }) })
     }
     // Unlinked new things: where they were created, else a column left of the map.
     const left = attached.length ? Math.min(...attached.map((n) => n.x - n.w / 2)) : 0
@@ -490,7 +500,7 @@
     }
   }
   let hidden = $state(loadHidden())
-  const saveHidden = (next) => {
+  const saveHidden = (next: Set<unknown>) => {
     hidden = next
     try {
       localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]))
@@ -514,7 +524,7 @@
     return new Set(['active'])
   }
   let questStatuses = $state(loadStatuses())
-  const toggleStatus = (st) => {
+  const toggleStatus = (st: any) => {
     const next = new Set(questStatuses)
     if (next.has(st)) next.delete(st)
     else next.add(st)
@@ -553,7 +563,7 @@
     return new Set(ENTITY_TYPES)
   }
   let shownTypes = $state(loadTypes())
-  const toggleType = (t) => {
+  const toggleType = (t: any) => {
     const next = new Set(shownTypes)
     if (next.has(t)) next.delete(t)
     else next.add(t)
@@ -577,8 +587,8 @@
       return []
     }
   }
-  let expandKeys = $state(/** @type {string[]} */ (loadExpand()))
-  const setExpand = (next) => {
+  let expandKeys = $state((loadExpand() as string[]))
+  const setExpand = (next: any[]) => {
     expandKeys = next
     try {
       localStorage.setItem(EXPAND_KEY, JSON.stringify(next))
@@ -587,10 +597,10 @@
     }
   }
 
-  const ownExpand = (key) => expandKeys.filter((k) => k === key || k.startsWith(`${key}>`))
+  const ownExpand = (key: string) => expandKeys.filter((k) => k === key || k.startsWith(`${key}>`))
 
   /** A quest the status filter would drop again, so opening it shows nothing. */
-  function statusOff(key) {
+  function statusOff(key: string) {
     if (!key.startsWith('quest:')) return false
     const q = quests.find((x) => x.id === Number(key.slice('quest:'.length)))
     return Boolean(q) && !questStatuses.has(q.status)
@@ -601,7 +611,7 @@
   let hiddenAdj = $derived.by(() => {
     const out = new Map()
     if (!hidden.size) return out
-    const add = (from, other) => {
+    const add = (from: unknown, other: unknown) => {
       if (!hidden.has(other) || hidden.has(from)) return
       const type = other.slice(0, other.indexOf(':'))
       if (!out.has(from)) out.set(from, {})
@@ -619,7 +629,7 @@
   /** Unopened links of a card by entity type, as circles on its border: what the
    * map has not reached yet plus what was taken off it. Kinds filtered out and
    * quests outside the status filter are not counted — opening them shows nothing. */
-  function moreOf(n) {
+  function moreOf(n: { draft: any; more: {}; key: any }) {
     if (n.draft) return []
     const own = n.more ?? {}
     const gone = hiddenAdj.get(n.key) ?? {}
@@ -634,7 +644,7 @@
   }
 
   /** Open only the links of one type of a card. */
-  function openMore(n, type) {
+  function openMore(n: { key: string; more: { [x: string]: string|any[] } }, type: string|number) {
     const back = hiddenAdj.get(n.key)?.[type]
     if (back?.length) {
       const next = new Set(hidden)
@@ -649,8 +659,8 @@
 
   // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
   let selectMode = $state(false)
-  let picked = $state(/** @type {Set<string>} */ (new Set()))
-  let marquee = $state(/** @type {{ x0: number, y0: number, x1: number, y1: number } | null} */ (null))
+  let picked = $state((new Set() as Set<string>))
+  let marquee = $state((null as { x0: number, y0: number, x1: number, y1: number } | null))
 
   function toggleSelectMode() {
     selectMode = !selectMode
@@ -673,7 +683,7 @@
    * cleared. Draft cards are not hidden (drop them from the log instead).
    * @param {string[]} keys
    */
-  async function hideKeys(keys) {
+  async function hideKeys(keys: string[]) {
     const gone = new Set(keys)
     const shown = view?.nodes ?? []
     const left = shown.filter((n) => !gone.has(n.key) && !n.draft)
@@ -718,15 +728,15 @@
   }
 
   /** New steps / files with no owner: drawn red, they block saving. */
-  let ownerless = $state(/** @type {Set<string>} */ (new Set()))
+  let ownerless = $state((new Set() as Set<string>))
   /** Saved things that the draft writes into: node key → ops, oldest first. */
-  let touched = $state(/** @type {Map<string, number[]>} */ (new Map()))
+  let touched = $state((new Map() as Map<string, number[]>))
   /** The log row shown briefly after clicking a card's change marker. */
-  let flashOp = $state(/** @type {number | null} */ (null))
+  let flashOp = $state((null as number | null))
   let flashTimer = 0
 
   /** Opens the log on the last change that wrote into this card. */
-  function showChanges(key) {
+  function showChanges(key: string) {
     const ops = touched.get(key)
     if (!ops?.length) return
     draftOpen = true
@@ -779,7 +789,7 @@
     // goes too; draft things stay wherever they are.
     {
       const adj = new Map()
-      const link = (a, b) => {
+      const link = (a: any, b: any) => {
         if (!adj.has(a)) adj.set(a, [])
         adj.get(a).push(b)
       }
@@ -819,7 +829,7 @@
   })
 
   /** Puts hand-placed cards back, and an expanded block where its cluster was. */
-  function restoreSaved(groups) {
+  function restoreSaved(groups: any[]) {
     if (!view) return
     const handPlaced = new Set()
     for (const n of view.nodes) {
@@ -852,21 +862,21 @@
   }
 
   const FRAME = { left: 14, right: 14, top: 44, bottom: 14 }
-  const frameOf = (ms) => ({
-    x0: Math.min(...ms.map((m) => m.x - m.w / 2)) - FRAME.left,
-    x1: Math.max(...ms.map((m) => m.x + m.w / 2)) + FRAME.right,
-    y0: Math.min(...ms.map((m) => m.y - m.h / 2)) - FRAME.top,
-    y1: Math.max(...ms.map((m) => m.y + m.h / 2)) + FRAME.bottom,
+  const frameOf = (ms: any[]) => ({
+    x0: Math.min(...ms.map((m: { x: number; w: number }) => m.x - m.w / 2)) - FRAME.left,
+    x1: Math.max(...ms.map((m: { x: number; w: number }) => m.x + m.w / 2)) + FRAME.right,
+    y0: Math.min(...ms.map((m: { y: number; h: number }) => m.y - m.h / 2)) - FRAME.top,
+    y1: Math.max(...ms.map((m: { y: number; h: number }) => m.y + m.h / 2)) + FRAME.bottom,
   })
 
   /** Smallest nudge (down first, then sideways/up) that puts a block's frame
    * clear of every other card and group frame. {0,0} if it is already clear
    * or nothing nearby is free. */
-  function freeShift(g, members, allGroups) {
+  function freeShift(g: { key: any }, members: any[], allGroups: any) {
     if (!view) return { dx: 0, dy: 0 }
-    const mine = new Set(members.map((m) => m.key))
+    const mine = new Set(members.map((m: { key: any }) => m.key))
     const gap = 18
-    const obstacles = []
+    const obstacles: { x0: number; x1: any; y0: number; y1: any }[] = []
     for (const n of view.nodes) {
       if (mine.has(n.key)) continue
       obstacles.push({ x0: n.x - n.w / 2, x1: n.x + n.w / 2, y0: n.y - n.h / 2, y1: n.y + n.h / 2 })
@@ -877,7 +887,7 @@
       if (ms.length) obstacles.push(frameOf(ms))
     }
     const f = frameOf(members)
-    const clear = (dx, dy) =>
+    const clear = (dx: number, dy: number) =>
       !obstacles.some(
         (o) => f.x0 + dx < o.x1 + gap && f.x1 + dx > o.x0 - gap && f.y0 + dy < o.y1 + gap && f.y1 + dy > o.y0 - gap,
       )
@@ -1005,10 +1015,10 @@
   })
   let miniDrag = false
   /** Centres the view on the world point under the pointer on the minimap. */
-  function miniGo(e) {
+  function miniGo(e: { currentTarget: HTMLElement; clientX: number; clientY: number }) {
     const m = mini
     if (!m) return
-    const r = /** @type {HTMLElement} */ (e.currentTarget).getBoundingClientRect()
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const wx = (e.clientX - r.left) / m.sc + m.x0
     const wy = (e.clientY - r.top) / m.sc + m.y0
     cam = { ...cam, x: stageSize.w / 2 - wx * cam.k, y: stageSize.h / 2 - wy * cam.k }
@@ -1036,7 +1046,7 @@
   const STUB = 16
 
   /** Which sides of a and b an edge uses: facing sides, horizontal if far apart in x. */
-  function sidesOf(a, b) {
+  function sidesOf(a: { x: any; w: any; y: any; h?: number }, b: { x: any; w: any; y: any; h?: number }) {
     const dx = b.x - a.x
     if (Math.abs(dx) > (a.w + b.w) / 2 * 0.7) {
       const dir = dx > 0 ? 1 : -1
@@ -1051,7 +1061,7 @@
    * along the side, of where it leaves a and where it arrives at b, so edges
    * sharing a side get their own points. Returns the path and the start point.
    */
-  function edgePath(a, b, oa = 0, ob = 0) {
+  function edgePath(a: { x: number; w: number; y: number; h: number }, b: { x: number; w: number; y: number; h: number }, oa = 0, ob = 0) {
     const { vertical, dir } = sidesOf(a, b)
     if (!vertical) {
       const x1 = a.x + (dir * a.w) / 2
@@ -1077,10 +1087,10 @@
    * the other end is, so lines do not cross needlessly.
    * @param {{ e: any, a: any, b: any }[]} items
    */
-  function spreadEnds(items) {
+  function spreadEnds(items: { e: any, a: any, b: any }[]) {
     /** @type {Map<string, { item: any, end: 'a' | 'b', other: number }[]>} */
-    const groups = new Map()
-    const push = (key, item, end, other) => {
+    const groups: Map<string, { item: any, end: 'a' | 'b', other: number }[]> = new Map()
+    const push = (key: string, item: { e: any; a: any; b: any }, end: string, other: any) => {
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key).push({ item, end, other })
     }
@@ -1119,7 +1129,7 @@
     }),
   )
   /** Cluster key a ball can fold back into (only attachment groups that came from one). */
-  const collapseKey = (g) =>
+  const collapseKey = (g: { type: any; owner: any }) =>
     g.type === 'attachment' && expanded.has(`cluster:${g.owner}`) ? `cluster:${g.owner}` : null
   let groupMap = $derived(new Map(groups.map((g) => [g.key, g])))
   /** Steps that wait for another step hang off that step, not off the quest. */
@@ -1132,7 +1142,7 @@
   )
   let drawEdges = $derived.by(() => {
     /** @type {{ e: any, a: any, b: any, oa?: number, ob?: number }[]} */
-    const items = []
+    const items: { e: any, a: any, b: any, oa?: number, ob?: number }[] = []
     for (const e of view?.edges ?? []) {
       if (!showEdge[e.kind]) continue
       const a = nodeMap.get(e.from)
@@ -1156,14 +1166,14 @@
 
   // Pan / zoom / card drag. Dragging a card works from anywhere except its
   // scrollable text and links, so reading and scrolling are not hijacked.
-  let drag = null
+  let drag: { moved?: any; kind: any; n?: any; nx?: any; ny?: any; items?: any; members?: any; k?: any; d?: any; wx?: any; wy?: any; x?: any; y?: any; cx?: any; cy?: any; additive?: any; key?: any } = null
   const MIN_K = 0.2
   const MAX_K = 2.5
   /** Limits a zoom step that starts at `from`. Fit can go below MIN_K on a big
    * map; from there zooming in must not jump straight to MIN_K. */
-  const clampK = (k, from) => Math.max(Math.min(MIN_K, from), Math.min(Math.max(MAX_K, from), k))
+  const clampK = (k: number, from: number) => Math.max(Math.min(MIN_K, from), Math.min(Math.max(MAX_K, from), k))
   /** Zooms to `k` keeping the stage point (px, py) on the same world point. */
-  function zoomAt(k, px, py) {
+  function zoomAt(k: number, px: number, py: number) {
     k = clampK(k, cam.k)
     cam = { k, x: px - ((px - cam.x) / cam.k) * k, y: py - ((py - cam.y) / cam.k) * k }
   }
@@ -1197,7 +1207,7 @@
     }
   }
   /** Capture phase, so a second finger on a card starts a pinch, not a card drag. */
-  function onTouchDown(e) {
+  function onTouchDown(e: { pointerType: string; pointerId: number; clientX: any; clientY: any; stopPropagation: () => void; preventDefault: () => void }) {
     if (e.pointerType !== 'touch') return
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (touches.size !== 2) return
@@ -1208,7 +1218,7 @@
     pinchStart()
     stageEl?.setPointerCapture(e.pointerId)
   }
-  function onBgDown(e) {
+  function onBgDown(e: { target: { closest: (arg0: string) => any }; button: number; preventDefault: () => void; clientX: number; clientY: number; pointerId: number; shiftKey: any; ctrlKey: any; metaKey: any }) {
     if (e.target.closest('[data-gkey]')) return
     // Middle button always pans, also in selection mode.
     if (e.button === 1) {
@@ -1231,7 +1241,7 @@
     drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
     stageEl?.setPointerCapture(e.pointerId)
   }
-  function onCardDown(e, n) {
+  function onCardDown(e: { button: number; stopPropagation: () => void; target: { closest: (arg0: string) => any }; clientX: any; clientY: any; pointerId: number; offsetX: number }, n: { key: any; x?: any; y?: any }) {
     if (linking) {
       if (e.button === 0) {
         e.stopPropagation()
@@ -1266,7 +1276,7 @@
     stageEl?.setPointerCapture(e.pointerId)
   }
   /** Dragging an expanded block by its frame moves all its cards together. */
-  function onGroupDown(e, g) {
+  function onGroupDown(e: { button: number; stopPropagation: () => void; clientX: any; clientY: any; pointerId: number }, g: { key: any }) {
     if (e.button !== 0 || linking || selectMode) return
     e.stopPropagation()
     const members = (view?.nodes ?? []).filter((n) => n.group === g.key)
@@ -1279,7 +1289,7 @@
     }
     stageEl?.setPointerCapture(e.pointerId)
   }
-  function onMove(e) {
+  function onMove(e: { pointerId?: any; clientX: any; clientY: any; preventDefault?: (() => void)|(() => void)|(() => void); stopPropagation?: (() => void)|(() => void)|(() => void) }) {
     if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (drag?.kind === 'pinch') {
       if (touches.size < 2) return
@@ -1331,7 +1341,7 @@
       view = view && { ...view }
     }
   }
-  function onUp(e) {
+  function onUp(e: { pointerId: any }) {
     touches.delete(e.pointerId)
     if (drag?.kind === 'pinch') {
       // Lifting one finger keeps panning with the other one.
@@ -1375,7 +1385,7 @@
     if (drag?.kind === 'node' && !drag.moved) select(drag.n)
     drag = null
   }
-  function onWheel(e) {
+  function onWheel(e: { target: { closest: (arg0: string) => any }; preventDefault: () => void; ctrlKey: any; deltaY: number; clientX: number; clientY: number }) {
     // Over a card's scrollable text the wheel scrolls the text, not the map.
     const body = e.target instanceof Element ? e.target.closest('.gcard__body, textarea') : null
     if (body && body.scrollHeight > body.clientHeight + 1) return
@@ -1393,7 +1403,7 @@
 
   /** Folds an expanded attachment group back into its cluster node. */
   /** Centre of a group's cards (not of its frame, which has a header strip). */
-  function membersCenter(g) {
+  function membersCenter(g: { key: any; x: any; y: any }) {
     const ms = (view?.nodes ?? []).filter((n) => n.group === g.key)
     if (!ms.length) return { x: g.x, y: g.y }
     return {
@@ -1404,14 +1414,14 @@
 
   /** Folding puts the group back where it stood before it was opened (the open
    * block may have been nudged aside to keep clear of other cards). */
-  function foldSpot(key) {
+  function foldSpot(key: string) {
     const g = groups.find((x) => x.type === 'attachment' && `cluster:${x.owner}` === key)
     const spot = origins.get(key) ?? (g ? membersCenter(g) : null)
     if (spot) saved.set(key, spot)
     origins.delete(key)
   }
 
-  function collapse(key) {
+  function collapse(key: string) {
     foldSpot(key)
     expanded = new Set([...expanded].filter((k) => k !== key))
   }
@@ -1423,14 +1433,14 @@
   }
 
   /** Lays a file group out as separate cards. */
-  function disband(owner) {
+  function disband(owner: any) {
     const key = `cluster:${owner}`
     if (expanded.has(key)) foldSpot(key)
     expanded = new Set([...expanded].filter((k) => k !== key))
     loose = new Set([...loose, owner])
   }
 
-  function select(n) {
+  function select(n: { type: string; key: string; x: any; y: any }) {
     if (n.type === 'cluster') {
       saved.set(n.key, { x: n.x, y: n.y })
       origins.set(n.key, { x: n.x, y: n.y })
@@ -1441,18 +1451,18 @@
   }
 
   /** Where "Открыть" leads: a step opens its quest. */
-  function openTarget(n) {
+  function openTarget(n: { draft: any; type: string; id: any; key: any }) {
     if (!n || n.draft) return null
     if (n.type === 'quest' || n.type === 'note' || n.type === 'attachment') return [n.type, n.id]
     if (n.type === 'step') {
-      const e = data?.edges.find((x) => x.to === n.key && x.kind === 'structure')
-      const q = e && data.nodes.find((m) => m.key === e.from)
+      const e = data?.edges.find((x: { to: any; kind: string }) => x.to === n.key && x.kind === 'structure')
+      const q = e && data.nodes.find((m: { key: any }) => m.key === e.from)
       return q ? ['quest', q.id] : null
     }
     return null
   }
 
-  function recenter(n) {
+  function recenter(n: { type: string; draft: any; id: number }) {
     if (!CENTERABLE.has(n.type) || n.draft) return
     resetPositions()
     setExpand([])
@@ -1467,7 +1477,7 @@
   let found = $derived(findEntities(rootQuery, { questlines, quests, notes, limit: 12 }))
   let matches = $derived(found.items)
   let rootParsed = $derived(found.parsed)
-  function chooseRoot(m) {
+  function chooseRoot(m: { type: string; id: number }) {
     rootQuery = ''
     pickOpen = false
     resetPositions()
@@ -1480,7 +1490,7 @@
   // --- Link mode: a line follows the cursor from a card; click a target to
   // make the link, right-click or Esc to cancel. Also used for "attach to". ---
   /** @type {{ mode: 'to' | 'from' | 'attach', anchor: string } | null} */
-  let linking = $state(null)
+  let linking: { mode: 'to' | 'from' | 'attach', anchor: string } | null = $state(null)
   let linkCursor = $state({ x: 0, y: 0 })
 
   const REF_FROM = new Set(['quest', 'note', 'step', 'questline'])
@@ -1489,7 +1499,7 @@
   const REF_TO = new Set(['quest', 'note', 'step', 'attachment', 'questline'])
 
   /** Whether the card can be picked as the other end in the current link mode. */
-  function canPick(n) {
+  function canPick(n: { key: any; type?: any }) {
     if (!linking || !n || n.key === linking.anchor || n.type === 'cluster') return false
     const a = nodeMap.get(linking.anchor)
     if (!a) return false
@@ -1502,9 +1512,9 @@
   }
 
   /** Keys of the notes below this one, over the structure edges on the map (draft included). */
-  function noteDescendants(key) {
+  function noteDescendants(key: any) {
     const seen = new Set()
-    const walk = (k) => {
+    const walk = (k: any) => {
       for (const e of view?.edges ?? []) {
         if (e.kind === 'structure' && e.from === k && e.draft !== 'remove' && e.to.startsWith('note:') && !seen.has(e.to)) {
           seen.add(e.to)
@@ -1517,16 +1527,16 @@
   }
 
   /** Cards of one kind that belong to this card (steps of a quest, quests of a questline), as shown. */
-  const childKeys = (n, type) =>
+  const childKeys = (n: { key: any }, type: string) =>
     (view?.edges ?? [])
       .filter((e) => e.kind === 'structure' && e.from === n.key && e.to.startsWith(`${type}:`) && !e.to.includes(':t') && nodeMap.has(e.to))
       .map((e) => e.to)
 
   /** The note this one hangs under, on the map. */
-  const parentNote = (n) =>
+  const parentNote = (n: { key: any }) =>
     (view?.edges ?? []).find((e) => e.kind === 'structure' && e.to === n.key && e.from.startsWith('note:') && e.draft !== 'remove')?.from ?? null
 
-  function startLink(mode, n) {
+  function startLink(mode: string, n: { key: any }) {
     const a = nodeMap.get(n.key)
     linking = { mode, anchor: n.key }
     linkCursor = a ? { x: a.x, y: a.y } : { x: 0, y: 0 }
@@ -1538,10 +1548,10 @@
   }
 
   /** A reference from a to b that would survive saving already exists. */
-  const hasRef = (from, to) =>
+  const hasRef = (from: any, to: any) =>
     (view?.edges ?? []).some((e) => e.kind === 'reference' && e.from === from && e.to === to && e.draft !== 'remove')
 
-  async function finishLink(target) {
+  async function finishLink(target: { key: any }) {
     const l = linking
     if (!l || !canPick(target)) return
     linking = null
@@ -1568,13 +1578,13 @@
   }
 
   /** Links written in this card's own text, as targets still visible on the map. */
-  function outgoingRefs(n) {
+  function outgoingRefs(n: { key: any }) {
     return (view?.edges ?? [])
       .filter((e) => e.kind === 'reference' && e.from === n.key && e.draft !== 'remove' && nodeMap.has(e.to))
       .map((e) => e.to)
   }
 
-  async function unlinkRef(n, targetKey) {
+  async function unlinkRef(n: { key: any }, targetKey: string) {
     const e = (view?.edges ?? []).find(
       (x) => x.kind === 'reference' && x.from === n.key && x.to === targetKey && x.draft !== 'remove',
     )
@@ -1588,16 +1598,16 @@
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
   /** @type {{ open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any }} */
-  let ctx = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
+  let ctx: { open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any } = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
 
   /** Screen point → world coordinates (where a new thing should land). */
-  function worldAt(e) {
+  function worldAt(e: { preventDefault?: (() => void)|(() => void)|(() => void); stopPropagation?: (() => void)|(() => void)|(() => void); clientX: any; clientY: any }) {
     const r = stageEl?.getBoundingClientRect()
     if (!r) return { x: 0, y: 0 }
     return { x: (e.clientX - r.left - cam.x) / cam.k, y: (e.clientY - r.top - cam.y) / cam.k }
   }
 
-  function onCtx(e, n = null) {
+  function onCtx(e: { preventDefault: () => void; stopPropagation: () => void; clientX: any; clientY: any }, n = null) {
     e.preventDefault()
     e.stopPropagation()
     if (linking) {
@@ -1620,7 +1630,7 @@
   }
 
   /** Right-click on the frame of an opened file block. */
-  function onGroupCtx(e, g) {
+  function onGroupCtx(e: { preventDefault: () => void; stopPropagation: () => void; clientX: any; clientY: any }, g: { type: string; owner: any }) {
     e.preventDefault()
     e.stopPropagation()
     if (linking || g.type !== 'attachment') return
@@ -1628,7 +1638,7 @@
   }
 
   /** What can be done to a line itself (nothing for plain ownership of steps and files). */
-  function edgeActions(e) {
+  function edgeActions(e: { draft: string; from: string; to: string; kind: string }) {
     if (e.draft === 'remove' || !e.from || !e.to) return []
     if (e.kind === 'reference') return [{ id: 'edge-unref', label: 'Разорвать ссылку' }]
     if (e.kind === 'dependency' && e.from.startsWith('step:') && e.to.startsWith('step:')) {
@@ -1643,7 +1653,7 @@
     return []
   }
 
-  function onEdgeCtx(ev, e) {
+  function onEdgeCtx(ev: { preventDefault: () => void; stopPropagation: () => void; clientX: any; clientY: any }, e: any) {
     ev.preventDefault()
     ev.stopPropagation()
     if (linking) {
@@ -1653,7 +1663,7 @@
     ctx = { open: true, x: ev.clientX, y: ev.clientY, node: null, at: worldAt(ev), group: false, cluster: null, edge: e }
   }
 
-  const isExtraRoot = (n) => n && !n.draft && draft.roots.some((r) => `${r.type}:${r.id}` === n.key)
+  const isExtraRoot = (n: { draft: any; key: string }) => n && !n.draft && draft.roots.some((r) => `${r.type}:${r.id}` === n.key)
 
   let ctxItems = $derived.by(() => {
     const n = ctx.node
@@ -1743,26 +1753,26 @@
   })
 
   // Modals started from the menus.
-  let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: /** @type {number | null} */ (null) })
+  let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: (null as number | null) })
   let entityModal = $state({
     open: false,
-    kind: /** @type {'note' | 'step' | 'questline'} */ ('note'),
+    kind: ('note' as 'note' | 'step' | 'questline'),
     at: { x: 0, y: 0 },
     /** quest key a new step is made for */
     owner: '',
     /** key of a card that should link to the new note */
     linkFrom: '',
     /** a thing that exists only in the draft, edited in place */
-    edit: /** @type {{ opId: number, payload: any, title: string, description: string, heading: string } | null} */ (null),
+    edit: (null as { opId: number, payload: any, title: string, description: string, heading: string } | null),
   })
-  let editQuest = $state({ open: false, quest: /** @type {any | null} */ (null) })
-  let editStep = $state({ open: false, questId: /** @type {number | null} */ (null), step: /** @type {any | null} */ (null) })
+  let editQuest = $state({ open: false, quest: (null as any | null) })
+  let editStep = $state({ open: false, questId: (null as number | null), step: (null as any | null) })
   let fileOwner = ''
   let findModal = $state(false)
-  let fileInput = $state(/** @type {HTMLInputElement | null} */ (null))
+  let fileInput = $state((null as HTMLInputElement | null))
   let fileAt = { x: 0, y: 0 }
 
-  async function onCtxSelect(id) {
+  async function onCtxSelect(id: string) {
     const n = ctx.node
     const at = ctx.at
     const plain = { owner: '', linkFrom: '', edit: null }
@@ -1811,7 +1821,7 @@
     } else if (id === 'center' && n) recenter(n)
   }
 
-  async function onFilesPicked(e) {
+  async function onFilesPicked(e: { currentTarget: { files: any; value: string } }) {
     const files = [...(e.currentTarget.files ?? [])]
     e.currentTarget.value = ''
     for (const [i, file] of files.entries()) {
@@ -1828,23 +1838,23 @@
   // --- Editing. A saved quest / step opens its usual form (the change goes to
   // the draft); a thing that exists only in the draft is edited in place; a
   // note is edited right on its card, in markdown. ---
-  const sameVal = (a, b, key) => {
+  const sameVal = (a: string|number|Date, b: string|number|Date, key: string) => {
     if ((a == null || a === '') && (b == null || b === '')) return true
     if (key === 'description') return String(a ?? '').trim() === String(b ?? '').trim()
     if (key.endsWith('_at')) return new Date(a).getTime() === new Date(b).getTime()
     return JSON.stringify(a) === JSON.stringify(b)
   }
   /** @param {Record<string, any>} orig @param {Record<string, any>} payload @param {string[]} keys */
-  const diffFields = (orig, payload, keys) => {
+  const diffFields = (orig: Record<string, any>, payload: Record<string, any>, keys: string[]) => {
     /** @type {Record<string, any>} */
-    const out = {}
+    const out: Record<string, any> = {}
     for (const k of keys) if (k in payload && !sameVal(orig[k], payload[k], k)) out[k] = payload[k]
     return out
   }
   const QUEST_KEYS = ['title', 'description', 'status', 'significance', 'pinned', 'automated', 'sort_order', 'category_id', 'questline_id', 'deadline_at', 'duration_seconds']
   const STEP_KEYS = ['title', 'description', 'progress_current', 'progress_total', 'check_command', 'check_interval_seconds', 'wait_previous', 'run_mode', 'run_on']
 
-  async function startEdit(n) {
+  async function startEdit(n: { type?: any; draft: any; op: any; title: any; id: any; key: any }) {
     if (n.type === 'note') return startEditNote(n)
     if (n.draft) {
       const op = draft.ops.find((o) => o.id === n.op)
@@ -1883,11 +1893,11 @@
   }
 
   /** @param {Record<string, any>} payload */
-  async function draftEditQuest(payload) {
+  async function draftEditQuest(payload: Record<string, any>) {
     const orig = editQuest.quest
     if (!orig) return
     const fields = diffFields(orig, payload, QUEST_KEYS)
-    const was = (orig.tags ?? []).map((t) => t.id).sort((a, b) => a - b)
+    const was = (orig.tags ?? []).map((t: { id: any }) => t.id).sort((a: number, b: number) => a - b)
     const now = [...(payload.tag_ids ?? [])].sort((a, b) => a - b)
     if (JSON.stringify(was) !== JSON.stringify(now)) fields.tag_ids = payload.tag_ids
     if (!Object.keys(fields).length) {
@@ -1897,7 +1907,7 @@
     await addOp('edit_quest', { id: `quest:${orig.id}`, fields })
   }
 
-  async function draftEditStep(payload) {
+  async function draftEditStep(payload: Record<string,any>) {
     const orig = editStep.step
     if (!orig) return
     const fields = diffFields(orig, payload, STEP_KEYS)
@@ -1909,7 +1919,7 @@
   }
 
   /** Submit of the small title + description form (new note / step, or an in-place edit). */
-  async function onEntitySubmit(fields) {
+  async function onEntitySubmit(fields: any) {
     const m = entityModal
     if (m.edit) {
       try {
@@ -1948,7 +1958,7 @@
   }
 
   /** A new note appears at the cursor with its title selected, ready to type over. */
-  async function createNoteHere(at, linkFrom) {
+  async function createNoteHere(at: { x: number; y: number }, linkFrom: string) {
     const title = freshNoteTitle()
     const op = await addOp('create_note', { fields: { title, description: '' }, pos: at })
     if (!op) return
@@ -1958,10 +1968,10 @@
 
   /** Note edited on its card: the full text is fetched first (the map shows only the start of long notes). */
   let editing = $state(
-    /** @type {{ key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any, fresh?: boolean } | null} */ (null),
+    (null as { key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any, fresh?: boolean } | null),
   )
 
-  async function startEditNote(n, fresh = false) {
+  async function startEditNote(n: { key: any; draft: any; op: any; title: any; id?: any }, fresh = false) {
     if (editing?.key === n.key) return
     try {
       if (n.draft) {
@@ -1992,7 +2002,7 @@
     }
   }
 
-  async function finishEdit(saveIt) {
+  async function finishEdit(saveIt: any) {
     const e = editing
     editing = null
     if (!saveIt || !e) return
@@ -2012,16 +2022,16 @@
     await addOp('edit_note', { id: e.key, fields: changed })
   }
 
-  const autofocus = (node) => {
+  const autofocus = (node: { focus: () => void }) => {
     node.focus()
   }
 
-  const autofocusIf = (node, on) => {
+  const autofocusIf = (node: { focus: () => void }, on: any) => {
     if (on) node.focus()
   }
 
   /** Title of a brand-new note: focused with the whole text selected. */
-  const focusSelect = (node) => {
+  const focusSelect = (node: Element) => {
     // The card is mounted while the map is still hidden for measuring, and a
     // hidden field cannot take focus — keep trying until it shows.
     let tries = 0
@@ -2057,7 +2067,7 @@
   /** There is something to clear: a centre, extra centres, or hidden cards. */
   let canClear = $derived(Boolean(center.id) || draft.roots.length > 0 || hidden.size > 0)
 
-  async function addToMap(type, id) {
+  async function addToMap(type: string, id: number) {
     // First thing on an empty map becomes its centre.
     if (!center.id) {
       resetPositions()
@@ -2077,11 +2087,11 @@
     await loadDraft()
   }
 
-  const titleOf = (key) => nodeMap.get(key)?.title ?? key
+  const titleOf = (key: any) => nodeMap.get(key)?.title ?? key
 
-  const isDone = (n) => n.status === 'completed' || n.status === 'done'
-  const isOrphan = (n) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
-  const rasterOf = (n) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
+  const isDone = (n: { status: string }) => n.status === 'completed' || n.status === 'done'
+  const isOrphan = (n: { type: string; links: number }) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
+  const rasterOf = (n: { type: string; mime: any }) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
 </script>
 
 {#snippet glyph(n, t)}

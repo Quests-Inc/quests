@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { QUESTLINE_COLORS, QUESTLINE_ICONS } from '../js/api.ts'
   import Icon from './Icon.svelte'
   import QuestlineIcon from './QuestlineIcon.svelte'
@@ -24,10 +24,17 @@
     pendingFile = $bindable(null),
     clearCustom = $bindable(false),
     ownerLabel = 'этого элемента',
+  }: {
+    color?: string,
+    icon?: string,
+    iconUrl?: string | null,
+    pendingFile?: File | null,
+    clearCustom?: boolean,
+    ownerLabel?: string,
   } = $props()
 
-  let fileInput = $state(/** @type {HTMLInputElement | null} */ (null))
-  let pendingPreview = $state(/** @type {string | null} */ (null))
+  let fileInput = $state((null as HTMLInputElement | null))
+  let pendingPreview = $state((null as string | null))
 
   // Object URL for the picked file, revoked when it changes or goes away.
   $effect(() => {
@@ -42,14 +49,14 @@
 
   let previewUrl = $derived(pendingPreview || (!clearCustom ? iconUrl : null))
 
-  function pickBuiltin(name) {
+  function pickBuiltin(name: string) {
     icon = name
     clearCustom = true
     pendingFile = null
   }
 
-  function onFileChange(event) {
-    const input = /** @type {HTMLInputElement} */ (event.currentTarget)
+  function onFileChange(event: { currentTarget: HTMLInputElement }) {
+    const input = (event.currentTarget as HTMLInputElement)
     const file = input.files?.[0] || null
     input.value = ''
     if (!file) return

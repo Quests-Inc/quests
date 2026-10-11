@@ -1,15 +1,15 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte'
   import SettingsBlock from './SettingsBlock.svelte'
   import { fetchTokens, createToken, revokeToken } from '../../js/api.ts'
   import { currentWorkspaceName } from './workspaceState.svelte.ts'
 
-  let tokens = $state(/** @type {{ id: number, name: string, created_at: string, last_used_at: string | null }[]} */ ([]))
+  let tokens = $state(([] as { id: number, name: string, created_at: string, last_used_at: string | null }[]))
   let name = $state('')
   let busy = $state(false)
   let error = $state('')
   /** The freshly minted secret: shown once, then gone. */
-  let fresh = $state(/** @type {{ name: string, token: string } | null} */ (null))
+  let fresh = $state((null as { name: string, token: string } | null))
   let copied = $state('')
 
   const PRESETS = ['HUD', 'MCP', 'Android', 'CLI', 'Бот']
@@ -40,7 +40,7 @@
     }
   }
 
-  async function revoke(t) {
+  async function revoke(t: { name: any; id: number }) {
     if (!confirm(`Отозвать токен «${t.name}»? Клиент с ним перестанет работать.`)) return
     error = ''
     try {
@@ -51,7 +51,7 @@
     }
   }
 
-  async function copy(text, key) {
+  async function copy(text: string, key: string) {
     try {
       await navigator.clipboard.writeText(text)
       copied = key
@@ -61,7 +61,7 @@
     }
   }
 
-  function when(iso) {
+  function when(iso: string|number|Date) {
     if (!iso) return 'ни разу'
     const d = new Date(iso.endsWith('Z') ? iso : iso.replace(' ', 'T') + 'Z')
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })

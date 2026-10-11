@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   import SettingsBlock from './SettingsBlock.svelte'
 
   /** @type {{ health: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string }} */
-  let { health, liveStatus = 'off' } = $props()
+  let { health, liveStatus = 'off' }: { health: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string } = $props()
 
-  function statusLabel(s) {
+  function statusLabel(s: string) {
     if (s === 'ok' || s === 'live') return 'онлайн'
     if (s === 'offline' || s === 'off') return 'офлайн'
     if (s === 'disabled') return 'не настроен'
@@ -13,7 +13,7 @@
     return 'неизвестно'
   }
 
-  function ageLabel(comp) {
+  function ageLabel(comp: string) {
     const row = health?.detail?.components?.[comp]
     if (comp === 'db') {
       return row?.detail || ''
@@ -31,11 +31,11 @@
     return `${age} с назад`
   }
 
-  function probeStatus(comp) {
+  function probeStatus(comp: string) {
     return health?.detail?.components?.[comp]?.status || health[comp] || 'unknown'
   }
 
-  function chipOf(s) {
+  function chipOf(s: string) {
     if (s === 'ok' || s === 'offline' || s === 'warn') return s
     return 'unknown'
   }

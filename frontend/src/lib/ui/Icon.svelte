@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import add from '../../assets/icons/add.svg?raw'
   import alert from '../../assets/icons/alert.svg?raw'
   import arrowUp from '../../assets/icons/arrow-up.svg?raw'
@@ -98,7 +98,7 @@
   }
 
   /** @type {{ name: string, size?: number, label?: string }} */
-  let { name, size = 16, label = '' } = $props()
+  let { name, size = 16, label = '' }: { name: string, size?: number, label?: string } = $props()
 
   let svg = $derived(ICONS[name] ?? '')
 </script>

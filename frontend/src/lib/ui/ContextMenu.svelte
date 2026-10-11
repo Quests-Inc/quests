@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte'
 
   /**
@@ -12,14 +12,24 @@
    *   children?: CtxItem[],
    * }} CtxItem
    */
+  type CtxItem = {
+    id: string,
+    label?: string,
+    danger?: boolean,
+    sep?: boolean,
+    checked?: boolean,
+    disabled?: boolean,
+    children?: CtxItem[],
+  }
+
 
   /**
    * @type {{ open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void }}
    */
-  let { open = false, x = 0, y = 0, items = [], onSelect, onClose } = $props()
+  let { open = false, x = 0, y = 0, items = [], onSelect, onClose }: { open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
 
-  let menuEl = $state(/** @type {HTMLDivElement | null} */ (null))
-  let subEl = $state(/** @type {HTMLDivElement | null} */ (null))
+  let menuEl = $state((null as HTMLDivElement | null))
+  let subEl = $state((null as HTMLDivElement | null))
   let posX = $state(0)
   let posY = $state(0)
   let placed = $state(false)
@@ -27,7 +37,7 @@
   let subY = $state(0)
   let subPlaced = $state(false)
   /** @type {{ id: string, items: CtxItem[], left: number, right: number, top: number } | null} */
-  let branch = $state(null)
+  let branch: { id: string, items: CtxItem[], left: number, right: number, top: number } | null = $state(null)
 
   const PAD = 8
 
@@ -54,7 +64,7 @@
    * @param {CtxItem} item
    * @param {HTMLElement} el
    */
-  function openBranch(item, el) {
+  function openBranch(item: CtxItem, el: HTMLElement) {
     if (!item.children?.length) return
     if (branch?.id === item.id) return
     const rect = el.getBoundingClientRect()
@@ -92,14 +102,14 @@
    * @param {HTMLElement} el
    * @param {boolean} inSub
    */
-  function onRowEnter(item, el, inSub) {
+  function onRowEnter(item: CtxItem, el: HTMLElement, inSub: boolean) {
     if (item.sep || item.disabled) return
     if (!inSub && item.children?.length) openBranch(item, el)
     else if (!inSub) branch = null
   }
 
   /** @param {CtxItem} item */
-  function pick(item) {
+  function pick(item: CtxItem) {
     if (item.sep || item.disabled || item.children?.length) return
     onSelect(item.id)
     onClose()
@@ -163,13 +173,13 @@
 
   $effect(() => {
     if (!open) return
-    const onKey = (event) => {
+    const onKey = (event: { key: string; preventDefault: () => void }) => {
       if (event.key === 'Escape') {
         event.preventDefault()
         onClose()
       }
     }
-    const onPointer = (event) => {
+    const onPointer = (event: { target: any }) => {
       const el = event.target
       if (el instanceof Element && el.closest('.ctx-menu')) return
       onClose()

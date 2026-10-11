@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   // Sign-in gate. Rendered instead of the journal whenever the instance
   // requires accounts and no valid session cookie is present.
   import { login, loginMfa } from '../js/api.ts'
 
   /** @type {{ onAuthenticated: (username: string) => void }} */
-  let { onAuthenticated } = $props()
+  let { onAuthenticated }: { onAuthenticated: (username: string) => void } = $props()
 
   let username = $state('')
   let password = $state('')
@@ -14,7 +14,7 @@
   let mfaToken = $state('')
   let code = $state('')
 
-  async function submit(event) {
+  async function submit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (busy) return
     error = ''

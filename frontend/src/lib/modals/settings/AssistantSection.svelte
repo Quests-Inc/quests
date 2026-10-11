@@ -1,9 +1,9 @@
-<script>
+<script lang="ts">
   import SettingsBlock from './SettingsBlock.svelte'
   import { getMyLLM, saveMyLLM, deleteMyLLM, testMyLLM } from '../../js/api.ts'
 
   /** @type {any} */
-  let info = $state(null)
+  let info: any = $state(null)
   let loadError = $state('')
   let provider = $state('groq')
   let baseUrl = $state('')
@@ -11,16 +11,16 @@
   let apiKey = $state('')
   let busy = $state(false)
   /** @type {{ kind: 'ok' | 'err', text: string } | null} */
-  let note = $state(null)
+  let note: { kind: 'ok' | 'err', text: string } | null = $state(null)
 
-  const preset = $derived(info?.providers?.find((p) => p.id === provider))
+  const preset = $derived(info?.providers?.find((p: { id: string }) => p.id === provider))
   const SOURCE = {
     own: 'Используется ваш ключ',
     server: 'Используется ключ сервера',
     none: 'Ассистент не настроен',
   }
 
-  function apply(v) {
+  function apply(v: { provider: string; base_url: string; model: string }) {
     info = v
     provider = v.provider || 'groq'
     baseUrl = v.base_url || ''
@@ -34,7 +34,7 @@
 
   const form = () => ({ provider, base_url: baseUrl, model, api_key: apiKey })
 
-  async function run(fn) {
+  async function run(fn: { (): Promise<void>; (): Promise<void>; (): Promise<void>; (): any }) {
     busy = true
     note = null
     try {

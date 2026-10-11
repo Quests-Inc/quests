@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { previewActionBatch, applyActionBatch } from '../js/api.ts'
   import { buildPreviewTree } from '../js/actionsPreview.ts'
   import Icon from '../ui/Icon.svelte'
@@ -16,15 +16,23 @@
    *   onClose: () => void,
    *   onApplied: () => void,
    * }} */
-  let { open = false, quests = [], questlines = [], notes = [], attachments = [], onClose, onApplied } = $props()
+  let { open = false, quests = [], questlines = [], notes = [], attachments = [], onClose, onApplied }: {
+    open: boolean,
+    quests: any[],
+    questlines: any[],
+    notes?: any[],
+    attachments?: any[],
+    onClose: () => void,
+    onApplied: () => void,
+  } = $props()
 
   let text = $state('')
-  let phase = $state(/** @type {'input' | 'loading' | 'preview' | 'applying'} */ ('input'))
+  let phase = $state(('input' as 'input' | 'loading' | 'preview' | 'applying'))
   let clarifyQuestion = $state('')
-  let batch = $state(/** @type {any | null} */ (null))
-  let preview = $state(/** @type {any[]} */ ([]))
+  let batch = $state((null as any | null))
+  let preview = $state(([] as any[]))
   let errorMsg = $state('')
-  let textareaEl = $state(/** @type {HTMLTextAreaElement | null} */ (null))
+  let textareaEl = $state((null as HTMLTextAreaElement | null))
 
   let tree = $derived(
     phase === 'preview'
@@ -91,14 +99,14 @@
     preview = []
   }
 
-  function onPromptKeydown(event) {
+  function onPromptKeydown(event: { key: string; metaKey: any; ctrlKey: any; preventDefault: () => void }) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault()
       generate()
     }
   }
 
-  function fmtVal(v) {
+  function fmtVal(v: string) {
     if (v === null || v === undefined || v === '') return '—'
     if (typeof v === 'boolean') return v ? 'да' : 'нет'
     return String(v)

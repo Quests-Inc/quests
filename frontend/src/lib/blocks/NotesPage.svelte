@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { untrack, tick } from 'svelte'
   import {
     createNote,
@@ -35,6 +35,7 @@
   import NoteIconModal from '../modals/NoteIconModal.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
+import { NotePayload } from '../api/http.gen.ts'
 
   /** @type {{
    *   notes: any[],
@@ -61,15 +62,27 @@
     onChanged,
     onRef,
     onOpenSecrets,
+  }: {
+    notes: any[],
+    selectedId: number | null,
+    labels?: Record<string, string>,
+    quests?: any[],
+    questlines?: any[],
+    attachments?: any[],
+    sidebarCollapsed?: boolean,
+    onSelect: (id: number | null) => void,
+    onChanged: () => void,
+    onRef?: (kind: string, id: number) => void,
+    onOpenSecrets?: (id: number) => void,
   } = $props()
 
   let search = $state('')
   /** @type {Record<string, boolean>} — false = свёрнуто; по умолчанию развёрнуто */
-  let treeOpen = $state({})
+  let treeOpen: Record<string, boolean> = $state({})
   /** Ссылки/Ссылаются — свёрнуты по умолчанию. */
   let refsOpen = $state(false)
   let backlinksOpen = $state(false)
-  let detail = $state(/** @type {any | null} */ (null))
+  let detail = $state((null as any | null))
   let title = $state('')
   let description = $state('')
   let parentId = $state('')
@@ -83,11 +96,11 @@
   /** The open note was changed from outside (agent, another tab, the bot)
    * while it has unsaved edits here — the incoming version waits for the
    * user's say instead of replacing their text. */
-  let external = $state(/** @type {ReturnType<typeof fromRow> | null} */ (null))
+  let external = $state((null as ReturnType<typeof fromRow> | null))
   let flashing = $state(false)
   let deleting = $state(false)
   let deleteOpen = $state(false)
-  let deleteTargetId = $state(/** @type {number | null} */ (null))
+  let deleteTargetId = $state((null as number | null))
   let error = $state('')
   let saved = $state({
     title: '',
@@ -99,11 +112,11 @@
     isCategory: false,
   })
   /** @type {'raw' | 'combined' | 'formatted'} */
-  let viewMode = $state(loadViewMode())
+  let viewMode: 'raw' | 'combined' | 'formatted' = $state(loadViewMode())
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
-  let ctxNoteId = $state(/** @type {number | null} */ (null))
+  let ctxNoteId = $state((null as number | null))
   let parentMenuOpen = $state(false)
   let parentMenuX = $state(0)
   let parentMenuY = $state(0)
@@ -112,18 +125,18 @@
   let exportMenuY = $state(0)
   let exportBusy = $state(false)
   let iconModalOpen = $state(false)
-  let iconModalNoteId = $state(/** @type {number | null} */ (null))
+  let iconModalNoteId = $state((null as number | null))
   /** Inline rename in the tree — id of the row being renamed, or null. */
-  let renamingId = $state(/** @type {number | null} */ (null))
+  let renamingId = $state((null as number | null))
   let renamingValue = $state('')
-  let renameInputEl = $state(/** @type {HTMLInputElement | null} */ (null))
+  let renameInputEl = $state((null as HTMLInputElement | null))
   /** Drag-n-drop reparenting in the tree — only moves a note between parents,
    * never touches sort order (that stays children → pinned → sort_order → id,
    * same as byParent's own sort above). */
-  let dragId = $state(/** @type {number | null} */ (null))
+  let dragId = $state((null as number | null))
   /** String(id) of the row under the cursor, or 'root' for the list's empty
    * background, or null. */
-  let dragOverKey = $state(/** @type {string | null} */ (null))
+  let dragOverKey = $state((null as string | null))
 
   let dirty = $derived(
     title !== saved.title ||
@@ -148,13 +161,13 @@
         { id: 'pinned', label: 'закреплена', aliases: ['pin'] },
         { id: 'check', label: 'есть проверка актуальности' },
       ],
-      test: (n, v) =>
+      test: (n: { outdated: any; is_readme: any; is_private: any; is_category: any; pinned: any; has_check: any }, v: string|number) =>
         ({ outdated: !!n.outdated, readme: !!n.is_readme, private: !!n.is_private, category: !!n.is_category, pinned: !!n.pinned, check: !!n.has_check })[v],
     },
   }
   let parsedSearch = $derived(parseQuery(search, NOTE_SPEC))
   let searchText = $derived(parsedSearch.text)
-  const flagOk = (n) => passes(parsedSearch, NOTE_SPEC, n)
+  const flagOk = (n: any) => passes(parsedSearch, NOTE_SPEC, n)
 
   let filtered = $derived.by(() => {
     const q = searchText.toLowerCase()
@@ -165,7 +178,7 @@
   })
 
   /** The given notes and the chain of their parents, in the original order. */
-  function withAncestors(list) {
+  function withAncestors(list: any[]) {
     const byId = new Map(notes.map((n) => [n.id, n]))
     const keep = new Set()
     for (const n of list) {
@@ -184,7 +197,7 @@
   let searchActive = $derived(search.trim().length > 0)
 
   /** Ranked server results for the query (null = not asked / unavailable → the tree filter above stays). */
-  let searchHits = $state(/** @type {any[] | null} */ (null))
+  let searchHits = $state((null as any[] | null))
   $effect(() => {
     const q = searchText
     if (q.length < 2) {
@@ -195,7 +208,7 @@
     const timer = setTimeout(async () => {
       try {
         const r = await searchNotes(q, parsedSearch.active ? 50 : 30)
-        if (!stale) searchHits = (r?.hits ?? []).filter((h) => flagOk(noteById(h.id) ?? h))
+        if (!stale) searchHits = (r?.hits ?? []).filter((h: { id: number }) => flagOk(noteById(h.id) ?? h))
       } catch {
         if (!stale) searchHits = null
       }
@@ -219,7 +232,7 @@
    * `parentId` still holds the *previous* note's value. Using it anyway for
    * that one tick drew the row at a wrong/stale spot that then snapped to
    * the right one a moment later — the flash this was fixing. */
-  function parentKeyOf(n) {
+  function parentKeyOf(n: { id: number; parent_id: null }) {
     if (n.id === selectedId && loadedId === selectedId) return parentId === '' ? 'root' : parentId
     const draft = noteDrafts[String(n.id)]
     if (draft) return draft.parentId === '' ? 'root' : draft.parentId
@@ -228,21 +241,21 @@
 
   let byParent = $derived.by(() => {
     /** @type {Map<string, any[]>} */
-    const m = new Map()
+    const m: Map<string, any[]> = new Map()
     for (const n of filtered) {
       const key = parentKeyOf(n)
       if (!m.has(key)) m.set(key, [])
       m.get(key).push(n)
     }
     // Notes with children first, then leaves; pin only breaks ties inside a group.
-    const hasKids = (/** @type {any} */ n) => (m.get(String(n.id))?.length ?? 0) > 0
+    const hasKids = (/** @type {any} */ n: { id: any }) => (m.get(String(n.id))?.length ?? 0) > 0
     for (const list of m.values()) list.sort((a, b) => compareNotes(a, b, hasKids))
     return m
   })
 
   /** Tree order: with children → pinned → sort_order → id.
    * @param {any} a @param {any} b @param {(n: any) => boolean} hasKids */
-  function compareNotes(a, b, hasKids) {
+  function compareNotes(a: any, b: any, hasKids: (n: any) => boolean) {
     return (
       Number(hasKids(b)) - Number(hasKids(a)) ||
       Number(b.pinned) - Number(a.pinned) ||
@@ -253,13 +266,13 @@
 
   let roots = $derived(byParent.get('root') || [])
 
-  let loadedId = $state(/** @type {number | null} */ (null))
+  let loadedId = $state((null as number | null))
 
-  const VIEW_MODES = /** @type {const} */ ([
+  const VIEW_MODES = ([
     { id: 'raw', label: 'Текст' },
     { id: 'combined', label: 'Оба' },
     { id: 'formatted', label: 'Просмотр' },
-  ])
+  ] as const)
 
   function loadViewMode() {
     try {
@@ -272,7 +285,7 @@
   }
 
   /** @param {'raw' | 'combined' | 'formatted'} mode */
-  function setViewMode(mode) {
+  function setViewMode(mode: 'raw' | 'combined' | 'formatted') {
     viewMode = mode
     try {
       localStorage.setItem('quests.notes.viewMode', mode)
@@ -294,7 +307,7 @@
     return () => mq.removeEventListener('change', apply)
   })
 
-  function fromRow(row) {
+  function fromRow(row: NotePayload) {
     return {
       title: row.title || '',
       description: row.description || '',
@@ -306,7 +319,7 @@
     }
   }
 
-  function applyForm(src) {
+  function applyForm(src: { title: any; description: any; parentId: any; pinned: any; isReadme: any; isPrivate: any; isCategory: any }) {
     title = src.title
     description = src.description
     parentId = src.parentId
@@ -321,7 +334,7 @@
     return { title, description, parentId, pinned, isReadme, isPrivate, isCategory }
   }
 
-  function draftsEqual(a, b) {
+  function draftsEqual(a: { title: any; description: any; parentId: any; pinned: any; isReadme: any; isPrivate: any; isCategory: any }, b: { title: any; description: any; parentId: any; pinned: any; isReadme: any; isPrivate: any; isCategory: any }) {
     return (
       a.title === b.title &&
       a.description === b.description &&
@@ -333,7 +346,7 @@
     )
   }
 
-  function syncDraft(id) {
+  function syncDraft(id: number) {
     if (id == null) return
     const form = formDraft()
     if (draftsEqual(form, saved)) clearNoteDraft(id)
@@ -346,12 +359,12 @@
     if (selectedId != null) clearNoteDraft(selectedId)
   }
 
-  function rowTitle(n) {
+  function rowTitle(n: { id: number; title: any }) {
     if (n.id === renamingId) return renamingValue
     return noteDrafts[String(n.id)]?.title || n.title
   }
 
-  function startRename(id) {
+  function startRename(id: number) {
     const n = noteById(id)
     if (!n) return
     renamingId = id
@@ -362,7 +375,7 @@
     })
   }
 
-  function rowTitleRaw(n) {
+  function rowTitleRaw(n: { id: any; title: any }) {
     return noteDrafts[String(n.id)]?.title || n.title
   }
 
@@ -422,14 +435,14 @@
     }
   }
 
-  function onTitleKeydown(event) {
+  function onTitleKeydown(event: { key: string; preventDefault: () => void }) {
     if (event.key === 'Enter') {
       event.preventDefault()
       titleEl?.blur()
     }
   }
 
-  function onRenameKeydown(event) {
+  function onRenameKeydown(event: { key: string; preventDefault: () => void; stopPropagation: () => void }) {
     if (event.key === 'Enter') {
       event.preventDefault()
       renameInputEl?.blur()
@@ -440,7 +453,7 @@
     event.stopPropagation()
   }
 
-  function rowDirty(n) {
+  function rowDirty(n: { id: number }) {
     return n.id === selectedId ? dirty : noteDrafts[String(n.id)] != null
   }
 
@@ -507,7 +520,7 @@
   }
 
   /** Take the server's current version of the open note as the form. */
-  async function adoptExternal(id) {
+  async function adoptExternal(id: number) {
     try {
       const row = await getNote(id)
       if (selectedId !== id) return
@@ -614,7 +627,7 @@
     }
   }
 
-  function onKey(event) {
+  function onKey(event: { ctrlKey: any; metaKey: any; code: string; key: string; preventDefault: () => void; stopPropagation: () => void }) {
     if (!(event.ctrlKey || event.metaKey)) return
     // code=KeyS — раскладконезависимо (ru: Ctrl+ы); key оставляем как запасной.
     const isSave =
@@ -631,18 +644,18 @@
     return () => window.removeEventListener('keydown', onKey, true)
   })
 
-  let editEl = $state(/** @type {HTMLTextAreaElement | null} */ (null))
-  let titleEl = $state(/** @type {HTMLInputElement | null} */ (null))
+  let editEl = $state((null as HTMLTextAreaElement | null))
+  let titleEl = $state((null as HTMLInputElement | null))
   let findOpen = $state(false)
   let noteIsOutdated = $derived(selectedId != null && !!(detail?.id === selectedId ? detail.outdated : noteById(selectedId)?.outdated))
-  function onFindKey(e) {
+  function onFindKey(e: { ctrlKey: any; metaKey: any; shiftKey: any; altKey: any; key: string; preventDefault: () => void }) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && selectedId) {
       e.preventDefault()
       findOpen = true
     }
   }
-  let previewEl = $state(/** @type {HTMLDivElement | null} */ (null))
-  let pageEl = $state(/** @type {HTMLElement | null} */ (null))
+  let previewEl = $state((null as HTMLDivElement | null))
+  let pageEl = $state((null as HTMLElement | null))
   let titleEditing = $state(false)
 
   let titleReadonly = $derived(viewMode === 'formatted' && !titleEditing)
@@ -720,7 +733,7 @@
   }
 
   /** @param {MouseEvent} [event] */
-  async function startBodyEdit(event) {
+  async function startBodyEdit(event?: MouseEvent) {
     if (viewMode !== 'formatted') return
     event?.preventDefault?.()
     let offset = description.length
@@ -744,7 +757,7 @@
   }
 
   /** Esc в сыром/оба при фокусе в textarea → режим просмотра около каретки. */
-  async function onEditKeydown(event) {
+  async function onEditKeydown(event: { key: string; preventDefault: () => void }) {
     if (event.key !== 'Escape') return
     if (viewMode === 'formatted') return
     event.preventDefault()
@@ -762,38 +775,38 @@
     })
   }
 
-  function childrenOf(id) {
+  function childrenOf(id: any) {
     return byParent.get(String(id)) || []
   }
 
-  function hasChildren(id) {
+  function hasChildren(id: any) {
     return childrenOf(id).length > 0
   }
 
-  function isTreeOpen(id) {
+  function isTreeOpen(id: any) {
     return treeOpen[String(id)] === true
   }
 
   /** @param {MouseEvent} event */
-  function toggleTree(id, event) {
+  function toggleTree(id: any, event: MouseEvent) {
     event.stopPropagation()
     event.preventDefault()
     const key = String(id)
     treeOpen = { ...treeOpen, [key]: treeOpen[key] !== true }
   }
 
-  function showChildren(id) {
+  function showChildren(id: any) {
     if (!hasChildren(id)) return false
     if (searchActive) return true
     return isTreeOpen(id)
   }
 
-  function noteById(id) {
+  function noteById(id: number) {
     return notes.find((n) => n.id === id) ?? null
   }
 
   /** candidate is under ancestor (cannot become its parent). */
-  function isUnder(candidateId, ancestorId) {
+  function isUnder(candidateId: number, ancestorId: number) {
     if (candidateId == null || ancestorId == null) return false
     let cur = noteById(candidateId)
     const seen = new Set()
@@ -807,7 +820,7 @@
 
   /** A note is visible in the sidebar when every ancestor up to the root is
    * expanded (or it has no parent). */
-  function isNoteVisible(id) {
+  function isNoteVisible(id: any) {
     const n = noteById(id)
     if (!n) return false
     if (n.parent_id == null) return true
@@ -817,7 +830,7 @@
 
   /** Walking up from a hidden note, the closest ancestor that is itself
    * visible — the row where a "there's a README below" hint should land. */
-  function nearestVisibleAncestor(id) {
+  function nearestVisibleAncestor(id: any) {
     const n = noteById(id)
     let cur = n?.parent_id != null ? noteById(n.parent_id) : null
     while (cur) {
@@ -844,11 +857,11 @@
 
   let crumbs = $derived.by(() => {
     /** @type {{ id: number | null, title: string }[]} */
-    const out = [{ id: null, title: 'Корень' }]
+    const out: { id: number | null, title: string }[] = [{ id: null, title: 'Корень' }]
     const pid = parentId === '' ? null : Number(parentId)
     if (pid == null || Number.isNaN(pid)) return out
     /** @type {{ id: number, title: string }[]} */
-    const chain = []
+    const chain: { id: number, title: string }[] = []
     let cur = noteById(pid)
     const seen = new Set()
     while (cur && !seen.has(cur.id)) {
@@ -861,7 +874,7 @@
 
   let parentMenuItems = $derived.by(() => {
     /** @type {{ id: string, label: string }[]} */
-    const items = [{ id: 'root', label: '— корень —' }]
+    const items: { id: string, label: string }[] = [{ id: 'root', label: '— корень —' }]
     if (selectedId == null) return items
     for (const n of notes) {
       if (n.id === selectedId) continue
@@ -872,39 +885,39 @@
   })
 
   /** @param {MouseEvent} event */
-  function openParentPicker(event) {
+  function openParentPicker(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
-    const el = /** @type {HTMLElement} */ (event.currentTarget)
+    const el = (event.currentTarget as HTMLElement)
     const rect = el.getBoundingClientRect()
     parentMenuX = rect.left
     parentMenuY = rect.bottom + 4
     parentMenuOpen = true
   }
 
-  function setParentFromMenu(action) {
+  function setParentFromMenu(action: string) {
     if (selectedId == null) return
     reparentNote(selectedId, action === 'root' ? null : Number(action))
   }
 
   /** @param {number | null} id */
-  function setParentCrumb(id) {
+  function setParentCrumb(id: number | null) {
     if (selectedId == null) return
     reparentNote(selectedId, id)
   }
 
   /** @param {MouseEvent} event */
-  function openExportMenu(event) {
+  function openExportMenu(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
-    const el = /** @type {HTMLElement} */ (event.currentTarget)
+    const el = (event.currentTarget as HTMLElement)
     const rect = el.getBoundingClientRect()
     exportMenuX = rect.left
     exportMenuY = rect.bottom + 4
     exportMenuOpen = true
   }
 
-  async function exportNoteById(id, action) {
+  async function exportNoteById(id: number, action: string) {
     if (id == null || exportBusy) return
     const n = noteById(id)
     const payload =
@@ -948,7 +961,7 @@
     }
   }
 
-  function onExportSelect(action) {
+  function onExportSelect(action: any) {
     exportNoteById(selectedId, action)
   }
 
@@ -959,9 +972,9 @@
 
   let ctxNote = $derived(ctxNoteId == null ? null : noteById(ctxNoteId))
 
-  function moveTargets(note) {
+  function moveTargets(note: { parent_id: null; id: null }) {
     /** @type {{ id: string, label?: string, sep?: boolean, checked?: boolean }[]} */
-    const items = []
+    const items: { id: string, label?: string, sep?: boolean, checked?: boolean }[] = []
     if (note?.parent_id != null) {
       items.push({ id: 'move-up', label: 'На уровень вверх' })
     }
@@ -975,8 +988,8 @@
     // Own descendants are excluded, so there is never an ambiguous re-parenting.
     const pid = note?.parent_id ?? null
     const parent = pid != null ? noteById(pid) : null
-    const hasKids = (/** @type {any} */ n) => hasChildren(n.id)
-    const level = (/** @type {number | null} */ parentOf) =>
+    const hasKids = (/** @type {any} */ n: { id: any }) => hasChildren(n.id)
+    const level = (/** @type {number | null} */ parentOf: any) =>
       notes
         .filter(
           (n) =>
@@ -1043,7 +1056,7 @@
     ]
   })
 
-  function openNoteMenu(event, note) {
+  function openNoteMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, note: { id: number }) {
     if (!note?.id) return
     event.preventDefault()
     event.stopPropagation()
@@ -1057,7 +1070,7 @@
     ctxOpen = false
   }
 
-  async function copyNoteRef(id) {
+  async function copyNoteRef(id: number) {
     if (id == null) return
     try {
       const text = `note=${id}`
@@ -1069,7 +1082,7 @@
     }
   }
 
-  async function reparentNote(id, nextParent) {
+  async function reparentNote(id: number, nextParent: number) {
     const n = noteById(id)
     if (!n) return
     const current = n.parent_id ?? null
@@ -1092,7 +1105,7 @@
     }
   }
 
-  async function togglePinNote(id) {
+  async function togglePinNote(id: number) {
     const n = noteById(id)
     if (!n) return
     const next = !n.pinned
@@ -1114,7 +1127,7 @@
 
   /** Shared body for the three status toggles below — same immediate-save
    * shape as togglePinNote, just parameterised over which field flips. */
-  async function toggleNoteFlag(id, apiField, stateVar, setState) {
+  async function toggleNoteFlag(id: number, apiField: string, stateVar: string, setState: { (v: boolean): boolean; (v: boolean): boolean; (v: boolean): boolean; (arg0: boolean): void }) {
     const n = noteById(id)
     if (!n) return
     const current = apiField === 'is_readme' ? n.is_readme : apiField === 'is_private' ? n.is_private : n.is_category
@@ -1135,7 +1148,7 @@
     }
   }
 
-  async function toggleOutdatedNote(id) {
+  async function toggleOutdatedNote(id: number) {
     const n = noteById(id)
     if (!n) return
     error = ''
@@ -1148,19 +1161,19 @@
     }
   }
 
-  function toggleReadmeNote(id) {
-    return toggleNoteFlag(id, 'is_readme', 'isReadme', (v) => (isReadme = v))
+  function toggleReadmeNote(id: number) {
+    return toggleNoteFlag(id, 'is_readme', 'isReadme', (v: boolean) => (isReadme = v))
   }
 
-  function togglePrivateNote(id) {
-    return toggleNoteFlag(id, 'is_private', 'isPrivate', (v) => (isPrivate = v))
+  function togglePrivateNote(id: number) {
+    return toggleNoteFlag(id, 'is_private', 'isPrivate', (v: boolean) => (isPrivate = v))
   }
 
-  function toggleCategoryNote(id) {
-    return toggleNoteFlag(id, 'is_category', 'isCategory', (v) => (isCategory = v))
+  function toggleCategoryNote(id: number) {
+    return toggleNoteFlag(id, 'is_category', 'isCategory', (v: boolean) => (isCategory = v))
   }
 
-  async function moveNoteUp(id) {
+  async function moveNoteUp(id: number) {
     const n = noteById(id)
     if (!n?.parent_id) return
     const parent = noteById(n.parent_id)
@@ -1168,7 +1181,7 @@
   }
 
   /** @param {number | null} targetId — null means "make it a root note" */
-  function canDropOn(targetId, draggedId = dragId) {
+  function canDropOn(targetId: number | null, draggedId = dragId) {
     if (draggedId == null) return false
     if (targetId === draggedId) return false
     // target is a descendant of the dragged note — moving there would cycle it.
@@ -1178,11 +1191,11 @@
 
   /** Reparent from a tree drag — saved immediately, like the breadcrumb picker.
    * @param {number} id @param {number | null} newParentId */
-  function moveNoteTo(id, newParentId) {
+  function moveNoteTo(id: number, newParentId: number | null) {
     return reparentNote(id, newParentId)
   }
 
-  function onRowDragStart(event, id) {
+  function onRowDragStart(event: { preventDefault: () => void; dataTransfer: { effectAllowed: string; setData: (arg0: string,arg1: string) => void } }, id: number) {
     if (renamingId != null) {
       event.preventDefault()
       return
@@ -1197,7 +1210,7 @@
     dragOverKey = null
   }
 
-  function onRowDragOver(event, id) {
+  function onRowDragOver(event: { preventDefault: () => void; stopPropagation: () => void; dataTransfer: { dropEffect: string } }, id: number) {
     if (!canDropOn(id)) return
     event.preventDefault()
     event.stopPropagation()
@@ -1205,11 +1218,11 @@
     dragOverKey = String(id)
   }
 
-  function onRowDragLeave(event, id) {
+  function onRowDragLeave(event: any, id: any) {
     if (dragOverKey === String(id)) dragOverKey = null
   }
 
-  function onRowDrop(event, id) {
+  function onRowDrop(event: { preventDefault: () => void; stopPropagation: () => void }, id: number) {
     event.preventDefault()
     event.stopPropagation()
     const draggedId = dragId
@@ -1219,18 +1232,18 @@
     moveNoteTo(draggedId, id)
   }
 
-  function onListDragOver(event) {
+  function onListDragOver(event: { preventDefault: () => void; dataTransfer: { dropEffect: string } }) {
     if (!canDropOn(null)) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
     dragOverKey = 'root'
   }
 
-  function onListDragLeave(event) {
+  function onListDragLeave(event: any) {
     if (dragOverKey === 'root') dragOverKey = null
   }
 
-  function onListDrop(event) {
+  function onListDrop(event: { preventDefault: () => void }) {
     event.preventDefault()
     const draggedId = dragId
     dragId = null
@@ -1239,13 +1252,13 @@
     moveNoteTo(draggedId, null)
   }
 
-  function requestDelete(id) {
+  function requestDelete(id: number) {
     if (id == null) return
     deleteTargetId = id
     deleteOpen = true
   }
 
-  async function onCtxSelect(action) {
+  async function onCtxSelect(action: string) {
     const id = ctxNoteId
     if (action === 'copy-id') {
       await copyNoteRef(id)
@@ -1310,7 +1323,7 @@
     iconModalNoteId == null ? null : noteById(iconModalNoteId),
   )
 
-  function onIconSaved(row) {
+  function onIconSaved(row: { id: number }) {
     if (selectedId === row?.id) {
       detail = row
     }

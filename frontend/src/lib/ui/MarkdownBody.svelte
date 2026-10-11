@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { untrack } from 'svelte'
   import { renderMarkdown } from '../js/markdown.ts'
   import { parseRefHref } from '../js/refs.ts'
@@ -20,11 +20,17 @@
     labels = {},
     onRef,
     typing = false,
+  }: {
+    source?: string,
+    class?: string,
+    labels?: Record<string, string>,
+    onRef?: (kind: string, id: number) => void,
+    typing?: boolean,
   } = $props()
 
   let html = $derived(renderMarkdown(source, { labels }))
   /** @type {HTMLDivElement | undefined} */
-  let root = $state()
+  let root: HTMLDivElement | undefined = $state()
 
   $effect(() => {
     const el = root
@@ -36,7 +42,7 @@
   /**
    * @param {HTMLElement} rootEl
    */
-  function enhanceCodeBlocks(rootEl) {
+  function enhanceCodeBlocks(rootEl: HTMLElement) {
     for (const block of rootEl.querySelectorAll('.md-codeblock')) {
       if (block.querySelector(':scope > .md-codeblock__copy')) continue
       const pre = block.querySelector(':scope > pre')
@@ -81,7 +87,7 @@
    * blank hole.
    * @param {Event} event
    */
-  function onImgError(event) {
+  function onImgError(event: Event) {
     const img = event.target
     if (!(img instanceof HTMLImageElement) || !img.classList.contains('md-attachment-img')) return
     const ph = document.createElement('span')
@@ -93,12 +99,12 @@
   }
 
   /** @param {HTMLElement} node */
-  function captureImgErrors(node) {
+  function captureImgErrors(node: HTMLElement) {
     node.addEventListener('error', onImgError, true)
     return { destroy: () => node.removeEventListener('error', onImgError, true) }
   }
 
-  function onClick(event) {
+  function onClick(event: { target: { closest: (arg0: string) => any }; preventDefault: () => void }) {
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
     const href = a.getAttribute('href') || ''

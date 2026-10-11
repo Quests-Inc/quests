@@ -69,7 +69,7 @@ export function toastDone(id: string, message: string, kind: ToastKind = 'succes
   })
 }
 
-const STATUS_RU = {
+const STATUS_RU: Record<string, string> = {
   active: 'активен',
   expired: 'просрочен',
   frozen: 'заморожен',

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     clearQuestlineIcon,
     createQuestline,
@@ -30,7 +30,7 @@
     onClose,
     onSaved,
     onDeleted,
-  } = $props()
+  }: { open: boolean, mode: 'create' | 'edit', line?: any, quests?: any[], questlines?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (line: any, meta?: { mode: string }) => void, onDeleted?: (id: number) => void } = $props()
 
   let title = $state('')
   let description = $state('')
@@ -39,13 +39,13 @@
   let color = $state('#9a9a9a')
   let icon = $state('document')
   /** Current server custom icon URL (if any). */
-  let iconUrl = $state(/** @type {string | null} */ (null))
+  let iconUrl = $state((null as string | null))
   /** Pending local file for upload after save. */
-  let pendingFile = $state(/** @type {File | null} */ (null))
+  let pendingFile = $state((null as File | null))
   /** User chose to drop custom icon on save. */
   let clearCustom = $state(false)
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let categories = $state([])
+  let categories: { id: number, slug: string, label: string, color?: string }[] = $state([])
   let saving = $state(false)
   let deleting = $state(false)
   let deleteConfirmOpen = $state(false)
@@ -55,7 +55,7 @@
     categories.map((c) => ({ id: String(c.id), label: c.label, color: c.color || '' })),
   )
 
-  function resetFromLine(row) {
+  function resetFromLine(row: { title: string; description: string; category_id: null; color: string; icon: string; icon_url: null }) {
     pendingFile = null
     clearCustom = false
     title = row?.title ?? ''
@@ -85,7 +85,7 @@
     })
   })
 
-  async function onSubmit(event) {
+  async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!title.trim()) {
       formError = 'Нужен заголовок'

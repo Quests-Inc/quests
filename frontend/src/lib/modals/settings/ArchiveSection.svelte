@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import SettingsBlock from './SettingsBlock.svelte'
   import Toggle from '../../ui/Toggle.svelte'
   import { workspaceExportUrl } from '../../js/api.ts'
@@ -7,11 +7,11 @@
   let exportSecrets = $state(false)
   let importSecrets = $state(false)
   /** @type {HTMLInputElement | null} */
-  let fileInput = $state(null)
+  let fileInput: HTMLInputElement | null = $state(null)
 
   const isOwner = $derived(wsx.myRole === 'owner')
 
-  async function onFile(event) {
+  async function onFile(event: { currentTarget: any }) {
     const input = event.currentTarget
     const file = input.files?.[0]
     input.value = ''

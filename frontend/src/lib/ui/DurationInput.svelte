@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   /**
    * Hours + minutes, both optional (empty = unset). Values stay as the raw
    * input strings/numbers; callers turn them into seconds (js/duration.js).
@@ -9,7 +9,7 @@
     minutes = $bindable(''),
     disabled = false,
     label = 'Длительность',
-  } = $props()
+  }: { hours?: string | number, minutes?: string | number, disabled?: boolean, label?: string } = $props()
 </script>
 
 <span class="dur" role="group" aria-label={label}>

@@ -129,7 +129,12 @@ export function nearestVote(
 export function suggestTags(
   index: ReturnType<typeof buildSuggestIndex>,
   query: { title: string; description?: string },
-  { excludeSlugs = [], k = SUGGEST_DEFAULTS.k, minSim = SUGGEST_DEFAULTS.minSim, limit = 5 } = {}
+  {
+    excludeSlugs = [],
+    k = SUGGEST_DEFAULTS.k,
+    minSim = SUGGEST_DEFAULTS.minSim,
+    limit = 5,
+  }: { excludeSlugs?: string[]; k?: number; minSim?: number; limit?: number } = {}
 ) {
   if (!index?.n) return []
   const q = vectorize(termCounts(query.title, query.description), index.df, index.n)
@@ -161,7 +166,7 @@ export function suggestTags(
  */
 export function pickSuggestion(
   vote: { id: number; share: number; sim: number },
-  current = null,
+  current: number | null = null,
   opts = SUGGEST_DEFAULTS
 ): number | null {
   if (!vote || vote.id == null) return null

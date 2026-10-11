@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   /**
    * A row of pill buttons for a short, fixed set of choices (status,
    * significance, frequency…). Single-choice by default (`bind:value`); pass
@@ -13,6 +13,14 @@
    *   none?: boolean,
    * }} PillOption
    */
+  type PillOption = {
+    id: string,
+    label: string,
+    kind?: 'status' | 'sig' | 'cat',
+    color?: string,
+    none?: boolean,
+  }
+
 
   /**
    * @type {{
@@ -35,11 +43,20 @@
     wrap = false,
     compact = false,
     disabled = false,
+  }: {
+    options: PillOption[],
+    value?: string,
+    selected?: Set<string> | null,
+    onToggle?: (id: string) => void,
+    label?: string,
+    wrap?: boolean,
+    compact?: boolean,
+    disabled?: boolean,
   } = $props()
 
   let multi = $derived(selected != null)
 
-  function choose(id) {
+  function choose(id: string) {
     if (!multi) value = id
     onToggle?.(id)
   }

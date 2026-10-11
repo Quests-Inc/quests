@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import DOMPurify from 'dompurify'
   import { tailFade } from '../js/typewriter.ts'
   import { renderRefTextHtml, parseRefHref } from '../js/refs.ts'
@@ -16,6 +16,12 @@
     labels = {},
     onRef,
     typing = false,
+  }: {
+    source?: string,
+    class?: string,
+    labels?: Record<string, string>,
+    onRef?: (kind: string, id: number) => void,
+    typing?: boolean,
   } = $props()
 
   const PURIFY = {
@@ -30,7 +36,7 @@
     return DOMPurify.sanitize(raw, PURIFY)
   })
 
-  function onClick(event) {
+  function onClick(event: { target: { closest: (arg0: string) => any }; preventDefault: () => void; stopPropagation: () => void }) {
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
     const href = a.getAttribute('href') || ''

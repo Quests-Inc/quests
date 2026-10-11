@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount, tick } from 'svelte'
   import Icon from './Icon.svelte'
 
@@ -13,12 +13,19 @@
    *   threshold?: number,
    *   hold?: number,
    * }} */
-  let { scroller, content, enabled = true, dep = '', threshold = 280, hold = 2400 } = $props()
+  let { scroller, content, enabled = true, dep = '', threshold = 280, hold = 2400 }: {
+    scroller: HTMLElement | null,
+    content: HTMLElement | null,
+    enabled?: boolean,
+    dep?: string,
+    threshold?: number,
+    hold?: number,
+  } = $props()
 
   const WIDE = '(orientation: landscape) and (min-width: 820px)'
   let wide = $state(false)
   /** @type {{ el: HTMLElement, text: string, level: number }[]} */
-  let heads = $state([])
+  let heads: { el: HTMLElement, text: string, level: number }[] = $state([])
   let current = $state(-1)
   let visible = $state(false)
   let hovered = false
@@ -33,7 +40,7 @@
       }
     })(),
   )
-  function setFolded(v) {
+  function setFolded(v: boolean) {
     folded = v
     try {
       localStorage.setItem(FOLD_KEY, v ? '1' : '0')
@@ -42,7 +49,7 @@
     }
   }
   /** @type {number | undefined} */
-  let timer
+  let timer: number | undefined
 
   onMount(() => {
     const mq = window.matchMedia(WIDE)
@@ -61,7 +68,7 @@
       return
     }
     const list = [...content.querySelectorAll('h1, h2, h3')]
-      .map((el) => ({ el: /** @type {HTMLElement} */ (el), text: (el.textContent || '').trim(), level: Number(el.tagName[1]) }))
+      .map((el) => ({ el: (el as HTMLElement), text: (el.textContent || '').trim(), level: Number(el.tagName[1]) }))
       .filter((h) => h.text)
     heads = list
     spy()
@@ -127,7 +134,7 @@
   const minLevel = $derived(heads.length ? Math.min(...heads.map((h) => h.level)) : 1)
 
   /** @param {{ el: HTMLElement }} h */
-  function go(h) {
+  function go(h: { el: HTMLElement }) {
     h.el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 </script>

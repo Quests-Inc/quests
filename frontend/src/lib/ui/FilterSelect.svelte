@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte'
   import Icon from './Icon.svelte'
   import { placePopover, watchPopover } from '../js/popover.ts'
@@ -13,14 +13,19 @@
    *   onChange: (next: Set<string>) => void,
    * }}
    */
-  let { label, options = [], selected, onChange } = $props()
+  let { label, options = [], selected, onChange }: {
+    label: string,
+    options: { id: string, label: string, color?: string }[],
+    selected: Set<string>,
+    onChange: (next: Set<string>) => void,
+  } = $props()
 
   let open = $state(false)
   let active = $state(0)
-  let triggerEl = $state(/** @type {HTMLButtonElement | null} */ (null))
-  let popEl = $state(/** @type {HTMLDivElement | null} */ (null))
-  let listEl = $state(/** @type {HTMLUListElement | null} */ (null))
-  let popPlacement = $state(/** @type {'below' | 'above'} */ ('below'))
+  let triggerEl = $state((null as HTMLButtonElement | null))
+  let popEl = $state((null as HTMLDivElement | null))
+  let listEl = $state((null as HTMLUListElement | null))
+  let popPlacement = $state(('below' as 'below' | 'above'))
 
   let allOn = $derived(options.length > 0 && options.every((o) => selected.has(o.id)))
 
@@ -52,7 +57,7 @@
   }
 
   /** @param {string} id */
-  function toggle(id) {
+  function toggle(id: string) {
     const next = new Set(selected)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -64,7 +69,7 @@
   }
 
   /** @param {KeyboardEvent} event */
-  function onTriggerKey(event) {
+  function onTriggerKey(event: KeyboardEvent) {
     if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       event.preventDefault()
       openList()
@@ -72,7 +77,7 @@
   }
 
   /** @param {KeyboardEvent} event */
-  function onListKey(event) {
+  function onListKey(event: KeyboardEvent) {
     const last = options.length
     if (event.key === 'ArrowDown') {
       event.preventDefault()

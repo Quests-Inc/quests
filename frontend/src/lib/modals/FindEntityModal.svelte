@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { untrack } from 'svelte'
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
@@ -25,11 +25,20 @@
     questlines = [],
     onClose,
     onPick,
+  }: {
+    open: boolean,
+    title?: string,
+    types?: ('quest' | 'note' | 'questline')[],
+    quests?: any[],
+    notes?: any[],
+    questlines?: any[],
+    onClose: () => void,
+    onPick: (type: string, id: number) => void,
   } = $props()
 
   const LABEL = { quest: 'Квест', note: 'Заметка', questline: 'Квестлайн' }
   let query = $state('')
-  let input = $state(/** @type {HTMLInputElement | null} */ (null))
+  let input = $state((null as HTMLInputElement | null))
 
   $effect(() => {
     if (!open) return
@@ -43,7 +52,7 @@
   let matches = $derived(found.items)
   let parsed = $derived(found.parsed)
 
-  function pick(m) {
+  function pick(m: { type: string; id: number }) {
     onPick(m.type, m.id)
     onClose()
   }

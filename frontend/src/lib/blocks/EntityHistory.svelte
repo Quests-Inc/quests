@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from '../ui/Icon.svelte'
   import { getQuestLog } from '../js/api.ts'
   import { KINDS, detailOf } from '../js/historyKinds.ts'
@@ -7,12 +7,12 @@
   /** Collapsed timeline of one entity's change-log entries (plus what hangs off it).
    * `version` is any value that changes when the entity does, to refetch while open.
    * @type {{ entityType: 'quest' | 'note' | 'attachment', entityId: number, version?: string | number | null, label?: string, labelClass?: string }} */
-  let { entityType, entityId, version = null, label = 'История', labelClass = 'block__label' } = $props()
+  let { entityType, entityId, version = null, label = 'История', labelClass = 'block__label' }: { entityType: 'quest' | 'note' | 'attachment', entityId: number, version?: string | number | null, label?: string, labelClass?: string } = $props()
 
   const LIMIT = 50
 
   let open = $state(false)
-  let rows = $state(/** @type {any[]} */ ([]))
+  let rows = $state(([] as any[]))
   let loaded = $state(false)
   let error = $state('')
   let seq = 0

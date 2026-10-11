@@ -2,7 +2,7 @@
 // graph is capped at a couple of hundred nodes, so a library isn't worth its weight.
 
 /** Ideal edge length by kind: ownership hugs, references stand off. */
-const LEN = { structure: 110, dependency: 150, reference: 210 }
+const LEN: Record<string, number> = { structure: 110, dependency: 150, reference: 210 }
 
 /**
  * Lays out nodes in place (sets x/y). Root sits at the origin.
@@ -10,7 +10,14 @@ const LEN = { structure: 110, dependency: 150, reference: 210 }
  * @param {{ from: string, to: string, kind: string }[]} edges
  * @param {{ iterations?: number, sizeOf?: (n: any) => { w: number, h: number } }} [opts]
  */
-export function layoutGraph(nodes, edges, { iterations = 320, sizeOf = () => ({ w: 120, h: 26 }) } = {}) {
+export function layoutGraph(
+  nodes: { key: string; depth: number; x?: number; y?: number }[],
+  edges: { from: string; to: string; kind: string }[],
+  {
+    iterations = 320,
+    sizeOf = (_n: any) => ({ w: 120, h: 26 }),
+  }: { iterations?: number; sizeOf?: (n: any) => { w: number; h: number } } = {}
+) {
   const n = nodes.length
   if (!n) return
   const byKey = new Map(nodes.map((nd) => [nd.key, nd]))
@@ -125,8 +132,16 @@ export function layoutGraph(nodes, edges, { iterations = 320, sizeOf = () => ({ 
   }
 }
 
-const TYPE_ORDER = { step: 0, cluster: 1, attachment: 1, note: 2, quest: 3, template: 4, questline: 5 }
-const EDGE_RANK = { structure: 0, dependency: 1, reference: 2 }
+const TYPE_ORDER: Record<string, number> = {
+  step: 0,
+  cluster: 1,
+  attachment: 1,
+  note: 2,
+  quest: 3,
+  template: 4,
+  questline: 5,
+}
+const EDGE_RANK: Record<string, number> = { structure: 0, dependency: 1, reference: 2 }
 /** Leaf siblings of these types, from this count up, are packed into a block.
  * Steps are not: a quest rarely has more than ten and they read better in a column. */
 const BALL_TYPES = new Set(['attachment'])
@@ -138,7 +153,7 @@ const BALL_MIN = 6
  * top for the group's label. Offsets are from the block centre.
  * @param {{ w: number, h: number }[]} items
  */
-export function packBall(items, gap = 12, pad = 14, head = 30) {
+export function packBall(items: { w: number; h: number }[], gap = 12, pad = 14, head = 30) {
   const area = items.reduce((a, b) => a + (b.w + gap) * (b.h + gap), 0)
   const maxW = Math.max(...items.map((i) => i.w))
   const target = Math.max(maxW, Math.sqrt(area * 1.6))
@@ -160,7 +175,7 @@ export function packBall(items, gap = 12, pad = 14, head = 30) {
   const heights = rows.map((r) => Math.max(...r.map((i) => i.h)))
   const w = Math.max(...widths) + pad * 2
   const h = heights.reduce((a, b) => a + b, 0) + (rows.length - 1) * gap + pad * 2 + head
-  const pos = []
+  const pos: { item: { w: number; h: number }; dx: number; dy: number }[] = []
   let y = -h / 2 + pad + head
   rows.forEach((r, i) => {
     let x = -w / 2 + pad
@@ -183,7 +198,36 @@ export function packBall(items, gap = 12, pad = 14, head = 30) {
  * @param {{ hgap?: number, vgap?: number, balls?: boolean, loose?: Set<string> | null }} [opts] `loose`: owners whose files are never packed
  * @returns {{ key: string, owner: string, type: string, title: string, x: number, y: number, w: number, h: number, count: number }[]}
  */
-export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, loose = null } = {}) {
+export function layoutTree(
+  nodes: {
+    key: string
+    depth: number
+    type: string
+    title?: string
+    w: number
+    h: number
+    x?: number
+    y?: number
+    group?: string
+  }[],
+  edges: { from: string; to: string; kind: string }[],
+  {
+    hgap = 70,
+    vgap = 14,
+    balls = true,
+    loose = null,
+  }: { hgap?: number; vgap?: number; balls?: boolean; loose?: any } = {}
+): {
+  key: string
+  owner: string
+  type: string
+  title: string
+  x: number
+  y: number
+  w: number
+  h: number
+  count: number
+}[] {
   const byKey = new Map(nodes.map((n) => [n.key, n]))
   // Several roots (extra centres on the map) become separate trees, stacked.
   const roots = nodes.filter((n) => n.depth === 0)
@@ -206,15 +250,15 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
     }
   }
   /** @type {Map<string, any[]>} */
-  const kids = new Map(nodes.map((n) => [n.key, []]))
+  const kids: Map<string, any[]> = new Map(nodes.map((n): [string, any[]] => [n.key, []]))
   for (const n of nodes) {
     if (isRoot.has(n)) continue
     const par = parentOf.get(n.key)?.p ?? root.key
     kids.get(par)?.push(n)
   }
-  const sortKids = (list) =>
+  const sortKids = (list: any[]) =>
     list.sort(
-      (a, b) =>
+      (a: { type: string; sort: any; title: any }, b: { type: string; sort: any; title: any }) =>
         (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) ||
         // Steps keep the order they are worked in; the rest sort by title.
         (a.type === 'step' && b.type === 'step' ? (a.sort ?? 0) - (b.sort ?? 0) : 0) ||
@@ -260,11 +304,21 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
       sortKids(kids.get(owner.key))
     }
   }
-  const sortType = (g) => (g.pack ? g.type : g.type)
+  const sortType = (g: { pack: any; type: any }) => (g.pack ? g.type : g.type)
   void sortType
 
   const span = new Map()
-  const measure = (n) => {
+  const measure = (n: {
+    key: any
+    depth?: number
+    type?: string
+    title?: string
+    w?: number
+    h: any
+    x?: number
+    y?: number
+    group?: string
+  }) => {
     const list = kids.get(n.key) ?? []
     let total = 0
     for (const c of list) total += measure(c)
@@ -274,15 +328,29 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
     return h
   }
   for (const r of isRoot) measure(r)
-  const colW = []
+  const colW: string | any[] = []
   for (const n of all) colW[n.depth] = Math.max(colW[n.depth] ?? 0, n.w)
-  const colX = []
+  const colX: number[] = []
   let acc = 0
   for (let d = 0; d < colW.length; d++) {
     colX[d] = acc
     acc += (colW[d] ?? 0) + hgap
   }
-  const place = (n, top) => {
+  const place = (
+    n: {
+      key: any
+      depth: any
+      type?: string
+      title?: string
+      w: any
+      h?: number
+      x?: number
+      y?: number
+      group?: string
+      pack?: any
+    },
+    top: number
+  ) => {
     const h = span.get(n.key)
     const list = kids.get(n.key) ?? []
     n.x = colX[n.depth] + n.w / 2
@@ -319,7 +387,7 @@ export function layoutTree(nodes, edges, { hgap = 70, vgap = 14, balls = true, l
  * balls), then the axes are swapped back.
  * @param {any[]} nodes @param {any[]} edges
  */
-export function layoutTreeDown(nodes, edges) {
+export function layoutTreeDown(nodes: any[], edges: any[]): any[] {
   for (const n of nodes) [n.w, n.h] = [n.h, n.w]
   layoutTree(nodes, edges, { hgap: 50, vgap: 22, balls: false })
   for (const n of nodes) {
@@ -334,17 +402,20 @@ export function layoutTreeDown(nodes, edges) {
  * each stacked top to bottom: shows what the map is made of, not how it hangs.
  * @param {any[]} nodes
  */
-export function layoutLayers(nodes, { hgap = 90, vgap = 14 } = {}) {
+export function layoutLayers(nodes: any[], { hgap = 90, vgap = 14 } = {}): any[] {
   const ORDER = ['questline', 'quest', 'step', 'note', 'attachment', 'template']
   /** @type {Map<string, any>} */
-  const cols = new Map(ORDER.map((t) => [t, []]))
+  const cols: Map<string, any> = new Map(ORDER.map((t): [string, any[]] => [t, []]))
   for (const n of nodes) (cols.get(n.type) ?? cols.get('template')).push(n)
   let x = 0
   for (const t of ORDER) {
     const list = cols.get(t)
     if (!list.length) continue
-    list.sort((a, b) => a.depth - b.depth || String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru'))
-    const w = Math.max(...list.map((n) => n.w))
+    list.sort(
+      (a: { depth: number; title: any }, b: { depth: number; title: any }) =>
+        a.depth - b.depth || String(a.title ?? '').localeCompare(String(b.title ?? ''), 'ru')
+    )
+    const w = Math.max(...list.map((n: { w: any }) => n.w))
     let y = 0
     for (const n of list) {
       n.x = x + w / 2
@@ -365,7 +436,7 @@ export function layoutLayers(nodes, { hgap = 90, vgap = 14 } = {}) {
  * as its number of leaves. Several centres sit side by side.
  * @param {any[]} nodes @param {any[]} edges
  */
-export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
+export function layoutRadial(nodes: any[], edges: any[], { gap = 50 } = {}): any[] {
   const byKey = new Map(nodes.map((n) => [n.key, n]))
   const roots = nodes.filter((n) => n.depth === 0)
   if (!roots.length) return []
@@ -384,7 +455,7 @@ export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
       if (!cur || rank < cur.rank) parentOf.set(c, { p, rank })
     }
   }
-  const kids = new Map(nodes.map((n) => [n.key, []]))
+  const kids = new Map<string, any[]>(nodes.map((n): [string, any[]] => [n.key, []]))
   for (const n of nodes) {
     if (isRoot.has(n)) continue
     kids.get(parentOf.get(n.key)?.p ?? roots[0].key)?.push(n)
@@ -397,7 +468,7 @@ export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
     )
   }
   const weight = new Map()
-  const wOf = (n) => {
+  const wOf = (n: { key: any }) => {
     const list = kids.get(n.key) ?? []
     const w = list.length ? list.reduce((s, c) => s + wOf(c), 0) : 1
     weight.set(n.key, w)
@@ -407,8 +478,8 @@ export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
   for (const root of roots) {
     wOf(root)
     // Radius per ring: far enough for the widest card, and for the ring's circumference to hold its cards.
-    const rings = []
-    const collect = (n) => {
+    const rings: any[][] = []
+    const collect = (n: { depth: number; key: any }) => {
       ;(rings[n.depth] ??= []).push(n)
       for (const c of kids.get(n.key) ?? []) collect(c)
     }
@@ -416,12 +487,13 @@ export function layoutRadial(nodes, edges, { gap = 50 } = {}) {
     const radius = [0]
     for (let d = 1; d < rings.length; d++) {
       const list = rings[d] ?? []
-      const diag = Math.max(...list.map((n) => Math.hypot(n.w, n.h) / 2), 0)
-      const prev = Math.max(...(rings[d - 1] ?? []).map((n) => Math.hypot(n.w, n.h) / 2), 0)
-      const around = list.reduce((s, n) => s + Math.max(n.w, n.h) + gap * 0.4, 0) / (2 * Math.PI)
+      const diag = Math.max(...list.map((n: { w: number; h: number }) => Math.hypot(n.w, n.h) / 2), 0)
+      const prev = Math.max(...(rings[d - 1] ?? []).map((n: { w: number; h: number }) => Math.hypot(n.w, n.h) / 2), 0)
+      const around =
+        list.reduce((s: number, n: { w: number; h: number }) => s + Math.max(n.w, n.h) + gap * 0.4, 0) / (2 * Math.PI)
       radius[d] = Math.max(radius[d - 1] + prev + diag + gap, around)
     }
-    const place = (n, a0, a1) => {
+    const place = (n: { x: number; depth: number; y: number; key: any }, a0: number, a1: number) => {
       const a = (a0 + a1) / 2
       n.x = offsetX + Math.cos(a) * radius[n.depth]
       n.y = Math.sin(a) * radius[n.depth]

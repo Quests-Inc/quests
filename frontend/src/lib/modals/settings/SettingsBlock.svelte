@@ -1,7 +1,7 @@
-<script>
+<script lang="ts">
   /** A titled group inside a settings section. `danger` frames it as the risky zone.
    * @type {{ title?: string, hint?: string, danger?: boolean, children?: import('svelte').Snippet }} */
-  let { title = '', hint = '', danger = false, children } = $props()
+  let { title = '', hint = '', danger = false, children }: { title?: string, hint?: string, danger?: boolean, children?: import('svelte').Snippet } = $props()
 </script>
 
 <section class="block" class:block--danger={danger}>

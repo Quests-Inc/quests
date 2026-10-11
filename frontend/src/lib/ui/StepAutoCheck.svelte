@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import HelpTip from './HelpTip.svelte'
   import OptionPills from './OptionPills.svelte'
   import { mirrorQuestId as findMirrorQuest } from '../js/steps.ts'
@@ -16,7 +16,7 @@
     runMode = $bindable('poll'),
     runOn = $bindable(''),
     text = '',
-  } = $props()
+  }: { command?: string, interval?: string, waitPrevious?: boolean, runMode?: string, runOn?: string, text?: string } = $props()
 
   const MODES = [
     { id: 'poll', label: 'опрос' },

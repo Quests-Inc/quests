@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { parseQuery, tokenValues, setToken, helpLine } from '../js/searchFlags.ts'
   import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
@@ -14,7 +14,13 @@
    *   questlines?: any[],
    *   onOpen?: (kind: string, id: number) => void,
    * }} */
-  let { active = true, nonce = 0, categories = [], questlines = [], onOpen } = $props()
+  let { active = true, nonce = 0, categories = [], questlines = [], onOpen }: {
+    active?: boolean,
+    nonce?: number,
+    categories?: any[],
+    questlines?: any[],
+    onOpen?: (kind: string, id: number) => void,
+  } = $props()
 
   const PAGE = 100
 
@@ -61,7 +67,7 @@
   ]
 
   /** @param {string} key @param {string} fallback */
-  function param(key, fallback = '') {
+  function param(key: string, fallback: string = '') {
     try {
       return new URL(location.href).searchParams.get(key) ?? fallback
     } catch {
@@ -79,7 +85,7 @@
     return q
   }
   let search = $state(initialQuery())
-  let tags = $state(/** @type {any[]} */ ([]))
+  let tags = $state(([] as any[]))
   const histSpec = $derived({
     type: { label: 'что менялось', values: ENTITIES.filter((e) => e.id).map((e) => ({ id: e.id, label: e.label })), test: () => true },
     act: {
@@ -100,8 +106,8 @@
     day: { label: 'день', hint: 'ГГГГ-ММ-ДД', test: () => true },
   })
   let parsedSearch = $derived(parseQuery(search, histSpec))
-  const first = (key) => tokenValues(parsedSearch, key)[0] ?? ''
-  const put = (key, v) => (search = setToken(search, key, v ? [v] : []))
+  const first = (key: string) => tokenValues(parsedSearch, key)[0] ?? ''
+  const put = (key: string, v: string) => (search = setToken(search, key, v ? [v] : []))
   let entity = $derived(first('type'))
   let kindGroup = $derived(first('act'))
   let questlineId = $derived(first('line'))
@@ -110,7 +116,7 @@
   let period = $derived(first('when'))
   let day = $derived(first('day'))
 
-  let rows = $state(/** @type {any[]} */ ([]))
+  let rows = $state(([] as any[]))
   let loading = $state(false)
   let more = $state(false)
   let error = $state('')
@@ -124,7 +130,7 @@
   function syncUrl() {
     try {
       const qs = new URLSearchParams({ tab: 'history' })
-      const set = (k, v) => v && qs.set(k, v)
+      const set = (k: string, v: string) => v && qs.set(k, v)
       set('q', search.trim())
       const next = `${location.pathname}?${qs}`
       if (next !== `${location.pathname}${location.search}`) history.replaceState(null, '', next)
@@ -133,7 +139,7 @@
     }
   }
 
-  function dayStart(s) {
+  function dayStart(s: string) {
     const [y, m, d] = s.split('-').map(Number)
     return new Date(y, m - 1, d)
   }
@@ -153,7 +159,7 @@
   }
 
   /** @param {boolean} append */
-  async function load(append = false) {
+  async function load(append: boolean = false) {
     const mine = ++seq
     loading = true
     error = ''
@@ -206,15 +212,15 @@
   }
 
   /** @param {string} iso */
-  function localDay(iso) {
+  function localDay(iso: string) {
     const d = parseApiDate(iso)
     if (!d) return ''
-    const p = (n) => String(n).padStart(2, '0')
+    const p = (n: number) => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
   }
 
   /** @param {string} key */
-  function dayLabel(key) {
+  function dayLabel(key: string) {
     const d = dayStart(key)
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -231,14 +237,14 @@
   }
 
   /** @param {string} iso */
-  function timeLabel(iso) {
+  function timeLabel(iso: string) {
     const d = parseApiDate(iso)
     return d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''
   }
 
   let groups = $derived.by(() => {
     /** @type {{ key: string, items: any[] }[]} */
-    const out = []
+    const out: { key: string, items: any[] }[] = []
     for (const r of rows) {
       const key = localDay(r.at)
       const g = out[out.length - 1]
@@ -249,7 +255,7 @@
   })
 
   /** Entity the row points at, or null when it's gone / not openable. */
-  function target(r) {
+  function target(r: { kind: string; entity_type: string; entity_id: null; quest_id: any }) {
     if (r.kind.endsWith('_deleted')) return null
     if (r.entity_type === 'quest' && (r.entity_id ?? r.quest_id) != null) {
       return ['quest', r.entity_id ?? r.quest_id]
@@ -260,13 +266,13 @@
   }
 
   /** @param {any} r */
-  function open(r) {
+  function open(r: any) {
     const t = target(r)
     if (t) onOpen?.(t[0], t[1])
   }
 
   /** Owner shown under attachment rows. */
-  function parentLabel(r) {
+  function parentLabel(r: { parent_type: string|number; parent_id: null }) {
     if (!r.parent_type || r.parent_id == null) return ''
     const name = { quest: 'квест', questline: 'квестлайн', note: 'заметка' }[r.parent_type] ?? r.parent_type
     return `${name} ${r.parent_id}`

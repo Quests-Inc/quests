@@ -1,19 +1,19 @@
-<script>
+<script lang="ts">
   import SettingsBlock from './SettingsBlock.svelte'
   import { getMyMfa, setupMyMfa, enableMyMfa, disableMyMfa, regenerateRecoveryCodes } from '../../js/api.ts'
 
   /** @type {any} */
-  let st = $state(null)
+  let st: any = $state(null)
   let loadError = $state('')
   let busy = $state(false)
   let error = $state('')
   /** Enrolment in progress: the secret and its QR code. */
-  let setup = $state(/** @type {{ secret: string, uri: string, qr: string } | null} */ (null))
+  let setup = $state((null as { secret: string, uri: string, qr: string } | null))
   /** Recovery codes, visible only right after they were made. */
-  let codes = $state(/** @type {string[] | null} */ (null))
+  let codes = $state((null as string[] | null))
   let code = $state('')
   /** Which action waits for a code: 'disable' | 'recovery' | null. */
-  let ask = $state(/** @type {'disable' | 'recovery' | null} */ (null))
+  let ask = $state((null as 'disable' | 'recovery' | null))
   let copied = $state(false)
 
   async function refresh() {
@@ -27,7 +27,7 @@
     void refresh()
   })
 
-  async function run(fn) {
+  async function run(fn: { (): Promise<void>; (): Promise<void>; (): Promise<void>; (): any }) {
     busy = true
     error = ''
     try {
@@ -70,7 +70,7 @@
       await refresh()
     })
 
-  const groups = (s) => s.replace(/(.{4})/g, '$1 ').trim()
+  const groups = (s: string) => s.replace(/(.{4})/g, '$1 ').trim()
 
   async function copyCodes() {
     try {

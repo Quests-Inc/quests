@@ -1,16 +1,17 @@
-<script>
+<script lang="ts">
   import HelpTip from './HelpTip.svelte'
   import Icon from './Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '../js/api.ts'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
+import { NoteCheckView } from '../api/http.gen.ts'
 
   /** A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer
    * is "out of date?" — a bare 0/1 or {"outdated": 0|1, "reason": "…"}. The state follows the server;
    * this block polls it while open.
    * @type {{ noteId: number, onOpenSecrets?: () => void, onChanged?: () => void }} */
-  let { noteId, onOpenSecrets, onChanged } = $props()
+  let { noteId, onOpenSecrets, onChanged }: { noteId: number, onOpenSecrets?: () => void, onChanged?: () => void } = $props()
 
-  let check = $state(/** @type {any | null} */ (null))
+  let check = $state((null as any | null))
   let open = $state(false)
   let command = $state('')
   let interval = $state('')
@@ -19,7 +20,7 @@
   let error = $state('')
   let dirty = $state(false)
 
-  function adopt(c) {
+  function adopt(c: NoteCheckView) {
     check = c
     if (!dirty) {
       command = c?.command ?? ''
@@ -56,7 +57,7 @@
   const active = $derived(Boolean(check?.command))
   const missing = $derived(runOn && !runnersList.items.some((r) => r.label === runOn) ? runOn : '')
 
-  async function run(fn) {
+  async function run(fn: { (): Promise<void>; (): Promise<void>; (): Promise<void>; (): any }) {
     busy = true
     error = ''
     try {
@@ -93,7 +94,7 @@
       setTimeout(load, 20000) // the scheduler ticks every 15 s
     })
 
-  const when = (iso) => (iso ? new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '—')
+  const when = (iso: string|number|Date) => (iso ? new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '—')
 </script>
 
 <div class="nc">

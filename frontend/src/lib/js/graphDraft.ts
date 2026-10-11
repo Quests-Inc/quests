@@ -4,31 +4,35 @@
 
 import { parseRefs } from './refs.ts'
 
-const tmpKey = (type, opId) => `${type}:t${opId}`
+const tmpKey = (type: string, opId: number) => `${type}:t${opId}`
 
 /**
  * @param {{ nodes: any[], edges: any[], roots?: string[], root?: string }} graph
  * @param {{ id: number, kind: string, payload: any }[]} ops
  * @returns {{ nodes: any[], edges: any[], ownerless: Set<string>, touched: Map<string, number[]> }}
  */
-export function applyDraft(graph, ops) {
+export function applyDraft(
+  graph: { nodes: any[]; edges: any[]; roots?: string[]; root?: string },
+  ops: { id: number; kind: string; payload: any }[]
+): { nodes: any[]; edges: any[]; ownerless: Set<string>; touched: Map<string, number[]> } {
   const nodes = graph.nodes.map((n) => ({ ...n }))
   const edges = graph.edges.map((e) => ({ ...e }))
   const byKey = new Map(nodes.map((n) => [n.key, n]))
-  const has = (from, to, kind) => edges.some((e) => e.from === from && e.to === to && e.kind === kind)
-  const addEdge = (from, to, kind, draft, opId) => {
+  const has = (from: string, to: string, kind: string) =>
+    edges.some((e) => e.from === from && e.to === to && e.kind === kind)
+  const addEdge = (from: string, to: string, kind: string, draft: string, opId: number) => {
     if (from === to || has(from, to, kind)) return
     edges.push({ from, to, kind, draft, op: opId })
   }
   const ownerOf = new Map() // node key → owner key (new steps / files)
   /** node key → ops that write into it (the source of a link, the moved item) */
   const touched = new Map()
-  const touch = (key, opId) => {
+  const touch = (key: any, opId: number) => {
     if (!touched.has(key)) touched.set(key, [])
     touched.get(key).push(opId)
   }
 
-  const stub = (type, opId, title, extra = {}) => {
+  const stub = (type: string, opId: number, title: string, extra = {}) => {
     const key = tmpKey(type, opId)
     const n = {
       key,
@@ -46,7 +50,7 @@ export function applyDraft(graph, ops) {
     return n
   }
   // Tokens typed into a new thing's own text are real links once saved.
-  const textRefs = (from, text) => {
+  const textRefs = (from: string, text: any) => {
     for (const r of parseRefs(text || '')) {
       if (
         r.kind === 'quest' ||
@@ -234,7 +238,7 @@ export function applyDraft(graph, ops) {
   // Owners: a new thing's owner edge, or a re-parented file's / step's new one.
   /** quest key → change in its number of steps */
   const stepDelta = new Map()
-  const bump = (k, d) => stepDelta.set(k, (stepDelta.get(k) ?? 0) + d)
+  const bump = (k: any, d: number) => stepDelta.set(k, (stepDelta.get(k) ?? 0) + d)
   for (const [item, owner] of ownerOf) {
     const n = byKey.get(item)
     if (!n) continue
@@ -257,7 +261,7 @@ export function applyDraft(graph, ops) {
 
   // Invalid until fixed: a new step or file with no owner cannot exist on its
   // own, and a quest must keep at least one step.
-  const ownerless = new Set()
+  const ownerless = new Set<string>()
   for (const n of nodes) {
     if (n.draft && (n.type === 'step' || n.type === 'attachment') && !ownerOf.has(n.key)) ownerless.add(n.key)
     if (n.type === 'quest' && !n.draft && n.step_count != null && n.step_count + (stepDelta.get(n.key) ?? 0) < 1) {
@@ -288,7 +292,7 @@ export function applyDraft(graph, ops) {
 }
 
 /** One line for the draft log. @param {any} op @param {(key: string) => string} title */
-export function describeOp(op, title) {
+export function describeOp(op: any, title: (key: string) => string) {
   const p = op.payload || {}
   switch (op.kind) {
     case 'create_quest':

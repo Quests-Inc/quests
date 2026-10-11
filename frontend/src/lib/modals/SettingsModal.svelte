@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import ServicesSection from './settings/ServicesSection.svelte'
@@ -20,7 +20,7 @@
     username = '',
     onLogout = null,
     section = null,
-  } = $props()
+  }: { open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null } = $props()
 
   // Sections are shown only when they apply: workspaces and the account need a signed-in account.
   const sections = $derived([
@@ -38,7 +38,7 @@
 
   let active = $state('services')
   /** Phone: the section list is a screen of its own; picking one opens it. */
-  let pane = $state(/** @type {'nav' | 'content'} */ ('nav'))
+  let pane = $state(('nav' as 'nav' | 'content'))
 
   $effect(() => {
     if (!open) return
@@ -49,7 +49,7 @@
 
   const activeLabel = $derived(sections.find((s) => s.id === active)?.label ?? '')
 
-  function pick(id) {
+  function pick(id: string) {
     active = id
     pane = 'content'
   }

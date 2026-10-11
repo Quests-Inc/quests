@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { SECRET_OWNER_KINDS, listSecrets, setSecret, deleteSecret } from '../js/api.ts'
   import { parseRefs } from '../js/refs.ts'
   import Icon from '../ui/Icon.svelte'
@@ -21,7 +21,14 @@
    *   questlines?: any[],
    *   labels?: Record<string, string>,
    * }} */
-  let { open = false, onClose, owner = null, quests = [], questlines = [], labels = {} } = $props()
+  let { open = false, onClose, owner = null, quests = [], questlines = [], labels = {} }: {
+    open: boolean,
+    onClose: () => void,
+    owner?: { kind: string, id: number } | null,
+    quests?: any[],
+    questlines?: any[],
+    labels?: Record<string, string>,
+  } = $props()
 
   const KIND_LABEL = { questline: 'квестлайн', template: 'шаблон', quest: 'квест', step: 'шаг', note: 'заметка' }
 
@@ -35,8 +42,8 @@
     target ? labels[`${target.kind}:${target.id}`] || `${target.kind}=${target.id}` : '',
   )
 
-  let keys = $state(/** @type {string[]} */ ([]))
-  let inherited = $state(/** @type {{ key: string, from: string, id: number }[]} */ ([]))
+  let keys = $state(([] as string[]))
+  let inherited = $state(([] as { key: string, from: string, id: number }[]))
   let keysLoading = $state(false)
   let keysError = $state('')
 
@@ -45,7 +52,7 @@
   let saving = $state(false)
 
   /** key being overwritten inline, or null */
-  let editingKey = $state(/** @type {string | null} */ (null))
+  let editingKey = $state((null as string | null))
   let editValue = $state('')
 
   const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
@@ -103,7 +110,7 @@
     })
   })
 
-  async function onAdd(event) {
+  async function onAdd(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!target || saving) return
     const key = newKey.trim()
@@ -129,7 +136,7 @@
     }
   }
 
-  function startEdit(key) {
+  function startEdit(key: string) {
     editingKey = key
     editValue = ''
     keysError = ''
@@ -140,7 +147,7 @@
     editValue = ''
   }
 
-  async function saveEdit(key) {
+  async function saveEdit(key: string) {
     if (!target || saving) return
     if (!editValue) {
       keysError = 'Нужно значение'
@@ -160,7 +167,7 @@
     }
   }
 
-  async function onDelete(key) {
+  async function onDelete(key: string) {
     if (!target || saving) return
     saving = true
     keysError = ''
@@ -176,7 +183,7 @@
   }
 
   /** @param {{ from: string, id: number }} ref */
-  function sourceLabel(ref) {
+  function sourceLabel(ref: { from: string, id: number }) {
     const name = labels[`${ref.from}:${ref.id}`]
     return `${KIND_LABEL[ref.from] || ref.from}${name ? ` «${name}»` : ''} (${ref.from}=${ref.id})`
   }

@@ -1,11 +1,11 @@
-<script>
+<script lang="ts">
   import { THEMES, applyTheme, currentThemeId } from '../../js/theme.ts'
   import Icon from '../../ui/Icon.svelte'
   import SettingsBlock from './SettingsBlock.svelte'
 
   let themeId = $state(currentThemeId())
 
-  function selectTheme(id) {
+  function selectTheme(id: string) {
     themeId = applyTheme(id)
   }
 </script>

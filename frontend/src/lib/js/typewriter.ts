@@ -135,7 +135,7 @@ export function tailFade(node: HTMLElement, active: boolean) {
     const m = getComputedStyle(node).color.match(/[\d.]+/g) || ['128', '128', '128']
     const [r, g, b] = m
     const rules = []
-    const ranges = names.map(() => [])
+    const ranges = names.map((): any[] => [])
     const texts: Text[] = []
     const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
     for (let t = walker.nextNode(); t; t = walker.nextNode()) texts.push(t as Text)

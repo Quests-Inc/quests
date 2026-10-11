@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from '../ui/Icon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
 
@@ -31,6 +31,20 @@
     onOpenCreateQuestline,
     onOpenCreateQuest,
     onOpenAssistant,
+  }: {
+    view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners',
+    liveStatus: string,
+    health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
+    sidebarCollapsed?: boolean,
+    onToggleSidebar?: (() => void) | null,
+    onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners') => void,
+    onOpenSettings: () => void,
+    onOpenTemplates: () => void,
+    onOpenSecrets: () => void,
+    onOpenTags: () => void,
+    onOpenCreateQuestline: () => void,
+    onOpenCreateQuest: () => void,
+    onOpenAssistant: () => void,
   } = $props()
 
   /** Only 'journal' and 'notes' have a collapsible sidebar. */
@@ -46,13 +60,13 @@
     return { status: 'offline', title: `WebSocket: ${s}` }
   })
 
-  function davTitle(status) {
+  function davTitle(status: string) {
     if (status === 'ok') return 'WebDAV / вложения: онлайн'
     if (status === 'offline') return 'WebDAV / вложения: офлайн'
     return 'WebDAV / вложения: не настроен'
   }
 
-  function dbTitle(status) {
+  function dbTitle(status: string) {
     const detail = health?.detail?.components?.db?.detail
     if (status === 'warn') return detail || 'БД: схема новее API — обнови образ'
     if (status === 'ok') return detail || 'БД: схема совпадает с API'
@@ -65,12 +79,12 @@
 
   let showLowActions = $derived(view === 'journal' || view === 'notes')
 
-  let actionsMode = $state(/** @type {'full' | 'icons' | 'icons-core' | 'icons-primary'} */ ('full'))
+  let actionsMode = $state(('full' as 'full' | 'icons' | 'icons-core' | 'icons-primary'))
 
   /** Overflow menu lists only actions hidden behind ⋮ for the current stage. */
   let menuItems = $derived.by(() => {
     /** @type {{ id: string, label: string }[]} */
-    const items = []
+    const items: { id: string, label: string }[] = []
     if (actionsMode === 'icons-primary') {
       items.push({ id: 'settings', label: 'Настройки' })
     }
@@ -85,14 +99,14 @@
     return items
   })
 
-  function openMenu(event) {
+  function openMenu(event: { currentTarget: { getBoundingClientRect: () => any } }) {
     const rect = event.currentTarget.getBoundingClientRect()
     menuX = rect.right
     menuY = rect.bottom + 4
     menuOpen = true
   }
 
-  function onMenuSelect(id) {
+  function onMenuSelect(id: string) {
     if (id === 'assistant') onOpenAssistant()
     else if (id === 'settings') onOpenSettings()
     else if (id === 'templates') onOpenTemplates()
@@ -112,7 +126,7 @@
   let measurePrimaryEl = $state(null)
   let actionsEl = $state(null)
 
-  const ACTION_STAGES = /** @type {const} */ (['full', 'icons', 'icons-core', 'icons-primary'])
+  const ACTION_STAGES = (['full', 'icons', 'icons-core', 'icons-primary'] as const)
 
   let showOverflow = $derived(actionsMode === 'icons-core' || actionsMode === 'icons-primary')
   let showSettingsBtn = $derived(

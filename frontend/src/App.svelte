@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // Quests web UI — orchestrator (state, load, overlays)
   import HistoryPage from './lib/blocks/HistoryPage.svelte'
 import RunnersPage from './lib/blocks/RunnersPage.svelte'
@@ -71,20 +71,20 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let authRequired = $state(false)
   let username = $state('')
   /** Cleanup for the live subscription + timers, so logout can tear them down. */
-  let stopApp = null
+  let stopApp: () => void = null
 
   let quests = $state([])
   let notes = $state([])
   /** @type {Record<string, any> | null} */
-  let attachmentIndex = $state(null)
+  let attachmentIndex: Record<string, any> | null = $state(null)
   let selectedId = $state(null)
-  let selectedNoteId = $state(/** @type {number | null} */ (null))
-  let selectedAttachmentId = $state(/** @type {number | null} */ (null))
+  let selectedNoteId = $state((null as number | null))
+  let selectedAttachmentId = $state((null as number | null))
   let loading = $state(true)
   let error = $state('')
   let liveStatus = $state('off')
   /** @type {{ api: string, overlay: string, telegram: string, webdav: string, db?: string, detail?: Record<string, any> }} */
-  let health = $state({
+  let health: { api: string, overlay: string, telegram: string, webdav: string, db?: string, detail?: Record<string, any> } = $state({
     api: 'unknown',
     overlay: 'unknown',
     telegram: 'unknown',
@@ -93,7 +93,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   })
   let searchQuery = $state('')
   let view = $state(
-    /** @type {'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'} */ ('journal'),
+    ('journal' as 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'),
   )
   /** Sidebar visibility per view that has one — remembered across reloads. */
   let sidebarCollapsed = $state(loadSidebarCollapsed())
@@ -107,11 +107,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function toggleSidebar(key) {
+  function toggleSidebar(key: string) {
     setSidebarCollapsed(key, !sidebarCollapsed[key])
   }
 
-  function setSidebarCollapsed(key, value) {
+  function setSidebarCollapsed(key: string, value: boolean) {
     if (sidebarCollapsed[key] === value) return
     sidebarCollapsed = { ...sidebarCollapsed, [key]: value }
     try {
@@ -133,18 +133,18 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   /** On a full-screen sidebar, picking an item should reveal it, not leave the list covering it. */
-  function revealDetailOnNarrow(key) {
+  function revealDetailOnNarrow(key: string) {
     if (isNarrowViewport()) setSidebarCollapsed(key, true)
   }
 
   /** …and going back to the list should bring it back, not leave an empty detail pane. */
-  function revealListOnNarrow(key) {
+  function revealListOnNarrow(key: string) {
     if (isNarrowViewport()) setSidebarCollapsed(key, false)
   }
   /** @type {{ id: number, slug: string, label: string, sort_order: number, color?: string }[]} */
   /** Centre of the relations map tab; null until picked or opened from a card. */
   let graphRoot = $state(
-    /** @type {{ type: 'quest' | 'note' | 'questline' | null, id: number | null }} */ ({ type: null, id: null }),
+    ({ type: null, id: null } as { type: 'quest' | 'note' | 'questline' | null, id: number | null }),
   )
   /** Bump to refresh the map after live events. */
   let graphNonce = $state(0)
@@ -152,11 +152,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let historyNonce = $state(0)
   let categories = $state([])
   /** @type {{ id: number, title: string, category_id?: number | null, color?: string, icon?: string }[]} */
-  let questlines = $state([])
+  let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
   /** Open state for category subgroups: `${bucket}:${key}` → boolean (default true). */
-  let categoryOpen = $state(/** @type {Record<string, boolean>} */ ({}))
+  let categoryOpen = $state(({} as Record<string, boolean>))
   /** Open state for questline subgroups: `${bucket}:${catKey}:${lineKey}` → boolean. */
-  let lineOpen = $state(/** @type {Record<string, boolean>} */ ({}))
+  let lineOpen = $state(({} as Record<string, boolean>))
   /** Sidebar "Заморожено (N)" tab — collapsed by default. */
   let frozenOpen = $state(false)
   function toggleFrozen() {
@@ -164,33 +164,33 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   let modalOpen = $state(false)
-  let modalMode = $state(/** @type {'create' | 'edit'} */ ('create'))
+  let modalMode = $state(('create' as 'create' | 'edit'))
   /** Prefill when creating from questline context menu. */
   let modalDefaults = $state(
-    /** @type {{ questline_id?: number | null, category_id?: number | null, description?: string } | null} */ (null),
+    (null as { questline_id?: number | null, category_id?: number | null, description?: string } | null),
   )
   let templatesOpen = $state(false)
   let secretsOpen = $state(false)
   /** entity the secrets modal opens on (context menu → «Секреты»), or null */
-  let secretsOwner = $state(/** @type {{ kind: string, id: number } | null} */ (null))
+  let secretsOwner = $state((null as { kind: string, id: number } | null))
   /** template the templates modal opens for editing (a template=N link) */
-  let templatesFocusId = $state(/** @type {number | null} */ (null))
+  let templatesFocusId = $state((null as number | null))
   let tagsOpen = $state(false)
   let settingsOpen = $state(false)
   /** Section the settings modal scrolls to when opened (e.g. 'hotkeys'). */
-  let settingsSection = $state(/** @type {string | null} */ (null))
+  let settingsSection = $state((null as string | null))
   let assistantOpen = $state(false)
   let lineModalOpen = $state(false)
-  let lineModalMode = $state(/** @type {'create' | 'edit'} */ ('create'))
-  let lineModalTarget = $state(/** @type {any | null} */ (null))
+  let lineModalMode = $state(('create' as 'create' | 'edit'))
+  let lineModalTarget = $state((null as any | null))
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
   /** @type {'line' | 'quest' | 'step' | null} */
-  let ctxKind = $state(null)
-  let ctxLineId = $state(/** @type {number | null} */ (null))
-  let ctxQuestId = $state(/** @type {number | null} */ (null))
-  let ctxStepId = $state(/** @type {number | null} */ (null))
+  let ctxKind: 'line' | 'quest' | 'step' | null = $state(null)
+  let ctxLineId = $state((null as number | null))
+  let ctxQuestId = $state((null as number | null))
+  let ctxStepId = $state((null as number | null))
   let lineDeleteConfirmOpen = $state(false)
   let lineDeleting = $state(false)
   let deleting = $state(false)
@@ -198,18 +198,18 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let stepDeleteOpen = $state(false)
   let stepDeleteBusy = $state(false)
   /** @type {{ questId: number, stepId: number, title: string } | null} */
-  let stepDelete = $state(null)
+  let stepDelete: { questId: number, stepId: number, title: string } | null = $state(null)
   /** True while QuestDetail is playing its erase-before-delete animation. */
   let deleteAnimActive = $state(false)
   /** @type {(() => void) | null} */
   /** @type {((v?: unknown) => void) | null} */
-  let deleteAnimResolve = null
+  let deleteAnimResolve: ((v?: unknown) => void) | null = null
   /** quest id → when a live event from outside the web UI touched it. The
    * event lands before the refetched data, so QuestDetail picks the mark up
    * when the text actually changes and decides to type it in. */
   const remoteEdits = new Map()
   const REMOTE_EDIT_TTL_MS = 8000
-  function consumeRemoteEdit(questId) {
+  function consumeRemoteEdit(questId: any) {
     const at = remoteEdits.get(questId)
     if (at == null) return false
     remoteEdits.delete(questId)
@@ -221,16 +221,16 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
   let statusBusy = $state(false)
   let questPdfBusy = false
-  let pinBusyId = $state(/** @type {number | null} */ (null))
-  let stepBusyId = $state(/** @type {number | null} */ (null))
-  let stepEditId = $state(/** @type {number | null} */ (null))
-  let stepEditQuestId = $state(/** @type {number | null} */ (null))
+  let pinBusyId = $state((null as number | null))
+  let stepBusyId = $state((null as number | null))
+  let stepEditId = $state((null as number | null))
+  let stepEditQuestId = $state((null as number | null))
   let stepEditValue = $state('')
   let stepModalOpen = $state(false)
-  let stepModalQuestId = $state(/** @type {number | null} */ (null))
-  let stepModalStep = $state(/** @type {any | null} */ (null))
+  let stepModalQuestId = $state((null as number | null))
+  let stepModalStep = $state((null as any | null))
   /** Prefer this id across in-flight load() (URL / HUD focus). */
-  let pendingSelectId = $state(/** @type {number | null} */ (null))
+  let pendingSelectId = $state((null as number | null))
   // The sidebar's search text is the single source of truth for its filters: «показывать завершённые»
   // is `status:all`, the category / questline scope are `cat:slug` / `line:id` (searchFlags.js).
   let questQuerySpec = $derived(questSpec({ categories }))
@@ -251,15 +251,15 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   })
   let nowMs = $state(Date.now())
 
-  function setShowAll(on) {
+  function setShowAll(on: any) {
     const rest = tokenValues(parsedQuestSearch, 'status').filter((v) => v !== 'all')
     searchQuery = setToken(searchQuery, 'status', on ? [...rest, 'all'] : rest)
   }
-  function setScopeCategory(id) {
+  function setScopeCategory(id: null) {
     const slug = id == null ? null : categories.find((c) => c.id === id)?.slug
     searchQuery = setToken(setToken(searchQuery, 'line', []), 'cat', slug ? [slug] : [])
   }
-  function setScopeQuestline(id) {
+  function setScopeQuestline(id: null) {
     searchQuery = setToken(searchQuery, 'line', id == null ? [] : [String(id)])
   }
   /** Questlines to narrow to under the current scope category: those whose own
@@ -305,7 +305,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
       const status = quest?.status
       const significance = quest?.significance || 'common'
       /** @type {{ id: string, label?: string, sep?: boolean, checked?: boolean }[]} */
-      const delayChildren = [
+      const delayChildren: { id: string, label?: string, sep?: boolean, checked?: boolean }[] = [
         { id: 'delay-15', label: '15 мин' },
         { id: 'delay-30', label: '30 мин' },
         { id: 'delay-60', label: '60 мин' },
@@ -360,7 +360,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
       const found = findStepRef(ctxStepId)
       const total = Math.max(1, Number(found?.step?.progress_total) || 1)
       /** @type {{ id: string, label?: string, sep?: boolean, danger?: boolean, children?: { id: string, label?: string, sep?: boolean }[] }[]} */
-      const items = [{ id: 'copy-id', label: `Копировать step=${ctxStepId}` }]
+      const items: { id: string, label?: string, sep?: boolean, danger?: boolean, children?: { id: string, label?: string, sep?: boolean }[] }[] = [{ id: 'copy-id', label: `Копировать step=${ctxStepId}` }]
       if (total > 1) {
         items.push({
           id: 'progress',
@@ -427,7 +427,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let attachments = $derived(allAttachments.filter((a) => !a.hidden))
   let refLabels = $derived.by(() => {
     /** @type {Record<string, string>} */
-    const m = {}
+    const m: Record<string, string> = {}
     for (const n of notes) m[`note:${n.id}`] = n.title || `note=${n.id}`
     for (const q of quests) {
       m[`quest:${q.id}`] = q.title || `quest=${q.id}`
@@ -443,20 +443,20 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     return m
   })
 
-  function isCategoryOpen(key) {
+  function isCategoryOpen(key: string|number) {
     return categoryOpen[key] !== false
   }
 
-  function toggleCategory(key) {
+  function toggleCategory(key: any) {
     categoryOpen = { ...categoryOpen, [key]: !isCategoryOpen(key) }
   }
 
-  function isLineOpen(catKey, lineKey) {
+  function isLineOpen(catKey: any, lineKey: any) {
     const id = `${catKey}:${lineKey}`
     return lineOpen[id] !== false
   }
 
-  function toggleLine(catKey, lineKey) {
+  function toggleLine(catKey: any, lineKey: any) {
     const id = `${catKey}:${lineKey}`
     lineOpen = { ...lineOpen, [id]: !isLineOpen(catKey, lineKey) }
   }
@@ -535,7 +535,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   /** @param {{ kind: string, id: number } | null} [owner] */
-  function openSecrets(owner = null) {
+  function openSecrets(owner: { kind: string, id: number } | null = null) {
     secretsOwner = owner
     secretsOpen = true
   }
@@ -545,7 +545,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   /** @param {{ section?: string } | Event | null} [opts] */
-  function openSettings(opts = null) {
+  function openSettings(opts: { section?: string } | Event | null = null) {
     settingsSection = opts && !(opts instanceof Event) ? (opts.section ?? null) : null
     settingsOpen = true
   }
@@ -556,7 +556,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     lineModalOpen = true
   }
 
-  function openEditQuestline(line) {
+  function openEditQuestline(line: number) {
     const row =
       typeof line === 'number' ? questlines.find((l) => l.id === line) : line
     if (!row) return
@@ -574,7 +574,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     modalOpen = true
   }
 
-  function openLineContextMenu(event, line) {
+  function openLineContextMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, line: { id: number }) {
     event.preventDefault()
     event.stopPropagation()
     ctxKind = 'line'
@@ -586,7 +586,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     ctxOpen = true
   }
 
-  function openQuestContextMenu(event, quest) {
+  function openQuestContextMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, quest: { id: number }) {
     event.preventDefault()
     event.stopPropagation()
     ctxKind = 'quest'
@@ -599,7 +599,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     ctxOpen = true
   }
 
-  function openStepContextMenu(event, step) {
+  function openStepContextMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, step: { id: number }) {
     event.preventDefault()
     event.stopPropagation()
     ctxKind = 'step'
@@ -616,7 +616,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     ctxKind = null
   }
 
-  async function copyIdToClipboard(kind, id) {
+  async function copyIdToClipboard(kind: string, id: number) {
     if (id == null) return
     try {
       const text = `${kind}=${id}`
@@ -628,7 +628,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onLineContextSelect(action) {
+  function onLineContextSelect(action: string) {
     if (action === 'copy-id') {
       copyIdToClipboard('questline', ctxLineId)
       return
@@ -655,7 +655,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function patchQuestStatus(quest, status) {
+  async function patchQuestStatus(quest: { id: number }, status: string) {
     if (!quest || statusBusy) return
     statusBusy = true
     error = ''
@@ -671,7 +671,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function postponeQuest(quest, minutes) {
+  async function postponeQuest(quest: { id: number }, minutes: number) {
     if (!quest || statusBusy) return
     statusBusy = true
     error = ''
@@ -693,7 +693,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function patchQuestSignificance(quest, significance) {
+  async function patchQuestSignificance(quest: { significance: any; id: number }, significance: string) {
     if (!quest || statusBusy) return
     if (significance === (quest.significance || 'common')) return
     statusBusy = true
@@ -711,7 +711,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function exportQuestFromMenu(quest, mode) {
+  async function exportQuestFromMenu(quest: any, mode: string) {
     if (!quest || questPdfBusy) return
     if (mode === 'md') {
       downloadQuestMarkdown(quest)
@@ -733,7 +733,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onQuestContextSelect(action) {
+  function onQuestContextSelect(action: string) {
     if (action === 'copy-id') {
       copyIdToClipboard('quest', ctxQuestId)
       return
@@ -780,7 +780,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onContextSelect(action) {
+  function onContextSelect(action: string) {
     if (ctxKind === 'line') {
       onLineContextSelect(action)
       return
@@ -794,7 +794,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function onStepContextSelect(action) {
+  async function onStepContextSelect(action: string) {
     if (action === 'copy-id') {
       copyIdToClipboard('step', ctxStepId)
       return
@@ -874,7 +874,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onQuestlineSaved(_line, meta = /** @type {{ mode?: string }} */ ({})) {
+  function onQuestlineSaved(_line: any, meta = ({} as { mode?: string })) {
     load({ silent: true })
     if (meta.mode === 'create') toast('Квестлайн создан', { kind: 'success' })
   }
@@ -935,7 +935,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function togglePin(quest, event) {
+  async function togglePin(quest: { id: number; pinned: any; overlay_hidden: any }, event: { stopPropagation: () => void; preventDefault: () => void }) {
     event?.stopPropagation?.()
     event?.preventDefault?.()
     if (!quest || pinBusyId != null) return
@@ -958,7 +958,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function setStepProgress(step, value, questId = null) {
+  async function setStepProgress(step: { progress_current?: any; id?: any; progress_total?: any }, value: string|number, questId = null) {
     const qid = questId ?? selected?.id
     if (qid == null || stepBusyId != null) return
     const total = Math.max(0, Number(step.progress_total) || 0)
@@ -984,11 +984,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function bumpStep(step, delta, questId = null) {
+  async function bumpStep(step: { progress_current: any }, delta: number, questId = null) {
     await setStepProgress(step, step.progress_current + delta, questId)
   }
 
-  function beginEditStep(step, questId = null) {
+  function beginEditStep(step: { id: number; progress_current: any }, questId = null) {
     if (stepBusyId != null) return
     stepEditId = step.id
     stepEditQuestId = questId ?? findQuestIdForStep(step.id) ?? selected?.id ?? null
@@ -1000,22 +1000,22 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     stepEditQuestId = null
   }
 
-  function findQuestIdForStep(stepId) {
+  function findQuestIdForStep(stepId: any) {
     for (const q of quests) {
-      if (q.steps?.some((s) => s.id === stepId)) return q.id
+      if (q.steps?.some((s: { id: any }) => s.id === stepId)) return q.id
     }
     return null
   }
 
-  function findStepRef(stepId) {
+  function findStepRef(stepId: number) {
     for (const q of quests) {
-      const step = q.steps?.find((s) => s.id === stepId)
+      const step = q.steps?.find((s: { id: any }) => s.id === stepId)
       if (step) return { step, questId: q.id }
     }
     return null
   }
 
-  function onStepEditKeydown(event, step) {
+  function onStepEditKeydown(event: { key: string; preventDefault: () => void }, step: any) {
     if (event.key === 'Enter') {
       event.preventDefault()
       setStepProgress(step, stepEditValue, stepEditQuestId)
@@ -1025,12 +1025,12 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onStepEditBlur(step) {
+  function onStepEditBlur(step: { id: number }) {
     if (stepEditId !== step.id) return
     setStepProgress(step, stepEditValue, stepEditQuestId)
   }
 
-  function applyQuest(quest, { select = true } = {}) {
+  function applyQuest(quest: { id: any }, { select = true } = {}) {
     const idx = quests.findIndex((q) => q.id === quest.id)
     if (idx >= 0) {
       quests = quests.map((q) => (q.id === quest.id ? quest : q))
@@ -1040,14 +1040,14 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     if (select) selectedId = quest.id
   }
 
-  function onSaved(quest, meta = /** @type {{ mode?: string }} */ ({})) {
+  function onSaved(quest: { id: any }, meta = ({} as { mode?: string })) {
     selectedId = quest.id
     load({ silent: true })
     if (meta.mode === 'create') toast('Квест создан', { kind: 'success' })
     if (view === 'graph') graphNonce += 1
   }
 
-  function onDeleted(id) {
+  function onDeleted(id: any) {
     if (selectedId === id) selectedId = null
     load({ silent: true })
     toast('Квест удалён', { kind: 'success' })
@@ -1106,7 +1106,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   /** Rewrite the query from scratch — tab / quest= / note= / attachment= never share the bar. */
-  function replaceSearch(params) {
+  function replaceSearch(params: ArrayLike<unknown>|{ [s: string]: unknown }|{ quest: any; note?: undefined; tab?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ quest?: undefined; note?: undefined; tab?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ note: number; quest?: undefined; tab?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ tab: string; quest?: undefined; note?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ tab: string; gt: "questline"|"quest"|"note"; gid: number; quest?: undefined; note?: undefined; attachment?: undefined }|{ attachment: number; quest?: undefined; note?: undefined; tab?: undefined; gt?: undefined; gid?: undefined }) {
     try {
       const qs = new URLSearchParams()
       for (const [key, value] of Object.entries(params)) {
@@ -1121,7 +1121,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function searchForView(nextView) {
+  function searchForView(nextView: string) {
     if (nextView === 'journal') {
       return selectedId != null ? { quest: selectedId } : {}
     }
@@ -1149,7 +1149,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   // slide the other tabs get (they are re-created per tab, the map is not).
   let graphSeen = $state(false)
   let graphOn = $state(view === 'graph')
-  let graphEl = $state(/** @type {HTMLDivElement | null} */ (null))
+  let graphEl = $state((null as HTMLDivElement | null))
   let prevView = view
   const SLIDE_MS = 220
   const SLIDE_EASE = 'cubic-bezier(0.215, 0.61, 0.355, 1)'
@@ -1177,16 +1177,16 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   })
 
   /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
-  function slideTab(node, { dir, out = false }) {
+  function slideTab(node: any, { dir, out = false }: any) {
     const sign = out ? -dir : dir
     return {
       duration: 220,
       easing: cubicOut,
-      css: (t) => `transform: translateX(${(1 - t) * sign * 100}%)`,
+      css: (t: number) => `transform: translateX(${(1 - t) * sign * 100}%)`,
     }
   }
 
-  function setView(next) {
+  function setView(next: string) {
     const from = TAB_ORDER.indexOf(view)
     const to = TAB_ORDER.indexOf(next)
     if (from !== -1 && to !== -1 && from !== to) navDir = to > from ? 1 : -1
@@ -1195,14 +1195,14 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   }
 
   /** A free horizontal swipe on the page steps to the neighbouring header tab. */
-  function swipeTab(dir) {
+  function swipeTab(dir: number) {
     const i = TAB_ORDER.indexOf(view)
     const next = i === -1 ? null : TAB_ORDER[i + dir]
     if (next) setView(next)
   }
 
   /** Opens the relations map centred on one entity. */
-  function openGraph(type, id) {
+  function openGraph(type: any, id: any) {
     const from = TAB_ORDER.indexOf(view)
     navDir = TAB_ORDER.indexOf('graph') > from ? 1 : -1
     graphRoot = { type, id: Number(id) }
@@ -1210,26 +1210,26 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     view = 'graph'
   }
 
-  function onGraphCenter(type, id) {
+  function onGraphCenter(type: any, id: null) {
     // (null, null) = the map was cleared.
     graphRoot = id == null ? { type: null, id: null } : { type, id: Number(id) }
     replaceSearch(searchForView('graph'))
   }
 
   /** Opens a map node's entity in its own tab. */
-  function onGraphOpen(kind, id) {
+  function onGraphOpen(kind: string, id: number) {
     onJournalRef(kind, id)
   }
 
   /** Calendar → History for one day. The URL is set first: History reads its filters on mount. */
-  function openHistoryDay(dayKey) {
+  function openHistoryDay(dayKey: any) {
     const from = TAB_ORDER.indexOf(view)
     navDir = TAB_ORDER.indexOf('history') > from ? 1 : -1
     replaceSearch({ tab: 'history', day: dayKey })
     view = 'history'
   }
 
-  function selectQuestFromUi(id, { pushUrl = true } = {}) {
+  function selectQuestFromUi(id: number, { pushUrl = true } = {}) {
     const n = Number(id)
     if (!Number.isFinite(n) || n <= 0) return
     pendingSelectId = n
@@ -1244,7 +1244,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function selectNoteFromUi(id, { pushUrl = true } = {}) {
+  function selectNoteFromUi(id: number, { pushUrl = true } = {}) {
     const n = Number(id)
     if (!Number.isFinite(n) || n <= 0) {
       selectedNoteId = null
@@ -1258,7 +1258,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     revealDetailOnNarrow('notes')
   }
 
-  function selectAttachmentFromUi(id, { pushUrl = true } = {}) {
+  function selectAttachmentFromUi(id: number, { pushUrl = true } = {}) {
     const n = Number(id)
     if (!Number.isFinite(n) || n <= 0) {
       selectedAttachmentId = null
@@ -1270,7 +1270,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     if (pushUrl) replaceSearch({ attachment: n })
   }
 
-  function onJournalRef(kind, id) {
+  function onJournalRef(kind: string, id: number) {
     if (kind === 'note') {
       selectNoteFromUi(id)
       return
@@ -1291,7 +1291,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
     if (kind === 'step') {
       for (const q of quests) {
-        if (q.steps?.some((s) => s.id === id)) {
+        if (q.steps?.some((s: { id: any }) => s.id === id)) {
           selectQuestFromUi(q.id)
           return
         }
@@ -1338,13 +1338,13 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function probeStatus(status) {
+  function probeStatus(status: string) {
     if (status === 'ok') return 'ok'
     if (status === 'offline') return 'offline'
     return 'unknown'
   }
 
-  function dbStatus(status) {
+  function dbStatus(status: string) {
     if (status === 'ok') return 'ok'
     if (status === 'warn') return 'warn'
     return 'unknown'
@@ -1425,7 +1425,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onAuthenticated(name) {
+  function onAuthenticated(name: string) {
     username = name
     authed = true
     stopApp = startApp()
@@ -1454,7 +1454,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     // through this instead of a full page reload — keeps the header mounted
     // and lets setView()'s own transition animate the change.
     window.questsNav = {
-      setTab: (name) => setView(name),
+      setTab: (name: any) => setView(name),
       currentTab: () => view,
     }
 
@@ -1504,7 +1504,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
 
   // Keyboard cursor on the steps of the open quest. Invisible until a step key
   // is used (kbStepId stays null for mouse users); then it follows [ ] and +/-.
-  let kbStepId = $state(/** @type {number | null} */ (null))
+  let kbStepId = $state((null as number | null))
   $effect(() => {
     selectedId
     kbStepId = null
@@ -1513,10 +1513,10 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   function kbCursor() {
     const steps = selected?.steps ?? []
     if (!steps.length) return null
-    return steps.find((s) => s.id === kbStepId) ?? steps.find((s) => !s.done) ?? steps[steps.length - 1]
+    return steps.find((s: { id: number }) => s.id === kbStepId) ?? steps.find((s: { done: any }) => !s.done) ?? steps[steps.length - 1]
   }
 
-  function kbMoveStep(delta) {
+  function kbMoveStep(delta: number) {
     const steps = selected?.steps ?? []
     const cur = kbCursor()
     if (!cur) return
@@ -1524,11 +1524,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
       kbStepId = cur.id // first press only reveals the cursor
       return
     }
-    const i = steps.findIndex((s) => s.id === cur.id)
+    const i = steps.findIndex((s: { id: any }) => s.id === cur.id)
     kbStepId = steps[Math.min(steps.length - 1, Math.max(0, i + delta))].id
   }
 
-  function kbBumpStep(delta) {
+  function kbBumpStep(delta: number) {
     const cur = kbCursor()
     if (!cur || !selected) return false
     kbStepId = cur.id
@@ -1554,7 +1554,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
         label: 'Журнал, заметки, вложения, календарь, история, карта',
         keys: '1–6',
         codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
-        run: (event) => {
+        run: (event: { code: string|any[] }) => {
           const i = Number(event.code.slice(-1)) - 1
           if (TAB_ORDER[i] === view) return false
           setView(TAB_ORDER[i])

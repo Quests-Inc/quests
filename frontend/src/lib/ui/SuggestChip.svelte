@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { untrack } from 'svelte'
   import Icon from './Icon.svelte'
   import { nearestVote, pickSuggestion } from '../js/suggest.ts'
@@ -18,13 +18,21 @@
    *   onAccept: (id: string) => void,
    * }}
    */
-  let { index, title, description = '', target, options, enabled = true, onAccept } = $props()
+  let { index, title, description = '', target, options, enabled = true, onAccept }: {
+    index: ReturnType<typeof import('../js/suggest.ts').buildSuggestIndex> | null,
+    title: string,
+    description?: string,
+    target: 'questline' | 'category',
+    options: { id: string, label: string, color?: string }[],
+    enabled?: boolean,
+    onAccept: (id: string) => void,
+  } = $props()
 
   const DEBOUNCE_MS = 300
   const MIN_TITLE = 3
 
   let query = $state({ title: '', description: '' })
-  let shownId = $state(/** @type {number | null} */ (null))
+  let shownId = $state((null as number | null))
   let dismissed = $state(false)
 
   $effect(() => {

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     WEEKDAY_LABELS,
     QUEST_SIGNIFICANCES,
@@ -41,23 +41,23 @@
   /** `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
    * @type {{ open: boolean, quests?: any[], notes?: any[], attachments?: any[], focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void }} */
-  let { open = false, quests = [], notes = [], attachments = [], focusId = null, onClose, onChanged, onOpenSecrets } = $props()
+  let { open = false, quests = [], notes = [], attachments = [], focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, quests?: any[], notes?: any[], attachments?: any[], focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
 
   const LOCAL_TZ = localTimeZone() || 'Europe/Moscow'
   const WORKDAYS = [0, 1, 2, 3, 4]
 
-  let templates = $state(/** @type {any[]} */ ([]))
+  let templates = $state(([] as any[]))
   let loading = $state(false)
   let error = $state('')
-  let view = $state(/** @type {'list' | 'create' | 'edit'} */ ('list'))
-  let editing = $state(/** @type {any | null} */ (null))
+  let view = $state(('list' as 'list' | 'create' | 'edit'))
+  let editing = $state((null as any | null))
 
   let title = $state('')
   let description = $state('')
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let tagCatalog = $state([])
+  let tagCatalog: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let selectedTags = $state([])
+  let selectedTags: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** HUD presence of created quests: 'default' | 'always' | 'never'. */
   let overlayMode = $state('default')
   const OVERLAY_OPTIONS = [
@@ -74,9 +74,9 @@
   let categoryId = $state('')
   let questlineId = $state('')
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let categories = $state([])
+  let categories: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** @type {{ id: number, title: string, category_id?: number | null, color?: string }[]} */
-  let questlines = $state([])
+  let questlines: { id: number, title: string, category_id?: number | null, color?: string }[] = $state([])
   /** 0..100 for UI; sent as 0..1 */
   let emitChancePct = $state(100)
   let windowStartHour = $state('09')
@@ -84,7 +84,7 @@
   let windowEndHour = $state('18')
   let windowEndMinute = $state('00')
   /** @type {Set<number>} */
-  let weekdays = $state(new Set(WORKDAYS))
+  let weekdays: Set<number> = $state(new Set(WORKDAYS))
   let timezone = $state(LOCAL_TZ)
   let tzEditing = $state(false)
   /** Empty hour = no deadline. */
@@ -98,7 +98,7 @@
   let emitRunOn = $state('')
   let durationHours = $state('')
   let durationMinutes = $state('')
-  let steps = $state(/** @type {ReturnType<typeof templateStepDraft>[]} */ ([]))
+  let steps = $state(([] as ReturnType<typeof templateStepDraft>[]))
   let saving = $state(false)
   let deleting = $state(false)
   let deleteConfirmOpen = $state(false)
@@ -125,7 +125,7 @@
     { id: 'surprise', label: 'случайно' },
   ]
   const DAY_OPTIONS = WEEKDAY_LABELS.map((d) => ({ id: String(d.id), label: d.label }))
-  const SIG_OPTIONS = QUEST_SIGNIFICANCES.map((s) => ({ ...s, kind: /** @type {const} */ ('sig') }))
+  const SIG_OPTIONS = QUEST_SIGNIFICANCES.map((s) => ({ ...s, kind: ('sig' as const) }))
 
   let isSurprise = $derived(emitMode === 'surprise')
   let hasDeadline = $derived(!isSurprise && Boolean(deadlineHour))
@@ -137,7 +137,7 @@
   })
 
   /** @param {string} text */
-  function parseLimits(text) {
+  function parseLimits(text: string) {
     try {
       const v = JSON.parse(text)
       if (v && typeof v === 'object' && !Array.isArray(v)) return v
@@ -158,7 +158,7 @@
     categoryId === '' ? null : categories.find((c) => String(c.id) === categoryId) ?? null,
   )
 
-  function daysLabel(set) {
+  function daysLabel(set: Set<unknown>) {
     const ids = [...set].sort((a, b) => a - b)
     if (ids.length === 7) return 'каждый день'
     if (ids.join() === WORKDAYS.join()) return 'по будням'
@@ -204,7 +204,7 @@
     return n ? `${n} ${plural(n, ['шаг', 'шага', 'шагов'])}` : 'нет'
   })
 
-  function applyQuestline(idStr) {
+  function applyQuestline(idStr: string) {
     questlineId = idStr
     if (idStr === '') return
     const line = questlines.find((l) => String(l.id) === idStr)
@@ -212,7 +212,7 @@
     categoryId = line.category_id != null ? String(line.category_id) : ''
   }
 
-  function parseClock(raw, fallbackH, fallbackM) {
+  function parseClock(raw: any, fallbackH: string, fallbackM: string) {
     const text = String(raw || '').trim()
     if (text && text.includes(':')) {
       const [hh = fallbackH, mm = fallbackM] = text.split(':')
@@ -224,7 +224,7 @@
     return { hour: fallbackH, minute: fallbackM }
   }
 
-  function parseWeekdays(raw) {
+  function parseWeekdays(raw: any) {
     const set = new Set()
     for (const part of String(raw || '').split(',')) {
       const n = Number(part.trim())
@@ -270,8 +270,8 @@
       deadlineMinute = d.minute
     }
     ;({ hours: durationHours, minutes: durationMinutes } = secondsToParts(t?.duration_seconds))
-    steps = t?.steps?.length ? t.steps.map((s) => templateStepDraft(s)) : [templateStepDraft()]
-    selectedTags = Array.isArray(t?.tags) ? t.tags.map((x) => ({ ...x })) : []
+    steps = t?.steps?.length ? t.steps.map((s: any) => templateStepDraft(s)) : [templateStepDraft()]
+    selectedTags = Array.isArray(t?.tags) ? t.tags.map((x: any) => ({ ...x })) : []
     // A new template starts at its schedule; an existing one reads fine
     // from the one-line summary.
     secSchedule = !t
@@ -281,11 +281,11 @@
   }
 
   /** Per-template close streaks, loaded after the list so rows render at once. */
-  let streaks = $state(/** @type {Record<number, any>} */ ({}))
+  let streaks = $state(({} as Record<number, any>))
 
   /** @param {any[]} tpls */
-  async function loadStreaks(tpls) {
-    const out = /** @type {Record<number, any>} */ ({})
+  async function loadStreaks(tpls: any[]) {
+    const out = ({} as Record<number, any>)
     await Promise.all(
       tpls.map(async (t) => {
         try {
@@ -299,7 +299,7 @@
   }
 
   /** @param {number} id */
-  function streakLabel(id) {
+  function streakLabel(id: number) {
     const st = streaks[id]
     if (!st || !st.closed) return ''
     const pct = Math.round((st.close_rate || 0) * 100)
@@ -355,13 +355,13 @@
     resetForm(null)
   }
 
-  function openEdit(t) {
+  function openEdit(t: any) {
     editing = t
     view = 'edit'
     resetForm(t)
   }
 
-  function toggleDay(idStr) {
+  function toggleDay(idStr: any) {
     const id = Number(idStr)
     const next = new Set(weekdays)
     if (next.has(id)) next.delete(id)
@@ -414,7 +414,7 @@
     }
   }
 
-  async function onSubmit(event) {
+  async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!title.trim()) {
       formError = 'Нужен заголовок'
@@ -454,7 +454,7 @@
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
-  let ctxId = $state(/** @type {number | null} */ (null))
+  let ctxId = $state((null as number | null))
   let ctxTemplate = $derived(templates.find((t) => t.id === ctxId) ?? null)
   let ctxItems = $derived(
     ctxTemplate
@@ -472,7 +472,7 @@
   )
 
   /** @param {MouseEvent} event @param {any} t */
-  function openTemplateMenu(event, t) {
+  function openTemplateMenu(event: MouseEvent, t: any) {
     event.preventDefault()
     event.stopPropagation()
     ctxId = t.id
@@ -481,7 +481,7 @@
     ctxOpen = true
   }
 
-  async function onTemplateMenuSelect(action) {
+  async function onTemplateMenuSelect(action: string) {
     const t = ctxTemplate
     if (!t) return
     if (action === 'copy-id') {
@@ -513,7 +513,7 @@
     untrack(() => openEdit(t))
   })
 
-  async function onToggleEnabled(t) {
+  async function onToggleEnabled(t: { id: number; enabled: any }) {
     try {
       await updateTemplate(t.id, { enabled: !t.enabled })
       onChanged()
@@ -523,7 +523,7 @@
     }
   }
 
-  async function onCopy(t, event) {
+  async function onCopy(t: { id: number }, event: { stopPropagation: () => void }) {
     event?.stopPropagation?.()
     try {
       await copyTemplate(t.id)
@@ -535,7 +535,7 @@
   }
 
   /** @param {any} t @param {Event} [event] */
-  async function onEmit(t, event) {
+  async function onEmit(t: any, event?: Event) {
     event?.stopPropagation?.()
     error = ''
     try {
@@ -569,7 +569,7 @@
     }
   }
 
-  function rowMeta(t) {
+  function rowMeta(t: { emit_mode: string; freq: string; weekdays: any; emit_pool_command: any; questline_title: any; category_label: any; significance: string; pinned: any; overlay_hidden: any; id: number; steps: string|any[] }) {
     const mode = t.emit_mode === 'surprise' ? 'случайно' : 'по расписанию'
     const days = t.freq === 'weekly' ? daysLabel(parseWeekdays(t.weekdays)) : 'каждый день'
     return [

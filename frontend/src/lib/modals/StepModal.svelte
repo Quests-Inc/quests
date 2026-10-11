@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { updateQuestStep } from '../js/api.ts'
   import { checkPayload, questStepDraft } from '../js/steps.ts'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
@@ -31,6 +31,17 @@
     onClose,
     onSaved,
     onDraft = null,
+  }: {
+    open: boolean,
+    questId?: number | null,
+    step?: any | null,
+    quests?: any[],
+    questlines?: any[],
+    notes?: any[],
+    attachments?: any[],
+    onClose: () => void,
+    onSaved: (q: any) => void,
+    onDraft?: ((payload: any) => void) | null,
   } = $props()
 
   let draft = $state(questStepDraft())
@@ -46,7 +57,7 @@
     })
   })
 
-  async function onSubmit(event) {
+  async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!step?.id || questId == null || saving) return
     const trimmed = draft.title.trim()

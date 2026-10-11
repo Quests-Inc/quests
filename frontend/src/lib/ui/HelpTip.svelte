@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte'
   import { placePopover, watchPopover } from '../js/popover.ts'
 
@@ -7,11 +7,11 @@
    * how-it-works text that used to sit permanently under form fields.
    * @type {{ label?: string, children?: import('svelte').Snippet }}
    */
-  let { label = 'Подробнее', children } = $props()
+  let { label = 'Подробнее', children }: { label?: string, children?: import('svelte').Snippet } = $props()
 
   let open = $state(false)
-  let btnEl = $state(/** @type {HTMLButtonElement | null} */ (null))
-  let popEl = $state(/** @type {HTMLDivElement | null} */ (null))
+  let btnEl = $state((null as HTMLButtonElement | null))
+  let popEl = $state((null as HTMLDivElement | null))
 
   function place() {
     if (open && btnEl && popEl) placePopover(btnEl, popEl)
@@ -24,7 +24,7 @@
     place()
   }
 
-  function onKey(event) {
+  function onKey(event: { key: string; preventDefault: () => void; stopPropagation: () => void }) {
     if (open && event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()

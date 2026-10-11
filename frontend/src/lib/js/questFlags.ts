@@ -1,9 +1,9 @@
 /** What the journal's quest search understands: status:, flag:, type:, sig:, tag:, cat:, line:. See searchFlags.js. */
 
-const STATUS_OF = { done: 'completed', overdue: 'expired' }
+const STATUS_OF: Record<string, string> = { done: 'completed', overdue: 'expired' }
 
 /** @param {{ categories?: any[] }} ctx */
-export function questSpec({ categories = [] } = {}) {
+export function questSpec({ categories = [] }: { categories?: any[] } = {}) {
   return {
     status: {
       label: 'статус',

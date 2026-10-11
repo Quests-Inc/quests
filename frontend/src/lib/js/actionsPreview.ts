@@ -1,4 +1,4 @@
-const ACTION_LABELS = {
+const ACTION_LABELS: Record<string, string> = {
   create_questline: 'создать квестлайн',
   create_quest: 'создать квест',
   add_step: 'добавить шаг',
@@ -7,7 +7,7 @@ const ACTION_LABELS = {
   update_quest: 'изменить квест',
 }
 
-const FIELD_LABELS = {
+const FIELD_LABELS: Record<string, string> = {
   title: 'название',
   description: 'описание',
   status: 'статус',
@@ -43,7 +43,10 @@ function findStepIn(before: { steps: any[] }, id: any) {
  * create — e.g. an update_quest that only flips status, with no questline
  * touched at all.
  */
-export function buildPreviewTree(preview: any, { quests = [], questlines = [] } = {}) {
+export function buildPreviewTree(
+  preview: any,
+  { quests = [], questlines = [] }: { quests?: any[]; questlines?: any[] } = {}
+) {
   const questlineById = new Map(questlines.map((l) => [l.id, l]))
   const questById = new Map(quests.map((q) => [q.id, q]))
 
@@ -58,7 +61,7 @@ export function buildPreviewTree(preview: any, { quests = [], questlines = [] } 
       kind: 'questline',
       label: row?.title || `Квестлайн #${id}`,
       isNew: false,
-      quests: [],
+      quests: [] as any[],
     }
     lineNodes.set(id, node)
     return node
@@ -129,7 +132,7 @@ export function buildPreviewTree(preview: any, { quests = [], questlines = [] } 
         label: after.title || ctxStep?.title || `Шаг #${after.step_id}`,
         isNew: action === 'add_step',
         deleted: action === 'delete_step',
-        changes: [],
+        changes: [] as any[],
       }
       if (action === 'update_step') {
         for (const [k, v] of Object.entries(after)) {

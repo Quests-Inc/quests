@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { hotkeyGroups } from '../../js/hotkeys.ts'
   import SettingsBlock from './SettingsBlock.svelte'
 

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { activeMentionToken, applyMention, matchMentions } from '../js/mentionSuggest.ts'
   import { templateStore } from '../js/templatesStore.svelte.ts'
 
@@ -31,14 +31,28 @@
     el = $bindable(null),
     onkeydown,
     oninput,
+  }: {
+    value?: string,
+    quests?: any[],
+    questlines?: any[],
+    notes?: any[],
+    attachments?: any[],
+    placeholder?: string,
+    rows?: number,
+    class?: string,
+    disabled?: boolean,
+    placement?: 'below' | 'inside',
+    el?: HTMLTextAreaElement | null,
+    onkeydown?: (event: KeyboardEvent) => void,
+    oninput?: (event: Event) => void,
   } = $props()
 
   let mentionOpen = $state(false)
-  let mentionItems = $state(/** @type {any[]} */ ([]))
+  let mentionItems = $state(([] as any[]))
   let mentionIndex = $state(0)
-  let mentionToken = $state(/** @type {{ query: string, start: number } | null} */ (null))
+  let mentionToken = $state((null as { query: string, start: number } | null))
 
-  function refreshMentions(caret) {
+  function refreshMentions(caret: number) {
     const token = activeMentionToken(value, caret)
     if (!token) {
       mentionOpen = false
@@ -57,13 +71,13 @@
     mentionOpen = mentionItems.length > 0
   }
 
-  function onFieldInput(event) {
-    const node = /** @type {HTMLTextAreaElement} */ (event.currentTarget)
+  function onFieldInput(event: Event) {
+    const node = (event.currentTarget as HTMLTextAreaElement)
     refreshMentions(node.selectionStart ?? value.length)
     oninput?.(event)
   }
 
-  function pickMention(item) {
+  function pickMention(item: { kind: any; id: any }) {
     if (!item || !mentionToken) return
     const { text: nextText, caret } = applyMention(value, mentionToken, item)
     value = nextText
@@ -75,7 +89,7 @@
     })
   }
 
-  function onFieldKeydown(event) {
+  function onFieldKeydown(event: KeyboardEvent) {
     if (mentionOpen) {
       if (event.key === 'ArrowDown') {
         event.preventDefault()

@@ -1,7 +1,7 @@
-<script>
+<script lang="ts">
   /** On/off switch with a label (a real checkbox underneath, so keyboard and screen readers work).
    * @type {{ checked?: boolean, label: string, disabled?: boolean, hint?: string }} */
-  let { checked = $bindable(false), label, disabled = false, hint = '' } = $props()
+  let { checked = $bindable(false), label, disabled = false, hint = '' }: { checked?: boolean, label: string, disabled?: boolean, hint?: string } = $props()
 </script>
 
 <label class="toggle" class:toggle--disabled={disabled}>

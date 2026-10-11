@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from '../ui/Icon.svelte'
 
   /** Dialog title bar: icon + title on the left, close (and optional extra
@@ -11,7 +11,14 @@
    *   closeDisabled?: boolean,
    *   actions?: import('svelte').Snippet,
    * }} */
-  let { id, title, icon = '', onClose, closeDisabled = false, actions } = $props()
+  let { id, title, icon = '', onClose, closeDisabled = false, actions }: {
+    id: string,
+    title: string,
+    icon?: string,
+    onClose: () => void,
+    closeDisabled?: boolean,
+    actions?: import('svelte').Snippet,
+  } = $props()
 </script>
 
 <header class="modal__head">

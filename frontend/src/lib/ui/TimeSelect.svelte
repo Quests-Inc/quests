@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   /**
    * 24h HH:MM — no native time input (it follows the OS 12h/24h setting).
    * A button opens a popup: hours as a 6×4 grid, minutes in steps of 5 with
@@ -12,7 +12,7 @@
     allowNone = false,
     disabled = false,
     label = 'Время',
-  } = $props()
+  }: { hour?: string, minute?: string, allowNone?: boolean, disabled?: boolean, label?: string } = $props()
 
   const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
   const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
@@ -35,23 +35,23 @@
   }
 
   /** @param {number} delta */
-  function nudge(delta) {
+  function nudge(delta: number) {
     const total = (((+minute + delta) % 60) + 60) % 60
     minute = String(total).padStart(2, '0')
   }
 
   /** Moves the popup to <body>: an ancestor with transform would re-anchor `fixed`. */
-  function portal(/** @type {HTMLElement} */ node) {
+  function portal(/** @type {HTMLElement} */ node: { remove: () => any }) {
     document.body.appendChild(node)
     return { destroy: () => node.remove() }
   }
 
-  function onDocDown(/** @type {PointerEvent} */ e) {
-    const t = /** @type {Node} */ (e.target)
+  function onDocDown(/** @type {PointerEvent} */ e: { target: Node }) {
+    const t = (e.target as Node)
     if (open && !root?.contains(t) && !pop?.contains(t)) open = false
   }
 
-  function onKey(/** @type {KeyboardEvent} */ e) {
+  function onKey(/** @type {KeyboardEvent} */ e: { key: string; stopPropagation: () => void }) {
     if (e.key === 'Escape' && open) {
       open = false
       e.stopPropagation()

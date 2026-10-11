@@ -1,18 +1,18 @@
-<script>
+<script lang="ts">
   /**
    * Date as YYYY-MM-DD with a Monday-first month popup — no native date input,
    * whose first weekday follows the browser locale and cannot be overridden.
    * @type {{ value?: string, label?: string, clearable?: boolean }}
    */
-  let { value = $bindable(''), label = 'Дата', clearable = false } = $props()
+  let { value = $bindable(''), label = 'Дата', clearable = false }: { value?: string, label?: string, clearable?: boolean } = $props()
 
   const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
   const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
-  const pad = (n) => String(n).padStart(2, '0')
-  const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`
 
-  function parse(v) {
+  function parse(v: string) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '')
     return m ? { y: +m[1], m: +m[2] - 1, d: +m[3] } : null
   }
@@ -52,24 +52,24 @@
     open = true
   }
 
-  function shift(delta) {
+  function shift(delta: number) {
     const d = new Date(viewY, viewM + delta, 1)
     viewY = d.getFullYear()
     viewM = d.getMonth()
   }
 
-  function pick(day) {
+  function pick(day: any) {
     value = iso(viewY, viewM, day)
     open = false
   }
 
   /** Moves the popup to <body>: an ancestor with transform would re-anchor `fixed`. */
-  function portal(node) {
+  function portal(node: { remove: () => any }) {
     document.body.appendChild(node)
     return { destroy: () => node.remove() }
   }
 
-  function onDocDown(e) {
+  function onDocDown(e: { target: any }) {
     if (open && root && !root.contains(e.target) && !pop?.contains(e.target)) open = false
   }
 </script>

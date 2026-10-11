@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { clearNoteIcon, updateNote, uploadNoteIcon } from '../js/api.ts'
   import ColorIconPicker from '../ui/ColorIconPicker.svelte'
   import ModalShell from './ModalShell.svelte'
@@ -7,12 +7,12 @@
   import { untrack } from 'svelte'
 
   /** @type {{ open: boolean, note?: any | null, onClose: () => void, onSaved: (row: any) => void }} */
-  let { open = false, note = null, onClose, onSaved } = $props()
+  let { open = false, note = null, onClose, onSaved }: { open: boolean, note?: any | null, onClose: () => void, onSaved: (row: any) => void } = $props()
 
   let color = $state('#9a9a9a')
   let icon = $state('document')
-  let iconUrl = $state(/** @type {string | null} */ (null))
-  let pendingFile = $state(/** @type {File | null} */ (null))
+  let iconUrl = $state((null as string | null))
+  let pendingFile = $state((null as File | null))
   let clearCustom = $state(false)
   let saving = $state(false)
   let formError = $state('')
@@ -32,7 +32,7 @@
     })
   })
 
-  async function onSubmit(event) {
+  async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!note?.id || saving) return
     saving = true

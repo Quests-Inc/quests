@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '../js/searchFlags.ts'
   import FlagHints from '../ui/FlagHints.svelte'
   import Icon from '../ui/Icon.svelte'
@@ -38,6 +38,15 @@
     onSelect,
     onOpenOwner,
     onChanged,
+  }: {
+    attachments?: any[],
+    quests?: any[],
+    questlines?: any[],
+    notes?: any[],
+    selectedId?: number | null,
+    onSelect?: (id: number | null) => void,
+    onOpenOwner?: (kind: string, id: number) => void,
+    onChanged?: () => void,
   } = $props()
 
   const KINDS = [
@@ -62,29 +71,29 @@
   let search = $state('')
   let sort = $state('new')
   let grouped = $state(true)
-  let busyId = $state(/** @type {number | null} */ (null))
+  let busyId = $state((null as number | null))
   let commentDraft = $state('')
-  let commentFor = $state(/** @type {number | null} */ (null))
-  let revs = $state(/** @type {any[]} */ ([]))
-  let revsFor = $state(/** @type {number | null} */ (null))
+  let commentFor = $state((null as number | null))
+  let revs = $state(([] as any[]))
+  let revsFor = $state((null as number | null))
   let revsBusy = $state(false)
   /** @type {{ att: any, revision: number | null } | null} */
-  let pendingDelete = $state(null)
+  let pendingDelete: { att: any, revision: number | null } | null = $state(null)
   let deleteBusy = $state(false)
-  let versionInput = $state(/** @type {HTMLInputElement | null} */ (null))
-  let versionFor = $state(/** @type {any | null} */ (null))
+  let versionInput = $state((null as HTMLInputElement | null))
+  let versionFor = $state((null as any | null))
 
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
-  let ctxAtt = $state(/** @type {any | null} */ (null))
+  let ctxAtt = $state((null as any | null))
 
   /** @param {any} a */
-  const ownerKind = (a) => a.owner_type || 'quest'
+  const ownerKind = (a: any) => a.owner_type || 'quest'
 
   let titles = $derived.by(() => {
     /** @type {Record<string, string>} */
-    const m = {}
+    const m: Record<string, string> = {}
     for (const q of quests) m[`quest:${q.id}`] = q.title || `quest=${q.id}`
     for (const l of questlines) m[`questline:${l.id}`] = l.title || `questline=${l.id}`
     for (const n of notes) m[`note:${n.id}`] = n.title || `note=${n.id}`
@@ -92,31 +101,31 @@
   })
 
   /** @param {any} a */
-  function ownerLabel(a) {
+  function ownerLabel(a: any) {
     const kind = ownerKind(a)
     return titles[`${kind}:${a.owner_id}`] || `${kind}=${a.owner_id}`
   }
 
   /** @param {any} a */
-  function isRaster(a) {
+  function isRaster(a: any) {
     const t = (a.content_type_detected || '').split(';')[0].trim().toLowerCase()
     return t === 'image/png' || t === 'image/jpeg' || t === 'image/gif' || t === 'image/webp'
   }
 
   /** @param {any} a */
-  function thumbSrc(a) {
+  function thumbSrc(a: any) {
     return `/api/attachments/${a.id}/image?preview=1&revision=${a.revision || 1}`
   }
 
   /** @param {any} a */
-  function extOf(a) {
+  function extOf(a: any) {
     const m = /\.([A-Za-z0-9]{1,6})$/.exec(a.filename || '')
     return m ? m[1].toUpperCase() : ''
   }
 
   /** Filters typed into the search box; the segment buttons below read and write the same tokens. */
   const ATT_SPEC = {
-    flag: { label: 'флаг', all: true, values: [{ id: 'hidden', label: 'скрыто' }], test: (a) => !!a.hidden },
+    flag: { label: 'флаг', all: true, values: [{ id: 'hidden', label: 'скрыто' }], test: (a: { hidden: any }) => !!a.hidden },
     show: { label: 'показать', values: [{ id: 'all', label: 'и скрытые тоже' }], test: () => true },
     owner: {
       label: 'владелец',
@@ -125,12 +134,12 @@
         { id: 'questline', label: 'квестлайн' },
         { id: 'note', label: 'заметка' },
       ],
-      test: (a, v) => ownerKind(a) === v,
+      test: (a: any, v: any) => ownerKind(a) === v,
     },
     ftype: {
       label: 'тип файла',
       hint: 'pdf|png|image',
-      test: (a, v) => {
+      test: (a: { content_type_detected: any; content_type_declared: any; filename: any }, v: string) => {
         const want = v.toLowerCase().replace(/^\./, '')
         const mime = (a.content_type_detected || a.content_type_declared || '').split(';')[0].trim().toLowerCase()
         const ext = ((/\.([A-Za-z0-9]{1,8})$/.exec(a.filename || '') || [])[1] || '').toLowerCase()
@@ -140,7 +149,7 @@
     rev: {
       label: 'число версий',
       hint: 'N|>N|<N',
-      test: (a, v) => {
+      test: (a: { revision_count: number }, v: string) => {
         const m = /^(>=|<=|>|<|=)?(\d+)$/.exec(v)
         if (!m) return false
         const n = Number(m[2])
@@ -152,10 +161,10 @@
   let parsedSearch = $derived(parseQuery(search, ATT_SPEC))
   let kindFilter = $derived(tokenValues(parsedSearch, 'owner')[0] ?? 'all')
   let stateFilter = $derived(hasToken(parsedSearch, 'flag', 'hidden') ? 'hidden' : hasToken(parsedSearch, 'show', 'all') ? 'all' : 'active')
-  function setKind(id) {
+  function setKind(id: string) {
     search = setToken(search, 'owner', id === 'all' ? [] : [id])
   }
-  function setState(id) {
+  function setState(id: string) {
     search = setToken(setToken(search, 'flag', id === 'hidden' ? ['hidden'] : []), 'show', id === 'all' ? ['all'] : [])
   }
 
@@ -172,12 +181,12 @@
         .toLowerCase()
         .includes(q)
     })
-    const byWhen = (x, y) => (y.uploaded_at || '').localeCompare(x.uploaded_at || '') || y.id - x.id
+    const byWhen = (x: { uploaded_at: any; id: number }, y: { uploaded_at: any; id: number }) => (y.uploaded_at || '').localeCompare(x.uploaded_at || '') || y.id - x.id
     const cmp = {
       new: byWhen,
-      old: (x, y) => -byWhen(x, y),
-      name: (x, y) => (x.filename || '').localeCompare(y.filename || '', 'ru'),
-      size: (x, y) => (y.size_bytes || 0) - (x.size_bytes || 0),
+      old: (x: any, y: any) => -byWhen(x, y),
+      name: (x: { filename: any }, y: { filename: any }) => (x.filename || '').localeCompare(y.filename || '', 'ru'),
+      size: (x: { size_bytes: any }, y: { size_bytes: any }) => (y.size_bytes || 0) - (x.size_bytes || 0),
     }[sort]
     return out.sort(cmp)
   })
@@ -185,7 +194,7 @@
   let groups = $derived.by(() => {
     if (!grouped) return []
     /** @type {Map<string, { key: string, kind: string, id: number, title: string, files: any[] }>} */
-    const m = new Map()
+    const m: Map<string, { key: string, kind: string, id: number, title: string, files: any[] }> = new Map()
     for (const a of filtered) {
       const kind = ownerKind(a)
       const key = `${kind}:${a.owner_id}`
@@ -230,7 +239,7 @@
   })
 
   /** @param {any} a */
-  async function loadRevs(a) {
+  async function loadRevs(a: any) {
     revsBusy = true
     try {
       const data = await listAttachmentRevisions(ownerKind(a), a.owner_id, a.id)
@@ -243,7 +252,7 @@
   }
 
   /** Run a mutation, then refresh the index (and the open card's versions). */
-  async function run(a, fn, okMessage) {
+  async function run(a: { id: number }, fn: { (): Promise<any>; (): Promise<any>; (): Promise<any>; (): Promise<any>; (): any }, okMessage: string) {
     busyId = a.id
     try {
       await fn()
@@ -258,7 +267,7 @@
   }
 
   /** @param {any} a */
-  function toggleHidden(a) {
+  function toggleHidden(a: any) {
     return run(
       a,
       () => setAttachmentHidden(ownerKind(a), a.owner_id, a.id, !a.hidden),
@@ -267,7 +276,7 @@
   }
 
   /** @param {any} a @param {number} revision */
-  function makeCurrent(a, revision) {
+  function makeCurrent(a: any, revision: number) {
     return run(
       a,
       () => setAttachmentCurrentRevision(ownerKind(a), a.owner_id, a.id, revision),
@@ -276,7 +285,7 @@
   }
 
   /** @param {any} a */
-  function saveComment(a) {
+  function saveComment(a: any) {
     const next = commentDraft.trim()
     if (next === (a.comment || '')) return
     return run(a, () => updateAttachmentComment(ownerKind(a), a.owner_id, a.id, next))
@@ -308,12 +317,12 @@
   }
 
   /** @param {any} a */
-  function pickVersion(a) {
+  function pickVersion(a: any) {
     versionFor = a
     versionInput?.click()
   }
 
-  async function onVersionPick(event) {
+  async function onVersionPick(event: { currentTarget: { files: any[]; value: string } }) {
     const file = event.currentTarget.files?.[0]
     const a = versionFor
     versionFor = null
@@ -323,7 +332,7 @@
   }
 
   /** @param {any} a @param {number | null} [revision] */
-  function downloadAtt(a, revision = null) {
+  function downloadAtt(a: any, revision: number | null = null) {
     const link = document.createElement('a')
     link.href = attachmentDownloadUrl(ownerKind(a), a.owner_id, a.id, revision)
     link.download = a.filename || ''
@@ -334,7 +343,7 @@
   }
 
   /** @param {any} a */
-  async function copyRef(a) {
+  async function copyRef(a: any) {
     try {
       const text = `attachment=${a.id}`
       await copyText(text)
@@ -359,7 +368,7 @@
   })
 
   /** @param {MouseEvent} event @param {any} a */
-  function openAttMenu(event, a) {
+  function openAttMenu(event: MouseEvent, a: any) {
     const target = event.target
     if (target instanceof Element && target.closest('a, button, input, textarea')) return
     event.preventDefault()
@@ -371,7 +380,7 @@
   }
 
   /** @param {string} action */
-  function onAttSelect(action) {
+  function onAttSelect(action: string) {
     const a = ctxAtt
     if (!a) return
     if (action === 'download') downloadAtt(a)
@@ -383,7 +392,7 @@
   }
 
   /** @param {number} n */
-  function formatSize(n) {
+  function formatSize(n: number) {
     const bytes = Number(n) || 0
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -391,7 +400,7 @@
   }
 
   /** @param {string} iso @param {boolean} [full] */
-  function formatWhen(iso, full = false) {
+  function formatWhen(iso: string, full: boolean = false) {
     if (!iso) return '—'
     try {
       return new Date(iso).toLocaleString(
@@ -406,7 +415,7 @@
   }
 
   /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape' && selectedId != null && !pendingDelete) {
       const t = e.target
       if (t instanceof Element && t.closest('input, textarea')) return

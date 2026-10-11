@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from './Icon.svelte'
   import MentionTextarea from './MentionTextarea.svelte'
   import StepAutoCheck from './StepAutoCheck.svelte'
@@ -27,6 +27,13 @@
     questlines = [],
     notes = [],
     attachments = [],
+  }: {
+    steps: any[],
+    variant?: 'quest' | 'template',
+    quests?: any[],
+    questlines?: any[],
+    notes?: any[],
+    attachments?: any[],
   } = $props()
 
   let isQuest = $derived(variant === 'quest')
@@ -39,24 +46,24 @@
     steps = [...steps, blank()]
   }
 
-  function remove(key) {
+  function remove(key: any) {
     steps = steps.length <= 1 ? [blank()] : steps.filter((s) => s.key !== key)
   }
 
   /** quest=N in a folded step's title/description with no check yet: offer it
    * right on the row — the check field itself sits inside the ⚙ details. */
-  function foldedMirrorId(s) {
+  function foldedMirrorId(s: { open: any; check_command: any; title: string; description: string }) {
     if (s.open || String(s.check_command || '').trim()) return null
     return mirrorQuestId(s.title, s.description)
   }
 
-  function useMirrorCheck(s, questId) {
+  function useMirrorCheck(s: { check_command: string; run_mode: string; open: boolean }, questId: any) {
     s.check_command = `quests progress ${questId}`
     s.run_mode = 'watch'
     s.open = true
   }
 
-  function hasDetails(s) {
+  function hasDetails(s: { check_command: any; description: any }) {
     return Boolean(String(s.check_command || '').trim() || String(s.description || '').trim())
   }
 </script>

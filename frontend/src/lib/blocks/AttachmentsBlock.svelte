@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from '../ui/Icon.svelte'
   import FileKindIcon from '../ui/FileKindIcon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
@@ -25,44 +25,44 @@
   } from '../js/attachmentCache.ts'
 
   /** @type {{ ownerType: 'quest' | 'questline' | 'note', ownerId: number, onOpenOwner?: (kind: string, id: number) => void, label?: string, labelClass?: string }} */
-  let { ownerType, ownerId, onOpenOwner, label = 'Вложения', labelClass = 'block__label' } = $props()
+  let { ownerType, ownerId, onOpenOwner, label = 'Вложения', labelClass = 'block__label' }: { ownerType: 'quest' | 'questline' | 'note', ownerId: number, onOpenOwner?: (kind: string, id: number) => void, label?: string, labelClass?: string } = $props()
 
   /** Файлы свёрнуты по умолчанию; строка «Прикрепить файл» видна всегда. */
   let open = $state(false)
 
   /** @type {any[]} */
-  let items = $state([])
+  let items: any[] = $state([])
   /** Hidden cards live only on the Attachments tab. */
   let visible = $derived(items.filter((a) => !a.hidden))
   /** @type {{ att: any, revision: number | null } | null} */
-  let pendingDelete = $state(null)
+  let pendingDelete: { att: any, revision: number | null } | null = $state(null)
   let deleteBusy = $state(false)
   let uploading = $state(false)
   let error = $state('')
   let dragOver = $state(false)
-  let fileInput = $state(/** @type {HTMLInputElement | null} */ (null))
-  let versionInput = $state(/** @type {HTMLInputElement | null} */ (null))
+  let fileInput = $state((null as HTMLInputElement | null))
+  let versionInput = $state((null as HTMLInputElement | null))
   /** @type {number | null} */
-  let versionForId = $state(null)
+  let versionForId: number | null = $state(null)
   /** @type {Record<number, string>} */
-  let commentDraft = $state({})
+  let commentDraft: Record<number, string> = $state({})
   /** @type {number | null} */
-  let commentBusy = $state(null)
+  let commentBusy: number | null = $state(null)
   /** @type {number | null} */
-  let historyOpenId = $state(null)
+  let historyOpenId: number | null = $state(null)
   /** @type {Record<number, any[]>} */
-  let historyById = $state({})
+  let historyById: Record<number, any[]> = $state({})
   let historyBusy = $state(false)
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
-  let ctxAtt = $state(/** @type {any | null} */ (null))
+  let ctxAtt = $state((null as any | null))
 
   let ctxItems = $derived.by(() => {
     const a = ctxAtt
     if (!a) return []
     /** @type {{ id: string, label?: string, sep?: boolean, danger?: boolean, disabled?: boolean }[]} */
-    const items = [
+    const items: { id: string, label?: string, sep?: boolean, danger?: boolean, disabled?: boolean }[] = [
       { id: 'download', label: 'Скачать', disabled: a.available === false },
       { id: 'new-version', label: 'Новая версия…' },
     ]
@@ -83,7 +83,7 @@
   })
 
   /** @param {MouseEvent} event @param {any} a */
-  function openAttMenu(event, a) {
+  function openAttMenu(event: MouseEvent, a: any) {
     const target = event.target
     if (target instanceof Element && target.closest('a, button, input, textarea')) return
     event.preventDefault()
@@ -94,7 +94,7 @@
     ctxOpen = true
   }
 
-  function downloadAtt(a, revision = null) {
+  function downloadAtt(a: { id: number; filename: string }, revision = null) {
     const link = document.createElement('a')
     link.href = attachmentDownloadUrl(ownerType, ownerId, a.id, revision)
     link.download = a.filename || ''
@@ -104,7 +104,7 @@
     link.remove()
   }
 
-  async function toggleHistory(a) {
+  async function toggleHistory(a: { id: number }) {
     if (historyOpenId === a.id) {
       historyOpenId = null
       return
@@ -122,7 +122,7 @@
     }
   }
 
-  async function makeCurrent(a, revision) {
+  async function makeCurrent(a: { id: number }, revision: string|number) {
     error = ''
     try {
       const updated = await setAttachmentCurrentRevision(ownerType, ownerId, a.id, revision)
@@ -157,7 +157,7 @@
     }
   }
 
-  async function hide(a) {
+  async function hide(a: { id: number }) {
     error = ''
     try {
       const updated = await setAttachmentHidden(ownerType, ownerId, a.id, true)
@@ -174,7 +174,7 @@
     }
   }
 
-  async function removeRevision(a, revision) {
+  async function removeRevision(a: { id: number }, revision: number) {
     error = ''
     try {
       await deleteAttachmentRevision(ownerType, ownerId, a.id, revision)
@@ -188,7 +188,7 @@
     }
   }
 
-  async function onAttSelect(action) {
+  async function onAttSelect(action: string) {
     const a = ctxAtt
     if (!a) return
     if (action === 'download') {
@@ -226,13 +226,13 @@
     if (action === 'delete') pendingDelete = { att: a, revision: null }
   }
 
-  function draftsFrom(rows) {
-    const drafts = /** @type {Record<number, string>} */ ({})
+  function draftsFrom(rows: any[]) {
+    const drafts = ({} as Record<number, string>)
     for (const a of rows || []) drafts[a.id] = a.comment || ''
     return drafts
   }
 
-  function applyRows(type, id, rows, { probed = false } = {}) {
+  function applyRows(type: string, id: number, rows: any[], { probed = false } = {}) {
     const next = rows || []
     setAttachmentList(type, id, next, { probed })
     if (type !== ownerType || id !== ownerId) return
@@ -281,14 +281,14 @@
     }
   })
 
-  function formatSize(n) {
+  function formatSize(n: any) {
     const bytes = Number(n) || 0
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  async function sendFiles(files) {
+  async function sendFiles(files: any) {
     const list = [...files].filter(Boolean)
     if (!list.length || uploading) return
     uploading = true
@@ -309,7 +309,7 @@
     }
   }
 
-  async function onVersionPick(event) {
+  async function onVersionPick(event: { currentTarget: { files: any[] } }) {
     const file = event.currentTarget.files?.[0]
     const aid = versionForId
     versionForId = null
@@ -334,17 +334,17 @@
     }
   }
 
-  function onPick(event) {
+  function onPick(event: { currentTarget: { files: any } }) {
     sendFiles(event.currentTarget.files || [])
   }
 
-  function onDrop(event) {
+  function onDrop(event: { preventDefault: () => void; dataTransfer: { files: any } }) {
     event.preventDefault()
     dragOver = false
     sendFiles(event.dataTransfer?.files || [])
   }
 
-  async function saveComment(a) {
+  async function saveComment(a: { id: number; comment: any }) {
     const next = (commentDraft[a.id] ?? '').trim()
     if (next === (a.comment || '')) return
     commentBusy = a.id
@@ -364,7 +364,7 @@
     }
   }
 
-  async function remove(a) {
+  async function remove(a: { id: number }) {
     error = ''
     try {
       await deleteAttachment(ownerType, ownerId, a.id)

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte'
   import Icon from './Icon.svelte'
   import { placePopover, watchPopover } from '../js/popover.ts'
@@ -28,15 +28,23 @@
     disabled = false,
     id = undefined,
     onChange,
+  }: {
+    options: { id: string, label: string, color?: string }[],
+    value?: string,
+    noneLabel?: string,
+    label?: string,
+    disabled?: boolean,
+    id?: string,
+    onChange?: (id: string) => void,
   } = $props()
 
   let open = $state(false)
   let query = $state('')
   let active = $state(0)
-  let triggerEl = $state(/** @type {HTMLButtonElement | null} */ (null))
-  let popEl = $state(/** @type {HTMLDivElement | null} */ (null))
-  let searchEl = $state(/** @type {HTMLInputElement | null} */ (null))
-  let listEl = $state(/** @type {HTMLUListElement | null} */ (null))
+  let triggerEl = $state((null as HTMLButtonElement | null))
+  let popEl = $state((null as HTMLDivElement | null))
+  let searchEl = $state((null as HTMLInputElement | null))
+  let listEl = $state((null as HTMLUListElement | null))
 
   let all = $derived([{ id: '', label: noneLabel, color: '' }, ...options])
   let current = $derived(all.find((o) => o.id === value) ?? all[0])
@@ -65,7 +73,7 @@
     if (refocus) triggerEl?.focus()
   }
 
-  function pick(opt) {
+  function pick(opt: { id: any; label?: string; color?: string }) {
     value = opt.id
     onChange?.(opt.id)
     close()
@@ -76,7 +84,7 @@
     listEl?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
   }
 
-  function onSearchKey(event) {
+  function onSearchKey(event: { key: string; preventDefault: () => void; stopPropagation: () => void }) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       active = Math.min(active + 1, shown.length - 1)
@@ -98,7 +106,7 @@
     }
   }
 
-  function onTriggerKey(event) {
+  function onTriggerKey(event: { key: string; preventDefault: () => void }) {
     if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       event.preventDefault()
       openList()

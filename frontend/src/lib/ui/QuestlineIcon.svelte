@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from './Icon.svelte'
 
   /** @type {{
@@ -12,6 +12,11 @@
     iconUrl = null,
     size = 'md',
     alt = '',
+  }: {
+    icon?: string | null,
+    iconUrl?: string | null,
+    size?: 'sm' | 'md' | 'lg',
+    alt?: string,
   } = $props()
 
   let custom = $derived(Boolean(iconUrl))

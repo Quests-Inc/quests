@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     QUEST_SIGNIFICANCES,
     QUEST_STATUSES,
@@ -53,7 +53,7 @@
     onSaved,
     onDeleted,
     onDraft = null,
-  } = $props()
+  }: { open: boolean, mode: 'create' | 'edit', quest?: any, defaults?: { questline_id?: number | null, category_id?: number | null, description?: string } | null, quests?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (q: any, meta?: { mode: string }) => void, onDeleted?: (id: number) => void, onDraft?: (payload: any) => void } = $props()
 
   let title = $state('')
   let description = $state('')
@@ -73,13 +73,13 @@
   /** Empty string = no questline. */
   let questlineId = $state('')
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let categories = $state([])
+  let categories: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** @type {{ id: number, title: string, category_id?: number | null, color?: string }[]} */
-  let questlines = $state([])
+  let questlines: { id: number, title: string, category_id?: number | null, color?: string }[] = $state([])
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let tagCatalog = $state([])
+  let tagCatalog: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
-  let selectedTags = $state([])
+  let selectedTags: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** Local date YYYY-MM-DD + 24h clock. */
   let deadlineDate = $state('')
   let deadlineHour = $state('12')
@@ -90,7 +90,7 @@
   let deadlineOn = $state(false)
   /** Unchecked = duration_seconds explicitly 0 ("no window", no auto-expire). */
   let windowEnabled = $state(true)
-  let steps = $state(/** @type {ReturnType<typeof questStepDraft>[]} */ ([]))
+  let steps = $state(([] as ReturnType<typeof questStepDraft>[]))
   let saving = $state(false)
   let deleting = $state(false)
   let deleteConfirmOpen = $state(false)
@@ -110,9 +110,9 @@
   const STATUS_OPTIONS = QUEST_STATUSES.map((s) => ({
     id: s,
     label: QUEST_STATUS_LABELS[s] ?? s,
-    kind: /** @type {const} */ ('status'),
+    kind: ('status' as const),
   }))
-  const SIG_OPTIONS = QUEST_SIGNIFICANCES.map((s) => ({ ...s, kind: /** @type {const} */ ('sig') }))
+  const SIG_OPTIONS = QUEST_SIGNIFICANCES.map((s) => ({ ...s, kind: ('sig' as const) }))
 
   let lineOptions = $derived(
     questlines.map((l) => ({ id: String(l.id), label: l.title, color: l.color || '' })),
@@ -153,7 +153,7 @@
     return n ? `${n} ${plural(n, ['шаг', 'шага', 'шагов'])}` : 'нет'
   })
 
-  function applyQuestline(idStr) {
+  function applyQuestline(idStr: string) {
     questlineId = idStr
     if (idStr === '') return
     const line = questlines.find((l) => String(l.id) === idStr)
@@ -161,7 +161,7 @@
     categoryId = line.category_id != null ? String(line.category_id) : ''
   }
 
-  function setDeadlineOn(on) {
+  function setDeadlineOn(on: boolean) {
     deadlineOn = on
     if (on && !deadlineDate) {
       const parts = defaultLocalDeadlineParts()
@@ -171,7 +171,7 @@
     }
   }
 
-  function resetFromQuest(q) {
+  function resetFromQuest(q: { title: string; description: any; status: string; significance: string; pinned: any; overlay_hidden: any; automated: any; sort_order: number; category_id: any; questline_id: any; deadline_at: any; duration_seconds: number; steps: any[]; tags: any[] }) {
     title = q?.title ?? ''
     description = q?.description ?? defaults?.description ?? ''
     status = q?.status ?? 'active'
@@ -202,8 +202,8 @@
     windowEnabled = q?.duration_seconds !== 0
     ;({ hours: durationHours, minutes: durationMinutes } = secondsToParts(q?.duration_seconds))
 
-    steps = q?.steps?.length ? q.steps.map((s) => questStepDraft(s)) : [questStepDraft()]
-    selectedTags = Array.isArray(q?.tags) ? q.tags.map((t) => ({ ...t })) : []
+    steps = q?.steps?.length ? q.steps.map((s: any) => questStepDraft(s)) : [questStepDraft()]
+    selectedTags = Array.isArray(q?.tags) ? q.tags.map((t: any) => ({ ...t })) : []
     secProps = false
     secDeadline = false
     secSteps = true
@@ -237,8 +237,8 @@
   })
 
   /** Sync step list via CRUD (PATCH quest no longer replaces steps[]). */
-  async function syncQuestSteps(questId, desired, existing) {
-    const desiredIds = new Set(desired.filter((s) => s.id != null).map((s) => Number(s.id)))
+  async function syncQuestSteps(questId: number, desired: any[], existing: any) {
+    const desiredIds = new Set(desired.filter((s: { id: null }) => s.id != null).map((s: { id: any }) => Number(s.id)))
     let saved = null
     for (const s of desired) {
       if (s.id == null) continue
@@ -257,7 +257,7 @@
     return saved
   }
 
-  async function onSubmit(event) {
+  async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!title.trim()) {
       formError = 'Нужен заголовок'
@@ -271,7 +271,7 @@
         ? localInputToUtcIso(`${deadlineDate}T${deadlineHour}:${deadlineMinute}`)
         : null
       /** @type {Record<string, any>} */
-      const payload = {
+      const payload: Record<string, any> = {
         title: title.trim(),
         description: description.trim(),
         status,

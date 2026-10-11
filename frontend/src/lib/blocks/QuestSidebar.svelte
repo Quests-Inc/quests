@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte'
   import Icon from '../ui/Icon.svelte'
   import RefText from '../ui/RefText.svelte'
@@ -79,22 +79,54 @@
     onScopeQuestline,
     labels = {},
     onRef,
+  }: {
+    loading: boolean,
+    quests: any[],
+    matchedQuests: any[],
+    listedQuests: any[],
+    byCategory: any[],
+    frozenQuests: any[],
+    frozenOpen: boolean,
+    selectedId: number | null,
+    searchQuery: string,
+    showAllQuests: boolean,
+    onShowAll?: (on: boolean) => void,
+    querySpec: any,
+    parsedSearch: any,
+    categoryOpen: Record<string, boolean>,
+    lineOpen: Record<string, boolean>,
+    nowMs: number,
+    onSelect: (id: number) => void,
+    onTogglePin: (quest: any, event: Event) => void,
+    onQuestContextMenu: (event: MouseEvent, quest: any) => void,
+    onLineContextMenu: (event: MouseEvent, line: any) => void,
+    onToggleCategory: (key: string) => void,
+    onToggleLine: (catKey: string, lineKey: string) => void,
+    onToggleFrozen: () => void,
+    categories: any[],
+    scopeCategoryId: number | null,
+    scopeQuestlineId: number | null,
+    scopeQuestlineOptions: any[],
+    onScopeCategory: (id: number | null) => void,
+    onScopeQuestline: (id: number | null) => void,
+    labels?: Record<string, string>,
+    onRef?: (kind: string, id: number) => void,
   } = $props()
 
-  function onScopeCategoryChange(event) {
+  function onScopeCategoryChange(event: { currentTarget: { value: any } }) {
     const v = event.currentTarget.value
     onScopeCategory(v === '' ? null : Number(v))
   }
-  function onScopeQuestlineChange(event) {
+  function onScopeQuestlineChange(event: { currentTarget: { value: any } }) {
     const v = event.currentTarget.value
     onScopeQuestline(v === '' ? null : Number(v))
   }
 
   /** @type {HTMLElement | null} */
-  let rootEl = $state(null)
+  let rootEl: HTMLElement | null = $state(null)
 
   /** The nearest ancestor that actually scrolls. */
-  function scrollParent(el) {
+  function scrollParent(el: HTMLElement) {
     for (let p = el.parentElement; p; p = p.parentElement) {
       const oy = getComputedStyle(p).overflowY
       if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p
@@ -104,7 +136,7 @@
 
   // A quest picked from elsewhere (a link, a hotkey, the map) may sit far down
   // a long list: bring its row into view, centred, unless it is already visible.
-  let scrolledFor = /** @type {number | null} */ (null)
+  let scrolledFor = (null as number | null)
   $effect(() => {
     const id = selectedId
     // The list may not be there yet when the quest is chosen: re-check as it fills.
@@ -117,7 +149,7 @@
       const row = rootEl?.querySelector('.quest-row--active')
       if (!row) return
       scrolledFor = id
-      const box = scrollParent(/** @type {HTMLElement} */ (row))
+      const box = scrollParent((row as HTMLElement))
       if (!box) return
       const a = row.getBoundingClientRect()
       const b = box.getBoundingClientRect()
@@ -125,11 +157,11 @@
     })
   })
 
-  function isCategoryOpen(key) {
+  function isCategoryOpen(key: string|number) {
     return categoryOpen[key] !== false
   }
 
-  function isLineOpen(catKey, lineKey) {
+  function isLineOpen(catKey: any, lineKey: any) {
     return lineOpen[`${catKey}:${lineKey}`] !== false
   }
 </script>

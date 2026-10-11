@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from './Icon.svelte'
 
   /**
@@ -14,7 +14,13 @@
    *   children?: import('svelte').Snippet,
    * }}
    */
-  let { title, summary = '', open = $bindable(false), aside, children } = $props()
+  let { title, summary = '', open = $bindable(false), aside, children }: {
+    title: string,
+    summary?: string,
+    open?: boolean,
+    aside?: import('svelte').Snippet,
+    children?: import('svelte').Snippet,
+  } = $props()
 </script>
 
 <section class="fsec" class:fsec--open={open}>

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
   import ModalFoot from './ModalFoot.svelte'
@@ -13,7 +13,7 @@
     busy = false,
     onConfirm = () => {},
     onCancel = () => {},
-  } = $props()
+  }: { open?: boolean, title?: string, message?: string, confirmLabel?: string, cancelLabel?: string, busy?: boolean, onConfirm?: () => void, onCancel?: () => void } = $props()
 </script>
 
 <ModalShell {open} onClose={onCancel} labelledby="confirm-modal-title" zIndex={60} maxWidth="24rem" closeDisabled={busy}>

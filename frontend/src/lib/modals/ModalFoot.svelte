@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from '../ui/Icon.svelte'
 
   /** The one dialog footer: secondary/destructive actions on the left
@@ -28,6 +28,17 @@
     busyLabel = '…',
     disabled = false,
     left,
+  }: {
+    onCancel: () => void,
+    cancelLabel?: string,
+    submitLabel: string,
+    submitIcon?: string,
+    submitVariant?: 'accent' | 'danger-solid',
+    onSubmit?: () => void,
+    busy?: boolean,
+    busyLabel?: string,
+    disabled?: boolean,
+    left?: import('svelte').Snippet,
   } = $props()
 </script>
 

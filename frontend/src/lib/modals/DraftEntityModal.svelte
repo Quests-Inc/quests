@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { untrack } from 'svelte'
   import MentionTextarea from '../ui/MentionTextarea.svelte'
   import ModalShell from './ModalShell.svelte'
@@ -17,7 +17,16 @@
    *   onClose: () => void,
    *   onSubmit: (fields: { title: string, description: string }) => void,
    * }} */
-  let { open = false, kind = 'note', initial = null, heading = '', quests = [], notes = [], onClose, onSubmit } = $props()
+  let { open = false, kind = 'note', initial = null, heading = '', quests = [], notes = [], onClose, onSubmit }: {
+    open: boolean,
+    kind: 'note' | 'step' | 'questline',
+    initial?: { title: string, description: string } | null,
+    heading?: string,
+    quests?: any[],
+    notes?: any[],
+    onClose: () => void,
+    onSubmit: (fields: { title: string, description: string }) => void,
+  } = $props()
 
   let title = $state('')
   let description = $state('')
@@ -32,7 +41,7 @@
     })
   })
 
-  function submit(event) {
+  function submit(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (!title.trim()) {
       error = kind === 'step' ? 'Нужно название шага' : 'Нужен заголовок'

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // Signed in but a member of no workspace (e.g. removed from the last one).
   import { createWorkspace, switchWorkspace, logout } from '../js/api.ts'
 
@@ -6,7 +6,7 @@
   let busy = $state(false)
   let error = $state('')
 
-  async function create(event) {
+  async function create(event: { preventDefault: () => void }) {
     event.preventDefault()
     if (busy || !name.trim()) return
     busy = true

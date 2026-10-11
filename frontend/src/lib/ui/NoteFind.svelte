@@ -1,17 +1,17 @@
-<script>
+<script lang="ts">
   import { searchInNote } from '../js/api.ts'
 
   /** Search inside the open note with the notes search's rules (word forms, prefix, other layout…):
    * the server says which words matched, this marks them in the rendered text and steps through them.
    * @type {{ noteId: number, container: HTMLElement | null, dep?: string, onClose: () => void }} */
-  let { noteId, container, dep = '', onClose } = $props()
+  let { noteId, container, dep = '', onClose }: { noteId: number, container: HTMLElement | null, dep?: string, onClose: () => void } = $props()
 
   let q = $state('')
-  let ranges = $state(/** @type {Range[]} */ ([]))
+  let ranges = $state(([] as Range[]))
   let cur = $state(0)
   let error = $state('')
-  let inputEl = $state(/** @type {HTMLInputElement | null} */ (null))
-  let terms = /** @type {string[]} */ ([])
+  let inputEl = $state((null as HTMLInputElement | null))
+  let terms = ([] as string[])
   let seq = 0
   let timer = 0
 
@@ -29,7 +29,7 @@
     }
   }
 
-  function esc(s) {
+  function esc(s: string) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
@@ -54,7 +54,7 @@
     ranges = out
   }
 
-  function paint(scroll) {
+  function paint(scroll: boolean) {
     clearMarks()
     if (ranges.length === 0) return
     if (cur >= ranges.length) cur = 0
@@ -65,7 +65,7 @@
     if (scroll) ranges[cur].startContainer.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
 
-  async function run(scroll) {
+  async function run(scroll: boolean) {
     const query = q.trim()
     const mine = ++seq
     if (!query) {
@@ -106,13 +106,13 @@
     clearMarks()
   })
 
-  function step(d) {
+  function step(d: number) {
     if (ranges.length === 0) return
     cur = (cur + d + ranges.length) % ranges.length
     paint(true)
   }
 
-  function onKey(e) {
+  function onKey(e: { key: string; preventDefault: () => void; shiftKey: any }) {
     if (e.key === 'Enter') {
       e.preventDefault()
       step(e.shiftKey ? -1 : 1)

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // Opened from an invitation link (?invite=…). Joins the workspace with the
   // current account, or signs up a new account through the link.
   import { onMount } from 'svelte'
@@ -6,9 +6,9 @@
   import LoginScreen from './LoginScreen.svelte'
 
   /** @type {{ token: string }} */
-  let { token } = $props()
+  let { token }: { token: string } = $props()
 
-  let info = $state(/** @type {{ workspace: string, authenticated: boolean } | null} */ (null))
+  let info = $state((null as { workspace: string, authenticated: boolean } | null))
   let invalid = $state(false)
   let wantLogin = $state(false)
   let username = $state('')
@@ -29,7 +29,7 @@
     location.replace('/')
   }
 
-  async function join(event) {
+  async function join(event: { preventDefault: () => void }) {
     event?.preventDefault()
     if (busy) return
     busy = true

@@ -48,7 +48,7 @@ hljs.registerLanguage('yaml', yaml)
 hljs.registerLanguage('yml', yaml)
 
 /** Canonical language id for CSS / data-lang (aliases → primary). */
-const LANG_CANON = {
+const LANG_CANON: Record<string, string> = {
   sh: 'bash',
   shell: 'bash',
   zsh: 'bash',

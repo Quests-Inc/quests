@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { createTag } from '../js/api.ts'
   import { buildSuggestIndex, suggestTags } from '../js/suggest.ts'
 
@@ -23,6 +23,15 @@
     enabled = true,
     onChange,
     onCatalog = null,
+  }: {
+    catalog?: { id: number, slug: string, label: string, color?: string }[],
+    value?: { id: number, slug: string, label: string, color?: string }[],
+    title?: string,
+    description?: string,
+    quests?: any[],
+    enabled?: boolean,
+    onChange: (tags: { id: number, slug: string, label: string, color?: string }[]) => void,
+    onCatalog?: (tags: { id: number, slug: string, label: string, color?: string }[]) => void,
   } = $props()
 
   let draft = $state('')
@@ -48,7 +57,7 @@
     if (!q && !raw) return []
     const taken = new Set(selected.map((t) => t.id))
     /** @type {{ tag: any, rank: number }[]} */
-    const out = []
+    const out: { tag: any, rank: number }[] = []
     for (const c of catalog) {
       if (taken.has(c.id)) continue
       const slug = String(c.slug || '').toLowerCase()
@@ -68,7 +77,7 @@
     active = -1
   })
 
-  function normalizeSlug(raw) {
+  function normalizeSlug(raw: string) {
     return String(raw || '')
       .trim()
       .toLowerCase()
@@ -79,7 +88,7 @@
       .replace(/^-|-$/g, '')
   }
 
-  function findInCatalog(token) {
+  function findInCatalog(token: string) {
     const t = token.trim()
     if (!t) return null
     const slug = normalizeSlug(t)
@@ -89,7 +98,7 @@
     return catalog.find((c) => String(c.label || '').toLowerCase() === low) || null
   }
 
-  async function resolveToken(token) {
+  async function resolveToken(token: string) {
     const t = token.trim()
     if (!t) return null
     if (selected.length >= MAX) {
@@ -118,7 +127,7 @@
     return tag
   }
 
-  async function onInput(e) {
+  async function onInput(e: { currentTarget: { value: any } }) {
     err = ''
     const v = e.currentTarget.value
     if (!v.includes(',')) {
@@ -137,7 +146,7 @@
     if (next.length !== selected.length) onChange(next)
   }
 
-  async function onKeydown(e) {
+  async function onKeydown(e: { key: string; preventDefault: () => void; stopPropagation: () => void }) {
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && matches.length) {
       e.preventDefault()
       const n = matches.length
@@ -160,18 +169,18 @@
     }
   }
 
-  function remove(id) {
+  function remove(id: number) {
     onChange(selected.filter((t) => t.id !== id))
   }
 
   /** Accept a typed match: clears the draft so the next tag can be typed. */
-  function pick(tag) {
+  function pick(tag: { id: any; slug?: string; label?: string; color?: string }) {
     acceptHint(tag)
     draft = ''
     active = -1
   }
 
-  function acceptHint(tag) {
+  function acceptHint(tag: { id: any; slug?: string; label?: string; color?: string }) {
     if (selected.length >= MAX) {
       err = `Не больше ${MAX} тегов`
       return

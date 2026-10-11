@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   /** Shared backdrop + dialog + Escape-close wrapper used by every modal.
    * The dialog's own look, and the chrome/form primitives inside it, live in
    * styles/modal.css (scoped under .modal) rather than being copied into
@@ -22,11 +22,20 @@
     closeDisabled = false,
     dialogClass = '',
     children,
+  }: {
+    open: boolean,
+    onClose: () => void,
+    labelledby: string,
+    zIndex?: number,
+    maxWidth?: string,
+    closeDisabled?: boolean,
+    dialogClass?: string,
+    children?: import('svelte').Snippet,
   } = $props()
 
   $effect(() => {
     if (!open) return
-    const onKey = (event) => {
+    const onKey = (event: { key: string; target: { closest: (arg0: string) => any }; preventDefault: () => void; stopPropagation: () => void }) => {
       if (event.key !== 'Escape') return
       // A popover inside the dialog (picker list, help tip) closes itself on
       // Escape; this capture-phase listener runs first, so it has to step
@@ -40,7 +49,7 @@
     return () => window.removeEventListener('keydown', onKey, true)
   })
 
-  function onBackdrop(event) {
+  function onBackdrop(event: { target: any; currentTarget: any }) {
     if (closeDisabled) return
     if (event.target === event.currentTarget) onClose()
   }
