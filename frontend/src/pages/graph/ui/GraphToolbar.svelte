@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ComponentProps } from 'svelte'
   import { ENTITY_LABELS, ENTITY_TYPES, EDGES, LAYOUTS, TYPES } from '@/entities/graph'
   import { ENTITY_SPEC } from '@/entities/quest'
   import { QUEST_STATUSES, QUEST_STATUS_LABELS } from '@/shared/api/client.ts'
@@ -31,7 +32,7 @@
     depth?: number
     showEdge?: Record<string, boolean>
     matches: { type: string; id: number; title: string }[]
-    rootParsed: any
+    rootParsed: ComponentProps<typeof FlagHints>['parsed']
     statusLabel: string
     filteredOut: number
     questStatuses: Set<string>

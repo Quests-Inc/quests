@@ -564,7 +564,7 @@
   }
 
   /** Open only the links of one type of a card. */
-  function openMore(n: { key: string; more: { [x: string]: string|any[] } }, type: string|number) {
+  function openMore(n: { key: string; more?: { [x: string]: string|any[] } }, type: string|number) {
     const back = hiddenAdj.get(n.key)?.[type]
     if (back?.length) {
       const next = new Set(hidden)
@@ -1478,7 +1478,7 @@
   }
 
   /** What can be done to a line itself (nothing for plain ownership of steps and files). */
-  function edgeActions(e: { draft: string; from: string; to: string; kind: string }) {
+  function edgeActions(e: { draft?: string; from: string; to: string; kind: string }) {
     if (e.draft === 'remove' || !e.from || !e.to) return []
     if (e.kind === 'reference') return [{ id: 'edge-unref', label: 'Разорвать ссылку' }]
     if (e.kind === 'dependency' && e.from.startsWith('step:') && e.to.startsWith('step:')) {
@@ -1808,7 +1808,7 @@
     (null as { key: string, title: string, text: string, orig: { title: string, description: string }, opId: number | null, payload?: any, fresh?: boolean } | null),
   )
 
-  async function startEditNote(n: { key: any; draft: any; op: any; title: any; id?: any }, fresh = false) {
+  async function startEditNote(n: { key: any; draft?: any; op?: any; title: any; id?: any }, fresh = false) {
     if (editing?.key === n.key) return
     try {
       if (n.draft) {

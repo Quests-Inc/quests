@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { EDGES } from '@/entities/graph'
+  import { EDGES, type GraphEdgeView, type GraphNodeView } from '@/entities/graph'
 
   /** Слой рёбер карты: линии со стрелками, зоны клика для меню и «резинка» режима связывания. */
   let {
@@ -10,12 +10,12 @@
     edgeActions,
     onEdgeCtx,
   }: {
-    drawEdges: any[]
+    drawEdges: GraphEdgeView[]
     linking: { anchor: string; mode: string } | null
-    nodeMap: Map<string, any>
+    nodeMap: Map<string, GraphNodeView>
     linkCursor: { x: number; y: number }
-    edgeActions: (e: any) => unknown[]
-    onEdgeCtx: (ev: MouseEvent, e: any) => void
+    edgeActions(e: GraphEdgeView): unknown[]
+    onEdgeCtx: (ev: MouseEvent, e: GraphEdgeView) => void
   } = $props()
 </script>
 

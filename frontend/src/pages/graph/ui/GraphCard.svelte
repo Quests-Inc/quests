@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CARD, ENTITY_LABELS, SQUARE, TYPES } from '@/entities/graph'
+  import { CARD, ENTITY_LABELS, SQUARE, TYPES, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
   import { QuestlineIcon } from '@/entities/questline'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
@@ -34,7 +34,7 @@
     onOpenMore,
     onShowChanges,
   }: {
-    n: any
+    n: GraphNodeView
     selected?: boolean
     root?: boolean
     done?: boolean
@@ -50,17 +50,17 @@
     tier?: string
     more?: { type: string; count: number }[]
     changed?: boolean
-    editing?: any
-    onCardDown: (e: PointerEvent, n: any) => void
-    onCtx: (e: MouseEvent, n: any) => void
-    onStartEdit: (n: any) => void
+    editing?: GraphNoteEditing | null
+    onCardDown: (e: PointerEvent, n: GraphNodeView) => void
+    onCtx: (e: MouseEvent, n: GraphNodeView) => void
+    onStartEdit(n: GraphNodeView): void
     onFinishEdit: (save: boolean) => void
     onOpen?: (kind: string, id: number) => void
-    onOpenMore: (n: any, type: string) => void
+    onOpenMore(n: GraphNodeView, type: string): void
     onShowChanges: (key: string) => void
   } = $props()
 
-const autofocusIf = (node: { focus: () => void }, on: any) => {
+const autofocusIf = (node: { focus: () => void }, on: unknown) => {
   if (on) node.focus()
 }
 
@@ -220,7 +220,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         {/if}
       </div>
 
-{#snippet glyph(n: any, t: any)}
+{#snippet glyph(n: GraphNodeView, t: { color: string; glyph: string })}
 {#if (n.type === 'quest' || n.type === 'note' || n.type === 'questline') && (n.icon || n.icon_url)}
   <span class="gcard__icon" style:--line-color={n.color || t.color}>
     <QuestlineIcon icon={n.icon || 'document'} iconUrl={n.icon_url || null} size="sm" />

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TYPES } from '@/entities/graph'
+  import { TYPES, type GraphGroupView } from '@/entities/graph'
   import Icon from '@/shared/ui/Icon.svelte'
 
   /** Шары групп на карте: рамка вокруг вложений одного владельца; раскрытый кластер можно свернуть обратно. */
@@ -10,10 +10,10 @@
     onGroupCtx,
     onCollapse,
   }: {
-    groups: any[]
-    collapseKey: (g: any) => string | null
-    onGroupDown: (e: PointerEvent, g: any) => void
-    onGroupCtx: (e: MouseEvent, g: any) => void
+    groups: GraphGroupView[]
+    collapseKey: (g: GraphGroupView) => string | null
+    onGroupDown: (e: PointerEvent, g: GraphGroupView) => void
+    onGroupCtx: (e: MouseEvent, g: GraphGroupView) => void
     onCollapse: (key: string) => void
   } = $props()
 </script>
