@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/uuid"
 
-	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
-	"github.com/valirum/quests/go/internal/pdfdoc"
-	"github.com/valirum/quests/go/internal/store"
+	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/pdfdoc"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // pdfSlots bounds concurrent renders: each is CPU- and memory-heavy.

@@ -1,8 +1,8 @@
 package knowledgehttp
 
 import (
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 // Response shapes of the knowledge endpoints (the ones the web client needs types for).

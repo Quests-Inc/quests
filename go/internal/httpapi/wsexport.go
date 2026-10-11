@@ -21,10 +21,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/valirum/quests/go/internal/identity"
-	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/identity"
+	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // Workspace archive (quest=349): a zip with

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // Scanner is what *sql.Row and *sql.Rows share.

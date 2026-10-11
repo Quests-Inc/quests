@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	automationhttp "github.com/valirum/quests/go/internal/automation/http"
-	"github.com/valirum/quests/go/internal/schedule"
+	"github.com/quests-inc/quests/go/internal/automation"
+	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
+	"github.com/quests-inc/quests/go/internal/schedule"
 )
 
 // automationHTTP is the automation context's HTTP face, wired to this server (built on first use). What belongs to

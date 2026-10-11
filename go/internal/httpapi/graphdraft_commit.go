@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/refs"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 type draftProblem struct {

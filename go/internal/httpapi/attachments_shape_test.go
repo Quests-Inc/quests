@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/knowledge"
-	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
 )
 
 // The web client reads these keys by name: the shape of an attachment on the wire is part of the API.

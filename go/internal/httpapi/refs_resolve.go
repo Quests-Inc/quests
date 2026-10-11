@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 // The helpers below cross contexts (a mention can point at a quest, a note, a template…), so they stay in the root.

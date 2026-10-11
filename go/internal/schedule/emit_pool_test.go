@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func openEmitPoolDB(t *testing.T) *store.Store {

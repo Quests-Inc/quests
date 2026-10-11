@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 )
 
 func openTagTestDB(t *testing.T) *Store {

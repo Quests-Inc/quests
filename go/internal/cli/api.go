@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/valirum/quests/go/internal/platform/apiclient"
+	"github.com/quests-inc/quests/go/internal/platform/apiclient"
 )
 
 // The API client lives in platform/apiclient (shared with the assistant); the command line keeps its own names.

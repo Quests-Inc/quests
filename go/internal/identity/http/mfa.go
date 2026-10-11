@@ -12,8 +12,8 @@ import (
 	"encoding/base64"
 	"sync"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
 )
 
 // Two-factor sign-in (quest=359). Password first; an account with a second factor gets a

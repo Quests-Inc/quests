@@ -13,8 +13,8 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // SafeFilename keeps the original name for humans but strips anything that

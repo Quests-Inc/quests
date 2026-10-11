@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // Reading signals for ranking notes (quest=353).

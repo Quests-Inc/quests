@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // ErrCommandOwner is returned when a member (not an owner) sets a command.

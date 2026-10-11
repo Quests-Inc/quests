@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // emitJobValidFor is how long an emit_pool_command may wait for its device.

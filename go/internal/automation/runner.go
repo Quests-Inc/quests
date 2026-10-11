@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/platform/db"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/tokens"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/db"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/tokens"
 )
 
 // Runner is a device that executes checks for us. It registers once with a

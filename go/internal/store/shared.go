@@ -1,9 +1,9 @@
 package store
 
 import (
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/platform/apperr"
-	"github.com/valirum/quests/go/internal/platform/dbx"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/dbx"
 )
 
 // The helpers and errors below moved to platform/dbx, platform/apperr and kernel (ADR-0001) so that the contexts

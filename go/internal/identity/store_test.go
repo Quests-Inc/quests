@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/pgtest"
-	"github.com/valirum/quests/go/internal/platform/tokens"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/tokens"
 )
 
 // newTestStore is a Store on a fresh PostgreSQL database with the real schema, set up

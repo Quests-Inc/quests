@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/journal"
-	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/journal"
+	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func (s *Server) registerDomainRoutes(mux *http.ServeMux) {

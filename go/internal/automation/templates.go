@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // TemplateRead is a quest template as the API sends it.

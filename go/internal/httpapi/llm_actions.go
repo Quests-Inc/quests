@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/llmassist"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/llmassist"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // registerLLMActions wires the web-form path for the LLM action-batch

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/health"
-	"github.com/valirum/quests/go/internal/platform/pgtest"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/health"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func testMetrics(t *testing.T) *Metrics {

@@ -7,8 +7,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/ratelimit"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/ratelimit"
 )
 
 // Handler serves the identity endpoints.

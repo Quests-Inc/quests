@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/valirum/quests/go/internal/cli"
+	"github.com/quests-inc/quests/go/internal/cli"
 )
 
 func main() {

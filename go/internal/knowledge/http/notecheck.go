@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/apperr"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // A note's check (quest=370): set and trigger. The verdict itself comes from the scheduler.

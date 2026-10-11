@@ -1,18 +1,18 @@
 #!/bin/bash
-# Daily backup of the monitoring volumes (quest=345): Uptime Kuma (probes, history, accounts, 2FA)
-# and Grafana (users, preferences). Prometheus is left out on purpose: its 90-day history is large
-# and rebuilds itself; the dashboard and data source come from the repo.
+# Daily backup of the Grafana volume (quest=345): users and preferences. Prometheus is left out on
+# purpose: its 90-day history is large and rebuilds itself; the dashboard and data source come from
+# the repo.
 #
-# SQLite inside the volumes is only consistent when nothing writes to it, so each service is stopped
-# for the few seconds the tar takes (Kuma shows a one-minute gap in its own history).
+# SQLite inside the volume is only consistent when nothing writes to it, so Grafana is stopped for
+# the few seconds the tar takes.
 #
 # Cron (user crontab on the server):
 #   30 4 * * *  $HOME/Documents/projects/quests/deploy/docker/backup-monitoring.sh >> $HOME/backup-monitoring.log 2>&1
 #
 # Restore (service stopped):
-#   docker stop quests-kuma
-#   docker run --rm -v quests_kuma-data:/data -v "$PWD":/b alpine:3.20 sh -c 'rm -rf /data/* && tar -xzf /b/kuma-<ts>.tar.gz -C /data'
-#   docker start quests-kuma
+#   docker stop quests-grafana
+#   docker run --rm -v quests_grafana-data:/data -v "$PWD":/b alpine:3.20 sh -c 'rm -rf /data/* && tar -xzf /b/grafana-<ts>.tar.gz -C /data'
+#   docker start quests-grafana
 set -uo pipefail
 OUT="${BACKUP_DIR:-$HOME/QuestsBackups-monitoring}"
 KEEP="${KEEP:-14}"
@@ -43,7 +43,6 @@ backup_one() {
   ls -1t "$OUT/$1"-*.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f
 }
 
-backup_one kuma kuma-data
 backup_one grafana grafana-data
 
 if ssh -o BatchMode=yes -o ConnectTimeout=5 "$REMOTE" "mkdir -p '$REMOTE_DIR'" 2>/dev/null; then

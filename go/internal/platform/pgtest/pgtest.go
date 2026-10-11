@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/db"
+	"github.com/quests-inc/quests/go/internal/platform/db"
 )
 
 const (

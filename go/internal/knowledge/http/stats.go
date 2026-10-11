@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/valirum/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/knowledge"
 )
 
 // countRead feeds the reading signal (quest=353): only the web UI (a person) and MCP (an agent)

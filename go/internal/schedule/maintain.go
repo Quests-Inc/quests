@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 const PollInterval = 15 * time.Second

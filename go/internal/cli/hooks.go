@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/valirum/quests/go/internal/platform/hooks"
+	"github.com/quests-inc/quests/go/internal/platform/hooks"
 )
 
 type Hook = hooks.Hook

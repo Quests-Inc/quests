@@ -14,13 +14,13 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/knowledge"
-	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // dropStagedFiles deletes the WebDAV copies of uploads among ids.

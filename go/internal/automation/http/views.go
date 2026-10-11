@@ -1,6 +1,6 @@
 package automationhttp
 
-import "github.com/valirum/quests/go/internal/automation"
+import "github.com/quests-inc/quests/go/internal/automation"
 
 // RunnerView is a runner as the settings page shows it.
 type RunnerView struct {

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // TestPatchQuestCategoryFollowsQuestline covers the drift bug: manually

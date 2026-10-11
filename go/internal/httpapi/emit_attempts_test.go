@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 )
 
 func TestListEmitAttemptsEndpoint(t *testing.T) {

@@ -89,6 +89,6 @@ Run it against a **scratch** instance: it creates a workspace, an attacker accou
 - Tables without row-level security (`appuser`, `usersession`, `apitoken`, `workspace*`, `backuplog`) are readable by the
   API role (it must read password hashes to check logins): only an SQL injection could reach them. No injection is
   known; every dynamic identifier is validated. What the API role can no longer *change* is listed under "Grants".
-- No per-account storage quota for attachments; two-factor sign-in is optional (a policy that requires it for workspace owners is not built); Grafana/Kuma have their own logins only.
+- No per-account storage quota for attachments; two-factor sign-in is optional (a policy that requires it for workspace owners is not built); Grafana has its own login only.
 - `X-Forwarded-For` is trusted for throttling (the gateway rewrites it; a client on the LAN could forge it — the
   per-login stall covers that).

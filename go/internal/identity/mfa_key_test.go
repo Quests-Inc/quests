@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/pgtest"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/secretbox"
 )
 
 func newBox(t *testing.T) *secretbox.Box {

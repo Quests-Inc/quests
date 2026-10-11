@@ -3,8 +3,8 @@ package store
 import (
 	"database/sql"
 
-	"github.com/valirum/quests/go/internal/platform/apperr"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/secretbox"
 )
 
 // ErrNotFound is the shared "no such thing" error (platform/apperr).

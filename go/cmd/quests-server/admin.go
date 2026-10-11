@@ -14,17 +14,17 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/httpapi"
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/config"
-	"github.com/valirum/quests/go/internal/platform/db"
-	"github.com/valirum/quests/go/internal/platform/health"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
-	"github.com/valirum/quests/go/internal/platform/webdav"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/schedule"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/httpapi"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/config"
+	"github.com/quests-inc/quests/go/internal/platform/db"
+	"github.com/quests-inc/quests/go/internal/platform/health"
+	"github.com/quests-inc/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/schedule"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 const adminUsage = `quests-server admin commands (run on the host with access to the database):

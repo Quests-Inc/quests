@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // The relations map is edited through a draft: an ordered log of operations

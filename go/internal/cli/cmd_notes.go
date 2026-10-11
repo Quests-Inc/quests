@@ -3,7 +3,7 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"github.com/valirum/quests/go/internal/platform/apiclient"
+	"github.com/quests-inc/quests/go/internal/platform/apiclient"
 	"strconv"
 	"strings"
 )

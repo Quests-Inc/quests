@@ -146,7 +146,7 @@ pull-prod-data *args:
     API_CONTAINER="${QUESTS_PROD_CONTAINER:-quests-api}"
     PG_CONTAINER="${QUESTS_PROD_PG_CONTAINER:-quests-postgres}"
     LOCAL_PG="${QUESTS_LOCAL_PG_CONTAINER:-quests-pg-dev}"
-    IMAGE="${QUESTS_API_IMAGE:-ghcr.io/valirum/quests-api:main}"
+    IMAGE="${QUESTS_API_IMAGE:-ghcr.io/quests-inc/quests-api:0.1.1}"
 
     START=0
     PULL_IMAGE=0
@@ -167,7 +167,7 @@ pull-prod-data *args:
       QUESTS_PROD_PG_CONTAINER  postgres container on prod, default: quests-postgres
       QUESTS_LOCAL_PG_CONTAINER local dev postgres, default: quests-pg-dev
       QUESTS_DATA_DIR           default: <repo>/data
-      QUESTS_API_IMAGE          default: ghcr.io/valirum/quests-api:main
+      QUESTS_API_IMAGE          default: ghcr.io/quests-inc/quests-api:0.1.1
     DOC
           exit 0
           ;;

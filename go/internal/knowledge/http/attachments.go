@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
 )
 
 func (h *Handler) RegisterAttachments(mux *http.ServeMux) {

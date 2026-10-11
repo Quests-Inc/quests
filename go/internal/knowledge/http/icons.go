@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
 )
 
 func noteCustomIcon(n knowledge.Note) string {

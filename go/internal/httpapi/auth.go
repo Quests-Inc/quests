@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/ratelimit"
-	"github.com/valirum/quests/go/internal/platform/tokens"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/ratelimit"
+	"github.com/quests-inc/quests/go/internal/platform/tokens"
 )
 
 // SessionCookie holds the opaque session secret for the SPA.

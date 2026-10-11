@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/valirum/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/automation"
 )
 
 // secretKeyPattern matches a valid env var name — secrets are injected into a

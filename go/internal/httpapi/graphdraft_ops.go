@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // passOf orders the creating ops: containers first, then what lives in them.

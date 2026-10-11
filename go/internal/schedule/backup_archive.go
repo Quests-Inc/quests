@@ -14,8 +14,8 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/valirum/quests/go/internal/platform/webdav"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // attachmentsArchiveName derives the sidecar archive name from the DB snapshot

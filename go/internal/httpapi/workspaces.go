@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // WorkspaceHeader lets a client pick one of its workspaces per request. Tokens

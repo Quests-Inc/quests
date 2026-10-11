@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/schedule"
+	"github.com/quests-inc/quests/go/internal/schedule"
 )
 
 func TestParseWeekdaysPythonStyle(t *testing.T) {
