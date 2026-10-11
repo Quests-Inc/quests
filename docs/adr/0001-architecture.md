@@ -78,7 +78,7 @@ go/cmd/*                сборка зависимостей (composition root)
 
 ### 4. Проверка границ
 
-- Go: правила импортов в CI (`depguard` в golangci-lint либо `go-arch-lint`). Нарушения, существующие на дату решения (`store → auth`, `llmassist → cli`, `metrics → store`, `events → hooks`), перечисляются исключениями и удаляются подзадачами; новых нарушений правила не допускают.
+- Go: правила импортов — `depguard` в `go/.golangci.yml` (раздел `linters.settings.depguard`), гоняются в CI вместе с остальным `golangci-lint`; тестовые файлы из правил исключены. Нарушения, существующие на дату решения (`store → auth`, `llmassist → cli`, `metrics → store`, `events → hooks`), перечисляются исключениями и удаляются подзадачами; новых нарушений правила не допускают.
 - Фронтенд: `steiger` разбирает файлы через компилятор TypeScript и, вероятнее всего, не видит `.svelte`. **Это не проверено:** первый шаг — спайк; запасной путь — `dependency-cruiser` или `no-restricted-imports` в oxlint.
 
 ## Порядок внедрения
