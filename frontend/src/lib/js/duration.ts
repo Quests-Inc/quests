@@ -9,7 +9,7 @@ export function secondsToParts(seconds: number | null | undefined) {
 }
 
 /** Empty/zero on both → null ("not set"). */
-export function partsToSeconds(hours, minutes) {
+export function partsToSeconds(hours: any, minutes: any) {
   const h = Number(hours)
   const m = Number(minutes)
   const hh = Number.isFinite(h) ? Math.max(0, h) : 0
@@ -19,7 +19,7 @@ export function partsToSeconds(hours, minutes) {
 }
 
 /** "2 ч", "1 ч 30 мин", "45 мин"; '' when unset. */
-export function durationLabel(hours, minutes) {
+export function durationLabel(hours: any, minutes: any) {
   const total = partsToSeconds(hours, minutes)
   if (!total) return ''
   const h = Math.floor(total / 3600)
@@ -29,7 +29,7 @@ export function durationLabel(hours, minutes) {
 }
 
 /** Russian noun agreement: plural(3, ['шаг', 'шага', 'шагов']) → "шага". */
-export function plural(n, [one, few, many]) {
+export function plural(n: number, [one, few, many]: any) {
   const a = Math.abs(n) % 100
   const b = a % 10
   if (a > 10 && a < 20) return many

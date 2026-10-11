@@ -28,11 +28,11 @@ export function refHref(kind: string, id: number) {
   return `?${kind}=${id}`
 }
 
-function escapeHtml(s) {
+function escapeHtml(s: string) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function escapeAttr(s) {
+function escapeAttr(s: string) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;')
 }
 

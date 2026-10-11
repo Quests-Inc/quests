@@ -13,7 +13,25 @@
 
 const TOKEN = /(^|\s)(-?)([\p{L}]+):([^\s]*)/giu
 
-function resolve(def, name) {
+export type FlagValue = { id: string; label: string; aliases?: string[] }
+/** One filter flag (`status:done`): which values it takes and how an item is tested against one. */
+export type FlagDef = {
+  label: string
+  values?: FlagValue[]
+  /** every value must match (default: any of them) */
+  all?: boolean
+  hint?: string
+  test: (item: any, value: string) => boolean
+}
+export type FlagSpec = Record<string, FlagDef>
+export type ParsedQuery = {
+  text: string
+  terms: { key: string; value: string; neg: boolean }[]
+  unknown: string[]
+  active: boolean
+}
+
+function resolve(def: FlagDef, name: string) {
   if (!def.values) return name
   const key = name.toLowerCase()
   for (const v of def.values) {
@@ -23,9 +41,9 @@ function resolve(def, name) {
 }
 
 /** → { text, terms: [{key, value, neg}], unknown: ['key:value'…], active } */
-export function parseQuery(raw, spec) {
-  const terms = []
-  const unknown = []
+export function parseQuery(raw: string, spec: FlagSpec) {
+  const terms: { key: any; value: any; neg: boolean }[] = []
+  const unknown: string[] = []
   const text = String(raw ?? '')
     .replace(TOKEN, (m, lead, neg, key, name) => {
       const k = key.toLowerCase()
@@ -43,16 +61,16 @@ export function parseQuery(raw, spec) {
 }
 
 /** The positive values of one key, in the order typed. */
-export function tokenValues(parsed, key) {
-  return parsed.terms.filter((t) => t.key === key && !t.neg).map((t) => t.value)
+export function tokenValues(parsed: ParsedQuery, key: string) {
+  return parsed.terms.filter((t: { key: any; neg: any }) => t.key === key && !t.neg).map((t: { value: any }) => t.value)
 }
 
-export function hasToken(parsed, key, value) {
-  return parsed.terms.some((t) => t.key === key && !t.neg && t.value === value)
+export function hasToken(parsed: ParsedQuery, key: string, value: string) {
+  return parsed.terms.some((t: { key: any; neg: any; value: any }) => t.key === key && !t.neg && t.value === value)
 }
 
 /** Does the item pass every filter of the parsed query? */
-export function passes(parsed, spec, item) {
+export function passes(parsed: ParsedQuery, spec: FlagSpec, item: any) {
   if (!parsed.terms.length) return true
   const byKey = new Map()
   for (const t of parsed.terms) {
@@ -66,7 +84,7 @@ export function passes(parsed, spec, item) {
   }
   for (const [key, vals] of byKey) {
     const def = spec[key]
-    const ok = def.all ? vals.every((v) => def.test(item, v)) : vals.some((v) => def.test(item, v))
+    const ok = def.all ? vals.every((v: any) => def.test(item, v)) : vals.some((v: any) => def.test(item, v))
     if (!ok) return false
   }
   return true
@@ -74,24 +92,24 @@ export function passes(parsed, spec, item) {
 
 /** Rewrite the query so that `key` has exactly these positive values (none removes the key's tokens).
  *  Negative tokens of the key are kept. Free text and other tokens are untouched. */
-export function setToken(raw, key, values) {
-  const list = (values ?? []).filter((v) => v !== '' && v != null)
+export function setToken(raw: string, key: string, values: string[] | null | undefined) {
+  const list = (values ?? []).filter((v: string) => v !== '' && v != null)
   const kept = String(raw ?? '')
     .replace(TOKEN, (m, lead, neg, k, name) => (!neg && k.toLowerCase() === key && name ? lead : m))
     .replace(/\s+/g, ' ')
     .trim()
-  const add = list.map((v) => `${key}:${v}`).join(' ')
+  const add = list.map((v: any) => `${key}:${v}`).join(' ')
   return [kept, add].filter(Boolean).join(' ') + (add ? ' ' : '')
 }
 
 /** Toggle one value of a key on/off in the query. */
-export function toggleToken(raw, parsed, key, value) {
+export function toggleToken(raw: string, parsed: ParsedQuery, key: string, value: string) {
   const cur = tokenValues(parsed, key)
-  return setToken(raw, key, cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value])
+  return setToken(raw, key, cur.includes(value) ? cur.filter((v: any) => v !== value) : [...cur, value])
 }
 
 /** Values to offer while the caret sits in an unfinished `key:part` token (null = nothing to offer). */
-export function suggestions(raw, spec) {
+export function suggestions(raw: string, spec: FlagSpec) {
   const m = /(^|\s)(-?)([\p{L}]+):([^\s]*)$/iu.exec(String(raw ?? ''))
   if (!m) return null
   const def = spec[m[3].toLowerCase()]
@@ -104,7 +122,7 @@ export function suggestions(raw, spec) {
 }
 
 /** The query with its unfinished token completed to `value`. */
-export function completeToken(raw, key, value, neg) {
+export function completeToken(raw: string, key: string, value: string, neg?: boolean) {
   return String(raw ?? '').replace(/(^|\s)(-?)([\p{L}]+):([^\s]*)$/iu, `$1${neg ? '-' : ''}${key}:${value} `)
 }
 

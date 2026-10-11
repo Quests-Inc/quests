@@ -99,11 +99,11 @@ function highlightFence(code: string, lang: string) {
   return escapeHtml(src)
 }
 
-function escapeHtml(s) {
+function escapeHtml(s: string) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function escapeAttr(s) {
+function escapeAttr(s: any) {
   return String(s).replace(/[^a-z0-9_+-]/gi, '')
 }
 
@@ -188,7 +188,7 @@ function ensureLinkHook() {
   })
 }
 
-function splitCode(src) {
+function splitCode(src: string) {
   return String(src || '').split(/(```[\s\S]*?```|`[^`]+`)/)
 }
 
@@ -214,7 +214,7 @@ function linkifyRefs(source: string, opts: { labels?: Record<string, string> } =
 }
 
 /** Render markdown to sanitized HTML. Journal refs become in-app `?kind=id` links. */
-export function renderMarkdown(source, opts = {}) {
+export function renderMarkdown(source: any, opts = {}) {
   const text = String(source ?? '')
   if (!text.trim()) return ''
   const dirty = marked.parse(linkifyRefs(text, opts), { async: false })

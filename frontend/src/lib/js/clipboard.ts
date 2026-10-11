@@ -1,5 +1,5 @@
 /** Copy plain text; works on HTTP (non-secure) where Clipboard API is missing. */
-export async function copyText(text) {
+export async function copyText(text: any) {
   const value = String(text ?? '')
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(value)

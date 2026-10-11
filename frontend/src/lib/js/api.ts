@@ -566,7 +566,7 @@ export function renameWorkspace(id: number, name: string) {
 }
 
 /** Hides the workspace now and purges it after a grace period; `confirm` must be its exact name. */
-export function deleteWorkspace(id: number, confirm: boolean) {
+export function deleteWorkspace(id: number, confirm: string) {
   return request(`/api/workspaces/${id}`, { method: 'DELETE', body: JSON.stringify({ confirm }) })
 }
 

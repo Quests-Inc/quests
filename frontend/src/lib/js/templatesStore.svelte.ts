@@ -7,7 +7,7 @@ import { listTemplates } from './api.ts'
  */
 export const templateStore = $state({ list: /** @type {any[]} */ ([]), loaded: false })
 
-let inflight = /** @type {Promise<void> | null} */ (null)
+let inflight: Promise<void> = /** @type {Promise<void> | null} */ (null)
 
 export function refreshTemplates() {
   if (inflight) return inflight

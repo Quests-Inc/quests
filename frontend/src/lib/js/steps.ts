@@ -21,7 +21,13 @@ function normalizeRunMode(mode: any) {
   return mode === 'once' || mode === 'watch' ? mode : 'poll'
 }
 
-function checkDraft(s) {
+function checkDraft(s: {
+  check_command: any
+  check_interval_seconds: null
+  wait_previous: any
+  run_mode: any
+  run_on: any
+}) {
   return {
     check_command: s?.check_command ?? '',
     check_interval_seconds: s?.check_interval_seconds != null ? String(s.check_interval_seconds) : '',
@@ -62,7 +68,19 @@ export function templateStepDraft(s: any = null) {
 }
 
 /** Auto-check fields as the API wants them; all off without a command. */
-export function checkPayload(s) {
+export function checkPayload(s: {
+  id?: null
+  title?: string
+  description?: any
+  progress_current?: any
+  progress_total?: any
+  progress_range?: any
+  check_command?: any
+  check_interval_seconds?: any
+  wait_previous?: any
+  run_mode?: any
+  run_on?: any
+}) {
   const cmd = String(s.check_command || '').trim()
   const intervalRaw = String(s.check_interval_seconds ?? '').trim()
   const interval = intervalRaw === '' ? null : Math.max(15, Number(intervalRaw) || 15)
@@ -81,9 +99,11 @@ export function checkPayload(s) {
 }
 
 /** Untitled steps are dropped. */
-export function questStepsPayload(steps) {
+export function questStepsPayload(
+  steps: { id: null; title: string; description: any; progress_current: any; progress_total: any }[]
+) {
   return steps
-    .map((s, i) => ({
+    .map((s: { id: null; title: string; description: any; progress_current: any; progress_total: any }, i: any) => ({
       id: s.id != null ? Number(s.id) : null,
       title: s.title.trim(),
       description: String(s.description || '').trim(),
@@ -92,30 +112,30 @@ export function questStepsPayload(steps) {
       sort_order: i,
       ...checkPayload(s),
     }))
-    .filter((s) => s.title)
+    .filter((s: { title: any }) => s.title)
 }
 
 /** Untitled steps are dropped. */
-export function templateStepsPayload(steps) {
+export function templateStepsPayload(steps: { title: string; progress_range: any }[]) {
   return steps
-    .map((s, i) => ({
+    .map((s: { title: string; progress_range: any }, i: any) => ({
       title: s.title.trim(),
       description: '',
       ...parseProgressRange(s.progress_range),
       sort_order: i,
       ...checkPayload(s),
     }))
-    .filter((s) => s.title)
+    .filter((s: { title: any }) => s.title)
 }
 
-export function formatProgressRange(min, max) {
+export function formatProgressRange(min: any, max: any) {
   const lo = Math.max(1, Number(min) || 1)
   const hi = Math.max(lo, Number(max) || lo)
   return lo === hi ? String(lo) : `${lo}..${hi}`
 }
 
 /** "5" → 5..5, "5..10" or "5-10" → 5..10 (swapped if reversed). */
-export function parseProgressRange(raw) {
+export function parseProgressRange(raw: any) {
   const text = String(raw ?? '').trim()
   if (!text) return { progress_min: 1, progress_max: 1 }
   const sep = text.includes('..') ? '..' : text.includes('-') ? '-' : null

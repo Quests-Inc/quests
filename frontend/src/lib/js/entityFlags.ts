@@ -10,7 +10,7 @@ export const ENTITY_SPEC = {
       { id: 'note', label: 'заметки' },
       { id: 'questline', label: 'квестлайны' },
     ],
-    test: (i, v) => i.type === v,
+    test: (i: { type: any }, v: any) => i.type === v,
   },
   flag: {
     label: 'флаг',
@@ -19,7 +19,8 @@ export const ENTITY_SPEC = {
       { id: 'outdated', label: 'заметка устарела', aliases: ['stale'] },
       { id: 'pinned', label: 'закреплено', aliases: ['pin'] },
     ],
-    test: (i, v) => (v === 'outdated' ? i.type === 'note' && !!i.x.outdated : !!i.x.pinned),
+    test: (i: { type: string; x: { outdated: any; pinned: any } }, v: string) =>
+      v === 'outdated' ? i.type === 'note' && !!i.x.outdated : !!i.x.pinned,
   },
   status: {
     label: 'статус квеста',
@@ -29,20 +30,21 @@ export const ENTITY_SPEC = {
       { id: 'failed', label: 'провален' },
       { id: 'frozen', label: 'заморожен' },
     ],
-    test: (i, v) => i.type === 'quest' && i.x.status === (v === 'done' ? 'completed' : v),
+    test: (i: { type: string; x: { status: any } }, v: string) =>
+      i.type === 'quest' && i.x.status === (v === 'done' ? 'completed' : v),
   },
 }
 
 /** Quests, notes and questlines matching the words and filters of `raw` (title or `type=id`). */
 export function findEntities(
-  raw,
-  { questlines = [], quests = [], notes = [], types = ['questline', 'quest', 'note'], limit = 50 }
+  raw: any,
+  { questlines = [], quests = [], notes = [], types = ['questline', 'quest', 'note'], limit = 50 }: any
 ) {
   const parsed = parseQuery(raw, ENTITY_SPEC)
   const q = parsed.text.toLowerCase()
   if (!q && !parsed.active) return { parsed, items: [] }
-  const items = []
-  const scan = (type, list) => {
+  const items: { type: any; id: any; title: any }[] = []
+  const scan = (type: string, list: any[]) => {
     if (!types.includes(type)) return
     for (const x of list) {
       const item = { type, x }

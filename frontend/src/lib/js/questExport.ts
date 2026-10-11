@@ -1,3 +1,4 @@
+import type { AttachmentView } from '../api/http.gen.ts'
 import { listAttachments } from './api.ts'
 import { downloadPdf } from './pdfExport.ts'
 import { significanceLabel, periodBadge, quantifiedProgress } from './questFormat.ts'
@@ -59,7 +60,7 @@ export function downloadQuestMarkdown(quest: any) {
  */
 export async function downloadQuestPdf(quest: any, opts: { labels?: Record<string, string>; tzLabel?: string } = {}) {
   if (!quest) return
-  let attachments = []
+  let attachments: AttachmentView[] = []
   try {
     attachments = (await listAttachments('quest', quest.id, { stat: false })).filter((a) => !a.hidden)
   } catch {

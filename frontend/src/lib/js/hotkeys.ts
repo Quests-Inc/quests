@@ -37,7 +37,7 @@ const TEXT_INPUT_TYPES = new Set([
 const registry: Map<string, any> = new Map()
 
 /** True when the event target is somewhere the user types. */
-export function isTypingTarget(target) {
+export function isTypingTarget(target: EventTarget) {
   if (!(target instanceof HTMLElement)) return false
   if (target.isContentEditable) return true
   const tag = target.tagName
@@ -56,13 +56,13 @@ export function overlayOpen() {
  * list is not one: after Enter on it the focus stays there, and Space must
  * still reach the step keys. A group header is (Space folds it).
  */
-function isActivatable(target) {
+function isActivatable(target: EventTarget) {
   if (!(target instanceof HTMLElement)) return false
   if (target.closest('[data-nav]:not([aria-expanded])')) return false
   return !!target.closest('button, a[href], summary, [role="button"], input[type="checkbox"], input[type="radio"]')
 }
 
-function matches(action, event) {
+function matches(action: { codes: string[]; shift?: boolean | 'any' }, event: KeyboardEvent) {
   if (!action.codes.includes(event.code)) return false
   const shift = action.shift ?? false
   if (shift === 'any') return true
@@ -103,7 +103,7 @@ export function handleKeydown(event: KeyboardEvent) {
     // leave the field so the page keys work again.
     if (overlayOpen()) return
     event.preventDefault()
-    target.blur()
+    ;(target as HTMLElement).blur()
     return
   }
   if (typing || overlayOpen()) return

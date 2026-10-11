@@ -15,30 +15,33 @@ const STEP_H = 7
 export function buildQuestPdfPayload(quest: any): {
   title: string
   exportedAt: string
+  progress: string
   steps: { title: string; progress: string; done: boolean }[]
 } {
   const exportedAt = new Date().toLocaleString('ru-RU', {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
-  const steps = (quest?.steps || []).map((s) => {
-    const cur = Number(s.progress_current) || 0
-    const tot = Math.max(1, Number(s.progress_total) || 1)
-    return {
-      title: String(s.title || `step=${s.id}`),
-      progress: `${cur}/${tot}`,
-      done: Boolean(s.done) || cur >= tot,
+  const steps = (quest?.steps || []).map(
+    (s: { progress_current: any; progress_total: any; title: any; id: any; done: any }) => {
+      const cur = Number(s.progress_current) || 0
+      const tot = Math.max(1, Number(s.progress_total) || 1)
+      return {
+        title: String(s.title || `step=${s.id}`),
+        progress: `${cur}/${tot}`,
+        done: Boolean(s.done) || cur >= tot,
+      }
     }
-  })
+  )
   return {
     title: String(quest?.title || `quest=${quest?.id ?? ''}`),
     exportedAt,
-    progress: `${steps.filter((s) => s.done).length}/${steps.length || 0}`,
+    progress: `${steps.filter((s: { done: any }) => s.done).length}/${steps.length || 0}`,
     steps,
   }
 }
 
-function pdfFilename(quest) {
+function pdfFilename(quest: { id: null; title: any }) {
   const id = quest?.id != null ? String(quest.id) : 'x'
   const raw = String(quest?.title || 'quest')
     .trim()
@@ -117,7 +120,8 @@ export async function downloadQuestPdfSimple(quest: any) {
     })
   }
 
-  let pageBlocks = /** @type {typeof blocks} */ ([])
+  let pageBlocks: { left?: string; right?: string; font: string; h: number; color: string }[] =
+    /** @type {typeof blocks} */ ([])
   let used = 0
   let first = true
 

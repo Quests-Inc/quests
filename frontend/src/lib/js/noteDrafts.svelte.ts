@@ -1,4 +1,5 @@
 /** @typedef {{ title: string, description: string, parentId: string, pinned: boolean }} NoteDraft */
+export type NoteDraft = { title: string; description: string; parentId: string; pinned: boolean }
 
 /** Unsaved note edits keyed by note id. Missing key = last saved server copy. */
 export const noteDrafts = $state(/** @type {Record<string, NoteDraft>} */ ({}))

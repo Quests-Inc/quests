@@ -22,7 +22,7 @@ const KEEP = { share: 0.55, minSim: 0.07 }
 
 const TITLE_WEIGHT = 2
 
-function tokens(text) {
+function tokens(text: string) {
   const words =
     String(text || '')
       .toLowerCase()
@@ -36,14 +36,14 @@ function tokens(text) {
   return out
 }
 
-function termCounts(title, description) {
+function termCounts(title: string, description: string) {
   const tf = new Map()
   for (const t of tokens(title)) tf.set(t, (tf.get(t) || 0) + TITLE_WEIGHT)
   for (const t of tokens(description)) tf.set(t, (tf.get(t) || 0) + 1)
   return tf
 }
 
-function vectorize(tf, df, n) {
+function vectorize(tf: Map<any, any>, df: Map<any, any>, n: number) {
   const v = new Map()
   let norm = 0
   for (const [t, c] of tf) {
@@ -56,7 +56,7 @@ function vectorize(tf, df, n) {
   return v
 }
 
-function cosine(a, b) {
+function cosine(a: Map<any, any>, b: Map<any, any>) {
   if (a.size > b.size) [a, b] = [b, a]
   let s = 0
   for (const [t, w] of a) {
@@ -70,7 +70,9 @@ function cosine(a, b) {
  * @param {any[]} quests — anything with title/description/questline_id/category_id/tags
  */
 export function buildSuggestIndex(quests: any[]) {
-  const docs = (quests || []).map((q) => ({
+  const docs: { questline: any; category: any; tags: any[]; tf: Map<any, any>; vec?: Map<any, any> }[] = (
+    quests || []
+  ).map((q) => ({
     questline: q.questline_id ?? null,
     category: q.category_id ?? null,
     tags: Array.isArray(q.tags) ? q.tags : [],
@@ -101,7 +103,7 @@ export function nearestVote(
   if (!q.size) return null
   const pool = target === 'category' ? index.docs.filter((d) => d.questline == null) : index.docs
   const top = pool
-    .map((d) => ({ d, s: cosine(q, d.vec) }))
+    .map((d) => ({ d, s: cosine(q, d.vec!) }))
     .sort((a, b) => b.s - a.s)
     .slice(0, k)
   if (!top.length) return null
@@ -125,17 +127,17 @@ export function nearestVote(
  * already-selected slugs. Score = sum of neighbour similarities carrying that tag.
  */
 export function suggestTags(
-  index,
-  query,
+  index: ReturnType<typeof buildSuggestIndex>,
+  query: { title: string; description?: string },
   { excludeSlugs = [], k = SUGGEST_DEFAULTS.k, minSim = SUGGEST_DEFAULTS.minSim, limit = 5 } = {}
 ) {
   if (!index?.n) return []
   const q = vectorize(termCounts(query.title, query.description), index.df, index.n)
   if (!q.size) return []
   const top = index.docs
-    .map((d) => ({ d, s: cosine(q, d.vec) }))
-    .filter((x) => x.s >= minSim)
-    .sort((a, b) => b.s - a.s)
+    .map((d) => ({ d, s: cosine(q, d.vec!) }))
+    .filter((x: { s: number }) => x.s >= minSim)
+    .sort((a: { s: number }, b: { s: number }) => b.s - a.s)
     .slice(0, k)
   if (!top.length) return []
   const ex = new Set((excludeSlugs || []).map((s) => String(s).toLowerCase()))
@@ -157,7 +159,11 @@ export function suggestTags(
  * it stays while it's still the leader within the looser KEEP bounds.
  * @returns {number | null}
  */
-export function pickSuggestion(vote, current = null, opts = SUGGEST_DEFAULTS): number | null {
+export function pickSuggestion(
+  vote: { id: number; share: number; sim: number },
+  current = null,
+  opts = SUGGEST_DEFAULTS
+): number | null {
   if (!vote || vote.id == null) return null
   if (current != null && vote.id === current && vote.share >= KEEP.share && vote.sim >= KEEP.minSim) {
     return current

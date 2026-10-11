@@ -16,7 +16,7 @@ function prefersReducedMotion() {
 /** Split into chunks that re-concatenate exactly to the input: each chunk is
  * one non-space run plus any trailing whitespace, so revealing them in order
  * looks like words appearing left-to-right rather than dumping whole lines. */
-function wordChunks(text) {
+function wordChunks(text: string) {
   return text.match(/\S+\s*|\s+/g) || []
 }
 
@@ -136,9 +136,9 @@ export function tailFade(node: HTMLElement, active: boolean) {
     const [r, g, b] = m
     const rules = []
     const ranges = names.map(() => [])
-    const texts = []
+    const texts: Text[] = []
     const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
-    for (let t = walker.nextNode(); t; t = walker.nextNode()) texts.push(t)
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) texts.push(t as Text)
     let d = 0
     for (let i = texts.length - 1; i >= 0 && d < TAIL_CHARS; i -= 1) {
       const data = texts[i].data
@@ -168,7 +168,7 @@ export function tailFade(node: HTMLElement, active: boolean) {
     drain = null
   }
 
-  function set(value) {
+  function set(value: boolean) {
     const next = !!value
     if (next === on) return
     on = next

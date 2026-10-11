@@ -270,6 +270,7 @@
       const deadline_at = deadlineOn
         ? localInputToUtcIso(`${deadlineDate}T${deadlineHour}:${deadlineMinute}`)
         : null
+      /** @type {Record<string, any>} */
       const payload = {
         title: title.trim(),
         description: description.trim(),

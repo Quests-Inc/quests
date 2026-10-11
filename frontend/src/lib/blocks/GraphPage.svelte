@@ -1834,7 +1834,9 @@
     if (key.endsWith('_at')) return new Date(a).getTime() === new Date(b).getTime()
     return JSON.stringify(a) === JSON.stringify(b)
   }
+  /** @param {Record<string, any>} orig @param {Record<string, any>} payload @param {string[]} keys */
   const diffFields = (orig, payload, keys) => {
+    /** @type {Record<string, any>} */
     const out = {}
     for (const k of keys) if (k in payload && !sameVal(orig[k], payload[k], k)) out[k] = payload[k]
     return out
@@ -1880,6 +1882,7 @@
     }
   }
 
+  /** @param {Record<string, any>} payload */
   async function draftEditQuest(payload) {
     const orig = editQuest.quest
     if (!orig) return

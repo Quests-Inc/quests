@@ -53,11 +53,11 @@ export function watchPopover(
   onOutside: () => void,
   reposition: () => void
 ): () => void {
-  const onDown = (event) => {
+  const onDown = (event: Event) => {
     const inside = nodes().some((n) => n && event.target instanceof Node && n.contains(event.target))
     if (!inside) onOutside()
   }
-  const onScroll = (event) => {
+  const onScroll = (event: Event) => {
     // Scrolling the popover's own list must not re-place it.
     if (nodes().some((n) => n && event.target instanceof Node && n.contains(event.target))) return
     reposition()

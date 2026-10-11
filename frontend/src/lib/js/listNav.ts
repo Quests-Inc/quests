@@ -21,9 +21,12 @@ function visibleRows() {
 }
 
 /** The row to start from when focus is not in the list: the selected one, else null. */
-function selectedRow(rows) {
+function selectedRow(rows: any[]) {
   return (
-    rows.find((el) => el.classList.contains('quest-row--active') || el.classList.contains('notes__row--on')) ?? null
+    rows.find(
+      (el: { classList: { contains: (arg0: string) => any } }) =>
+        el.classList.contains('quest-row--active') || el.classList.contains('notes__row--on')
+    ) ?? null
   )
 }
 
@@ -31,7 +34,7 @@ function selectedRow(rows) {
  * Move focus to the next (+1) or previous (-1) row. Returns false when the
  * page has no list, so the key keeps its default behaviour.
  */
-export function moveRow(dir) {
+export function moveRow(dir: number) {
   const rows = visibleRows()
   if (rows.length === 0) return false
   const at = rows.indexOf(/** @type {HTMLElement} */ (document.activeElement))
@@ -49,7 +52,7 @@ export function moveRow(dir) {
 }
 
 /** The button that folds the group/node the focused row belongs to. */
-function foldButton(el) {
+function foldButton(el: HTMLElement) {
   if (el.hasAttribute('aria-expanded')) return el
   return el.closest('[data-nav-node]')?.querySelector('[aria-expanded]') ?? null
 }
@@ -58,7 +61,7 @@ function foldButton(el) {
  * Expand (open=true) or collapse (open=false) the focused row's group.
  * Returns false when there is nothing to fold or it is already in that state.
  */
-export function foldRow(open) {
+export function foldRow(open: boolean) {
   const el = document.activeElement
   if (!(el instanceof HTMLElement) || !el.closest('[data-nav-root]')) return false
   const btn = foldButton(el)

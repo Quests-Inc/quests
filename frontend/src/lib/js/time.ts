@@ -9,7 +9,7 @@ export function localTimeZone() {
 }
 
 /** Parse API datetime: naive ISO is treated as UTC (historical bug guard). */
-export function parseApiDate(value) {
+export function parseApiDate(value: string | Date | null | undefined) {
   if (value == null || value === '') return null
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value
@@ -24,7 +24,7 @@ export function parseApiDate(value) {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function formatLocal(value, opts = {}) {
+export function formatLocal(value: any, opts = {}) {
   const d = parseApiDate(value)
   if (!d) return value ? String(value) : '—'
   return d.toLocaleString('ru-RU', {
@@ -38,10 +38,10 @@ export function formatLocal(value, opts = {}) {
 }
 
 /** datetime-local value (YYYY-MM-DDTHH:mm) in the system timezone from UTC ISO. */
-export function toLocalInputValue(iso) {
+export function toLocalInputValue(iso: any) {
   const d = parseApiDate(iso)
   if (!d) return ''
-  const pad = (n) => String(n).padStart(2, '0')
+  const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
@@ -54,7 +54,7 @@ export function defaultLocalDeadlineParts(now = new Date()) {
   d.setSeconds(0, 0)
   d.setMinutes(0, 0)
   d.setHours(d.getHours() + 1)
-  const pad = (n) => String(n).padStart(2, '0')
+  const pad = (n: number) => String(n).padStart(2, '0')
   return {
     date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
     hour: pad(d.getHours()),
@@ -63,7 +63,7 @@ export function defaultLocalDeadlineParts(now = new Date()) {
 }
 
 /** Parse datetime-local (system local wall time) → UTC ISO string (with Z). */
-export function localInputToUtcIso(localValue) {
+export function localInputToUtcIso(localValue: any) {
   if (!localValue) return null
   // `datetime-local` has no TZ; Date parses it as local time in the browser.
   const isoLocal = localValue.length === 16 ? `${localValue}:00` : localValue
@@ -72,7 +72,7 @@ export function localInputToUtcIso(localValue) {
   return d.toISOString()
 }
 
-export function formatRemaining(seconds) {
+export function formatRemaining(seconds: number) {
   if (seconds == null || Number.isNaN(Number(seconds))) return ''
   const sign = seconds < 0 ? '-' : ''
   let s = Math.abs(Math.trunc(seconds))
@@ -84,7 +84,7 @@ export function formatRemaining(seconds) {
   return `${sign}${m}:${String(sec).padStart(2, '0')}`
 }
 
-export function timerTone(remainingSeconds, durationSeconds) {
+export function timerTone(remainingSeconds: number, durationSeconds: number) {
   if (remainingSeconds == null || !durationSeconds) return null
   const frac = remainingSeconds / Math.max(1, durationSeconds)
   if (frac > 2 / 3) return 'green'
@@ -92,7 +92,7 @@ export function timerTone(remainingSeconds, durationSeconds) {
   return 'red'
 }
 
-export function remainingFromDeadline(deadlineIso, now = Date.now()) {
+export function remainingFromDeadline(deadlineIso: any, now = Date.now()) {
   const d = parseApiDate(deadlineIso)
   if (!d) return null
   return Math.round((d.getTime() - now) / 1000)

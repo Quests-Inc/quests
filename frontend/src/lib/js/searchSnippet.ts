@@ -1,5 +1,5 @@
 /** A search snippet is plain text with matches in ⟪ ⟫ — escape it, then turn the marks into <mark>. */
-export function snippetHtml(snippet) {
+export function snippetHtml(snippet: any) {
   return String(snippet ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

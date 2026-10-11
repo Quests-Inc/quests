@@ -44,7 +44,45 @@ const FUZZY_MIN_LEN = 6
 const FUZZY_SPAN_FACTOR = 1.35
 const FUZZY_SPAN_PAD = 2
 
-function mapChars(text, table) {
+function mapChars(
+  text: string,
+  table: {
+    [x: string]: any
+    q?: string
+    w?: string
+    e?: string
+    r?: string
+    t?: string
+    y?: string
+    u?: string
+    i?: string
+    o?: string
+    p?: string
+    '['?: string
+    ']'?: string
+    a?: string
+    s?: string
+    d?: string
+    f?: string
+    g?: string
+    h?: string
+    j?: string
+    k?: string
+    l?: string
+    ';'?: string
+    "'"?: string
+    z?: string
+    x?: string
+    c?: string
+    v?: string
+    b?: string
+    n?: string
+    m?: string
+    ','?: string
+    '.'?: string
+    '`'?: string
+  }
+) {
   let out = ''
   for (const ch of text) {
     const lower = ch.toLowerCase()
@@ -59,14 +97,14 @@ function mapChars(text, table) {
 }
 
 /** Query variants: as typed + both layout remaps. */
-export function queryVariants(raw) {
+export function queryVariants(raw: any) {
   const q = String(raw || '').trim()
   if (!q) return []
   const variants = new Set([q, mapChars(q, EN_TO_RU), mapChars(q, RU_TO_EN)])
   return [...variants].filter(Boolean)
 }
 
-function normalize(text) {
+function normalize(text: string) {
   return String(text || '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -74,7 +112,7 @@ function normalize(text) {
 }
 
 /** Substring always; longer queries also get a tight subsequence fuzzy. */
-export function textMatches(haystack, needle) {
+export function textMatches(haystack: string, needle: string) {
   const h = normalize(haystack)
   const n = normalize(needle)
   if (!n) return true
@@ -99,8 +137,19 @@ export function textMatches(haystack, needle) {
   return false
 }
 
-export function questSearchBlob(quest) {
-  const steps = (quest.steps || []).map((s) => `${s.title || ''} ${s.description || ''}`).join(' ')
+export function questSearchBlob(quest: {
+  steps: any
+  title: any
+  description: any
+  status: any
+  progress_label: any
+  category_label: any
+  category_slug: any
+  questline_title: any
+}) {
+  const steps = (quest.steps || [])
+    .map((s: { title: any; description: any }) => `${s.title || ''} ${s.description || ''}`)
+    .join(' ')
   return [
     quest.title,
     quest.description,
@@ -115,7 +164,7 @@ export function questSearchBlob(quest) {
     .join(' ')
 }
 
-export function questMatchesQuery(quest, rawQuery) {
+export function questMatchesQuery(quest: any, rawQuery: any) {
   const variants = queryVariants(rawQuery)
   if (!variants.length) return true
   const blob = questSearchBlob(quest)

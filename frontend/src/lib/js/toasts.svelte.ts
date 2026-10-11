@@ -7,7 +7,7 @@ export const toasts: Toast[] = $state([])
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 let seq = 0
 
-function clearTimer(id) {
+function clearTimer(id: string) {
   const t = timers.get(id)
   if (t != null) {
     clearTimeout(t)

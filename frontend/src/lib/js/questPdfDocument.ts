@@ -13,6 +13,11 @@ const STATUS_COLORS: Record<string, string> = {
 /**
  * @typedef {{ significanceLabel: (q: any) => string, periodBadge: (q: any) => string | null, quantifiedProgress: (q: any) => string | null }} QuestFormat
  */
+export type QuestFormat = {
+  significanceLabel: (q: any) => string
+  periodBadge: (q: any) => string | null
+  quantifiedProgress: (q: any) => string | null
+}
 
 /** @param {any} quest @param {QuestFormat} fmt */
 function metaChips(quest: any, fmt: QuestFormat) {
@@ -28,21 +33,24 @@ function metaChips(quest: any, fmt: QuestFormat) {
   return chips.filter((c) => c.text)
 }
 
-function stepRows(quest) {
-  return (quest.steps || []).map((s) => {
-    const cur = Number(s.progress_current) || 0
-    const tot = Math.max(1, Number(s.progress_total) || 1)
-    return {
-      title: String(s.title || ''),
-      progress: `${cur}/${tot}`,
-      done: Boolean(s.done) || cur >= tot,
-      markdown: String(s.description || ''),
+function stepRows(quest: { steps: any }) {
+  return (quest.steps || []).map(
+    (s: { progress_current: any; progress_total: any; title: any; done: any; description: any }) => {
+      const cur = Number(s.progress_current) || 0
+      const tot = Math.max(1, Number(s.progress_total) || 1)
+      return {
+        title: String(s.title || ''),
+        progress: `${cur}/${tot}`,
+        done: Boolean(s.done) || cur >= tot,
+        markdown: String(s.description || ''),
+      }
     }
-  })
+  )
 }
 
-function dateFacts(quest, tzLabel) {
-  const fmt = (v) => new Date(v).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' })
+function dateFacts(quest: { created_at: any; updated_at: any; deadline_at: any }, tzLabel: string) {
+  const fmt = (v: string | number | Date) =>
+    new Date(v).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' })
   const suffix = tzLabel ? ` (${tzLabel})` : ''
   return [
     ['Создан', quest.created_at],

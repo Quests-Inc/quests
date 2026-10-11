@@ -14,7 +14,55 @@ export function exportedAtLabel(): string {
  * @param {object} document pdfdoc.Document
  * @param {string} filename
  */
-export async function downloadPdf(document_, filename: string) {
+export async function downloadPdf(
+  document_: {
+    title: string
+    meta?: { text: string; color?: string }[]
+    footnote: string
+    labels: Record<string, string>
+    blocks:
+      | (
+          | {
+              type: string
+              markdown: string
+              label?: undefined
+              steps?: undefined
+              empty?: undefined
+              items?: undefined
+              facts?: undefined
+            }
+          | {
+              type: string
+              label: string
+              steps: any
+              empty: string
+              markdown?: undefined
+              items?: undefined
+              facts?: undefined
+            }
+          | {
+              type: string
+              label: string
+              items: string[]
+              markdown?: undefined
+              steps?: undefined
+              empty?: undefined
+              facts?: undefined
+            }
+          | {
+              type: string
+              facts: { label: string; value: string }[]
+              markdown?: undefined
+              label?: undefined
+              steps?: undefined
+              empty?: undefined
+              items?: undefined
+            }
+        )[]
+      | { type: string; markdown: string; empty: string }[]
+  },
+  filename: string
+) {
   const resp = await fetch('/api/export/pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

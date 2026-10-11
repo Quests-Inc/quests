@@ -5,12 +5,12 @@
  * in the background so `available` / `source_updated` can fill in later.
  */
 
-function key(ownerType, ownerId) {
+function key(ownerType: string, ownerId: string | number) {
   return `${ownerType}:${ownerId}`
 }
 
-function asIdList(rows) {
-  return (rows || []).map((row) => row.id).join(',')
+function asIdList(rows: any) {
+  return (rows || []).map((row: { id: any }) => row.id).join(',')
 }
 
 const cache = new Map<string, { items: any[]; probed: boolean }>()
@@ -20,16 +20,16 @@ function notifyLive() {
   for (const fn of liveListeners) fn()
 }
 
-export function peekAttachmentList(ownerType, ownerId) {
+export function peekAttachmentList(ownerType: string, ownerId: string | number) {
   if (ownerId == null || ownerId === '') return null
   return cache.get(key(ownerType, ownerId)) ?? null
 }
 
-export function setAttachmentList(ownerType, ownerId, items, { probed = false } = {}) {
+export function setAttachmentList(ownerType: string, ownerId: string | number, items: any[], { probed = false } = {}) {
   cache.set(key(ownerType, ownerId), { items: items || [], probed })
 }
 
-function rowsFor(bucket, id) {
+function rowsFor(bucket: { [x: string]: any }, id: string | number) {
   if (!bucket || typeof bucket !== 'object') return []
   return bucket[id] || bucket[String(id)] || []
 }
@@ -50,11 +50,14 @@ function keepLiveFlags(prevItems: any[] | undefined, incoming: any[] | undefined
 
 /** Seed (or refresh) every listed owner. Empty owners get `[]` so a click
  * does not look like a cache miss and refetch. */
-export function seedAttachmentIndex(index, { questIds = [], questlineIds = [], noteIds = [] } = {}) {
+export function seedAttachmentIndex(
+  index: Record<string, Record<string, any[]>>,
+  { questIds = [], questlineIds = [], noteIds = [] } = {}
+) {
   const byQuest = index?.quest ?? {}
   const byLine = index?.questline ?? {}
   const byNote = index?.note ?? {}
-  const apply = (type, id, incoming) => {
+  const apply = (type: string, id: any, incoming: any) => {
     const k = key(type, id)
     const cur = cache.get(k)
     if (cur?.probed && asIdList(cur.items) === asIdList(incoming)) {
@@ -78,7 +81,7 @@ export function invalidateAttachmentLiveFlags() {
   notifyLive()
 }
 
-export function onAttachmentLiveInvalidate(fn) {
+export function onAttachmentLiveInvalidate(fn: () => void) {
   liveListeners.add(fn)
   return () => liveListeners.delete(fn)
 }

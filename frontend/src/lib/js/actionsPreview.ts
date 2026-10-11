@@ -21,14 +21,14 @@ const FIELD_LABELS = {
   progress_total: 'из',
 }
 
-export function actionLabel(action) {
+export function actionLabel(action: string | number) {
   return ACTION_LABELS[action] || action
 }
 
 // `before` is now the flat quest object (GET /api/quests/{id}) — the Go
 // executor fetches it directly, no more nested /api/context shape.
-function findStepIn(before, id) {
-  return before?.steps?.find((st) => st.id === id) || null
+function findStepIn(before: { steps: any[] }, id: any) {
+  return before?.steps?.find((st: { id: any }) => st.id === id) || null
 }
 
 /**
@@ -43,14 +43,14 @@ function findStepIn(before, id) {
  * create — e.g. an update_quest that only flips status, with no questline
  * touched at all.
  */
-export function buildPreviewTree(preview, { quests = [], questlines = [] } = {}) {
+export function buildPreviewTree(preview: any, { quests = [], questlines = [] } = {}) {
   const questlineById = new Map(questlines.map((l) => [l.id, l]))
   const questById = new Map(quests.map((q) => [q.id, q]))
 
   const lineNodes = new Map()
   const questNodes = new Map()
 
-  function ensureLineNode(id) {
+  function ensureLineNode(id: any) {
     if (lineNodes.has(id)) return lineNodes.get(id)
     const row = questlineById.get(id)
     const node = {

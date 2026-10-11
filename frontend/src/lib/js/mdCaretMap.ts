@@ -57,7 +57,7 @@ export function rangeFromTextOffset(root: ParentNode, offset: number): Range | n
   /** @type {Text | null} */
   let last: Text | null = null
   while ((n = walker.nextNode())) {
-    last = /** @type {Text} */ (n)
+    last = n as Text
     const len = last.textContent?.length ?? 0
     if (left <= len) {
       const range = document.createRange()
@@ -201,7 +201,7 @@ function locateByPrefix(src: string, ren: string, pos: number, len: number): num
 }
 
 /** Strip light markdown chrome so needles match rendered text. */
-function softenMarkdown(s) {
+function softenMarkdown(s: string) {
   return s
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/\*\*|__/g, '')
@@ -211,12 +211,12 @@ function softenMarkdown(s) {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
 }
 
-function collapseWs(s) {
+function collapseWs(s: string) {
   return s.replace(/\s+/g, ' ')
 }
 
 /** Map index in whitespace-collapsed string back to approximate raw index. */
-function approxExpandCollapsed(raw, collapsedIndex) {
+function approxExpandCollapsed(raw: any, collapsedIndex: number) {
   let ci = 0
   for (let i = 0; i < raw.length; i++) {
     const ch = raw[i]
@@ -232,6 +232,6 @@ function approxExpandCollapsed(raw, collapsedIndex) {
   return raw.length
 }
 
-function clamp(n, lo, hi) {
+function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n))
 }

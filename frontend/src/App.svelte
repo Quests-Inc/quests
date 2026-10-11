@@ -874,7 +874,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function onQuestlineSaved(_line, meta = {}) {
+  function onQuestlineSaved(_line, meta = /** @type {{ mode?: string }} */ ({})) {
     load({ silent: true })
     if (meta.mode === 'create') toast('Квестлайн создан', { kind: 'success' })
   }
@@ -1040,7 +1040,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     if (select) selectedId = quest.id
   }
 
-  function onSaved(quest, meta = {}) {
+  function onSaved(quest, meta = /** @type {{ mode?: string }} */ ({})) {
     selectedId = quest.id
     load({ silent: true })
     if (meta.mode === 'create') toast('Квест создан', { kind: 'success' })

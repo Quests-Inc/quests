@@ -28,7 +28,7 @@ export const wsx = $state({
 })
 
 export function currentWorkspaceName() {
-  return wsx.list.find((w) => w.id === wsx.current)?.name ?? ''
+  return wsx.list.find((w: { id: any }) => w.id === wsx.current)?.name ?? ''
 }
 
 export async function loadWorkspaceState() {
@@ -51,7 +51,7 @@ export async function loadWorkspaceState() {
 }
 
 /** Runs a mutation with the shared busy/error handling. */
-async function act(fn, failure) {
+async function act(fn: () => Promise<unknown>, failure: string) {
   if (wsx.busy) return false
   wsx.busy = true
   wsx.error = ''
@@ -66,12 +66,12 @@ async function act(fn, failure) {
   }
 }
 
-export async function pickWorkspace(id) {
+export async function pickWorkspace(id: number) {
   if (id === wsx.current) return
   if (await act(() => switchWorkspace(id), 'не удалось переключить')) location.reload()
 }
 
-export async function addWorkspace(name) {
+export async function addWorkspace(name: string) {
   if (!name.trim()) return false
   const ok = await act(async () => {
     const w = await createWorkspace(name.trim())
@@ -81,16 +81,16 @@ export async function addWorkspace(name) {
   return ok
 }
 
-export async function saveName(name) {
+export async function saveName(name: string) {
   const n = name.trim()
   if (!n || n === currentWorkspaceName()) return
   await act(async () => {
     await renameWorkspace(wsx.current, n)
-    wsx.list = wsx.list.map((w) => (w.id === wsx.current ? { ...w, name: n } : w))
+    wsx.list = wsx.list.map((w: { id: any }) => (w.id === wsx.current ? { ...w, name: n } : w))
   }, 'не удалось переименовать')
 }
 
-export async function removeCurrent(confirmName) {
+export async function removeCurrent(confirmName: string) {
   if (await act(() => deleteWorkspace(wsx.current, confirmName.trim()), 'не удалось удалить')) location.reload()
 }
 
@@ -104,16 +104,16 @@ export async function newInvite(): Promise<string> {
   return url
 }
 
-export async function dropMember(m, me) {
+export async function dropMember(m: { username: any; user_id: number }, me: any) {
   const self = m.username === me
   if (!confirm(self ? 'Выйти из этого пространства?' : `Убрать ${m.username} из пространства?`)) return
   const ok = await act(() => removeMember(wsx.current, m.user_id), 'не удалось убрать')
   if (!ok) return
   if (self) location.reload()
-  else wsx.members = wsx.members.filter((x) => x.user_id !== m.user_id)
+  else wsx.members = wsx.members.filter((x: { user_id: any }) => x.user_id !== m.user_id)
 }
 
-export async function doImport(file, secrets) {
+export async function doImport(file: Blob | File, secrets: any) {
   wsx.notice = ''
   const ok = await act(async () => {
     const r = await importWorkspace(file, { secrets })

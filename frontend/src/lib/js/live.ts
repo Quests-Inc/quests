@@ -29,10 +29,10 @@ export function subscribeQuestEvents(
   { onStatus, onResync }: { onStatus?: (s: string) => void; onResync?: () => void } = {}
 ) {
   let stopped = false
-  let socket = null
+  let socket: WebSocket = null
   let attempt = 0
-  let timer = null
-  let watchdog = null
+  let timer: number = null
+  let watchdog: number = null
   let lastMessageAt = 0
   let everOpened = false
   let hiddenAt = 0
@@ -43,7 +43,7 @@ export function subscribeQuestEvents(
     return `${proto}//${location.host}/ws`
   }
 
-  const setStatus = (status) => {
+  const setStatus = (status: string) => {
     if (onStatus) onStatus(status)
   }
 
@@ -171,8 +171,8 @@ export function subscribeQuestEvents(
 
   // Drop the socket on unload so the server doesn't keep a zombie client
   // (zombies made the overlay think a tab was still open → no new tab, no UI).
-  const onPageHide = (ev) => {
-    if (ev && ev.persisted) {
+  const onPageHide = (ev: Event) => {
+    if (ev && (ev as PageTransitionEvent).persisted) {
       try {
         socket?.close()
       } catch {
