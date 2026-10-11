@@ -1,6 +1,10 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
   import GraphToolbar from './GraphToolbar.svelte'
+  import GraphEdges from './GraphEdges.svelte'
+  import GraphFoot from './GraphFoot.svelte'
+  import GraphGroups from './GraphGroups.svelte'
+  import GraphCard from './GraphCard.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
@@ -1859,22 +1863,6 @@
     node.focus()
   }
 
-  const autofocusIf = (node: { focus: () => void }, on: any) => {
-    if (on) node.focus()
-  }
-
-  /** Title of a brand-new note: focused with the whole text selected. */
-  const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
-    // The card is mounted while the map is still hidden for measuring, and a
-    // hidden field cannot take focus — keep trying until it shows.
-    let tries = 0
-    const grab = () => {
-      node.focus()
-      node.select()
-      if (document.activeElement !== node && node.isConnected && tries++ < 30) requestAnimationFrame(grab)
-    }
-    grab()
-  }
 
   /** Empty map: no centre, no extra centres, nothing hidden, layout forgotten.
    * Pending draft changes stay in the log (they have their own "Отменить всё"). */
@@ -1935,16 +1923,6 @@
   const isOrphan = (n: { type: string; links: number }) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
   const rasterOf = (n: { type: string; mime: any }) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
 </script>
-
-{#snippet glyph(n: any, t: any)}
-  {#if (n.type === 'quest' || n.type === 'note' || n.type === 'questline') && (n.icon || n.icon_url)}
-    <span class="gcard__icon" style:--line-color={n.color || t.color}>
-      <QuestlineIcon icon={n.icon || 'document'} iconUrl={n.icon_url || null} size="sm" />
-    </span>
-  {:else}
-    <span class="gcard__glyph">{n.type === 'step' && isDone(n) ? '✓' : t.glyph}</span>
-  {/if}
-{/snippet}
 
 <svelte:window
   onkeydown={onKey}
@@ -2010,218 +1988,37 @@
     {/if}
 
     <div class="gworld" style:transform="translate({cam.x}px, {cam.y}px) scale({cam.k})" class:gworld--hidden={!ready}>
-      <svg class="gedges" aria-hidden="true">
-        <defs>
-          {#each Object.entries(EDGES) as [k, e] (k)}
-            <marker id="arrow-{k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M0 0L10 5L0 10z" fill={e.color} />
-            </marker>
-          {/each}
-        </defs>
-        {#each drawEdges as e, i (i)}
-          <path
-            d={e.d}
-            fill="none"
-            stroke={e.draft === 'remove' ? '#d23c3c' : EDGES[e.kind].color}
-            stroke-width={(e.kind === 'structure' ? 1.2 : 1.8) + (e.draft === 'add' ? 1 : 0)}
-            stroke-dasharray={e.draft === 'remove' ? '2 5' : EDGES[e.kind].dash}
-            opacity={e.draft === 'remove' ? 0.9 : e.kind === 'structure' ? 0.6 : 0.95}
-            marker-end={`url(#arrow-${e.kind})`}
-          />
-          {#if edgeActions(e).length}
-            <path d={e.d} fill="none" stroke="transparent" stroke-width="14" class="gedge-hit" oncontextmenu={(ev) => onEdgeCtx(ev, e)} />
-          {/if}
-          {#if e.kind !== 'structure'}
-            <circle cx={e.sx} cy={e.sy} r="3.4" fill={e.draft === 'remove' ? '#d23c3c' : EDGES[e.kind].color} />
-          {/if}
-        {/each}
-        {#if linking && nodeMap.get(linking.anchor)}
-          {@const a = nodeMap.get(linking.anchor)}
-          <line
-            x1={a.x}
-            y1={a.y}
-            x2={linkCursor.x}
-            y2={linkCursor.y}
-            stroke={linking.mode === 'attach' ? EDGES.structure.color : EDGES.reference.color}
-            stroke-width="2.4"
-            stroke-dasharray="6 4"
-            class="glink-line"
-          />
-          <circle cx={linkCursor.x} cy={linkCursor.y} r="4.5" fill={EDGES.reference.color} />
-        {/if}
-      </svg>
+      <GraphEdges {drawEdges} {linking} {nodeMap} {linkCursor} {edgeActions} {onEdgeCtx} />
 
-      {#each groups as g (g.key)}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          class="ggroup"
-          style:left="{g.x - g.w / 2}px"
-          style:top="{g.y - g.h / 2}px"
-          style:width="{g.w}px"
-          style:height="{g.h}px"
-          style:--c={TYPES[g.type].color}
-          onpointerdown={(e) => onGroupDown(e, g)}
-          oncontextmenu={(e) => onGroupCtx(e, g)}
-        >
-          {#if collapseKey(g)}
-            <button
-              type="button"
-              class="ggroup__label ggroup__label--btn"
-              title="Свернуть обратно"
-              onpointerdown={(e) => e.stopPropagation()}
-              onclick={() => collapse(collapseKey(g) ?? '')}
-            >
-              <span class="ggroup__fold" aria-hidden="true"><Icon name="chevron-down" size={12} /></span>
-              {g.title} · {g.count} · свернуть
-            </button>
-          {:else}
-            <span class="ggroup__label">{g.title} · {g.count}</span>
-          {/if}
-        </div>
-      {/each}
+      <GraphGroups {groups} {collapseKey} {onGroupDown} {onGroupCtx} onCollapse={collapse} />
 
       {#each view?.nodes ?? [] as n (n.key)}
-        {@const t = TYPES[n.type] ?? TYPES.step}
-        {@const square = n.type === 'attachment' || n.type === 'cluster'}
-        {@const big = n.type === 'quest' || n.type === 'note'}
-        {@const withText = n.type === 'step' && !!n.desc}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          class="gcard gcard--{n.type}"
-          class:gcard--sel={n.key === selectedKey}
-          class:gcard--root={n.key === data?.root}
-          class:gcard--done={isDone(n)}
-          class:gcard--orphan={isOrphan(n)}
-          class:gcard--draft={n.draft}
-          class:gcard--dim={linking && n.key !== linking.anchor && !canPick(n)}
-          class:gcard--pickable={linking && canPick(n)}
-          class:gcard--anchor={linking?.anchor === n.key}
-          class:gcard--ownerless={ownerless.has(n.key)}
-          class:gcard--editing={editing?.key === n.key}
-          class:gcard--picked={picked.has(n.key)}
-          class:gcard--pill={!big && !square && !withText}
-          style:--c={ownerless.has(n.key) ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
-          style:left="{n.x - n.w / 2}px"
-          style:top="{n.y - n.h / 2}px"
-          style:width={big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
-          style:height={ready && n.h ? `${editing?.key === n.key ? Math.max(n.h, 340) : n.h}px` : undefined}
-          data-gkey={n.key}
-          title="{t.label}: {n.title}{isOrphan(n) ? ' — на неё нет ссылок' : ''}"
-          onpointerdown={(e) => onCardDown(e, n)}
-          oncontextmenu={(e) => onCtx(e, n)}
-          ondblclick={(e) => {
-            if (n.type === 'note' && !(e.target instanceof Element && (e.target as Element).closest('a, button, textarea, input'))) void startEditNote(n)
-          }}
-        >
-          {#if square}
-            <div class="gcard__sq">
-              {#if rasterOf(n)}
-                <img class="gcard__thumb" src="/api/attachments/{n.id}/image?preview=1" alt="" loading="lazy" draggable="false" />
-              {:else if n.type === 'cluster'}
-                <span class="gcard__count">{n.title.split(' ')[0]}</span>
-              {:else}
-                <FileKindIcon att={{ filename: n.title, content_type_detected: n.mime }} size={30} />
-              {/if}
-              <span class="gcard__name">{n.type === 'cluster' ? 'вложений' : n.title}</span>
-            </div>
-          {:else if editing && editing.key === n.key}
-            <div class="gcard__head">
-              {@render glyph(n, t)}
-              {#if editing.fresh}
-                <input
-                  class="gcard__titleedit"
-                  bind:value={editing.title}
-                  aria-label="Заголовок"
-                  use:focusSelect
-                  onkeydown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      e.currentTarget.closest('.gcard')?.querySelector('textarea')?.focus()
-                    } else if (e.key === 'Escape') {
-                      e.stopPropagation()
-                      void finishEdit(true)
-                    }
-                  }}
-                />
-              {:else}
-                <input class="gcard__titleedit" bind:value={editing.title} aria-label="Заголовок" />
-              {/if}
-            </div>
-            <textarea
-              class="gcard__editor"
-              bind:value={editing.text}
-              use:autofocusIf={!editing.fresh}
-              placeholder="Markdown"
-              spellcheck="false"
-              onkeydown={(e) => {
-                if (e.key === 'Escape') {
-                  e.stopPropagation()
-                  void finishEdit(false)
-                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault()
-                  void finishEdit(true)
-                }
-              }}
-            ></textarea>
-            <div class="gcard__editbar">
-              <button type="button" class="graph__btn graph__btn--primary" onclick={() => finishEdit(true)}>Готово</button>
-              <button type="button" class="graph__btn" onclick={() => finishEdit(false)}>Отмена</button>
-              <span class="gcard__edithint">Ctrl+Enter — готово · Esc — отмена</span>
-            </div>
-          {:else if tier.get(n.key) === 'lite'}
-            <!-- frame only: off-screen or too small to read -->
-          {:else if big || withText}
-            <div class="gcard__head">
-              {@render glyph(n, t)}
-              <span class="gcard__title">{n.title}</span>
-              {#if n.type === 'quest' && n.status && n.status !== 'active'}
-                <span class="gcard__status">{n.status}</span>
-              {:else if n.type === 'step' && n.progress}
-                <span class="gcard__prog">{n.progress}</span>
-              {/if}
-            </div>
-            {#if n.desc && tier.get(n.key) !== 'title'}
-              <div class="gcard__body" style:max-height="{big ? CARD[n.type].max : CARD.stepBody.max}px">
-                <MarkdownBody source={n.desc} labels={{}} onRef={(k, id) => onOpen?.(k, id)} />
-              </div>
-            {/if}
-          {:else}
-            {@render glyph(n, t)}
-            <span class="gcard__title gcard__title--line">{n.title}</span>
-            {#if n.type === 'step' && n.progress}
-              <span class="gcard__prog">{n.progress}</span>
-            {/if}
-          {/if}
-          {#if !square && tier.get(n.key) !== 'lite'}
-            {@const more = moreMap.get(n.key) ?? []}
-            {#if more.length}
-              <div class="gcard__more">
-                {#each more as m (m.type)}
-                  <button
-                    type="button"
-                    class="gcard__dot"
-                    style:--dot={TYPES[m.type].color}
-                    title="{ENTITY_LABELS[m.type]}: {m.count} не на карте. Клик — показать"
-                    aria-label="Показать связи: {ENTITY_LABELS[m.type]}, {m.count}"
-                    onpointerdown={(e) => e.stopPropagation()}
-                    oncontextmenu={(e) => e.stopPropagation()}
-                    onclick={() => openMore(n, m.type)}>{m.count}</button
-                  >
-                {/each}
-              </div>
-            {/if}
-          {/if}
-          {#if touched.has(n.key) && !n.draft}
-            <button
-              type="button"
-              class="gcard__changed"
-              title="Есть несохранённые изменения — показать в журнале"
-              aria-label="Есть несохранённые изменения"
-              onpointerdown={(e) => e.stopPropagation()}
-              onclick={() => showChanges(n.key)}>!</button
-            >
-          {/if}
-        </div>
+        <GraphCard
+          {n}
+          selected={n.key === selectedKey}
+          root={n.key === data?.root}
+          done={isDone(n)}
+          orphan={isOrphan(n)}
+          dim={!!linking && n.key !== linking.anchor && !canPick(n)}
+          pickable={!!linking && canPick(n)}
+          anchor={linking?.anchor === n.key}
+          ownerless={ownerless.has(n.key)}
+          editingHere={editing?.key === n.key}
+          picked={picked.has(n.key)}
+          {ready}
+          raster={rasterOf(n)}
+          tier={tier.get(n.key)}
+          more={moreMap.get(n.key) ?? []}
+          changed={touched.has(n.key) && !n.draft}
+          bind:editing
+          {onCardDown}
+          {onCtx}
+          onStartEdit={startEditNote}
+          onFinishEdit={finishEdit}
+          {onOpen}
+          onOpenMore={openMore}
+          onShowChanges={showChanges}
+        />
       {/each}
     </div>
 
@@ -2404,31 +2201,13 @@
     {/if}
   </div>
 
-  <div class="graph__foot">
-    {#if selected}
-      {@const tgt = openTarget(selected)}
-      <span class="graph__sel">
-        <b>{TYPES[selected.type]?.label}</b>
-        {selected.title}
-        <span class="graph__meta">· ссылок: {selected.links}</span>
-      </span>
-      {#if tgt}
-        <button type="button" class="graph__btn" onclick={() => onOpen?.(tgt[0], tgt[1])}>Открыть</button>
-      {/if}
-      {#if selected.key !== data?.root && CENTERABLE.has(selected.type) && !selected.draft}
-        <button type="button" class="graph__btn" onclick={() => recenter(selected)}>Сделать центром</button>
-      {/if}
-    {:else}
-      <span class="graph__meta">
-        Клик по карточке — подробности, ПКМ — действия. Пунктирная рамка у заметки или вложения — на неё никто не ссылается.
-        <span class="graph__keys">
-          {#each ['quest', 'step', 'note', 'attachment', 'questline', 'template'] as k (k)}
-            <span class="graph__key" style:color={TYPES[k].color}>{TYPES[k].glyph} {TYPES[k].label}</span>
-          {/each}
-        </span>
-      </span>
-    {/if}
-  </div>
+  <GraphFoot
+    {selected}
+    target={(selected ? openTarget(selected) : null) as [string, number] | null}
+    canRecenter={!!selected && selected.key !== data?.root && CENTERABLE.has(selected.type) && !selected.draft}
+    {onOpen}
+    onRecenter={() => selected && recenter(selected)}
+  />
 </div>
 
 <input bind:this={fileInput} type="file" multiple hidden onchange={onFilesPicked} />
@@ -2530,7 +2309,7 @@
     box-sizing: border-box;
   }
 
-  .graph__btn {
+  :global(.graph__btn) {
     padding: 0.25rem 0.7rem;
     border: 1px solid var(--color-border, #333);
     border-radius: 4px;
@@ -2541,7 +2320,7 @@
     cursor: pointer;
   }
 
-  .graph__btn:hover {
+  :global(.graph__btn:hover) {
     border-color: var(--color-accent, #c9a227);
   }
 
@@ -2585,49 +2364,6 @@
     font-size: var(--text-xs, 0.75rem);
   }
 
-  .graph__foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem;
-    min-height: 1.8rem;
-    font-size: var(--text-sm, 0.875rem);
-  }
-
-  .graph__sel {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .graph__meta {
-    min-width: 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  /* Wide: in the line after the hint. Narrow: two rows of three. */
-  .graph__keys {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 0 0.6rem;
-    margin-left: 0.6rem;
-  }
-
-  .graph__key {
-    white-space: nowrap;
-  }
-
-  @media (max-width: 720px) {
-    .graph__keys {
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      justify-content: start;
-      gap: 0.15rem 0.9rem;
-      margin: 0.3rem 0 0;
-    }
-  }
-
   .graph__stage {
     cursor: grab;
     touch-action: none;
@@ -2645,181 +2381,6 @@
 
   .gworld--hidden {
     visibility: hidden;
-  }
-
-  .gedge-hit {
-    pointer-events: stroke;
-  }
-
-  .gedges {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 1px;
-    height: 1px;
-    overflow: visible;
-    pointer-events: none;
-  }
-
-  .ggroup {
-    position: absolute;
-    box-sizing: border-box;
-    border: 1.5px solid color-mix(in srgb, var(--c, #888) 45%, transparent);
-    border-radius: 18px;
-    background: color-mix(in srgb, var(--c, #888) 7%, transparent);
-    cursor: grab;
-  }
-
-  .ggroup__label {
-    position: absolute;
-    left: 0.9rem;
-    top: 0.55rem;
-    font-size: 0.72rem;
-    color: var(--c, #888);
-    white-space: nowrap;
-  }
-
-  .ggroup__label--btn {
-    padding: 0.1rem 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--c, #888) 55%, transparent);
-    border-radius: 999px;
-    background: var(--color-bg-raised, #1a1a1a);
-    font: inherit;
-    font-size: 0.68rem;
-    cursor: pointer;
-    pointer-events: auto;
-  }
-
-  .ggroup__label--btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .ggroup__fold {
-    display: inline-flex;
-    transform: rotate(180deg);
-  }
-
-  .ggroup__label--btn:hover {
-    border-color: var(--c, #888);
-  }
-
-  .gcard {
-    position: absolute;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.55rem 0.7rem;
-    border: 2.2px solid var(--c, #888);
-    border-radius: 14px;
-    /* Card tinted with its type colour, so kind reads at a glance. */
-    background: color-mix(in srgb, var(--c, #888) 11%, var(--color-bg-raised, #1a1a1a));
-    color: var(--color-fg, #e8e8e8);
-    font-size: var(--text-sm, 0.875rem);
-    cursor: default;
-    user-select: text;
-  }
-
-  .gcard--pill {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.4rem;
-    max-width: 240px;
-    padding: 0.3rem 0.8rem;
-    border-radius: 999px;
-    white-space: nowrap;
-  }
-
-  .gcard--step:not(.gcard--pill) {
-    border-radius: 10px;
-  }
-
-  .gcard--note {
-    border-radius: 10px;
-  }
-
-  .gcard--attachment,
-  .gcard--cluster {
-    padding: 0.4rem;
-    border-radius: 18px;
-    text-align: center;
-  }
-
-  .gcard--root {
-    border-width: 3px;
-  }
-
-  .gcard--editing {
-    z-index: 5;
-    cursor: default;
-    box-shadow: 0 6px 24px color-mix(in srgb, #000 55%, transparent);
-  }
-
-  .gcard__titleedit {
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 0.15rem 0.35rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--c, #888) 14%, var(--color-bg, #121212));
-    color: inherit;
-    font: inherit;
-    font-weight: 600;
-  }
-
-  .gcard__editor {
-    flex: 1 1 auto;
-    min-height: 0;
-    resize: none;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--c, #888) 14%, var(--color-bg, #121212));
-    color: var(--color-fg, #e8e8e8);
-    font-family: var(--font-mono, monospace);
-    font-size: 0.78rem;
-    line-height: 1.45;
-    user-select: text;
-  }
-
-  .gcard__editbar {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .gcard__edithint {
-    margin-left: auto;
-    font-size: 0.65rem;
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .gcard--sel {
-    background: color-mix(in srgb, var(--c, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
-  }
-
-  .gcard__prog {
-    flex: none;
-    margin-left: auto;
-    padding-left: 0.5rem;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.7rem;
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .gcard--done {
-    opacity: 0.6;
-  }
-
-  .gcard--orphan {
-    border-style: dashed;
-  }
-
-  .gcard--picked {
-    outline: 3px solid #5aa9ff;
-    outline-offset: 2px;
   }
 
   .gmarquee {
@@ -2911,27 +2472,9 @@
     padding-inline: 0.8rem;
   }
 
-  .graph__btn--on {
+  :global(.graph__btn--on) {
     border-color: #5aa9ff;
     color: #5aa9ff;
-  }
-
-  /* Link mode: what can be picked glows, the rest recedes. */
-  .gcard--dim {
-    opacity: 0.35;
-  }
-
-  .gcard--pickable {
-    cursor: crosshair;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, #c9a227) 35%, transparent);
-  }
-
-  .gcard--pickable:hover {
-    box-shadow: 0 0 0 4px var(--c, #c9a227);
-  }
-
-  .gcard--anchor {
-    box-shadow: 0 0 0 4px var(--c, #c9a227);
   }
 
   .glink-hint {
@@ -2947,20 +2490,6 @@
     background: var(--color-bg-raised, #1a1a1a);
     font-size: var(--text-sm, 0.875rem);
     pointer-events: none;
-  }
-
-  .glink-line {
-    pointer-events: none;
-  }
-
-  /* New, not yet saved: dotted frame; without an owner the frame turns red. */
-  .gcard--draft {
-    border-style: dotted;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, #888) 14%, transparent);
-  }
-
-  .gcard--ownerless {
-    box-shadow: 0 0 0 3px color-mix(in srgb, #e0443e 22%, transparent);
   }
 
   /* The change log floats over the top-right of the field; folded it is a strip. */
@@ -3021,14 +2550,14 @@
     color: var(--color-fg-muted, #9a9a9a);
   }
 
-  .graph__btn--primary {
+  :global(.graph__btn--primary) {
     background: var(--color-accent, #c9a227);
     border-color: var(--color-accent, #c9a227);
     color: var(--color-bg, #121212);
     font-weight: 600;
   }
 
-  .graph__btn--primary:disabled {
+  :global(.graph__btn--primary:disabled) {
     opacity: 0.45;
     cursor: not-allowed;
   }
@@ -3084,181 +2613,10 @@
     color: var(--color-fg, #e8e8e8);
   }
 
-  .gcard__head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    min-width: 0;
-  }
-
-  .gcard__icon {
-    flex: none;
-    display: inline-flex;
-    align-self: center;
-    color: var(--line-color, var(--c, #888));
-  }
-
-  /* Links not on the map yet: a circle per entity type on the card's lower border. */
-  .gcard__more {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -11px;
-    z-index: 2;
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-    pointer-events: none;
-  }
-
-  .gcard__dot {
-    min-width: 21px;
-    height: 21px;
-    padding: 0 5px;
-    box-sizing: border-box;
-    border: 2px solid var(--color-bg, #121212);
-    border-radius: 999px;
-    background: var(--dot, #888);
-    color: #141414;
-    font: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 17px;
-    text-align: center;
-    cursor: pointer;
-    pointer-events: auto;
-    box-shadow: 0 1px 4px color-mix(in srgb, #000 50%, transparent);
-  }
-
-  .gcard__dot:hover {
-    filter: brightness(1.15);
-    transform: scale(1.12);
-  }
-
-  /* Unsaved change: a yellow "!" in a circle on the card's top-right corner. */
-  .gcard__changed {
-    position: absolute;
-    top: -9px;
-    right: -9px;
-    z-index: 2;
-    width: 19px;
-    height: 19px;
-    padding: 0;
-    display: grid;
-    place-items: center;
-    border: 2px solid var(--color-bg, #121212);
-    border-radius: 50%;
-    background: #f2c230;
-    color: #1b1500;
-    font: inherit;
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1;
-    cursor: pointer;
-    box-shadow: 0 1px 4px color-mix(in srgb, #000 50%, transparent);
-  }
-
-  .gcard__changed:hover {
-    transform: scale(1.15);
-  }
-
   .gdraft__row--flash {
     background: color-mix(in srgb, #f2c230 28%, transparent);
     border-radius: 6px;
     outline: 1px solid #f2c230;
-  }
-
-  .gcard__glyph {
-    flex: none;
-    color: var(--c, #888);
-  }
-
-  .gcard__title {
-    min-width: 0;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-
-  .gcard__title--line {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 500;
-    font-size: 0.8rem;
-  }
-
-  .gcard__status {
-    margin-left: auto;
-    font-size: 0.65rem;
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .gcard__body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    color: var(--color-fg-muted, #b5b5b5);
-    cursor: auto;
-  }
-
-  .gcard__body :global(p) {
-    margin: 0 0 0.4em;
-  }
-
-  .gcard__body :global(> :last-child) {
-    margin-bottom: 0;
-  }
-
-  .gcard__body :global(h1),
-  .gcard__body :global(h2),
-  .gcard__body :global(h3) {
-    margin: 0.4em 0 0.25em;
-    font-size: 0.9rem;
-  }
-
-  .gcard__body :global(pre) {
-    overflow: auto;
-  }
-
-  .gcard__body :global(img) {
-    max-width: 100%;
-  }
-
-  .gcard__sq {
-    display: grid;
-    justify-items: center;
-    align-content: center;
-    gap: 0.3rem;
-    height: 100%;
-    min-width: 0;
-  }
-
-  .gcard__thumb {
-    width: 100%;
-    height: 56px;
-    object-fit: cover;
-    border-radius: 10px;
-    pointer-events: none;
-  }
-
-  .gcard__count {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--c, #888);
-  }
-
-  .gcard__name {
-    max-width: 100%;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-    font-size: 0.68rem;
-    line-height: 1.2;
   }
 
   /* Narrow (portrait) screens: the controls form an even grid and the page
