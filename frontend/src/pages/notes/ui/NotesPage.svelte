@@ -9,6 +9,7 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
+  import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
   import { NOTE_SPEC, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { parseQuery, passes, helpLine } from '@/shared/lib/searchFlags.ts'
@@ -106,10 +107,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let parentMenuOpen = $state(false)
   let parentMenuX = $state(0)
   let parentMenuY = $state(0)
-  let exportMenuOpen = $state(false)
-  let exportMenuX = $state(0)
-  let exportMenuY = $state(0)
-  let exportBusy = $state(false)
   let iconModalOpen = $state(false)
   let iconModalNoteId = $state((null as number | null))
   /** Inline rename in the tree — id of the row being renamed, or null. */
@@ -760,68 +757,29 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     reparentNote(selectedId, id)
   }
 
-  function openExportMenu(event: MouseEvent) {
-    event.preventDefault()
-    event.stopPropagation()
-    const el = (event.currentTarget as HTMLElement)
-    const rect = el.getBoundingClientRect()
-    exportMenuX = rect.left
-    exportMenuY = rect.bottom + 4
-    exportMenuOpen = true
-  }
+  const noteExport = createNoteExport({
+    downloadMarkdown: downloadNoteMarkdown,
+    downloadPdf: (payload) => downloadNotePdf(payload, { labels }),
+    setError: (message) => (error = message),
+  })
+  let exportBusy = $derived(noteExport.busy)
+  const openExportMenu = noteExport.openMenu
+  const exportMenuItems = $derived(noteExport.items)
 
-  async function exportNoteById(id: number, action: string) {
-    if (id == null || exportBusy) return
+  /** The note as it should be exported: what is on screen for the open one, what the list knows for the others. */
+  function exportNoteById(id: number, action: string) {
+    if (id == null) return
     const n = noteById(id)
     const payload =
       id === selectedId
-        ? {
-            id,
-            title: title.trim() || detail?.title || n?.title || `note=${id}`,
-            description,
-          }
-        : {
-            id,
-            title: n?.title || `note=${id}`,
-            description: n?.description || '',
-          }
-    exportBusy = true
-    error = ''
-    try {
-      if (action === 'md') {
-        downloadNoteMarkdown(payload)
-        toast('Markdown сохранён', { kind: 'success' })
-      } else if (action === 'pdf') {
-        const tid = 'pdf-note'
-        toastProgress(tid, 'Генерация PDF…')
-        try {
-          await downloadNotePdf(payload, { labels })
-          toastDone(tid, 'PDF сохранён')
-        } catch (e) {
-          toastDone(tid, e?.message || 'Не удалось сохранить PDF', 'error')
-          throw e
-        }
-      }
-    } catch (e) {
-      if (action !== 'pdf') {
-        error = e?.message || String(e)
-        toast(error, { kind: 'error' })
-      } else {
-        error = e?.message || String(e)
-      }
-    } finally {
-      exportBusy = false
-    }
+        ? { id, title: title.trim() || detail?.title || n?.title || `note=${id}`, description }
+        : { id, title: n?.title || `note=${id}`, description: n?.description || '' }
+    return noteExport.run(payload, action)
   }
 
-  function onExportSelect(action: any) {
+  function onExportSelect(action: string) {
     exportNoteById(selectedId, action)
   }
-
-  let exportMenuItems = $derived([
-    { id: 'md', label: 'Markdown (.md)' },
-    { id: 'pdf', label: exportBusy ? 'PDF…' : 'PDF' },
-  ])
 
   let ctxNote = $derived(ctxNoteId == null ? null : noteById(ctxNoteId))
 
@@ -1227,12 +1185,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 />
 
 <ContextMenu
-  open={exportMenuOpen}
-  x={exportMenuX}
-  y={exportMenuY}
+  open={noteExport.menuOpen}
+  x={noteExport.menuX}
+  y={noteExport.menuY}
   items={exportMenuItems}
   onSelect={onExportSelect}
-  onClose={() => (exportMenuOpen = false)}
+  onClose={() => (noteExport.menuOpen = false)}
 />
 
 <NoteIconModal
