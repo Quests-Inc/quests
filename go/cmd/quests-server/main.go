@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +20,7 @@ import (
 	"github.com/valirum/quests/go/internal/platform/hooks"
 	"github.com/valirum/quests/go/internal/platform/metrics"
 	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"github.com/valirum/quests/go/internal/platform/webdav"
 	"github.com/valirum/quests/go/internal/schedule"
 	"github.com/valirum/quests/go/internal/store"

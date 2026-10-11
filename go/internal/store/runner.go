@@ -5,15 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/platform/db"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/platform/db"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 )
 
 // Runner is a device that executes checks for us. It registers once with a

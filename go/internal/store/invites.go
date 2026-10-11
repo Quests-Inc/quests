@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"time"
 
 	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 )
 
 var (

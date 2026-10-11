@@ -3,7 +3,6 @@ package schedule
 import (
 	"context"
 	"encoding/json"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"log"
 	"regexp"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
 )
 

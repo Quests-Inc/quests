@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"encoding/json"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,7 +9,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
 	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
 
 var upgrader = websocket.Upgrader{

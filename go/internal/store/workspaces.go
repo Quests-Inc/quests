@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"strings"
 	"time"
 
 	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
 

@@ -4,11 +4,11 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"strings"
 
+	"github.com/valirum/quests/go/internal/platform/secretbox"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 )
 
 // Two-factor sign-in (quest=359). The secret is sealed with the server key; recovery codes

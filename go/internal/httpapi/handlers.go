@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -21,6 +20,7 @@ import (
 	"github.com/valirum/quests/go/internal/platform/secretbox"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/webdav"
+	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/store"
 )

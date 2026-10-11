@@ -3,14 +3,14 @@ package identity
 import (
 	"database/sql"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/db"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/valirum/quests/go/internal/platform/db"
+	"github.com/valirum/quests/go/internal/platform/secretbox"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 )
 
 // SessionTTL is how long a browser stays logged in without re-entering the password.

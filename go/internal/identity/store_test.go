@@ -1,11 +1,11 @@
 package identity
 
 import (
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"testing"
 	"time"
 
 	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 )
 
 // newTestStore is a Store on a fresh PostgreSQL database with the real schema, set up
