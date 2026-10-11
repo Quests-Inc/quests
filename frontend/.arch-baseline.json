@@ -7,35 +7,5 @@
     "pages/attachments/ui/AttachmentsPage.svelte": 881,
     "widgets/quest-detail/ui/QuestDetail.svelte": 809
   },
-  "untested": [
-    "entities/attachment/model/attachmentCache.ts",
-    "entities/history/model/historyKinds.ts",
-    "entities/note/model/noteDrafts.svelte.ts",
-    "entities/quest/model/entityFlags.ts",
-    "entities/quest/model/questExport.ts",
-    "entities/quest/model/questFlags.ts",
-    "entities/quest/model/questFormat.ts",
-    "entities/quest/model/questGroups.ts",
-    "entities/quest/model/steps.ts",
-    "entities/runner/model/runnersList.svelte.ts",
-    "entities/template/model/templatesStore.svelte.ts",
-    "features/settings/model/workspaceState.svelte.ts",
-    "shared/lib/actionsPreview.ts",
-    "shared/lib/clipboard.ts",
-    "shared/lib/duration.ts",
-    "shared/lib/fileKind.ts",
-    "shared/lib/listNav.ts",
-    "shared/lib/live.ts",
-    "shared/lib/markdown.ts",
-    "shared/lib/mdCaretMap.ts",
-    "shared/lib/mentionSuggest.ts",
-    "shared/lib/pdfExport.ts",
-    "shared/lib/popover.ts",
-    "shared/lib/refs.ts",
-    "shared/lib/searchSnippet.ts",
-    "shared/lib/suggest.ts",
-    "shared/lib/theme.ts",
-    "shared/lib/time.ts",
-    "shared/lib/typewriter.ts"
-  ]
+  "untested": []
 }

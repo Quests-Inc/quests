@@ -26,6 +26,9 @@ export const wsx = $state({
   notice: '',
 })
 
+/** Браузерное окружение, которое можно подменить в тестах: перезагрузка страницы и адрес сервера. */
+export const env = { reload: () => location.reload(), origin: () => location.origin }
+
 export function currentWorkspaceName() {
   return wsx.list.find((w: { id: any }) => w.id === wsx.current)?.name ?? ''
 }
@@ -66,7 +69,7 @@ async function act(fn: () => Promise<unknown>, failure: string) {
 
 export async function pickWorkspace(id: number) {
   if (id === wsx.current) return
-  if (await act(() => switchWorkspace(id), 'не удалось переключить')) location.reload()
+  if (await act(() => switchWorkspace(id), 'не удалось переключить')) env.reload()
 }
 
 export async function addWorkspace(name: string) {
@@ -75,7 +78,7 @@ export async function addWorkspace(name: string) {
     const w = await createWorkspace(name.trim())
     await switchWorkspace(w.id)
   }, 'не удалось создать')
-  if (ok) location.reload()
+  if (ok) env.reload()
   return ok
 }
 
@@ -89,7 +92,7 @@ export async function saveName(name: string) {
 }
 
 export async function removeCurrent(confirmName: string) {
-  if (await act(() => deleteWorkspace(wsx.current, confirmName.trim()), 'не удалось удалить')) location.reload()
+  if (await act(() => deleteWorkspace(wsx.current, confirmName.trim()), 'не удалось удалить')) env.reload()
 }
 
 /** @returns the one-time link, or '' on failure */
@@ -97,7 +100,7 @@ export async function newInvite(): Promise<string> {
   let url = ''
   await act(async () => {
     const r = await createInvite(wsx.current)
-    url = location.origin + r.path
+    url = env.origin() + r.path
   }, 'не удалось создать приглашение')
   return url
 }
@@ -107,7 +110,7 @@ export async function dropMember(m: { username: any; user_id: number }, me: any)
   if (!confirm(self ? 'Выйти из этого пространства?' : `Убрать ${m.username} из пространства?`)) return
   const ok = await act(() => removeMember(wsx.current, m.user_id), 'не удалось убрать')
   if (!ok) return
-  if (self) location.reload()
+  if (self) env.reload()
   else wsx.members = wsx.members.filter((x: { user_id: any }) => x.user_id !== m.user_id)
 }
 
@@ -119,5 +122,5 @@ export async function doImport(file: Blob | File, secrets: any) {
     wsx.notice = `Создано пространство «${r.name}». Команд без раннера убрано: ${rep.stripped_commands ?? 0}, битых ссылок: ${rep.dangling_refs ?? 0}.`
     await switchWorkspace(r.workspace_id)
   }, 'не удалось импортировать')
-  if (ok) setTimeout(() => location.reload(), 1800)
+  if (ok) setTimeout(() => env.reload(), 1800)
 }
