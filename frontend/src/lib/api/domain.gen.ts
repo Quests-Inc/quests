@@ -184,7 +184,7 @@ export interface QuestRead {
    * resolving note=N/attachment=N/... mentions for every row in a list
    * response would be an N+1 query fan-out nobody needs there.
    */
-  refs?: { [key: string]: any}[];
+  refs?: ResolvedRef[];
 }
 export interface StepRead {
   id: number /* int64 */;
@@ -202,4 +202,21 @@ export interface StepRead {
   run_status?: string;
   run_on?: string;
   done: boolean;
+}
+/**
+ * ResolvedRef is a kind=ID mention in a text with the title it points at (null when the target is gone).
+ */
+export interface ResolvedRef {
+  kind: string;
+  id: number /* int64 */;
+  title?: string;
+  /**
+   * QuestID is set for a step: the quest it belongs to.
+   */
+  quest_id?: number /* int64 */;
+  /**
+   * OwnerType and OwnerID are set for an attachment: what it hangs on.
+   */
+  owner_type?: string;
+  owner_id?: number /* int64 */;
 }

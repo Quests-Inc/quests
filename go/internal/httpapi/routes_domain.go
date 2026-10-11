@@ -639,13 +639,14 @@ func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64
 		return
 	}
 	payload := s.notePayloadFiltered(r, n)
-	payload["attachments"] = s.attachmentsForOwner(r.Context(), ownerNote, n.ID, true)
+	attachments := s.attachmentsForOwner(r.Context(), ownerNote, n.ID, true)
+	payload.Attachments = attachments
 	writeJSON(w, 200, map[string]any{
 		"focus":       map[string]any{"type": "note", "id": n.ID},
 		"note":        payload,
 		"questline":   nil,
 		"quests":      []any{},
-		"attachments": map[string]any{"note": payload["attachments"]},
+		"attachments": map[string]any{"note": attachments},
 	})
 }
 

@@ -338,7 +338,41 @@ export interface Note {
   CreatedAt: string;
   UpdatedAt: string;
 }
-export type NoteRead = { [key: string]: any};
+/**
+ * NoteRead is a note as the API sends it in a list or on its own.
+ */
+export interface NoteRead {
+  id: number /* int64 */;
+  title: string;
+  description: string;
+  pinned: boolean;
+  is_readme: boolean;
+  is_private: boolean;
+  is_category: boolean;
+  sort_order: number /* int */;
+  parent_id?: number /* int64 */;
+  color: string;
+  icon: string;
+  custom_icon?: string;
+  icon_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+/**
+ * NoteBriefRead is the short form of a note: a child in a tree, no text.
+ */
+export interface NoteBriefRead {
+  id: number /* int64 */;
+  title: string;
+  parent_id?: number /* int64 */;
+  pinned: boolean;
+  is_readme: boolean;
+  is_private: boolean;
+  is_category: boolean;
+  color: string;
+  icon: string;
+  icon_url?: string;
+}
 export interface NoteFilter {
   ParentID?: number /* int64 */;
   ParentUnset: boolean;

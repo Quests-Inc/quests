@@ -18,29 +18,25 @@ func (s *Server) registerNoteCheck(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/notes/{id}/outdated", s.putNoteOutdated)
 }
 
-// checkView is a note's check as the API shows it.
-func checkView(c store.NoteCheck) map[string]any {
-	return map[string]any{
-		"command":          c.Command,
-		"interval_seconds": c.IntervalSeconds,
-		"run_on":           c.RunOn,
-		"last_run_at":      timeutil.ToUTCISO(c.LastRunAt),
-		"outdated":         c.Outdated,
-		"outdated_at":      timeutil.ToUTCISO(c.OutdatedAt),
-		"reason":           c.Reason,
-		"error":            c.Error,
-		"error_at":         timeutil.ToUTCISO(c.ErrorAt),
-	}
+// NoteCheckView is a note's check as the API shows it.
+type NoteCheckView struct {
+	Command         *string `json:"command"`
+	IntervalSeconds *int    `json:"interval_seconds"`
+	RunOn           *string `json:"run_on"`
+	LastRunAt       *string `json:"last_run_at"`
+	Outdated        bool    `json:"outdated"`
+	OutdatedAt      *string `json:"outdated_at"`
+	Reason          string  `json:"reason"`
+	Error           string  `json:"error"`
+	ErrorAt         *string `json:"error_at"`
 }
 
-// withCheck adds the check state to a note read: the verdict (and why) on every note that has one,
-// the full check — command, interval, where it runs — only on the single-note read.
-func withCheck(out map[string]any, c store.NoteCheck, full bool) {
-	out["outdated"] = c.Outdated
-	out["outdated_reason"] = c.Reason
-	out["has_check"] = c.Active()
-	if full {
-		out["check"] = checkView(c)
+func checkView(c store.NoteCheck) NoteCheckView {
+	return NoteCheckView{
+		Command: c.Command, IntervalSeconds: c.IntervalSeconds, RunOn: c.RunOn,
+		LastRunAt: timeutil.ToUTCISO(c.LastRunAt), Outdated: c.Outdated,
+		OutdatedAt: timeutil.ToUTCISO(c.OutdatedAt), Reason: c.Reason, Error: c.Error,
+		ErrorAt: timeutil.ToUTCISO(c.ErrorAt),
 	}
 }
 

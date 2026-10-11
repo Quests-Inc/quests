@@ -29,7 +29,38 @@ type Note struct {
 	UpdatedAt   time.Time
 }
 
-type NoteRead map[string]any
+// NoteRead is a note as the API sends it in a list or on its own.
+type NoteRead struct {
+	ID          int64   `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Pinned      bool    `json:"pinned"`
+	IsReadme    bool    `json:"is_readme"`
+	IsPrivate   bool    `json:"is_private"`
+	IsCategory  bool    `json:"is_category"`
+	SortOrder   int     `json:"sort_order"`
+	ParentID    *int64  `json:"parent_id"`
+	Color       string  `json:"color"`
+	Icon        string  `json:"icon"`
+	CustomIcon  *string `json:"custom_icon"`
+	IconURL     *string `json:"icon_url"`
+	CreatedAt   *string `json:"created_at"`
+	UpdatedAt   *string `json:"updated_at"`
+}
+
+// NoteBriefRead is the short form of a note: a child in a tree, no text.
+type NoteBriefRead struct {
+	ID         int64   `json:"id"`
+	Title      string  `json:"title"`
+	ParentID   *int64  `json:"parent_id"`
+	Pinned     bool    `json:"pinned"`
+	IsReadme   bool    `json:"is_readme"`
+	IsPrivate  bool    `json:"is_private"`
+	IsCategory bool    `json:"is_category"`
+	Color      string  `json:"color"`
+	Icon       string  `json:"icon"`
+	IconURL    *string `json:"icon_url,omitempty"`
+}
 
 type NoteFilter struct {
 	ParentID    *int64
@@ -360,47 +391,31 @@ func scanNote(row rowScanner) (Note, error) {
 
 func NoteToRead(n Note) NoteRead {
 	out := NoteRead{
-		"id":          n.ID,
-		"title":       n.Title,
-		"description": n.Description,
-		"pinned":      n.Pinned,
-		"is_readme":   n.IsReadme,
-		"is_private":  n.IsPrivate,
-		"is_category": n.IsCategory,
-		"sort_order":  n.SortOrder,
-		"parent_id":   n.ParentID,
-		"color":       n.Color,
-		"icon":        n.Icon,
-		"custom_icon": nil,
-		"icon_url":    nil,
-		"created_at":  timeutil.ToUTCISO(&n.CreatedAt),
-		"updated_at":  timeutil.ToUTCISO(&n.UpdatedAt),
+		ID: n.ID, Title: n.Title, Description: n.Description, Pinned: n.Pinned,
+		IsReadme: n.IsReadme, IsPrivate: n.IsPrivate, IsCategory: n.IsCategory,
+		SortOrder: n.SortOrder, ParentID: n.ParentID, Color: n.Color, Icon: n.Icon,
+		CreatedAt: timeutil.ToUTCISO(&n.CreatedAt), UpdatedAt: timeutil.ToUTCISO(&n.UpdatedAt),
 	}
 	if n.CustomIcon != nil && *n.CustomIcon != "" {
-		out["custom_icon"] = *n.CustomIcon
+		icon := *n.CustomIcon
+		out.CustomIcon = &icon
 		u := fmt.Sprintf("/api/notes/%d/icon", n.ID)
 		if iso := timeutil.ToUTCISO(&n.UpdatedAt); iso != nil {
 			u += "?v=" + *iso
 		}
-		out["icon_url"] = u
+		out.IconURL = &u
 	}
 	return out
 }
 
-func NoteBrief(n Note) NoteRead {
-	out := NoteRead{
-		"id":          n.ID,
-		"title":       n.Title,
-		"parent_id":   n.ParentID,
-		"pinned":      n.Pinned,
-		"is_readme":   n.IsReadme,
-		"is_private":  n.IsPrivate,
-		"is_category": n.IsCategory,
-		"color":       n.Color,
-		"icon":        n.Icon,
+func NoteBrief(n Note) NoteBriefRead {
+	out := NoteBriefRead{
+		ID: n.ID, Title: n.Title, ParentID: n.ParentID, Pinned: n.Pinned, IsReadme: n.IsReadme,
+		IsPrivate: n.IsPrivate, IsCategory: n.IsCategory, Color: n.Color, Icon: n.Icon,
 	}
 	if n.CustomIcon != nil && *n.CustomIcon != "" {
-		out["icon_url"] = fmt.Sprintf("/api/notes/%d/icon", n.ID)
+		u := fmt.Sprintf("/api/notes/%d/icon", n.ID)
+		out.IconURL = &u
 	}
 	return out
 }

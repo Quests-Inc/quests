@@ -1,5 +1,5 @@
 import type { Category, QuestRead, Tag } from '../api/domain.gen'
-import type { LLMView, RunnerView } from '../api/http.gen'
+import type { LLMView, NoteCheckView, NoteListItem, NotePayload, RunnerView } from '../api/http.gen'
 import type { QuestlineRead, RunnerJob } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
@@ -192,8 +192,8 @@ export function deleteSecret(kind, id, key) {
 }
 
 /** Set (or, with a null command, remove) a note's freshness check. `body`: { command, interval_seconds, run_on }. */
-export function setNoteCheck(id, body) {
-  return request(`/api/notes/${id}/check`, { method: 'PUT', body: JSON.stringify(body) })
+export function setNoteCheck(id: number, body: object) {
+  return request<NoteCheckView>(`/api/notes/${id}/check`, { method: 'PUT', body: JSON.stringify(body) })
 }
 
 /** Ask for a run at the scheduler's next tick. */
@@ -309,22 +309,22 @@ export function deleteQuestline(id) {
 }
 
 export function listNotes() {
-  return request('/api/notes')
+  return request<NoteListItem[]>('/api/notes')
 }
 
-export function getNote(id) {
-  return request(`/api/notes/${id}`)
+export function getNote(id: number) {
+  return request<NotePayload>(`/api/notes/${id}`)
 }
 
-export function createNote(payload) {
-  return request('/api/notes', {
+export function createNote(payload: object) {
+  return request<NotePayload>('/api/notes', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
-export function updateNote(id, payload) {
-  return request(`/api/notes/${id}`, {
+export function updateNote(id: number, payload: object) {
+  return request<NotePayload>(`/api/notes/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })

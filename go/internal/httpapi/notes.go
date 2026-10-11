@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/events"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/store"
@@ -56,12 +57,11 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	checks, _ := s.Store.NoteChecks(r.Context())
-	out := make([]store.NoteRead, 0, len(rows))
+	out := make([]NoteListItem, 0, len(rows))
 	for _, n := range rows {
 		read := store.NoteToRead(n)
-		redactPrivateNote(r, n, read)
-		withCheck(read, checks[n.ID], false)
-		out = append(out, read)
+		redactPrivateNote(r, n, &read)
+		out = append(out, NoteListItem{NoteRead: read, NoteVerdict: verdictOf(checks[n.ID])})
 	}
 	if r.URL.Query().Get("sort") == "popular" {
 		// Reading history: decayed score first, then the boost (newness, manual weight); explained per note.
@@ -74,13 +74,12 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, perr.Error())
 			return
 		}
-		for _, read := range out {
-			id, _ := read["id"].(int64)
-			p := pop[id]
-			read["popularity"] = p
+		for i := range out {
+			p := pop[out[i].ID]
+			out[i].Popularity = &p
 		}
 		sort.SliceStable(out, func(i, j int) bool {
-			pi, pj := out[i]["popularity"].(store.NotePopularity), out[j]["popularity"].(store.NotePopularity)
+			pi, pj := out[i].Popularity, out[j].Popularity
 			if pi.Score != pj.Score {
 				return pi.Score > pj.Score
 			}
@@ -90,18 +89,54 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
+// NoteVerdict is the outcome of a note's check, shown on every note.
+type NoteVerdict struct {
+	Outdated       bool   `json:"outdated"`
+	OutdatedReason string `json:"outdated_reason"`
+	HasCheck       bool   `json:"has_check"`
+}
+
+func verdictOf(c store.NoteCheck) NoteVerdict {
+	return NoteVerdict{Outdated: c.Outdated, OutdatedReason: c.Reason, HasCheck: c.Active()}
+}
+
+// NoteListItem is a note in a list: its fields, the verdict of its check, and — in a popularity sort — why it ranks where it does.
+type NoteListItem struct {
+	store.NoteRead `tstype:",extends"`
+	NoteVerdict    `tstype:",extends"`
+	Popularity     *store.NotePopularity `json:"popularity,omitempty"`
+}
+
+// Backlink is something that mentions a note.
+type Backlink struct {
+	Kind  string `json:"kind"`
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+// NotePayload is a note read on its own: the list item plus its surroundings.
+type NotePayload struct {
+	NoteListItem `tstype:",extends"`
+	Children     []store.NoteBriefRead `json:"children"`
+	Refs         []domain.ResolvedRef  `json:"refs"`
+	Backlinks    []Backlink            `json:"backlinks"`
+	Check        NoteCheckView         `json:"check"`
+	// Attachments is set by the context endpoint only.
+	Attachments any `json:"attachments,omitempty"`
+}
+
 // redactPrivateNote replaces description in-place with a placeholder when the
 // note is marked private and this request came in via MCP (X-Quests-Source:
 // mcp) — see note=82. Every other source (web, cli, telegram, api, ...) keeps
 // seeing the real content; only the agent's default tool path is blocked.
-func redactPrivateNote(r *http.Request, n store.Note, out store.NoteRead) {
+func redactPrivateNote(r *http.Request, n store.Note, out *store.NoteRead) {
 	if !n.IsPrivate {
 		return
 	}
 	if src := requestSource(r); src == nil || *src != "mcp" {
 		return
 	}
-	out["description"] = "[приватная заметка — содержимое скрыто от MCP; попросите пользователя прочитать её самостоятельно, если это правда нужно]"
+	out.Description = "[приватная заметка — содержимое скрыто от MCP; попросите пользователя прочитать её самостоятельно, если это правда нужно]"
 }
 
 func (s *Server) getNote(w http.ResponseWriter, r *http.Request) {
@@ -446,46 +481,47 @@ func (s *Server) deleteNoteIcon(w http.ResponseWriter, r *http.Request) {
 
 // notePayloadFiltered is notePayload with private-note redaction applied —
 // use this everywhere a note goes back in a response, not the bare notePayload.
-func (s *Server) notePayloadFiltered(r *http.Request, n store.Note) map[string]any {
+func (s *Server) notePayloadFiltered(r *http.Request, n store.Note) NotePayload {
 	out := s.notePayload(r, n)
-	redactPrivateNote(r, n, store.NoteRead(out))
+	redactPrivateNote(r, n, &out.NoteRead)
 	return out
 }
 
-func (s *Server) notePayload(r *http.Request, n store.Note) map[string]any {
-	out := store.NoteToRead(n)
+func (s *Server) notePayload(r *http.Request, n store.Note) NotePayload {
 	children, _ := s.Store.ListNotes(r.Context(), store.NoteFilter{ParentID: &n.ID})
-	childReads := make([]store.NoteRead, 0, len(children))
+	childReads := make([]store.NoteBriefRead, 0, len(children))
 	for _, c := range children {
 		childReads = append(childReads, store.NoteBrief(c))
 	}
-	out["children"] = childReads
-	out["refs"] = s.resolveRefs(r, refs.Parse(n.Title+"\n"+n.Description))
-	out["backlinks"] = s.backlinksTo(r, "note", n.ID)
 	c, _ := s.Store.GetNoteCheck(r.Context(), n.ID)
-	withCheck(out, c, true)
-	return out
+	return NotePayload{
+		NoteListItem: NoteListItem{NoteRead: store.NoteToRead(n), NoteVerdict: verdictOf(c)},
+		Children:     childReads,
+		Refs:         s.resolveRefs(r, refs.Parse(n.Title+"\n"+n.Description)),
+		Backlinks:    s.backlinksTo(r, "note", n.ID),
+		Check:        checkView(c),
+	}
 }
 
-func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []map[string]any {
-	out := make([]map[string]any, 0, len(list))
+func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []domain.ResolvedRef {
+	out := make([]domain.ResolvedRef, 0, len(list))
 	for _, ref := range list {
-		row := map[string]any{"kind": ref.Kind, "id": ref.ID, "title": nil}
+		row := domain.ResolvedRef{Kind: ref.Kind, ID: ref.ID}
 		switch ref.Kind {
 		case "note":
 			n, err := s.Store.GetNote(r.Context(), ref.ID)
 			if err == nil {
-				row["title"] = n.Title
+				row.Title = &n.Title
 			}
 		case "quest":
 			q, err := s.Store.GetQuest(r.Context(), ref.ID)
 			if err == nil {
-				row["title"] = q.Title
+				row.Title = &q.Title
 			}
 		case "questline":
 			ql, err := s.Store.GetQuestline(r.Context(), ref.ID)
 			if err == nil {
-				row["title"] = ql.Title
+				row.Title = &ql.Title
 			}
 		case "step":
 			qid, err := s.Store.QuestIDForStep(r.Context(), ref.ID)
@@ -494,8 +530,8 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []map[string]any 
 				if err == nil {
 					for _, st := range q.Steps {
 						if st.ID == ref.ID {
-							row["title"] = st.Title
-							row["quest_id"] = q.ID
+							row.Title = &st.Title
+							row.QuestID = &q.ID
 							break
 						}
 					}
@@ -505,15 +541,15 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []map[string]any 
 			t, err := s.Store.GetTemplate(r.Context(), ref.ID)
 			if err == nil {
 				if title, ok := t["title"].(string); ok {
-					row["title"] = title
+					row.Title = &title
 				}
 			}
 		case "attachment":
 			a, err := s.Store.GetAttachment(r.Context(), ref.ID)
 			if err == nil {
-				row["title"] = a.Filename
-				row["owner_type"] = a.OwnerType
-				row["owner_id"] = a.OwnerID
+				row.Title = &a.Filename
+				row.OwnerType = a.OwnerType
+				row.OwnerID = &a.OwnerID
 			}
 		}
 		out = append(out, row)
@@ -521,12 +557,12 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []map[string]any 
 	return out
 }
 
-func (s *Server) backlinksTo(r *http.Request, kind string, id int64) []map[string]any {
+func (s *Server) backlinksTo(r *http.Request, kind string, id int64) []Backlink {
 	corpus, err := s.Store.ListLinkCorpus(r.Context())
 	if err != nil {
-		return []map[string]any{}
+		return []Backlink{}
 	}
-	out := make([]map[string]any, 0)
+	out := make([]Backlink, 0)
 	for _, doc := range corpus {
 		if doc.Kind == kind && doc.ID == id {
 			continue
@@ -541,16 +577,12 @@ func (s *Server) backlinksTo(r *http.Request, kind string, id int64) []map[strin
 		if !found {
 			continue
 		}
-		out = append(out, map[string]any{
-			"kind":  doc.Kind,
-			"id":    doc.ID,
-			"title": doc.Title,
-		})
+		out = append(out, Backlink{Kind: doc.Kind, ID: doc.ID, Title: doc.Title})
 	}
 	return out
 }
 
-func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []map[string]any {
+func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []domain.ResolvedRef {
 	var blob strings.Builder
 	for _, t := range texts {
 		blob.WriteString(t)

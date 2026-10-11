@@ -20,8 +20,11 @@ packages:
     include_files:
       - "runner.go"
       - "llm_settings.go"
+      - "notes.go"
+      - "notecheck.go"
     frontmatter: |
-      import type { Runner } from "./store.gen";
+      import type { ResolvedRef } from "./domain.gen";
+      import type { NoteBriefRead, NotePopularity, NoteRead, Runner } from "./store.gen";
       import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
@@ -29,6 +32,10 @@ packages:
       json.RawMessage: "unknown"
       llmassist.Provider: "Provider"
       store.Runner: "Runner"
+      store.NoteRead: "NoteRead"
+      store.NoteBriefRead: "NoteBriefRead"
+      store.NotePopularity: "NotePopularity"
+      domain.ResolvedRef: "ResolvedRef"
   - path: "github.com/valirum/quests/go/internal/llmassist"
     output_path: "../frontend/src/lib/api/llm.gen.ts"
     include_files:
