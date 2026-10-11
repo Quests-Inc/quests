@@ -1,14 +1,14 @@
 # TypeScript types of the HTTP API, generated from the Go structs: `just gen-types`
 # (frontend/src/shared/api/*.gen.ts; CI fails when they are stale).
 packages:
-  - path: "github.com/valirum/quests/go/internal/journal"
+  - path: "github.com/quests-inc/quests/go/internal/journal"
     output_path: "../frontend/src/shared/api/journal.gen.ts"
     frontmatter: |
       import type { Resolved } from "./refs.gen";
     type_mappings:
       time.Time: "string"
       refs.Resolved: "Resolved"
-  - path: "github.com/valirum/quests/go/internal/identity"
+  - path: "github.com/quests-inc/quests/go/internal/identity"
     output_path: "../frontend/src/shared/api/identity.gen.ts"
     include_files:
       - "workspaces.go"
@@ -16,7 +16,7 @@ packages:
     type_mappings:
       time.Time: "string"
       time.Duration: "number"
-  - path: "github.com/valirum/quests/go/internal/identity/http"
+  - path: "github.com/quests-inc/quests/go/internal/identity/http"
     output_path: "../frontend/src/shared/api/identity_http.gen.ts"
     include_files:
       - "views.go"
@@ -26,13 +26,13 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       identity.Workspace: "Workspace"
-  - path: "github.com/valirum/quests/go/internal/refs"
+  - path: "github.com/quests-inc/quests/go/internal/refs"
     output_path: "../frontend/src/shared/api/refs.gen.ts"
     include_files:
       - "resolved.go"
     type_mappings:
       time.Time: "string"
-  - path: "github.com/valirum/quests/go/internal/knowledge/http"
+  - path: "github.com/quests-inc/quests/go/internal/knowledge/http"
     output_path: "../frontend/src/shared/api/knowledge_http.gen.ts"
     include_files:
       - "views.go"
@@ -47,7 +47,7 @@ packages:
       knowledge.NoteBriefRead: "NoteBriefRead"
       knowledge.NotePopularity: "NotePopularity"
       refs.Resolved: "Resolved"
-  - path: "github.com/valirum/quests/go/internal/knowledge"
+  - path: "github.com/quests-inc/quests/go/internal/knowledge"
     output_path: "../frontend/src/shared/api/knowledge.gen.ts"
     exclude_files:
       - "store.go"
@@ -57,7 +57,7 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
-  - path: "github.com/valirum/quests/go/internal/automation"
+  - path: "github.com/quests-inc/quests/go/internal/automation"
     output_path: "../frontend/src/shared/api/automation.gen.ts"
     exclude_files:
       - "store.go"
@@ -70,7 +70,7 @@ packages:
       journal.Tag: "Tag"
     frontmatter: |
       import type { Tag } from "./journal.gen";
-  - path: "github.com/valirum/quests/go/internal/store"
+  - path: "github.com/quests-inc/quests/go/internal/store"
     output_path: "../frontend/src/shared/api/store.gen.ts"
     exclude_files:
       - "store.go"
@@ -81,7 +81,7 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
-  - path: "github.com/valirum/quests/go/internal/httpapi"
+  - path: "github.com/quests-inc/quests/go/internal/httpapi"
     output_path: "../frontend/src/shared/api/http.gen.ts"
     include_files:
       - "llm_settings.go"
@@ -97,7 +97,7 @@ packages:
       knowledge.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
       knowledge.RevisionRead: "RevisionRead"
-  - path: "github.com/valirum/quests/go/internal/automation/http"
+  - path: "github.com/quests-inc/quests/go/internal/automation/http"
     output_path: "../frontend/src/shared/api/automation_http.gen.ts"
     include_files:
       - "views.go"
@@ -108,7 +108,7 @@ packages:
       time.Duration: "number"
       json.RawMessage: "unknown"
       automation.Runner: "Runner"
-  - path: "github.com/valirum/quests/go/internal/llmassist"
+  - path: "github.com/quests-inc/quests/go/internal/llmassist"
     output_path: "../frontend/src/shared/api/llm.gen.ts"
     include_files:
       - "provider.go"

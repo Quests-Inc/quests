@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 func parseTagIDsFromBody(body map[string]any) ([]int64, bool, error) {

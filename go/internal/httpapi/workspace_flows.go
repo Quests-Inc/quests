@@ -3,8 +3,8 @@ package httpapi
 import (
 	"context"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // Flows that cross contexts are composed here, at the root: identity makes workspaces, other contexts

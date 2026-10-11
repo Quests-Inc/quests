@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 func (h *Handler) addStep(w http.ResponseWriter, r *http.Request) {

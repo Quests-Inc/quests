@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/valirum/quests/go/internal/platform/metrics"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/platform/metrics"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // statsSource adapts the data store to what the metrics collector asks for (metrics knows no store).

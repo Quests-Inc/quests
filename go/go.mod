@@ -1,4 +1,4 @@
-module github.com/valirum/quests/go
+module github.com/quests-inc/quests/go
 
 go 1.26.5
 

@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 // Handler serves the journal endpoints.

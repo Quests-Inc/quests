@@ -3,8 +3,8 @@ package httpapi
 import (
 	"context"
 
-	"github.com/valirum/quests/go/internal/identity"
-	identityhttp "github.com/valirum/quests/go/internal/identity/http"
+	"github.com/quests-inc/quests/go/internal/identity"
+	identityhttp "github.com/quests-inc/quests/go/internal/identity/http"
 )
 
 // identityHTTP is the identity context's HTTP face, wired to this server (built on first use, so the fields it

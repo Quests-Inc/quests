@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // The store layer writes `?` placeholders and relies on Result.LastInsertId. Rather

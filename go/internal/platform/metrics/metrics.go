@@ -17,8 +17,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/health"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/health"
 )
 
 type Metrics struct {

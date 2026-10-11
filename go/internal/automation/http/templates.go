@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {

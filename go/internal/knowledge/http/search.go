@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/knowledge"
 )
 
 // searchNotes ranks notes against a query: stemmed words in Russian and English, prefixes, the

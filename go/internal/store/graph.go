@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 // Edge kinds. Kept few and drawn differently by the UI.

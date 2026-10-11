@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 )
 
 func TestSearchVariantsLayout(t *testing.T) {

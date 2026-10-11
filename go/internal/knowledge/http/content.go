@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
 )
 
 func (h *Handler) getAttachmentContent(w http.ResponseWriter, r *http.Request, ownerType string) {

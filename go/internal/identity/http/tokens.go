@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
 )
 
 // Self-service API tokens: the signed-in user mints tokens for their own integrations

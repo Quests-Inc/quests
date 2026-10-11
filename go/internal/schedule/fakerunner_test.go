@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // testLabel is the runner label the tests' commands are queued for.

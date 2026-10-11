@@ -10,10 +10,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // What an emit_pool_command prints: one quest, as a JSON object shaped like the

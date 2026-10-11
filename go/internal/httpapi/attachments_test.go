@@ -16,14 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/clamav"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/pgtest"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/webdav"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/clamav"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 type davFile struct {

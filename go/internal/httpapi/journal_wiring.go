@@ -3,7 +3,7 @@ package httpapi
 import (
 	"context"
 
-	journalhttp "github.com/valirum/quests/go/internal/journal/http"
+	journalhttp "github.com/quests-inc/quests/go/internal/journal/http"
 )
 
 // journalHTTP is the journal context's HTTP face, wired to this server (built on first use). The things that live in

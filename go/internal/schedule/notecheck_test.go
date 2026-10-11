@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/pgtest"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func TestParseNoteCheckOutput(t *testing.T) {

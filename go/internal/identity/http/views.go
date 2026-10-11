@@ -1,6 +1,6 @@
 package identityhttp
 
-import "github.com/valirum/quests/go/internal/identity"
+import "github.com/quests-inc/quests/go/internal/identity"
 
 // Response shapes of the identity endpoints (the ones the web client needs types for).
 

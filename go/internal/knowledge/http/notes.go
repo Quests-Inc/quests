@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 func (h *Handler) RegisterNotes(mux *http.ServeMux) {

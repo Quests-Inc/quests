@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/pgtest"
-	"github.com/valirum/quests/go/internal/platform/ratelimit"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/platform/ratelimit"
 )
 
 // newTestServer wires just enough of Server to exercise requireAuth + the

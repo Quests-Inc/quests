@@ -9,8 +9,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 var upgrader = websocket.Upgrader{

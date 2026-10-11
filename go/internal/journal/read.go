@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 // QuestRead is the wire JSON shape matching Python serializers.quest_to_read.

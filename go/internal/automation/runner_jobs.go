@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // ClaimJob hands the runner its oldest waiting job (a one-shot before a poll)

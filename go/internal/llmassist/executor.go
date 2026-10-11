@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/valirum/quests/go/internal/platform/apiclient"
+	"github.com/quests-inc/quests/go/internal/platform/apiclient"
 )
 
 // ActionExecError carries the offending action's index alongside the message.

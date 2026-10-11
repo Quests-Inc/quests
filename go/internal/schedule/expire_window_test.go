@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func TestDeadlineSetWithOpenWindow(t *testing.T) {

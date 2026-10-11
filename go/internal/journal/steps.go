@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 func (s *Store) loadSteps(ctx context.Context, questID int64) ([]Step, error) {

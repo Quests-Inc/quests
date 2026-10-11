@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 func TestRewriteRefsRenumbersAndDefusesStrangers(t *testing.T) {

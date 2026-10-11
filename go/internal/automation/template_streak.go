@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // TemplateStreak is the close-rate / streak summary for a recurring template,

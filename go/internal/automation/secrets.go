@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // Secret owners. A secret is attached to exactly one of these; values are

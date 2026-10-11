@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/apperr"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 func (h *Handler) listTags(w http.ResponseWriter, r *http.Request) {

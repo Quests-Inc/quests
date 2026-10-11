@@ -3,7 +3,7 @@ package schedule
 import (
 	"testing"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func openTemplateSecretsDB(t *testing.T) *store.Store {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
 )
 
 // --- endpoints ---

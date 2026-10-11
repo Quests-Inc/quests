@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/platform/events"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/refs"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/refs"
 )
 
 // Handler serves the automation endpoints.

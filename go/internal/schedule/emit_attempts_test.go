@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func attemptsFor(t *testing.T, st *store.Store, templateID int64) []map[string]any {

@@ -6,13 +6,13 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/knowledge"
-	"github.com/valirum/quests/go/internal/platform/apperr"
-	"github.com/valirum/quests/go/internal/platform/dbx"
-	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/dbx"
+	"github.com/quests-inc/quests/go/internal/platform/secretbox"
 )
 
 // Store is the context's data access: the PostgreSQL database behind the row-level-security driver.

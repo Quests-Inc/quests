@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // TemplateRow is a template as the scheduler needs it to decide what is due and to build a quest from it.

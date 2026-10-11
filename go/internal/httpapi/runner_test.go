@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 )
 
 // rr sends a JSON request with an optional bearer token and decodes a JSON object answer.

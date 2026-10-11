@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/automation"
 )
 
 func TestSecureHeadersAndBodyCap(t *testing.T) {

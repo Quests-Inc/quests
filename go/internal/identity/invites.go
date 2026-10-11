@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/tokens"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/tokens"
 )
 
 var (

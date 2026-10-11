@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 func draftReq(t *testing.T, h http.Handler, method, path string, body any) (int, map[string]any) {

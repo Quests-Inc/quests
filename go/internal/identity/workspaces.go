@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/platform/apperr"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // ErrNotFound is the shared "no such thing" error (platform/apperr), so handlers recognise it from any context.

@@ -3,8 +3,8 @@ package httpapi
 import (
 	"context"
 
-	"github.com/valirum/quests/go/internal/journal"
-	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
+	"github.com/quests-inc/quests/go/internal/journal"
+	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
 )
 
 // knowledgeHTTP is the knowledge context's HTTP face, wired to this server (built on first use). What the context

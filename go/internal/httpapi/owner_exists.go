@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // Owner kinds of attachments (the first two are journal entities, the third is a note).

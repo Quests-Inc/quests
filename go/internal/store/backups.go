@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/valirum/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // BackupRow is one row of backuplog — one attempted DB snapshot (+ optional

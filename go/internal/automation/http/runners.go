@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/automation"
-	"github.com/valirum/quests/go/internal/kernel"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // Runner protocol. A runner only makes outgoing requests:

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // RequireOwner lets only an owner of the caller's current workspace through. Callers

@@ -11,9 +11,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/valirum/quests/go/internal/identity"
-	"github.com/valirum/quests/go/internal/llmassist"
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/llmassist"
+	"github.com/quests-inc/quests/go/internal/store"
 )
 
 // maxAssistantText bounds one request to the assistant: it is sent to a third party and paid per token.
