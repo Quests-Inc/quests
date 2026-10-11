@@ -1,4 +1,4 @@
-import { QUEST_SIGNIFICANCES } from '@/shared/api/client.ts'
+import { QUEST_SIGNIFICANCES } from '@/shared/api/questConsts.ts'
 import { formatRemaining, remainingFromDeadline, timerTone } from '@/shared/lib/time.ts'
 
 export const OPEN_STATUSES = new Set(['active', 'expired'])

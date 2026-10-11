@@ -31,6 +31,7 @@
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import { NoteIconModal } from '@/features/note-icon'
   import NotesTree from './NotesTree.svelte'
+  import NoteHead from './NoteHead.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { QuestlineIcon } from '@/entities/questline'
 import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
@@ -1306,167 +1307,45 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
           </button>
         </div>
       {/if}
-      <header
-        class="notes__head"
-        oncontextmenu={(e) => {
+      <NoteHead
+        bind:title
+        bind:titleEl
+        {titleReadonly}
+        {dirty}
+        {pinned}
+        {isReadme}
+        {isPrivate}
+        {isCategory}
+        outdated={noteIsOutdated}
+        outdatedReason={detail?.outdated_reason ?? ''}
+        {saving}
+        {exportBusy}
+        {crumbs}
+        {labels}
+        {onRef}
+        bind:findOpen
+        {viewMode}
+        viewModes={VIEW_MODES}
+        onContextMenu={(e) => {
           const n = noteById(selectedId)
           if (n) openNoteMenu(e, n)
         }}
-      >
-        <div class="notes__head-row">
-          <div class="notes__title-cluster">
-            <span class="notes__title-grow">
-              <span class="notes__title-sizer" aria-hidden="true">{title || '\u00a0'}</span>
-              <input
-                class="notes__title"
-                class:notes__title--locked={titleReadonly}
-                size="1"
-                bind:this={titleEl}
-                bind:value={title}
-                readonly={titleReadonly}
-                title={titleReadonly ? 'Двойной клик — править заголовок' : undefined}
-                ondblclick={startTitleEdit}
-                onblur={commitTitle}
-                onkeydown={onTitleKeydown}
-              />
-            </span>
-            {#if dirty}<span class="notes__unsaved" title="Несохранено">*</span>{/if}
-          </div>
-          <div class="detail__actions notes__actions">
-            <button
-              type="button"
-              class="btn btn--icon"
-              class:notes__pin--on={pinned}
-              onclick={() => selectedId != null && togglePinNote(selectedId)}
-              title={pinned ? 'Открепить' : 'Закрепить'}
-              aria-label={pinned ? 'Открепить' : 'Закрепить'}
-              aria-pressed={pinned}
-            >
-              <Icon name={pinned ? 'pin-filled' : 'pin'} />
-            </button>
-            <button
-              type="button"
-              class="btn btn--icon notes__status-btn notes__status-btn--readme"
-              class:notes__status-btn--on={isReadme}
-              onclick={() => selectedId != null && toggleReadmeNote(selectedId)}
-              title={isReadme ? 'Снять README (прочитано)' : 'Пометить README (прочитать)'}
-              aria-label={isReadme ? 'Снять README' : 'Пометить README'}
-              aria-pressed={isReadme}
-            >
-              <Icon name="alert" />
-            </button>
-            <button
-              type="button"
-              class="btn btn--icon notes__status-btn notes__status-btn--private"
-              class:notes__status-btn--on={isPrivate}
-              onclick={() => selectedId != null && togglePrivateNote(selectedId)}
-              title={isPrivate ? 'Снять PRIVATE' : 'Пометить PRIVATE (скрыть от MCP)'}
-              aria-label={isPrivate ? 'Снять PRIVATE' : 'Пометить PRIVATE'}
-              aria-pressed={isPrivate}
-            >
-              <Icon name="lock" />
-            </button>
-            <button
-              type="button"
-              class="btn btn--icon notes__status-btn notes__status-btn--category"
-              class:notes__status-btn--on={isCategory}
-              onclick={() => selectedId != null && toggleCategoryNote(selectedId)}
-              title={isCategory ? 'Снять CATEGORY' : 'Пометить CATEGORY (папка-агрегатор)'}
-              aria-label={isCategory ? 'Снять CATEGORY' : 'Пометить CATEGORY'}
-              aria-pressed={isCategory}
-            >
-              <Icon name="folder" />
-            </button>
-            <button
-              type="button"
-              class="btn btn--icon notes__status-btn notes__status-btn--outdated"
-              class:notes__status-btn--on={noteIsOutdated}
-              onclick={() => selectedId != null && toggleOutdatedNote(selectedId)}
-              title={noteIsOutdated ? `Снять «устарела»${detail?.outdated_reason ? ': ' + detail.outdated_reason : ''}` : 'Пометить «устарела» (содержимое расходится с действительностью)'}
-              aria-label={noteIsOutdated ? 'Снять «устарела»' : 'Пометить «устарела»'}
-              aria-pressed={noteIsOutdated}
-            >
-              <Icon name="clock-alert" />
-            </button>
-            {#if dirty}
-              <button
-                type="button"
-                class="btn btn--icon"
-                onclick={revert}
-                title="Отменить правки"
-                aria-label="Отменить правки"
-              >
-                <Icon name="undo" />
-              </button>
-            {/if}
-            <button
-              type="button"
-              class="btn btn--icon"
-              disabled={saving || !dirty}
-              onclick={save}
-              title={saving ? 'Сохранение…' : 'Сохранить (Ctrl+S)'}
-              aria-label={saving ? 'Сохранение…' : 'Сохранить'}
-            >
-              {#if saving}…{:else}<Icon name="save" />{/if}
-            </button>
-            <button
-              type="button"
-              class="btn btn--icon"
-              disabled={exportBusy}
-              onclick={openExportMenu}
-              title={exportBusy ? 'Выгрузка…' : 'Скачать'}
-              aria-label={exportBusy ? 'Выгрузка…' : 'Скачать заметку'}
-              aria-haspopup="menu"
-            >
-              {#if exportBusy}…{:else}<Icon name="file-download" />{/if}
-            </button>
-            <button
-              type="button"
-              class="btn btn--icon btn--danger"
-              onclick={() => requestDelete(selectedId)}
-              title="Удалить"
-              aria-label="Удалить"
-            >
-              <Icon name="delete" />
-            </button>
-          </div>
-        </div>
-        <div class="notes__colophon">
-          <nav class="notes__crumbs" aria-label="Родитель">
-            {#each crumbs as c, i (c.id ?? 'root')}
-              {#if i > 0}<span class="notes__crumb-sep" aria-hidden="true">/</span>{/if}
-              <button
-                type="button"
-                class="notes__crumb"
-                class:notes__crumb--here={i === crumbs.length - 1}
-                onclick={(e) => {
-                  if (i === crumbs.length - 1) openParentPicker(e)
-                  else setParentCrumb(c.id)
-                }}
-                title={i === crumbs.length - 1 ? 'Сменить родителя' : `Вложить в «${c.title}»`}
-              >
-                <RefText source={c.title} {labels} {onRef} />
-              </button>
-            {/each}
-          </nav>
-          <div class="notes__modes" role="radiogroup" aria-label="Режим просмотра">
-            <button type="button" class="notes__mode" class:notes__mode--on={findOpen} aria-pressed={findOpen} title="Поиск в заметке (Ctrl+F)" onclick={() => (findOpen = !findOpen)}>Найти</button>
-            {#each VIEW_MODES as mode (mode.id)}
-              <button
-                type="button"
-                class="notes__mode"
-                class:notes__mode--on={viewMode === mode.id}
-                data-mode={mode.id}
-                role="radio"
-                aria-checked={viewMode === mode.id}
-                onclick={() => setViewMode(mode.id)}
-              >
-                {mode.label}
-              </button>
-            {/each}
-          </div>
-        </div>
-      </header>
+        onTitleDblClick={startTitleEdit}
+        onTitleBlur={commitTitle}
+        {onTitleKeydown}
+        onTogglePin={() => selectedId != null && togglePinNote(selectedId)}
+        onToggleReadme={() => selectedId != null && toggleReadmeNote(selectedId)}
+        onTogglePrivate={() => selectedId != null && togglePrivateNote(selectedId)}
+        onToggleCategory={() => selectedId != null && toggleCategoryNote(selectedId)}
+        onToggleOutdated={() => selectedId != null && toggleOutdatedNote(selectedId)}
+        onRevert={revert}
+        onSave={save}
+        onExport={openExportMenu}
+        onDelete={() => requestDelete(selectedId)}
+        onCrumb={setParentCrumb}
+        onParentPicker={openParentPicker}
+        onViewMode={setViewMode}
+      />
       {#if isPrivate && !privateRevealed}
         <div class="notes__private-gate">
           <Icon name="lock" size={20} />
@@ -1716,16 +1595,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     gap: 0.15rem;
   }
 
-  /* Status toggles in the open note's header, and their matching sidebar badges. */
-  .notes__status-btn {
-    opacity: 0.35;
-  }
-
-  .notes__status-btn--on {
-    opacity: 1;
-  }
-
-  .notes__status-btn--readme.notes__status-btn--on,
+  :global(.notes__status-btn--readme.notes__status-btn--on),
   :global(.notes__status-dot--readme) {
     color: #d14343;
     animation: notes-readme-blink 1.4s steps(1, end) infinite;
@@ -1739,17 +1609,17 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     animation: notes-readme-blink 1.4s steps(1, end) infinite;
   }
 
-  .notes__status-btn--private.notes__status-btn--on,
+  :global(.notes__status-btn--private.notes__status-btn--on),
   :global(.notes__status-dot--private) {
     color: #9a9a9a;
   }
 
-  .notes__status-btn--category.notes__status-btn--on,
+  :global(.notes__status-btn--category.notes__status-btn--on),
   :global(.notes__status-dot--category) {
     color: #b5651d;
   }
 
-  .notes__status-btn--outdated.notes__status-btn--on,
+  :global(.notes__status-btn--outdated.notes__status-btn--on),
   :global(.notes__status-dot--outdated) {
     color: #d14343;
   }
@@ -1864,188 +1734,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     .notes__split--flash {
       animation: none;
     }
-  }
-
-  .notes__head {
-    /* No bottom margin: the page's flex gap alone sets the distance from the
-       header divider to the note body, matching the gap below the body so the
-       body sits evenly between its two dividers. */
-    margin: 0;
-    padding: 0 0 var(--space-3, 0.75rem);
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-
-  .notes__head-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3, 0.75rem);
-  }
-
-  .notes__actions {
-    flex-shrink: 0;
-  }
-
-  /* On a phone the four action buttons leave the title ~40% of the row;
-     give the title the full line and drop the actions under it. */
-  @media (max-width: 480px) {
-    .notes__head-row {
-      flex-wrap: wrap;
-      row-gap: var(--space-2, 0.5rem);
-    }
-
-    .notes__title-cluster {
-      flex-basis: 100%;
-    }
-
-    .notes__actions {
-      margin-left: auto;
-    }
-  }
-
-  .notes__pin--on {
-    color: var(--color-accent, #c9a227);
-  }
-
-  .notes__title-cluster {
-    display: inline-flex;
-    align-items: baseline;
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 100%;
-    font-family: var(--font-display, Georgia, serif);
-    font-size: clamp(1.35rem, 2.4vw, 1.85rem);
-    font-weight: 700;
-    line-height: 1.15;
-  }
-
-  .notes__title-grow {
-    position: relative;
-    display: inline-grid;
-    /* Flex items default to min-width:auto (= their content's min-content),
-       and the sizer's white-space:pre makes that the full title width —
-       without an explicit 0 here a long title refuses to shrink and
-       overlaps the pin/save buttons instead of clipping. */
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-  }
-
-  .notes__title-sizer,
-  .notes__title {
-    grid-area: 1 / 1;
-    /* Same min-width:auto trap applies to grid items sizing their track —
-       without this the track still grows to the sizer's full-text
-       min-content width even though the container above is now capped. */
-    min-width: 0;
-    padding: 0.15rem 0;
-    font: inherit;
-  }
-
-  .notes__title-sizer {
-    visibility: hidden;
-    white-space: pre;
-    pointer-events: none;
-  }
-
-  .notes__title {
-    width: 100%;
-    min-width: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    box-sizing: border-box;
-  }
-
-  .notes__title--locked {
-    cursor: default;
-    caret-color: transparent;
-  }
-
-  .notes__title--locked:focus {
-    outline: none;
-  }
-
-  .notes__title-cluster :global(.notes__unsaved) {
-    flex-shrink: 0;
-    padding: 0.15rem 0;
-  }
-
-  .notes__colophon {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.35rem 0.85rem;
-    margin: 0.45rem 0 0;
-    font-family: var(--font-ui, sans-serif);
-    font-size: 0.72rem;
-    letter-spacing: 0.02em;
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .notes__crumbs {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.25rem 0.35rem;
-    min-width: 0;
-  }
-
-  .notes__crumb {
-    border: 0;
-    padding: 0;
-    margin: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    max-width: 12rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .notes__crumb:hover {
-    color: var(--color-fg, #e8e8e8);
-  }
-
-  .notes__crumb--here {
-    color: var(--color-fg, #e8e8e8);
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-  }
-
-  .notes__crumb-sep {
-    opacity: 0.45;
-    user-select: none;
-  }
-
-  .notes__modes {
-    margin-left: auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    align-items: baseline;
-  }
-
-  .notes__mode {
-    border: 0;
-    padding: 0;
-    margin: 0;
-    background: transparent;
-    color: var(--color-fg-subtle, #6e6e6e);
-    font: inherit;
-    letter-spacing: 0.02em;
-    cursor: pointer;
-  }
-
-  .notes__mode:hover {
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .notes__mode--on {
-    color: var(--color-fg, #e8e8e8);
-    box-shadow: 0 1px 0 currentColor;
   }
 
   .notes__split {
@@ -2235,10 +1923,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     .notes__split--combined .notes__preview {
       padding-left: 0.1rem;
     }
-    .notes__modes {
-      margin-left: 0;
-      width: 100%;
-    }
   }
 
   @media (max-width: 480px) {
@@ -2259,12 +1943,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
     .notes--sidebar-collapsed .notes__page {
       display: flex;
-    }
-
-    /* No room for a side-by-side split; the $effect above steers away from
-       it too, so this is just for anyone still mid-toggle on resize. */
-    .notes__mode[data-mode="combined"] {
-      display: none;
     }
   }
 </style>

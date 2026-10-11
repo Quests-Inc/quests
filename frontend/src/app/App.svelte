@@ -3,6 +3,8 @@
   import { HistoryPage } from '@/pages/history'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
+  import { contextMenuItems } from '@/app/model/contextMenu.ts'
+  import { buildRefLabels } from '@/app/model/refLabels.ts'
   import {
     attachmentIdFromUrl,
     dbStatus,
@@ -40,7 +42,7 @@ import { RunnersPage } from '@/pages/runners'
   import { applyTheme, loadSavedTheme } from '@/shared/lib/theme.ts'
   import { questMatchesQuery } from '@/shared/lib/search.ts'
   import { parseQuery, passes, tokenValues, setToken } from '@/shared/lib/searchFlags.ts'
-  import { questSpec, OPEN_STATUSES, groupQuestsByCategory, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple } from '@/entities/quest'
+  import { questSpec, groupQuestsByCategory, inScope, listOpenOrAll, scopeQuestlineChoices, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple } from '@/entities/quest'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { installHotkeys, registerHotkeys } from '@/shared/lib/hotkeys.ts'
   import { foldRow, moveRow } from '@/shared/lib/listNav.ts'
@@ -257,183 +259,31 @@ import { RunnersPage } from '@/pages/runners'
   function setScopeQuestline(id: null) {
     searchQuery = setToken(searchQuery, 'line', id == null ? [] : [String(id)])
   }
-  /** Questlines to narrow to under the current scope category: those whose own
-   * category matches, plus any that hold quests of that category (a questline
-   * can lack a category while its quests have one). Limited to ones with an
-   * open quest unless "показывать завершённые" is on — a questline with
-   * nothing active left isn't a live "session" worth offering to narrow to. */
-  let scopeQuestlineOptions = $derived.by(() => {
-    if (scopeCategoryId == null) return []
-    const ids = new Set(
-      questlines.filter((l) => (l.category_id ?? null) === scopeCategoryId).map((l) => l.id),
-    )
-    for (const q of quests) {
-      if (q.questline_id != null && (q.category_id ?? null) === scopeCategoryId) {
-        ids.add(q.questline_id)
-      }
-    }
-    const inCategory = questlines.filter((l) => ids.has(l.id))
-    if (showAllQuests) return inCategory
-    const liveLineIds = new Set(
-      quests
-        .filter((q) => OPEN_STATUSES.has(q.status) && q.questline_id != null)
-        .map((q) => q.questline_id),
-    )
-    return inCategory.filter((l) => liveLineIds.has(l.id))
-  })
+  /** Questlines to narrow to under the current scope category (see scopeQuestlineOptions). */
+  let scopeQuestlineOptions = $derived(scopeQuestlineChoices({ scopeCategoryId, questlines, quests, showAll: showAllQuests }))
 
-  let ctxItems = $derived.by(() => {
-    if (ctxKind === 'line') {
-      return [
-        { id: 'copy-id', label: `Копировать questline=${ctxLineId}` },
-        { id: 'sep-copy', sep: true },
-        { id: 'add', label: 'Добавить квест' },
-        { id: 'edit', label: 'Редактировать' },
-        { id: 'icon', label: 'Иконка' },
-        { id: 'secrets', label: 'Секреты' },
-        { id: 'sep-danger', sep: true },
-        { id: 'delete', label: 'Удалить', danger: true },
-      ]
-    }
-    if (ctxKind === 'quest') {
-      const quest = quests.find((q) => q.id === ctxQuestId)
-      const status = quest?.status
-      const significance = quest?.significance || 'common'
-      const delayChildren: { id: string, label?: string, sep?: boolean, checked?: boolean }[] = [
-        { id: 'delay-15', label: '15 мин' },
-        { id: 'delay-30', label: '30 мин' },
-        { id: 'delay-60', label: '60 мин' },
-        { id: 'delay-90', label: '90 мин' },
-        { id: 'delay-120', label: '120 мин' },
-      ]
-      if (status === 'frozen') {
-        delayChildren.push(
-          { id: 'sep-undelay', sep: true },
-          { id: 'status:active', label: 'Вернуть в активные' },
-        )
-      }
-      return [
-        { id: 'copy-id', label: `Копировать quest=${ctxQuestId}` },
-        { id: 'sep-copy', sep: true },
-        { id: 'edit', label: 'Редактировать' },
-        { id: 'sep-groups', sep: true },
-        {
-          id: 'status',
-          label: 'Изменить статус',
-          children: QUEST_STATUSES.map((s) => ({
-            id: `status:${s}`,
-            label: QUEST_STATUS_LABELS[s] || s,
-            checked: s === status,
-          })),
-        },
-        { id: 'delay', label: 'Отложить', children: delayChildren },
-        {
-          id: 'sig',
-          label: 'Значимость',
-          children: QUEST_SIGNIFICANCES.map((s) => ({
-            id: `sig:${s.id}`,
-            label: s.label,
-            checked: s.id === significance,
-          })),
-        },
-        { id: 'secrets', label: 'Секреты' },
-        {
-          id: 'export',
-          label: 'Экспорт',
-          children: [
-            { id: 'export-md', label: 'Markdown (.md)' },
-            { id: 'export-pdf', label: 'PDF' },
-            { id: 'export-pdf-simple', label: 'PDF (просто)' },
-          ],
-        },
-        { id: 'sep-danger', sep: true },
-        { id: 'delete', label: 'Удалить', danger: true },
-      ]
-    }
-    if (ctxKind === 'step') {
-      const found = findStepRef(ctxStepId)
-      const total = Math.max(1, Number(found?.step?.progress_total) || 1)
-      const items: { id: string, label?: string, sep?: boolean, danger?: boolean, children?: { id: string, label?: string, sep?: boolean }[] }[] = [{ id: 'copy-id', label: `Копировать step=${ctxStepId}` }]
-      if (total > 1) {
-        items.push({
-          id: 'progress',
-          label: 'Прогресс',
-          children: [
-            { id: 'inc', label: '+1' },
-            { id: 'dec', label: '−1' },
-            { id: 'sep-done', sep: true },
-            { id: 'complete', label: 'Выполнить' },
-            { id: 'reset', label: 'Обнулить' },
-          ],
-        })
-      } else {
-        items.push(
-          { id: 'sep-done', sep: true },
-          { id: 'complete', label: 'Выполнить' },
-          { id: 'reset', label: 'Обнулить' },
-        )
-      }
-      items.push(
-        { id: 'sep-edit', sep: true },
-        { id: 'edit', label: 'Редактировать' },
-        { id: 'secrets', label: 'Секреты' },
-        { id: 'sep-danger', sep: true },
-        { id: 'delete', label: 'Удалить шаг', danger: true },
-      )
-      return items
-    }
-    return []
-  })
-
-  let matchedQuests = $derived(
-    quests.filter(
-      (q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q),
-    ),
-  )
-  let listedQuests = $derived(
-    showAllQuests || tokenValues(parsedQuestSearch, 'status').length > 0
-      ? matchedQuests
-      : matchedQuests.filter((q) => OPEN_STATUSES.has(q.status)),
-  )
-  let scopedQuests = $derived(
-    listedQuests.filter((q) => {
-      if (scopeCategoryId != null && (q.category_id ?? null) !== scopeCategoryId) return false
-      if (scopeQuestlineId != null && q.questline_id !== scopeQuestlineId) return false
-      return true
+  let ctxItems = $derived(
+    contextMenuItems({
+      kind: ctxKind,
+      lineId: ctxLineId,
+      quest: quests.find((q) => q.id === ctxQuestId),
+      questId: ctxQuestId,
+      stepId: ctxStepId,
+      step: findStepRef(ctxStepId)?.step,
     }),
   )
-  let byCategory = $derived(
-    groupQuestsByCategory(scopedQuests, categories, questlines),
-  )
+
+  let matchedQuests = $derived(quests.filter((q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q)))
+  let listedQuests = $derived(listOpenOrAll(matchedQuests, { showAll: showAllQuests, statusTokens: tokenValues(parsedQuestSearch, 'status') }))
+  let scopedQuests = $derived(inScope(listedQuests, { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
+  let byCategory = $derived(groupQuestsByCategory(scopedQuests, categories, questlines))
   /** "Заморожено" — own sidebar tab, independent of showAllQuests/OPEN_STATUSES. */
-  let frozenQuests = $derived(
-    matchedQuests.filter((q) => {
-      if (q.status !== 'frozen') return false
-      if (scopeCategoryId != null && (q.category_id ?? null) !== scopeCategoryId) return false
-      if (scopeQuestlineId != null && q.questline_id !== scopeQuestlineId) return false
-      return true
-    }),
-  )
+  let frozenQuests = $derived(inScope(matchedQuests.filter((q) => q.status === 'frozen'), { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
   let selected = $derived(quests.find((q) => q.id === selectedId) ?? null)
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
   let attachments = $derived(allAttachments.filter((a) => !a.hidden))
-  let refLabels = $derived.by(() => {
-    const m: Record<string, string> = {}
-    for (const n of notes) m[`note:${n.id}`] = n.title || `note=${n.id}`
-    for (const q of quests) {
-      m[`quest:${q.id}`] = q.title || `quest=${q.id}`
-      for (const s of q.steps || []) {
-        m[`step:${s.id}`] = s.title || `step=${s.id}`
-      }
-    }
-    for (const l of questlines) m[`questline:${l.id}`] = l.title || `questline=${l.id}`
-    for (const t of templateStore.list) m[`template:${t.id}`] = t.title || `template=${t.id}`
-    for (const a of allAttachments) {
-      m[`attachment:${a.id}`] = a.filename || `attachment=${a.id}`
-    }
-    return m
-  })
+  let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments }))
 
   function isCategoryOpen(key: string|number) {
     return categoryOpen[key] !== false

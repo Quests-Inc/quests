@@ -1,4 +1,5 @@
 export * from './model/entityFlags.ts'
+export * from './model/journalView.ts'
 export * from './model/questExport.ts'
 export * from './model/questFlags.ts'
 export * from './model/questFormat.ts'
