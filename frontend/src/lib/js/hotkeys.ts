@@ -34,7 +34,7 @@ const TEXT_INPUT_TYPES = new Set([
 ])
 
 /** @type {Map<string, any>} */
-const registry = new Map()
+const registry: Map<string, any> = new Map()
 
 /** True when the event target is somewhere the user types. */
 export function isTypingTarget(target) {
@@ -73,7 +73,7 @@ function matches(action, event) {
  * Add actions to the registry. Returns a function that removes them again.
  * @param {any[]} actions
  */
-export function registerHotkeys(actions) {
+export function registerHotkeys(actions: any[]) {
   for (const a of actions) registry.set(a.id, a)
   return () => {
     for (const a of actions) if (registry.get(a.id) === a) registry.delete(a.id)
@@ -83,7 +83,7 @@ export function registerHotkeys(actions) {
 /** Registered actions grouped for the help screen, in registration order. */
 export function hotkeyGroups() {
   /** @type {Map<string, any[]>} */
-  const groups = new Map()
+  const groups: Map<string, any[]> = new Map()
   for (const a of registry.values()) {
     if (!groups.has(a.group)) groups.set(a.group, [])
     groups.get(a.group).push({ keys: a.keys, label: a.label })
@@ -92,7 +92,7 @@ export function hotkeyGroups() {
 }
 
 /** @param {KeyboardEvent} event */
-export function handleKeydown(event) {
+export function handleKeydown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return
   if (event.ctrlKey || event.altKey || event.metaKey) return
   const target = event.target

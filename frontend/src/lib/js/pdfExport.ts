@@ -5,7 +5,7 @@
  */
 
 /** @returns {string} */
-export function exportedAtLabel() {
+export function exportedAtLabel(): string {
   return `Выгрузка: ${new Date().toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' })}`
 }
 
@@ -14,7 +14,7 @@ export function exportedAtLabel() {
  * @param {object} document pdfdoc.Document
  * @param {string} filename
  */
-export async function downloadPdf(document_, filename) {
+export async function downloadPdf(document_, filename: string) {
   const resp = await fetch('/api/export/pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -15,7 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
  */
 
 /** @param {any} quest @param {QuestFormat} fmt */
-function metaChips(quest, fmt) {
+function metaChips(quest: any, fmt: QuestFormat) {
   const chips: { text: string; color?: string }[] = [
     { text: String(quest.status || ''), color: STATUS_COLORS[quest.status] },
   ]
@@ -60,7 +60,11 @@ function dateFacts(quest, tzLabel) {
  * @param {{ labels?: Record<string, string>, tzLabel?: string, attachments?: any[] }} opts
  * @param {QuestFormat} fmt label helpers (kept out of this module: they pull in the API client)
  */
-export function buildQuestPdfDocument(quest, opts, fmt) {
+export function buildQuestPdfDocument(
+  quest: any,
+  opts: { labels?: Record<string, string>; tzLabel?: string; attachments?: any[] },
+  fmt: QuestFormat
+) {
   const title = String(quest?.title || '').trim() || `quest=${quest?.id ?? ''}`
   const attachments = opts.attachments || []
   return {

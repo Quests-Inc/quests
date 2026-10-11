@@ -12,7 +12,11 @@ const STEP_H = 7
  * @param {any} quest
  * @returns {{ title: string, exportedAt: string, steps: { title: string, progress: string, done: boolean }[] }}
  */
-export function buildQuestPdfPayload(quest) {
+export function buildQuestPdfPayload(quest: any): {
+  title: string
+  exportedAt: string
+  steps: { title: string; progress: string; done: boolean }[]
+} {
   const exportedAt = new Date().toLocaleString('ru-RU', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -51,7 +55,7 @@ function pdfFilename(quest) {
  * @param {number} maxWidth
  * @param {string} font
  */
-function wrapLines(ctx, text, maxWidth, font) {
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, font: string) {
   ctx.font = font
   const words = String(text || '')
     .split(/\s+/)
@@ -77,7 +81,7 @@ function wrapLines(ctx, text, maxWidth, font) {
  * line, export date at the end of the next line, then the step list.
  * @param {any} quest
  */
-export async function downloadQuestPdfSimple(quest) {
+export async function downloadQuestPdfSimple(quest: any) {
   if (!quest) return
   const payload = buildQuestPdfPayload(quest)
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -97,7 +101,7 @@ export async function downloadQuestPdfSimple(quest) {
   const stepPx = STEP_H * pxPerMm
 
   /** @type {{ left?: string, right?: string, font: string, h: number, color: string }[]} */
-  const blocks = []
+  const blocks: { left?: string; right?: string; font: string; h: number; color: string }[] = []
   blocks.push({ left: payload.title, right: payload.progress, font: boldFont, h: headPx, color: '#1a1a1a' })
   blocks.push({ right: `Выгрузка: ${payload.exportedAt}`, font, h: headPx, color: '#666666' })
 

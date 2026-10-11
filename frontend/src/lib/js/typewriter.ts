@@ -31,7 +31,16 @@ function wordChunks(text) {
  * }} opts
  * @returns {Promise<void>} resolves when done or aborted
  */
-export function animateText(text, opts) {
+export function animateText(
+  text: string,
+  opts: {
+    mode?: 'reveal' | 'erase'
+    granularity?: 'char' | 'word'
+    stepMs?: number
+    onUpdate: (partial: string) => void
+    signal?: AbortSignal
+  }
+): Promise<void> {
   const {
     mode = 'reveal',
     granularity = 'char',
@@ -102,7 +111,7 @@ let tailFadeUid = 0
  * touched; browsers without it simply get no fade.
  * @param {HTMLElement} node
  * @param {boolean} active */
-export function tailFade(node, active) {
+export function tailFade(node: HTMLElement, active: boolean) {
   if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') {
     return {}
   }
@@ -114,7 +123,7 @@ export function tailFade(node, active) {
   let on = false
   let shift = 0
   /** @type {number | null} */
-  let drain = null
+  let drain: number | null = null
 
   function clear() {
     for (const n of names) CSS.highlights.delete(n)

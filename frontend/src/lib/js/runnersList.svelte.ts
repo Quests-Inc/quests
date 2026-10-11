@@ -9,10 +9,10 @@ export const runnersList = $state({
 
 let at = 0
 /** @type {Promise<void> | null} */
-let inflight = null
+let inflight: Promise<void> | null = null
 
 /** @param {boolean} [force] */
-export function loadRunners(force = false) {
+export function loadRunners(force: boolean = false) {
   if (inflight) return inflight
   if (!force && runnersList.loaded && Date.now() - at < 20000) return Promise.resolve()
   inflight = getRunners()

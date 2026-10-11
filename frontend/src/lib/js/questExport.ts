@@ -6,7 +6,7 @@ import { buildQuestPdfDocument } from './questPdfDocument.ts'
 /**
  * @param {{ id?: number | null, title?: string }} quest
  */
-export function questExportFilename(quest, ext = 'pdf') {
+export function questExportFilename(quest: { id?: number | null; title?: string }, ext = 'pdf') {
   const id = quest?.id != null ? String(quest.id) : 'x'
   const raw = String(quest?.title || 'quest')
     .trim()
@@ -20,11 +20,11 @@ export function questExportFilename(quest, ext = 'pdf') {
  * Title, description, and steps as a markdown file.
  * @param {any} quest
  */
-export function downloadQuestMarkdown(quest) {
+export function downloadQuestMarkdown(quest: any) {
   if (!quest) return
   const title = String(quest.title || '').trim() || `quest=${quest.id ?? ''}`
   /** @type {string[]} */
-  const parts = [`# ${title}`, '']
+  const parts: string[] = [`# ${title}`, '']
   const body = String(quest.description || '').trim()
   if (body) parts.push(body, '')
   const steps = Array.isArray(quest.steps) ? quest.steps : []
@@ -57,7 +57,7 @@ export function downloadQuestMarkdown(quest) {
  * @param {any} quest
  * @param {{ labels?: Record<string, string>, tzLabel?: string }} [opts]
  */
-export async function downloadQuestPdf(quest, opts = {}) {
+export async function downloadQuestPdf(quest: any, opts: { labels?: Record<string, string>; tzLabel?: string } = {}) {
   if (!quest) return
   let attachments = []
   try {

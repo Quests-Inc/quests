@@ -39,7 +39,7 @@ const GENERIC = new Set([
 ])
 
 /** @param {any} r */
-export function detailOf(r) {
+export function detailOf(r: any) {
   const d = (r.detail || '').trim()
   if (!d || d === r.title || GENERIC.has(d.toLowerCase())) return ''
   return d

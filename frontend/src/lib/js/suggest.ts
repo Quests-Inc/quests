@@ -69,7 +69,7 @@ function cosine(a, b) {
 /**
  * @param {any[]} quests — anything with title/description/questline_id/category_id/tags
  */
-export function buildSuggestIndex(quests) {
+export function buildSuggestIndex(quests: any[]) {
   const docs = (quests || []).map((q) => ({
     questline: q.questline_id ?? null,
     category: q.category_id ?? null,
@@ -90,7 +90,12 @@ export function buildSuggestIndex(quests) {
  * @param {{ title: string, description?: string }} query
  * @param {'questline' | 'category'} target
  */
-export function nearestVote(index, query, target, k = SUGGEST_DEFAULTS.k) {
+export function nearestVote(
+  index: ReturnType<typeof buildSuggestIndex>,
+  query: { title: string; description?: string },
+  target: 'questline' | 'category',
+  k = SUGGEST_DEFAULTS.k
+) {
   if (!index?.n) return null
   const q = vectorize(termCounts(query.title, query.description), index.df, index.n)
   if (!q.size) return null
@@ -135,7 +140,7 @@ export function suggestTags(
   if (!top.length) return []
   const ex = new Set((excludeSlugs || []).map((s) => String(s).toLowerCase()))
   /** @type {Map<number, { tag: any, score: number }>} */
-  const votes = new Map()
+  const votes: Map<number, { tag: any; score: number }> = new Map()
   for (const { d, s } of top) {
     for (const tag of d.tags || []) {
       if (!tag?.id || ex.has(String(tag.slug || '').toLowerCase())) continue
@@ -152,7 +157,7 @@ export function suggestTags(
  * it stays while it's still the leader within the looser KEEP bounds.
  * @returns {number | null}
  */
-export function pickSuggestion(vote, current = null, opts = SUGGEST_DEFAULTS) {
+export function pickSuggestion(vote, current = null, opts = SUGGEST_DEFAULTS): number | null {
   if (!vote || vote.id == null) return null
   if (current != null && vote.id === current && vote.share >= KEEP.share && vote.sim >= KEEP.minSim) {
     return current

@@ -48,7 +48,11 @@ export function placePopover(
  * @param {() => void} reposition
  * @returns {() => void} cleanup
  */
-export function watchPopover(nodes, onOutside, reposition) {
+export function watchPopover(
+  nodes: () => (Element | null | undefined)[],
+  onOutside: () => void,
+  reposition: () => void
+): () => void {
   const onDown = (event) => {
     const inside = nodes().some((n) => n && event.target instanceof Node && n.contains(event.target))
     if (!inside) onOutside()

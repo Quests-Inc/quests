@@ -4,9 +4,13 @@
  * @param {{ id: number, label: string, sort_order?: number, color?: string }[]} categories
  * @param {{ id: number, title: string, category_id?: number | null, color?: string, icon?: string }[]} questlines
  */
-export function groupQuestsByCategory(list, categories, questlines) {
+export function groupQuestsByCategory(
+  list: any[],
+  categories: { id: number; label: string; sort_order?: number; color?: string }[],
+  questlines: { id: number; title: string; category_id?: number | null; color?: string; icon?: string }[]
+) {
   /** @type {Map<string, any[]>} */
-  const buckets = new Map()
+  const buckets: Map<string, any[]> = new Map()
   for (const q of list) {
     const key = q.category_id != null ? `c${q.category_id}` : 'none'
     if (!buckets.has(key)) buckets.set(key, [])
@@ -46,9 +50,9 @@ export function groupQuestsByCategory(list, categories, questlines) {
 }
 
 /** @param {any[]} items @param {any[]} questlines */
-export function partitionByQuestline(items, questlines) {
+export function partitionByQuestline(items: any[], questlines: any[]) {
   /** @type {Map<number, any[]>} */
-  const byLine = new Map()
+  const byLine: Map<number, any[]> = new Map()
   const alone = []
   for (const q of items) {
     if (q.questline_id != null) {

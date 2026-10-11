@@ -30,7 +30,7 @@ export function quantifiedProgress(q) {
 }
 
 /** @param {any} q @param {number} nowMs */
-export function questTimer(q, nowMs) {
+export function questTimer(q: any, nowMs: number) {
   if (!q?.deadline_at) return null
   if (q.status === 'completed' || q.status === 'failed') return null
   const rem = remainingFromDeadline(q.deadline_at, nowMs)

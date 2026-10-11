@@ -4,12 +4,12 @@
 export const noteDrafts = $state(/** @type {Record<string, NoteDraft>} */ ({}))
 
 /** @param {number | string | null | undefined} id */
-export function noteDraftKey(id) {
+export function noteDraftKey(id: number | string | null | undefined) {
   return id == null ? '' : String(id)
 }
 
 /** @param {number | string | null | undefined} id */
-export function getNoteDraft(id) {
+export function getNoteDraft(id: number | string | null | undefined) {
   const key = noteDraftKey(id)
   return key ? (noteDrafts[key] ?? null) : null
 }
@@ -18,7 +18,7 @@ export function getNoteDraft(id) {
  * @param {number | string} id
  * @param {NoteDraft} draft
  */
-export function putNoteDraft(id, draft) {
+export function putNoteDraft(id: number | string, draft: NoteDraft) {
   noteDrafts[noteDraftKey(id)] = {
     title: draft.title,
     description: draft.description,
@@ -28,7 +28,7 @@ export function putNoteDraft(id, draft) {
 }
 
 /** @param {number | string | null | undefined} id */
-export function clearNoteDraft(id) {
+export function clearNoteDraft(id: number | string | null | undefined) {
   const key = noteDraftKey(id)
   if (key) delete noteDrafts[key]
 }

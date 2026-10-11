@@ -2,7 +2,7 @@
  * collapsed-section summaries. */
 
 /** @param {number | null | undefined} seconds */
-export function secondsToParts(seconds) {
+export function secondsToParts(seconds: number | null | undefined) {
   const s = Number(seconds) || 0
   if (s <= 0) return { hours: '', minutes: '' }
   return { hours: String(Math.floor(s / 3600)), minutes: String(Math.floor((s % 3600) / 60)) }

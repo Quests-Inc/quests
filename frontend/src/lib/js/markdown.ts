@@ -87,7 +87,7 @@ marked.use({
  * @param {string} code
  * @param {string} lang
  */
-function highlightFence(code, lang) {
+function highlightFence(code: string, lang: string) {
   const src = String(code ?? '').replace(/\n$/, '')
   if (lang && hljs.getLanguage(lang)) {
     try {
@@ -148,7 +148,7 @@ export const ATTACHMENT_IMAGE_SRC_RE = /^\/api\/attachments\/(\d+)\/image$/
 const ATTACHMENT_IMG_RE = /!\[([^\]\n]*)\]\(\s*attachment=(\d+)\s*\)/g
 
 /** @param {number | string} id */
-export function attachmentImageSrc(id) {
+export function attachmentImageSrc(id: number | string) {
   return `/api/attachments/${id}/image`
 }
 

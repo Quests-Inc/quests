@@ -4,7 +4,7 @@ import { downloadPdf, exportedAtLabel } from './pdfExport.ts'
  * @param {{ id?: number | null, title?: string }} note
  * @param {'md' | 'pdf'} ext
  */
-export function noteExportFilename(note, ext) {
+export function noteExportFilename(note: { id?: number | null; title?: string }, ext: 'md' | 'pdf') {
   const id = note?.id != null ? String(note.id) : 'x'
   const raw = String(note?.title || 'note')
     .trim()
@@ -17,7 +17,7 @@ export function noteExportFilename(note, ext) {
 /**
  * @param {{ id?: number | null, title?: string, description?: string }} note
  */
-export function downloadNoteMarkdown(note) {
+export function downloadNoteMarkdown(note: { id?: number | null; title?: string; description?: string }) {
   if (!note) return
   const title = String(note.title || '').trim() || `note=${note.id ?? ''}`
   const body = String(note.description || '')

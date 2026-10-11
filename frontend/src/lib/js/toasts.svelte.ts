@@ -24,7 +24,7 @@ function clearTimer(id) {
  * }} [opts]
  * @returns {string} toast id
  */
-export function toast(message: string, opts: { id?: string; kind?: ToastKind; ttl?: number | null } = {}) {
+export function toast(message: string, opts: { id?: string; kind?: ToastKind; ttl?: number | null } = {}): string {
   const id = opts.id ?? `t${++seq}`
   const kind = opts.kind ?? 'info'
   const ttl = opts.ttl !== undefined ? opts.ttl : kind === 'progress' ? null : kind === 'error' ? 5200 : 2200
@@ -49,14 +49,14 @@ export function toast(message: string, opts: { id?: string; kind?: ToastKind; tt
 }
 
 /** @param {string} id */
-export function dismissToast(id) {
+export function dismissToast(id: string) {
   clearTimer(id)
   const i = toasts.findIndex((t) => t.id === id)
   if (i >= 0) toasts.splice(i, 1)
 }
 
 /** @param {string} id @param {string} message */
-export function toastProgress(id, message) {
+export function toastProgress(id: string, message: string) {
   return toast(message, { id, kind: 'progress', ttl: null })
 }
 
@@ -79,6 +79,6 @@ const STATUS_RU = {
 }
 
 /** @param {string} status */
-export function statusToastLabel(status) {
+export function statusToastLabel(status: string) {
   return STATUS_RU[status] || status
 }

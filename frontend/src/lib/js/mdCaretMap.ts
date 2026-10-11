@@ -9,9 +9,9 @@
  * @param {number} clientY
  * @returns {number} offset into root.textContent
  */
-export function caretOffsetFromPoint(root, clientX, clientY) {
+export function caretOffsetFromPoint(root: ParentNode, clientX: number, clientY: number): number {
   /** @type {Range | null} */
-  let range = null
+  let range: Range | null = null
   if (typeof document.caretRangeFromPoint === 'function') {
     range = document.caretRangeFromPoint(clientX, clientY)
   } else if (typeof document.caretPositionFromPoint === 'function') {
@@ -32,11 +32,11 @@ export function caretOffsetFromPoint(root, clientX, clientY) {
  * @param {Node} node
  * @param {number} offset
  */
-function offsetInRoot(root, node, offset) {
+function offsetInRoot(root: ParentNode, node: Node, offset: number) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let count = 0
   /** @type {Node | null} */
-  let n
+  let n: Node | null
   while ((n = walker.nextNode())) {
     if (n === node) return count + offset
     count += n.textContent?.length ?? 0
@@ -49,13 +49,13 @@ function offsetInRoot(root, node, offset) {
  * @param {number} offset
  * @returns {Range | null}
  */
-export function rangeFromTextOffset(root, offset) {
+export function rangeFromTextOffset(root: ParentNode, offset: number): Range | null {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let left = Math.max(0, offset)
   /** @type {Node | null} */
-  let n
+  let n: Node | null
   /** @type {Text | null} */
-  let last = null
+  let last: Text | null = null
   while ((n = walker.nextNode())) {
     last = /** @type {Text} */ (n)
     const len = last.textContent?.length ?? 0
@@ -79,7 +79,7 @@ export function rangeFromTextOffset(root, offset) {
  * @param {string} rendered
  * @param {number} renderedOffset
  */
-export function mapRenderedOffsetToSource(source, rendered, renderedOffset) {
+export function mapRenderedOffsetToSource(source: string, rendered: string, renderedOffset: number) {
   const src = source ?? ''
   const ren = rendered ?? ''
   if (!src) return 0
@@ -110,7 +110,7 @@ export function mapRenderedOffsetToSource(source, rendered, renderedOffset) {
  * @param {string} rendered
  * @param {number} sourceOffset
  */
-export function mapSourceOffsetToRendered(source, rendered, sourceOffset) {
+export function mapSourceOffsetToRendered(source: string, rendered: string, sourceOffset: number) {
   const src = source ?? ''
   const ren = rendered ?? ''
   if (!ren) return 0
@@ -155,7 +155,7 @@ export function scrollRootToTextOffset(
  * @param {HTMLTextAreaElement} ta
  * @param {number} offset
  */
-export function placeTextareaCaret(ta, offset) {
+export function placeTextareaCaret(ta: HTMLTextAreaElement, offset: number) {
   const o = clamp(offset, 0, ta.value.length)
   ta.focus()
   ta.setSelectionRange(o, o)
@@ -174,7 +174,7 @@ export function placeTextareaCaret(ta, offset) {
  * @param {number} len
  * @returns {number | null}
  */
-function locateByPrefix(src, ren, pos, len) {
+function locateByPrefix(src: string, ren: string, pos: number, len: number): number | null {
   if (pos < 3) return null
   let start = Math.max(0, pos - len)
   let needle = ren.slice(start, pos)

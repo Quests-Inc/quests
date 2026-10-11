@@ -22,6 +22,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "strict": false,
+    "noImplicitAny": true,
     "skipLibCheck": true,
     /**
      * Typecheck JS in `.svelte` and `.js` files by default.

@@ -95,7 +95,7 @@ export async function removeCurrent(confirmName) {
 }
 
 /** @returns {Promise<string>} the one-time link, or '' on failure */
-export async function newInvite() {
+export async function newInvite(): Promise<string> {
   let url = ''
   await act(async () => {
     const r = await createInvite(wsx.current)

@@ -15,9 +15,9 @@ import { toast } from './toasts.svelte.ts'
 const BASE = ''
 
 /** Set by App when a request comes back 401 — flips the UI to the login screen. */
-let onUnauthorized = null
+let onUnauthorized: (() => void) | null = null
 
-export function setUnauthorizedHandler(fn) {
+export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn
 }
 
@@ -83,46 +83,46 @@ export function fetchHealth() {
   return request('/api/health')
 }
 
-function quietQs(quiet) {
+function quietQs(quiet: boolean) {
   return quiet ? '?quiet=1' : ''
 }
 
 /** Manual web edits are quiet by default (no overlay toasts). */
-export function createQuest(payload, { quiet = true } = {}) {
+export function createQuest(payload: object, { quiet = true } = {}) {
   return request(`/api/quests${quietQs(quiet)}`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
-export function updateQuest(id, payload, { quiet = true } = {}) {
+export function updateQuest(id: number, payload: object, { quiet = true } = {}) {
   return request(`/api/quests/${id}${quietQs(quiet)}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
 }
 
-export function addQuestStep(questId, payload, { quiet = true } = {}) {
+export function addQuestStep(questId: number, payload: object, { quiet = true } = {}) {
   return request(`/api/quests/${questId}/steps${quietQs(quiet)}`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
-export function updateQuestStep(questId, stepId, payload, { quiet = true } = {}) {
+export function updateQuestStep(questId: number, stepId: number, payload: object, { quiet = true } = {}) {
   return request(`/api/quests/${questId}/steps/${stepId}${quietQs(quiet)}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
 }
 
-export function deleteQuestStep(questId, stepId, { quiet = true } = {}) {
+export function deleteQuestStep(questId: number, stepId: number, { quiet = true } = {}) {
   return request(`/api/quests/${questId}/steps/${stepId}${quietQs(quiet)}`, {
     method: 'DELETE',
   })
 }
 
-export function deleteQuest(id, { quiet = true } = {}) {
+export function deleteQuest(id: number, { quiet = true } = {}) {
   return request(`/api/quests/${id}${quietQs(quiet)}`, { method: 'DELETE' })
 }
 
@@ -147,7 +147,7 @@ export function updateTemplate(id: number, payload: object) {
   })
 }
 
-export function deleteTemplate(id) {
+export function deleteTemplate(id: number) {
   return request(`/api/templates/${id}`, { method: 'DELETE' })
 }
 
@@ -156,7 +156,7 @@ export function copyTemplate(id: number) {
 }
 
 /** Force-materialize one quest from a template (manual emit for testing). */
-export function emitTemplate(id) {
+export function emitTemplate(id: number) {
   return request(`/api/templates/${id}/emit`, { method: 'POST' })
 }
 
@@ -172,8 +172,8 @@ const SECRET_OWNER_PATH = {
 export const SECRET_OWNER_KINDS = Object.keys(SECRET_OWNER_PATH)
 
 /** @param {string} kind @param {number} id */
-function secretsPath(kind, id) {
-  return `/api/${SECRET_OWNER_PATH[kind]}/${id}/secrets`
+function secretsPath(kind: string, id: number) {
+  return `/api/${SECRET_OWNER_PATH[kind as keyof typeof SECRET_OWNER_PATH]}/${id}/secrets`
 }
 
 /**
@@ -183,20 +183,23 @@ function secretsPath(kind, id) {
  * @param {string} kind @param {number} id
  * @returns {Promise<{ keys: string[], inherited: { key: string, from: string, id: number }[] }>}
  */
-export async function listSecrets(kind, id) {
+export async function listSecrets(
+  kind: string,
+  id: number
+): Promise<{ keys: string[]; inherited: { key: string; from: string; id: number }[] }> {
   const out = await request(secretsPath(kind, id))
   return { keys: out?.keys || [], inherited: out?.inherited || [] }
 }
 
 /** Write-only: sets/overwrites one secret. Never readable back through the API. */
-export function setSecret(kind, id, key, value) {
+export function setSecret(kind: string, id: number, key: string, value: string) {
   return request(`${secretsPath(kind, id)}/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: JSON.stringify({ value }),
   })
 }
 
-export function deleteSecret(kind, id, key) {
+export function deleteSecret(kind: string, id: number, key: string) {
   return request(`${secretsPath(kind, id)}/${encodeURIComponent(key)}`, { method: 'DELETE' })
 }
 
@@ -206,17 +209,17 @@ export function setNoteCheck(id: number, body: object) {
 }
 
 /** Ask for a run at the scheduler's next tick. */
-export function runNoteCheck(id) {
+export function runNoteCheck(id: number) {
   return request(`/api/notes/${id}/check/run`, { method: 'POST' })
 }
 
 /** Streaks and close rate of a recurring template. */
-export function getTemplateStreak(id) {
+export function getTemplateStreak(id: number) {
   return request(`/api/templates/${id}/streak`)
 }
 
 /** Free text → LLM action batch → dry-run preview (no writes). */
-export function previewActionBatch(text, { noClarify = false } = {}) {
+export function previewActionBatch(text: string, { noClarify = false } = {}) {
   return request('/api/llm/actions/preview', {
     method: 'POST',
     body: JSON.stringify({ text, no_clarify: noClarify }),
@@ -224,7 +227,7 @@ export function previewActionBatch(text, { noClarify = false } = {}) {
 }
 
 /** Execute a batch previously returned by previewActionBatch() as-is (no re-generation). */
-export function applyActionBatch(batch) {
+export function applyActionBatch(batch: object) {
   return request('/api/llm/actions/apply', {
     method: 'POST',
     body: JSON.stringify({ batch }),
@@ -241,7 +244,7 @@ export function listTags(q = '') {
 }
 
 /** Create tag; on slug conflict returns the existing tag (409 body). */
-export async function createTag(payload) {
+export async function createTag(payload: object) {
   const res = await fetch(`${BASE}/api/tags`, {
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
@@ -273,22 +276,22 @@ export async function createTag(payload) {
   return data
 }
 
-export function updateTag(id, payload) {
+export function updateTag(id: number, payload: object) {
   return request(`/api/tags/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
 }
 
-export function deleteTag(id) {
+export function deleteTag(id: number) {
   return request(`/api/tags/${id}`, { method: 'DELETE' })
 }
 
-export function setQuestTags(questId, tagIds) {
+export function setQuestTags(questId: number, tagIds: number[]) {
   return request(`/api/quests/${questId}/tags`, {
     method: 'PUT',
     body: JSON.stringify({ tag_ids: tagIds }),
   })
 }
 
-export function setTemplateTags(templateId, tagIds) {
+export function setTemplateTags(templateId: number, tagIds: number[]) {
   return request(`/api/templates/${templateId}/tags`, {
     method: 'PUT',
     body: JSON.stringify({ tag_ids: tagIds }),
@@ -299,21 +302,21 @@ export function listQuestlines() {
   return request<QuestlineRead[]>('/api/questlines')
 }
 
-export function createQuestline(payload) {
+export function createQuestline(payload: object) {
   return request('/api/questlines', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
-export function updateQuestline(id, payload) {
+export function updateQuestline(id: number, payload: object) {
   return request(`/api/questlines/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
 }
 
-export function deleteQuestline(id) {
+export function deleteQuestline(id: number) {
   return request(`/api/questlines/${id}`, { method: 'DELETE' })
 }
 
@@ -339,12 +342,12 @@ export function updateNote(id: number, payload: object) {
   })
 }
 
-export function deleteNote(id) {
+export function deleteNote(id: number) {
   return request(`/api/notes/${id}`, { method: 'DELETE' })
 }
 
 /** Upload custom questline image (not added to built-in SVG pool). */
-export async function uploadQuestlineIcon(id, file) {
+export async function uploadQuestlineIcon(id: number, file: File | Blob) {
   const body = new FormData()
   body.append('file', file)
   const res = await fetch(`/api/questlines/${id}/icon`, {
@@ -367,12 +370,12 @@ export async function uploadQuestlineIcon(id, file) {
   return data
 }
 
-export function clearQuestlineIcon(id) {
+export function clearQuestlineIcon(id: number) {
   return request(`/api/questlines/${id}/icon`, { method: 'DELETE' })
 }
 
 /** Upload custom note image (not added to built-in SVG pool). */
-export async function uploadNoteIcon(id, file) {
+export async function uploadNoteIcon(id: number, file: File | Blob) {
   const body = new FormData()
   body.append('file', file)
   const res = await fetch(`/api/notes/${id}/icon`, {
@@ -395,7 +398,7 @@ export async function uploadNoteIcon(id, file) {
   return data
 }
 
-export function clearNoteIcon(id) {
+export function clearNoteIcon(id: number) {
   return request(`/api/notes/${id}/icon`, { method: 'DELETE' })
 }
 
@@ -423,7 +426,7 @@ export const WEEKDAY_LABELS = [
 export const QUEST_STATUSES = ['active', 'expired', 'frozen', 'completed', 'failed', 'archived']
 
 /** @type {Record<string, string>} */
-export const QUEST_STATUS_LABELS = {
+export const QUEST_STATUS_LABELS: Record<string, string> = {
   active: 'активен',
   expired: 'просрочен',
   frozen: 'заморожен',
@@ -433,13 +436,13 @@ export const QUEST_STATUS_LABELS = {
 }
 
 /** @type {Record<string, string>} */
-export const TEMPLATE_FREQ_LABELS = {
+export const TEMPLATE_FREQ_LABELS: Record<string, string> = {
   daily: 'ежедневно',
   weekly: 'еженедельно',
 }
 
 /** @type {{ id: string, label: string }[]} */
-export const QUEST_SIGNIFICANCES = [
+export const QUEST_SIGNIFICANCES: { id: string; label: string }[] = [
   { id: 'insignificant', label: 'незначительное' },
   { id: 'common', label: 'обычное' },
   { id: 'uncommon', label: 'необычное' },
@@ -458,16 +461,16 @@ export function fetchAuthState() {
  * Sign in. Deliberately bypasses `request()`: a 401 here means "wrong
  * password", not "session expired", so it must not trip the global handler.
  */
-export async function login(username, password) {
+export async function login(username: string, password: string) {
   return postSignIn('/api/auth/login', { username, password })
 }
 
 /** Second step of a sign-in: the ticket from login() plus an authenticator or recovery code. */
-export function loginMfa(mfaToken, code) {
+export function loginMfa(mfaToken: string, code: string) {
   return postSignIn('/api/auth/login/mfa', { mfa_token: mfaToken, code })
 }
 
-async function postSignIn(path, payload) {
+async function postSignIn(path: string, payload: object) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     credentials: 'same-origin',
@@ -497,28 +500,28 @@ export function fetchWorkspaces() {
   return request('/api/workspaces')
 }
 
-export function createWorkspace(name) {
+export function createWorkspace(name: string) {
   return request('/api/workspaces', { method: 'POST', body: JSON.stringify({ name }) })
 }
 
-export function fetchMembers(workspaceId) {
+export function fetchMembers(workspaceId: number) {
   return request(`/api/workspaces/${workspaceId}/members`)
 }
 
-export function removeMember(workspaceId, userId) {
+export function removeMember(workspaceId: number, userId: number) {
   return request(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' })
 }
 
-export function createInvite(workspaceId) {
+export function createInvite(workspaceId: number) {
   return request(`/api/workspaces/${workspaceId}/invites`, { method: 'POST' })
 }
 
-export function fetchInvite(token) {
+export function fetchInvite(token: string) {
   return request(`/api/invites/${encodeURIComponent(token)}`)
 }
 
 /** Spend an invitation: with a session joins as that account, else `body` {username, password} signs up. */
-export function acceptInvite(token, body = {}) {
+export function acceptInvite(token: string, body = {}) {
   return request(`/api/invites/${encodeURIComponent(token)}/accept`, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -526,19 +529,19 @@ export function acceptInvite(token, body = {}) {
 }
 
 /** URL of the archive download for a workspace (the browser handles the file). */
-export function workspaceExportUrl(id, { secrets = false } = {}) {
+export function workspaceExportUrl(id: number, { secrets = false } = {}) {
   return `${BASE}/api/workspaces/${id}/export${secrets ? '?secrets=1' : ''}`
 }
 
 /** Import an archive into a NEW workspace. Not through request(): this is multipart, not JSON. */
-export async function importWorkspace(file, { name = '', secrets = false } = {}) {
+export async function importWorkspace(file: File | Blob, { name = '', secrets = false } = {}) {
   const form = new FormData()
   form.append('file', file)
   if (name) form.append('name', name)
   if (secrets) form.append('secrets', '1')
   const res = await fetch(`${BASE}/api/workspaces/import`, { method: 'POST', body: form, credentials: 'same-origin' })
   if (res.status === 401 && onUnauthorized) onUnauthorized()
-  const data = await res.json().catch(() => null)
+  const data = await res.json().catch((): any => null)
   if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`)
   return data
 }
@@ -550,24 +553,24 @@ export function fetchTokens() {
 }
 
 /** The secret comes back once, in `token`. */
-export function createToken(name) {
+export function createToken(name: string) {
   return request('/api/tokens', { method: 'POST', body: JSON.stringify({ name }) })
 }
 
-export function revokeToken(id) {
+export function revokeToken(id: number) {
   return request(`/api/tokens/${id}`, { method: 'DELETE' })
 }
 
-export function renameWorkspace(id, name) {
+export function renameWorkspace(id: number, name: string) {
   return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 }
 
 /** Hides the workspace now and purges it after a grace period; `confirm` must be its exact name. */
-export function deleteWorkspace(id, confirm) {
+export function deleteWorkspace(id: number, confirm: boolean) {
   return request(`/api/workspaces/${id}`, { method: 'DELETE', body: JSON.stringify({ confirm }) })
 }
 
-export function switchWorkspace(id) {
+export function switchWorkspace(id: number) {
   return request(`/api/workspaces/${id}/switch`, { method: 'POST' })
 }
 
@@ -592,13 +595,18 @@ export function listAllAttachments({ stat = false } = {}) {
   )
 }
 
-export function attachmentDownloadUrl(ownerType, ownerId, attachmentId, revision = null) {
+export function attachmentDownloadUrl(
+  ownerType: string,
+  ownerId: number,
+  attachmentId: number,
+  revision: number | string | null = null
+) {
   const base = ownerAttachmentsPath(ownerType, ownerId, attachmentId)
   if (revision == null || revision === '') return base
   return `${base}?revision=${encodeURIComponent(String(revision))}`
 }
 
-export async function uploadAttachment(ownerType, ownerId, file, comment = '') {
+export async function uploadAttachment(ownerType: string, ownerId: number, file: File | Blob, comment = '') {
   const body = new FormData()
   body.append('file', file)
   if (comment) body.append('comment', comment)
@@ -628,7 +636,13 @@ export async function uploadAttachment(ownerType, ownerId, file, comment = '') {
 }
 
 /** Upload a new revision of an existing attachment (becomes current). */
-export async function uploadAttachmentRevision(ownerType, ownerId, attachmentId, file, comment = '') {
+export async function uploadAttachmentRevision(
+  ownerType: string,
+  ownerId: number,
+  attachmentId: number,
+  file: File | Blob,
+  comment = ''
+) {
   const body = new FormData()
   body.append('file', file)
   if (comment) body.append('comment', comment)
@@ -661,34 +675,44 @@ export function listAttachmentRevisions(ownerType: string, ownerId: number, atta
   return request<AttachmentRevisions>(`${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`)
 }
 
-export function setAttachmentCurrentRevision(ownerType, ownerId, attachmentId, revision) {
+export function setAttachmentCurrentRevision(
+  ownerType: string,
+  ownerId: number,
+  attachmentId: number,
+  revision: number | string | null
+) {
   return request(ownerAttachmentsPath(ownerType, ownerId, attachmentId), {
     method: 'PATCH',
     body: JSON.stringify({ current_revision: revision }),
   })
 }
 
-export function updateAttachmentComment(ownerType, ownerId, attachmentId, comment) {
+export function updateAttachmentComment(ownerType: string, ownerId: number, attachmentId: number, comment: string) {
   return request(ownerAttachmentsPath(ownerType, ownerId, attachmentId), {
     method: 'PATCH',
     body: JSON.stringify({ comment }),
   })
 }
 
-export function setAttachmentHidden(ownerType, ownerId, attachmentId, hidden) {
+export function setAttachmentHidden(ownerType: string, ownerId: number, attachmentId: number, hidden: boolean) {
   return request(ownerAttachmentsPath(ownerType, ownerId, attachmentId), {
     method: 'PATCH',
     body: JSON.stringify({ hidden: !!hidden }),
   })
 }
 
-export function deleteAttachment(ownerType, ownerId, attachmentId) {
+export function deleteAttachment(ownerType: string, ownerId: number, attachmentId: number) {
   return request(ownerAttachmentsPath(ownerType, ownerId, attachmentId), {
     method: 'DELETE',
   })
 }
 
-export function deleteAttachmentRevision(ownerType, ownerId, attachmentId, revision) {
+export function deleteAttachmentRevision(
+  ownerType: string,
+  ownerId: number,
+  attachmentId: number,
+  revision: number | string | null
+) {
   return request(`${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions/${revision}`, {
     method: 'DELETE',
   })
@@ -700,7 +724,7 @@ export function deleteAttachmentRevision(ownerType, ownerId, attachmentId, revis
  * from/to (ISO), q, before_id + before_at (keyset cursor).
  * @param {Record<string, string | number | null | undefined>} [params]
  */
-export function getQuestLog(params = {}) {
+export function getQuestLog(params: Record<string, string | number | null | undefined> = {}) {
   const q = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
     if (v != null && v !== '') q.set(k, String(v))
@@ -718,7 +742,7 @@ export function getQuestLog(params = {}) {
 export function getGraph(
   type: string,
   id: number,
-  depth = 2,
+  depth: number = 2,
   extra: { type: string; id: number }[] = [],
   expand: { type: string; id: number; only?: string }[] = []
 ) {
@@ -736,17 +760,17 @@ export function getGraphDraft() {
 }
 
 /** @param {string} kind @param {any} payload */
-export function addGraphDraftOp(kind, payload) {
+export function addGraphDraftOp(kind: string, payload: any) {
   return request('/api/graph-draft/ops', { method: 'POST', body: JSON.stringify({ kind, payload }) })
 }
 
 /** @param {number} id @param {boolean} [dry] dry = only report what would go with it */
-export function deleteGraphDraftOp(id, dry = false) {
+export function deleteGraphDraftOp(id: number, dry: boolean = false) {
   return request(`/api/graph-draft/ops/${id}${dry ? '?dry=1' : ''}`, { method: 'DELETE' })
 }
 
 /** @param {{ type: string, id: number }[]} roots */
-export function putGraphDraftRoots(roots) {
+export function putGraphDraftRoots(roots: { type: string; id: number }[]) {
   return request('/api/graph-draft/roots', { method: 'PUT', body: JSON.stringify({ roots }) })
 }
 
@@ -761,7 +785,7 @@ export async function commitGraphDraft() {
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', 'X-Quests-Source': 'web' },
   })
-  const data = await res.json().catch(() => null)
+  const data = await res.json().catch((): any => null)
   if (!res.ok) {
     const err = new Error(data?.error || data?.detail || `HTTP ${res.status}`)
     // @ts-ignore
@@ -774,7 +798,7 @@ export async function commitGraphDraft() {
 }
 
 /** Stages a file in the draft. @param {File} file @param {string} [owner] "quest:5" etc. */
-export async function uploadGraphDraftFile(file, owner = '') {
+export async function uploadGraphDraftFile(file: File, owner: string = '') {
   const fd = new FormData()
   fd.append('file', file)
   if (owner) fd.append('owner', owner)
@@ -784,7 +808,7 @@ export async function uploadGraphDraftFile(file, owner = '') {
     headers: { 'X-Quests-Source': 'web' },
     body: fd,
   })
-  const data = await res.json().catch(() => null)
+  const data = await res.json().catch((): any => null)
   if (!res.ok) {
     const msg = typeof data?.detail === 'string' ? data.detail : `HTTP ${res.status}`
     toast(msg, { kind: 'error' })
@@ -799,7 +823,7 @@ export function getQuestFull(id: number) {
 }
 
 /** Replaces the payload of a created thing in the draft. @param {number} id @param {any} payload */
-export function putGraphDraftOp(id, payload) {
+export function putGraphDraftOp(id: number, payload: any) {
   return request(`/api/graph-draft/ops/${id}`, { method: 'PUT', body: JSON.stringify({ payload }) })
 }
 
@@ -810,12 +834,14 @@ export function getRunners() {
 }
 
 /** @param {string} label @returns {Promise<{ label: string, registration_token: string, valid_hours: number }>} */
-export function createRunner(label) {
+export function createRunner(
+  label: string
+): Promise<{ label: string; registration_token: string; valid_hours: number }> {
   return request('/api/runners', { method: 'POST', body: JSON.stringify({ label }) })
 }
 
 /** @param {string} label */
-export function deleteRunner(label) {
+export function deleteRunner(label: string) {
   return request(`/api/runners/${encodeURIComponent(label)}`, { method: 'DELETE' })
 }
 
@@ -830,7 +856,7 @@ export function getRunnerJobs(f: { label?: string; state?: string; limit?: numbe
 }
 
 /** @param {number} id */
-export function cancelRunnerJob(id) {
+export function cancelRunnerJob(id: number) {
   return request(`/api/runner-jobs/${id}/cancel`, { method: 'POST' })
 }
 
@@ -840,7 +866,7 @@ export function getMyLLM() {
 }
 
 /** Save provider, address, model and (when typed) the key. An empty `api_key` keeps the stored one. */
-export function saveMyLLM(form) {
+export function saveMyLLM(form: FormData | object) {
   return request('/api/me/llm', { method: 'PUT', body: JSON.stringify(form) })
 }
 
@@ -849,14 +875,14 @@ export function deleteMyLLM() {
 }
 
 /** Does this provider/key answer? Uses the typed key, else the stored one. */
-export function testMyLLM(form) {
+export function testMyLLM(form: FormData | object) {
   return request('/api/me/llm/test', { method: 'POST', body: JSON.stringify(form) })
 }
 
 // --- two-factor sign-in (the account's own, session only) ---
 
 /** Ranked note search: [{ id, title, score, where: 'title'|'body'|'fuzzy', snippet (matches in ⟪ ⟫), … }]. */
-export function searchNotes(q, limit = 30) {
+export function searchNotes(q: string, limit = 30) {
   return request(`/api/notes/search?q=${encodeURIComponent(q)}&limit=${limit}`)
 }
 
@@ -870,25 +896,25 @@ export function setupMyMfa() {
 }
 
 /** Confirms the secret with a code; returns { recovery_codes } — shown once. */
-export function enableMyMfa(code) {
+export function enableMyMfa(code: string) {
   return request('/api/me/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) })
 }
 
-export function disableMyMfa(code) {
+export function disableMyMfa(code: string) {
   return request('/api/me/2fa/disable', { method: 'POST', body: JSON.stringify({ code }) })
 }
 
 /** Replaces the recovery codes (needs a valid code); returns { recovery_codes }. */
-export function regenerateRecoveryCodes(code) {
+export function regenerateRecoveryCodes(code: string) {
   return request('/api/me/2fa/recovery', { method: 'POST', body: JSON.stringify({ code }) })
 }
 
 /** Search inside one note with the notes search's rules: { terms: matched words, passages: paragraph count }. */
-export function searchInNote(id, q) {
+export function searchInNote(id: number, q: string) {
   return request(`/api/notes/${id}/search?q=${encodeURIComponent(q)}`)
 }
 
 /** Hand-set OUTDATED flag of a note; a later check gives its own verdict. */
-export function setNoteOutdated(id, outdated, reason = '') {
+export function setNoteOutdated(id: number, outdated: boolean, reason = '') {
   return request(`/api/notes/${id}/outdated`, { method: 'PUT', body: JSON.stringify({ outdated, reason }) })
 }

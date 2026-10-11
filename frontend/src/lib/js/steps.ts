@@ -17,7 +17,7 @@ export function newStepKey() {
 }
 
 /** @param {any} mode */
-function normalizeRunMode(mode) {
+function normalizeRunMode(mode: any) {
   return mode === 'once' || mode === 'watch' ? mode : 'poll'
 }
 
@@ -32,7 +32,7 @@ function checkDraft(s) {
 }
 
 /** @param {any} [s] API quest step, or nothing for a blank one. */
-export function questStepDraft(s = null) {
+export function questStepDraft(s: any = null) {
   const description = s?.description ?? ''
   const check = checkDraft(s)
   return {
@@ -48,7 +48,7 @@ export function questStepDraft(s = null) {
 }
 
 /** @param {any} [s] API template step, or nothing for a blank one. */
-export function templateStepDraft(s = null) {
+export function templateStepDraft(s: any = null) {
   const check = checkDraft(s)
   return {
     key: s?.id != null ? String(s.id) : newStepKey(),
@@ -136,7 +136,7 @@ export function parseProgressRange(raw) {
  * @param {...string} texts
  * @returns {number | null}
  */
-export function mirrorQuestId(...texts) {
+export function mirrorQuestId(...texts: string[]): number | null {
   const hit = parseRefs(texts.map((t) => String(t || '')).join('\n')).find((r) => r.kind === 'quest')
   return hit ? hit.id : null
 }

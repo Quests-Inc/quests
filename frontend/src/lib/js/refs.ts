@@ -8,7 +8,7 @@ export const REF_KINDS = ['note', 'quest', 'questline', 'step', 'attachment', 't
  * @param {string} text
  * @returns {{ kind: string, id: number }[]}
  */
-export function parseRefs(text) {
+export function parseRefs(text: string): { kind: string; id: number }[] {
   const seen = new Set()
   const out = []
   const src = String(text || '')
@@ -24,7 +24,7 @@ export function parseRefs(text) {
 }
 
 /** @param {string} kind @param {number} id */
-export function refHref(kind, id) {
+export function refHref(kind: string, id: number) {
   return `?${kind}=${id}`
 }
 
@@ -64,7 +64,7 @@ export function renderRefTextHtml(source: string, opts: { labels?: Record<string
 }
 
 /** @param {string} href */
-export function parseRefHref(href) {
+export function parseRefHref(href: string) {
   try {
     const u = new URL(href, 'http://local')
     for (const kind of REF_KINDS) {
