@@ -36,7 +36,7 @@
   } from '@/shared/api/client.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, canPickTarget, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, canPickTarget, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -652,80 +652,8 @@
     void rebuild({ ...g, nodes, edges }, open_)
   })
 
-  /** Puts hand-placed cards back, and an expanded block where its cluster was. */
-  function restoreSaved(groups: any[]) {
-    if (!view) return
-    const handPlaced = new Set()
-    for (const n of view.nodes) {
-      const p = saved.get(n.key)
-      if (p) {
-        n.x = p.x
-        n.y = p.y
-        handPlaced.add(n.key)
-      }
-    }
-    for (const g of groups) {
-      const spot = g.type === 'attachment' ? saved.get(`cluster:${g.owner}`) : null
-      const members = view.nodes.filter((n) => n.group === g.key)
-      if (!spot || !members.length || members.some((m) => handPlaced.has(m.key))) continue
-      const cx = (Math.min(...members.map((m) => m.x - m.w / 2)) + Math.max(...members.map((m) => m.x + m.w / 2))) / 2
-      const cy = (Math.min(...members.map((m) => m.y - m.h / 2)) + Math.max(...members.map((m) => m.y + m.h / 2))) / 2
-      const dx = spot.x - cx
-      const dy = spot.y - cy
-      for (const m of members) {
-        m.x += dx
-        m.y += dy
-      }
-      // The spot may be occupied; slide the block to the nearest free place.
-      const shift = freeShift(g, members, groups)
-      for (const m of members) {
-        m.x += shift.dx
-        m.y += shift.dy
-      }
-    }
-  }
-
-  const FRAME = { left: 14, right: 14, top: 44, bottom: 14 }
-  const frameOf = (ms: any[]) => ({
-    x0: Math.min(...ms.map((m: { x: number; w: number }) => m.x - m.w / 2)) - FRAME.left,
-    x1: Math.max(...ms.map((m: { x: number; w: number }) => m.x + m.w / 2)) + FRAME.right,
-    y0: Math.min(...ms.map((m: { y: number; h: number }) => m.y - m.h / 2)) - FRAME.top,
-    y1: Math.max(...ms.map((m: { y: number; h: number }) => m.y + m.h / 2)) + FRAME.bottom,
-  })
-
-  /** Smallest nudge (down first, then sideways/up) that puts a block's frame
-   * clear of every other card and group frame. {0,0} if it is already clear
-   * or nothing nearby is free. */
-  function freeShift(g: { key: any }, members: any[], allGroups: any) {
-    if (!view) return { dx: 0, dy: 0 }
-    const mine = new Set(members.map((m: { key: any }) => m.key))
-    const gap = 18
-    const obstacles: { x0: number; x1: any; y0: number; y1: any }[] = []
-    for (const n of view.nodes) {
-      if (mine.has(n.key)) continue
-      obstacles.push({ x0: n.x - n.w / 2, x1: n.x + n.w / 2, y0: n.y - n.h / 2, y1: n.y + n.h / 2 })
-    }
-    for (const og of allGroups) {
-      if (og.key === g.key) continue
-      const ms = view.nodes.filter((n) => n.group === og.key)
-      if (ms.length) obstacles.push(frameOf(ms))
-    }
-    const f = frameOf(members)
-    const clear = (dx: number, dy: number) =>
-      !obstacles.some(
-        (o) => f.x0 + dx < o.x1 + gap && f.x1 + dx > o.x0 - gap && f.y0 + dy < o.y1 + gap && f.y1 + dy > o.y0 - gap,
-      )
-    if (clear(0, 0)) return { dx: 0, dy: 0 }
-    // Directions in order of preference: down, right, up, left, then diagonals.
-    const dirs = [
-      [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1],
-    ]
-    for (let r = 40; r <= 3000; r += 40) {
-      for (const [ux, uy] of dirs) {
-        if (clear(ux * r, uy * r)) return { dx: ux * r, dy: uy * r }
-      }
-    }
-    return { dx: 0, dy: 0 }
+  const restoreSaved = (groups: GraphGroupView[]) => {
+    if (view) restoreHandPlaced(view.nodes, saved, groups)
   }
 
   function relayout() {
@@ -736,8 +664,6 @@
 
   // --- Minimap: every card as a small rectangle, the visible part as a frame;
   // click or drag on it to move the view. ---
-  const MINI_W = 170
-  const MINI_H = 120
   let stageSize = $state({ w: 0, h: 0 })
   $effect(() => {
     const el = stageEl
@@ -757,47 +683,11 @@
     ro.observe(el)
     return () => ro.disconnect()
   })
-  // How much of a card is built right now, by its share of the map area on screen:
-  // 'lite' — frame only (< 0.5%, or well outside the window); 'title' — the head
-  // without the markdown body (0.5–1%); full (not in the map) — everything.
-  // Cards keep their box, so nothing moves; the body is simply not built until
-  // it matters. Each threshold has ±5% slack around the card's current tier, so
-  // a card sitting right on a border does not flicker while zooming.
-  const LITE_AREA = 0.005
-  const FULL_AREA = 0.01
-  const SLACK = 1.05
-  let prevTier = new Map()
+  let prevTier = new Map<string, string>()
   let tier = $derived.by(() => {
-    const next = new Map()
-    const nodes = view?.nodes
     // Read everything up front so the dependencies are the same on every run.
-    const { k, x: cx, y: cy } = cam
-    const editingKey = editing?.key
-    if (ready && nodes && stageSize.w && stageSize.h) {
-      const W = stageSize.w
-      const H = stageSize.h
-      for (const n of nodes) {
-        if (n.type !== 'quest' && n.type !== 'note' && !(n.type === 'step' && n.desc)) continue
-        if (editingKey === n.key) continue
-        const sx = (n.x - n.w / 2) * k + cx
-        const sy = (n.y - n.h / 2) * k + cy
-        const sw = n.w * k
-        const sh = n.h * k
-        // One window of margin each way, so panning does not reveal empty frames.
-        const off = sx + sw < -W || sx > 2 * W || sy + sh < -H || sy > 2 * H
-        if (off) {
-          next.set(n.key, 'lite')
-          continue
-        }
-        const share = (sw * sh) / (W * H)
-        const was = prevTier.get(n.key) ?? 'full'
-        const lite = share < (was === 'lite' ? LITE_AREA * SLACK : LITE_AREA / SLACK)
-        const full = share >= (was === 'full' ? FULL_AREA / SLACK : FULL_AREA * SLACK)
-        if (lite) next.set(n.key, 'lite')
-        else if (!full) next.set(n.key, 'title')
-      }
-    }
-    if (next.size === prevTier.size && [...next].every(([key, t]) => prevTier.get(key) === t)) return prevTier
+    const { k, x, y } = cam
+    const next = computeTiers({ nodes: view?.nodes, cam: { k, x, y }, stage: stageSize, ready, editingKey: editing?.key, prev: prevTier })
     prevTier = next
     return next
   })
@@ -812,31 +702,7 @@
     return m
   })
 
-  let mini = $derived.by(() => {
-    const nodes = (view?.nodes ?? []).filter((n) => ready && Number.isFinite(n.x) && n.w)
-    if (!nodes.length || !stageSize.w) return null
-    const vx = -cam.x / cam.k
-    const vy = -cam.y / cam.k
-    const vw = stageSize.w / cam.k
-    const vh = stageSize.h / cam.k
-    let x0 = vx,
-      y0 = vy,
-      x1 = vx + vw,
-      y1 = vy + vh
-    for (const n of nodes) {
-      x0 = Math.min(x0, n.x - n.w / 2)
-      x1 = Math.max(x1, n.x + n.w / 2)
-      y0 = Math.min(y0, n.y - n.h / 2)
-      y1 = Math.max(y1, n.y + n.h / 2)
-    }
-    const pad = Math.max(x1 - x0, y1 - y0) * 0.04
-    x0 -= pad
-    y0 -= pad
-    x1 += pad
-    y1 += pad
-    const sc = Math.min(MINI_W / (x1 - x0), MINI_H / (y1 - y0))
-    return { x0, y0, sc, w: (x1 - x0) * sc, h: (y1 - y0) * sc, nodes, view: { x: vx, y: vy, w: vw, h: vh } }
-  })
+  let mini = $derived(minimapModel({ nodes: view?.nodes ?? [], ready, cam, stage: stageSize }))
   let miniDrag = false
   /** Centres the view on the world point under the pointer on the minimap. */
   function miniGo(e: { currentTarget: HTMLElement; clientX: number; clientY: number }) {
