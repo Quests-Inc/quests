@@ -4,11 +4,12 @@
   import { mirrorQuestId as findMirrorQuest } from '../js/steps.ts'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
 
-  /** A step's auto-check: command, poll interval, mode, pipeline gate.
+  /**
+   * A step's auto-check: command, poll interval, mode, pipeline gate.
    * The mode/gate controls only appear once there is a command to run.
    * `text` (read-only) is the step's title + description: a quest=N in it offers
    * the "mirror that quest" check (`quests progress N`).
-   * @type {{ command?: string, interval?: string, waitPrevious?: boolean, runMode?: string, runOn?: string, text?: string }} */
+   */
   let {
     command = $bindable(''),
     interval = $bindable(''),

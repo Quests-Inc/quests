@@ -2,7 +2,6 @@
   import SettingsBlock from './SettingsBlock.svelte'
   import MfaBlock from './MfaBlock.svelte'
 
-  /** @type {{ username?: string, onLogout: () => void }} */
   let { username = '', onLogout }: { username?: string, onLogout: () => void } = $props()
 </script>
 

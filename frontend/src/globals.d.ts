@@ -5,3 +5,6 @@ interface Window {
     currentTab: () => string
   }
 }
+
+// no bundled types
+declare module 'qrcode'

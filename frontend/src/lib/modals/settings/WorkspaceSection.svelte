@@ -11,7 +11,6 @@
     dropMember,
   } from './workspaceState.svelte.ts'
 
-  /** @type {{ username?: string }} */
   let { username = '' }: { username?: string } = $props()
 
   const mb = (n: number) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} ГБ` : `${(n / (1 << 20)).toFixed(n < 10 << 20 ? 1 : 0)} МБ`)

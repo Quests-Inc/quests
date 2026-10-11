@@ -3,7 +3,6 @@
   // requires accounts and no valid session cookie is present.
   import { login, loginMfa } from '../js/api.ts'
 
-  /** @type {{ onAuthenticated: (username: string) => void }} */
   let { onAuthenticated }: { onAuthenticated: (username: string) => void } = $props()
 
   let username = $state('')

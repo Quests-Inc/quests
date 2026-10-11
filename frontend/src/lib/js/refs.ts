@@ -4,10 +4,6 @@ export const REF_RE = /\b(note|quest|questline|step|attachment|template)=(\d+)\b
 
 export const REF_KINDS = ['note', 'quest', 'questline', 'step', 'attachment', 'template']
 
-/**
- * @param {string} text
- * @returns {{ kind: string, id: number }[]}
- */
 export function parseRefs(text: string): { kind: string; id: number }[] {
   const seen = new Set()
   const out = []
@@ -23,7 +19,6 @@ export function parseRefs(text: string): { kind: string; id: number }[] {
   return out
 }
 
-/** @param {string} kind @param {number} id */
 export function refHref(kind: string, id: number) {
   return `?${kind}=${id}`
 }
@@ -36,11 +31,7 @@ function escapeAttr(s: string) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;')
 }
 
-/**
- * Plain text with journal refs → HTML (escaped text + `<a class="md-ref">`).
- * @param {string} source
- * @param {{ labels?: Record<string, string> }} [opts]
- */
+/** Plain text with journal refs → HTML (escaped text + `<a class="md-ref">`). */
 export function renderRefTextHtml(source: string, opts: { labels?: Record<string, string> } = {}) {
   const labels = opts.labels || {}
   const text = String(source ?? '')
@@ -63,7 +54,6 @@ export function renderRefTextHtml(source: string, opts: { labels?: Record<string
   return out
 }
 
-/** @param {string} href */
 export function parseRefHref(href: string) {
   try {
     const u = new URL(href, 'http://local')

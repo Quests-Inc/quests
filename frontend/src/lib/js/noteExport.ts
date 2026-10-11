@@ -1,9 +1,5 @@
 import { downloadPdf, exportedAtLabel } from './pdfExport.ts'
 
-/**
- * @param {{ id?: number | null, title?: string }} note
- * @param {'md' | 'pdf'} ext
- */
 export function noteExportFilename(note: { id?: number | null; title?: string }, ext: 'md' | 'pdf') {
   const id = note?.id != null ? String(note.id) : 'x'
   const raw = String(note?.title || 'note')
@@ -14,9 +10,6 @@ export function noteExportFilename(note: { id?: number | null; title?: string },
   return `note-${id}${raw ? `-${raw}` : ''}.${ext}`
 }
 
-/**
- * @param {{ id?: number | null, title?: string, description?: string }} note
- */
 export function downloadNoteMarkdown(note: { id?: number | null; title?: string; description?: string }) {
   if (!note) return
   const title = String(note.title || '').trim() || `note=${note.id ?? ''}`
@@ -34,11 +27,7 @@ export function downloadNoteMarkdown(note: { id?: number | null; title?: string;
   URL.revokeObjectURL(url)
 }
 
-/**
- * Renders the note to PDF on the server and downloads the result.
- * @param {{ id?: number | null, title?: string, description?: string }} note
- * @param {{ labels?: Record<string, string> }} [opts]
- */
+/** Renders the note to PDF on the server and downloads the result. */
 export async function downloadNotePdf(note: any, opts: { labels?: Record<string, string> } = {}) {
   if (!note) return
   const title = String(note.title || '').trim() || `note=${note.id ?? ''}`

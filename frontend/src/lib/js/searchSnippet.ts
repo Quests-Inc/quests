@@ -10,4 +10,8 @@ export function snippetHtml(snippet: any) {
     .replace(/⟫/g, '</mark>')
 }
 
-export const WHERE_LABEL = { title: 'в названии', body: 'в тексте', fuzzy: 'похоже на название' }
+export const WHERE_LABEL: Record<string, string> = {
+  title: 'в названии',
+  body: 'в тексте',
+  fuzzy: 'похоже на название',
+}

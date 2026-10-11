@@ -171,7 +171,6 @@ const SECRET_OWNER_PATH = {
 /** Kinds that can own secrets (a secret is inherited step > quest > template > questline). */
 export const SECRET_OWNER_KINDS = Object.keys(SECRET_OWNER_PATH)
 
-/** @param {string} kind @param {number} id */
 function secretsPath(kind: string, id: number) {
   return `/api/${SECRET_OWNER_PATH[kind as keyof typeof SECRET_OWNER_PATH]}/${id}/secrets`
 }
@@ -180,8 +179,6 @@ function secretsPath(kind: string, id: number) {
  * Secret *names* for an owner — GET never returns values.
  * `keys` are set on the owner itself, `inherited` ({ key, from, id }) come from
  * a more general owner.
- * @param {string} kind @param {number} id
- * @returns {Promise<{ keys: string[], inherited: { key: string, from: string, id: number }[] }>}
  */
 export async function listSecrets(
   kind: string,
@@ -425,7 +422,6 @@ export const WEEKDAY_LABELS = [
 
 export const QUEST_STATUSES = ['active', 'expired', 'frozen', 'completed', 'failed', 'archived']
 
-/** @type {Record<string, string>} */
 export const QUEST_STATUS_LABELS: Record<string, string> = {
   active: 'активен',
   expired: 'просрочен',
@@ -435,13 +431,11 @@ export const QUEST_STATUS_LABELS: Record<string, string> = {
   archived: 'архив',
 }
 
-/** @type {Record<string, string>} */
 export const TEMPLATE_FREQ_LABELS: Record<string, string> = {
   daily: 'ежедневно',
   weekly: 'еженедельно',
 }
 
-/** @type {{ id: string, label: string }[]} */
 export const QUEST_SIGNIFICANCES: { id: string; label: string }[] = [
   { id: 'insignificant', label: 'незначительное' },
   { id: 'common', label: 'обычное' },
@@ -722,7 +716,6 @@ export function deleteAttachmentRevision(
  * Change-log feed. `params`: limit, entity_type (csv: quest|note|attachment|all),
  * entity_id, quest_id, kind (csv), questline_id, category_id, tag_id,
  * from/to (ISO), q, before_id + before_at (keyset cursor).
- * @param {Record<string, string | number | null | undefined>} [params]
  */
 export function getQuestLog(params: Record<string, string | number | null | undefined> = {}) {
   const q = new URLSearchParams()
@@ -735,9 +728,7 @@ export function getQuestLog(params: Record<string, string | number | null | unde
 
 /**
  * Relations map around one entity (plus optional extra roots).
- * @param {string} type @param {number} id @param {number} [depth]
- * @param {{ type: string, id: number }[]} [extra]
- * @param {{ type: string, id: number }[]} [expand] cards whose direct neighbours are added whatever the depth
+ * @param expand cards whose direct neighbours are added whatever the depth
  */
 export function getGraph(
   type: string,
@@ -759,17 +750,15 @@ export function getGraphDraft() {
   return request<GraphDraftView>('/api/graph-draft')
 }
 
-/** @param {string} kind @param {any} payload */
 export function addGraphDraftOp(kind: string, payload: any) {
   return request('/api/graph-draft/ops', { method: 'POST', body: JSON.stringify({ kind, payload }) })
 }
 
-/** @param {number} id @param {boolean} [dry] dry = only report what would go with it */
+/** @param dry dry = only report what would go with it */
 export function deleteGraphDraftOp(id: number, dry: boolean = false) {
   return request(`/api/graph-draft/ops/${id}${dry ? '?dry=1' : ''}`, { method: 'DELETE' })
 }
 
-/** @param {{ type: string, id: number }[]} roots */
 export function putGraphDraftRoots(roots: { type: string; id: number }[]) {
   return request('/api/graph-draft/roots', { method: 'PUT', body: JSON.stringify({ roots }) })
 }
@@ -797,7 +786,10 @@ export async function commitGraphDraft() {
   return data
 }
 
-/** Stages a file in the draft. @param {File} file @param {string} [owner] "quest:5" etc. */
+/**
+ * Stages a file in the draft.
+ * @param owner "quest:5" etc.
+ */
 export async function uploadGraphDraftFile(file: File, owner: string = '') {
   const fd = new FormData()
   fd.append('file', file)
@@ -817,12 +809,12 @@ export async function uploadGraphDraftFile(file: File, owner: string = '') {
   return data
 }
 
-/** One quest with its steps and tags. @param {number} id */
+/** One quest with its steps and tags. */
 export function getQuestFull(id: number) {
   return request<QuestRead>(`/api/quests/${id}`)
 }
 
-/** Replaces the payload of a created thing in the draft. @param {number} id @param {any} payload */
+/** Replaces the payload of a created thing in the draft. */
 export function putGraphDraftOp(id: number, payload: any) {
   return request(`/api/graph-draft/ops/${id}`, { method: 'PUT', body: JSON.stringify({ payload }) })
 }
@@ -833,19 +825,16 @@ export function getRunners() {
   return request<RunnerView[]>('/api/runners')
 }
 
-/** @param {string} label @returns {Promise<{ label: string, registration_token: string, valid_hours: number }>} */
 export function createRunner(
   label: string
 ): Promise<{ label: string; registration_token: string; valid_hours: number }> {
   return request('/api/runners', { method: 'POST', body: JSON.stringify({ label }) })
 }
 
-/** @param {string} label */
 export function deleteRunner(label: string) {
   return request(`/api/runners/${encodeURIComponent(label)}`, { method: 'DELETE' })
 }
 
-/** @param {{ label?: string, state?: string, limit?: number }} [f] */
 export function getRunnerJobs(f: { label?: string; state?: string; limit?: number } = {}) {
   const qs = new URLSearchParams()
   if (f.label) qs.set('label', f.label)
@@ -855,7 +844,6 @@ export function getRunnerJobs(f: { label?: string; state?: string; limit?: numbe
   return request<RunnerJob[]>(`/api/runner-jobs${q ? `?${q}` : ''}`)
 }
 
-/** @param {number} id */
 export function cancelRunnerJob(id: number) {
   return request(`/api/runner-jobs/${id}/cancel`, { method: 'POST' })
 }

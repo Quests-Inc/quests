@@ -14,39 +14,6 @@
     statusColor,
   } from '../js/questFormat.ts'
 
-  /** @type {{
-   *   loading: boolean,
-   *   quests: any[],
-   *   matchedQuests: any[],
-   *   listedQuests: any[],
-   *   byCategory: any[],
-   *   frozenQuests: any[],
-   *   frozenOpen: boolean,
-   *   selectedId: number | null,
-   *   searchQuery: string,
-   *   showAllQuests: boolean,
-   *   onShowAll?: (on: boolean) => void,
-   *   querySpec: any,
-   *   parsedSearch: any,
-   *   categoryOpen: Record<string, boolean>,
-   *   lineOpen: Record<string, boolean>,
-   *   nowMs: number,
-   *   onSelect: (id: number) => void,
-   *   onTogglePin: (quest: any, event: Event) => void,
-   *   onQuestContextMenu: (event: MouseEvent, quest: any) => void,
-   *   onLineContextMenu: (event: MouseEvent, line: any) => void,
-   *   onToggleCategory: (key: string) => void,
-   *   onToggleLine: (catKey: string, lineKey: string) => void,
-   *   onToggleFrozen: () => void,
-   *   categories: any[],
-   *   scopeCategoryId: number | null,
-   *   scopeQuestlineId: number | null,
-   *   scopeQuestlineOptions: any[],
-   *   onScopeCategory: (id: number | null) => void,
-   *   onScopeQuestline: (id: number | null) => void,
-   *   labels?: Record<string, string>,
-   *   onRef?: (kind: string, id: number) => void,
-   * }} */
   let {
     loading,
     quests,
@@ -122,7 +89,6 @@
     onScopeQuestline(v === '' ? null : Number(v))
   }
 
-  /** @type {HTMLElement | null} */
   let rootEl: HTMLElement | null = $state(null)
 
   /** The nearest ancestor that actually scrolls. */
@@ -208,7 +174,7 @@
       {/if}
     </div>
   </div>
-  {#snippet questRow(q)}
+  {#snippet questRow(q: any)}
     {@const rowTimer = questTimer(q, nowMs)}
     {@const frac = quantifiedProgress(q)}
     <button
@@ -305,7 +271,7 @@
     {:else if listedQuests.length === 0}
       <p class="empty">Нет активных — включи «Показывать завершённые»</p>
     {:else}
-      {#snippet categoryBody(g)}
+      {#snippet categoryBody(g: any)}
         {#if g.lines.length === 0}
           {#each g.alone as q (q.id)}
             {@render questRow(q)}

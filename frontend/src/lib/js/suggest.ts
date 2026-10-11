@@ -66,9 +66,7 @@ function cosine(a: Map<any, any>, b: Map<any, any>) {
   return s
 }
 
-/**
- * @param {any[]} quests — anything with title/description/questline_id/category_id/tags
- */
+/** @param quests — anything with title/description/questline_id/category_id/tags */
 export function buildSuggestIndex(quests: any[]) {
   const docs: { questline: any; category: any; tags: any[]; tf: Map<any, any>; vec?: Map<any, any> }[] = (
     quests || []
@@ -88,9 +86,6 @@ export function buildSuggestIndex(quests: any[]) {
  * Vote of the nearest quests for `target`. Returns the leader, or null.
  * For 'category' only questline-free quests vote: elsewhere the section is
  * inherited from the questline and says nothing about the text.
- * @param {ReturnType<typeof buildSuggestIndex>} index
- * @param {{ title: string, description?: string }} query
- * @param {'questline' | 'category'} target
  */
 export function nearestVote(
   index: ReturnType<typeof buildSuggestIndex>,
@@ -146,7 +141,6 @@ export function suggestTags(
     .slice(0, k)
   if (!top.length) return []
   const ex = new Set((excludeSlugs || []).map((s) => String(s).toLowerCase()))
-  /** @type {Map<number, { tag: any, score: number }>} */
   const votes: Map<number, { tag: any; score: number }> = new Map()
   for (const { d, s } of top) {
     for (const tag of d.tags || []) {
@@ -162,7 +156,6 @@ export function suggestTags(
 /**
  * Decide what to show. `current` is the id on screen right now (or null):
  * it stays while it's still the leader within the looser KEEP bounds.
- * @returns {number | null}
  */
 export function pickSuggestion(
   vote: { id: number; share: number; sim: number },

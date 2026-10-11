@@ -2,21 +2,6 @@
   import Icon from '../ui/Icon.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
 
-  /** @type {{
-   *   view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners',
-   *   liveStatus: string,
-   *   health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
-   *   sidebarCollapsed?: boolean,
-   *   onToggleSidebar?: (() => void) | null,
-   *   onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners') => void,
-   *   onOpenSettings: () => void,
-   *   onOpenTemplates: () => void,
-   *   onOpenSecrets: () => void,
-   *   onOpenTags: () => void,
-   *   onOpenCreateQuestline: () => void,
-   *   onOpenCreateQuest: () => void,
-   *   onOpenAssistant: () => void,
-   * }} */
   let {
     view,
     liveStatus,
@@ -83,7 +68,6 @@
 
   /** Overflow menu lists only actions hidden behind ⋮ for the current stage. */
   let menuItems = $derived.by(() => {
-    /** @type {{ id: string, label: string }[]} */
     const items: { id: string, label: string }[] = []
     if (actionsMode === 'icons-primary') {
       items.push({ id: 'settings', label: 'Настройки' })

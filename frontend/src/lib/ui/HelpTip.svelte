@@ -5,7 +5,6 @@
   /**
    * A small "?" that opens an explanation on click — for the paragraphs of
    * how-it-works text that used to sit permanently under form fields.
-   * @type {{ label?: string, children?: import('svelte').Snippet }}
    */
   let { label = 'Подробнее', children }: { label?: string, children?: import('svelte').Snippet } = $props()
 

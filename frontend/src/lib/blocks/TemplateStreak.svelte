@@ -1,9 +1,10 @@
 <script lang="ts">
   import { getTemplateStreak } from '../js/api.ts'
 
-  /** Streak row for a quest emitted by a template; renders nothing until the
+  /**
+   * Streak row for a quest emitted by a template; renders nothing until the
    * template has closed periods. `status` refetches when the quest closes.
-   * @type {{ templateId: number, status?: string }} */
+   */
   let { templateId, status = '' }: { templateId: number, status?: string } = $props()
 
   let streak = $state((null as any | null))

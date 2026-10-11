@@ -13,7 +13,8 @@
   import NoteFind from '../ui/NoteFind.svelte'
   import { parseQuery, passes, helpLine } from '../js/searchFlags.ts'
   import FlagHints from '../ui/FlagHints.svelte'
-  import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft } from '../js/noteDrafts.svelte.ts'
+  import { clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft } from '../js/noteDrafts.svelte.ts'
+  type NoteForm = NoteDraft & { isReadme?: boolean; isPrivate?: boolean; isCategory?: boolean }
   import { copyText } from '../js/clipboard.ts'
   import {
     caretOffsetFromPoint,
@@ -35,21 +36,8 @@
   import NoteIconModal from '../modals/NoteIconModal.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
-import { NotePayload } from '../api/http.gen.ts'
+import type { NotePayload } from '../api/http.gen.ts'
 
-  /** @type {{
-   *   notes: any[],
-   *   selectedId: number | null,
-   *   labels?: Record<string, string>,
-   *   quests?: any[],
-   *   questlines?: any[],
-   *   attachments?: any[],
-   *   sidebarCollapsed?: boolean,
-   *   onSelect: (id: number | null) => void,
-   *   onChanged: () => void,
-   *   onRef?: (kind: string, id: number) => void,
-   *   onOpenSecrets?: (id: number) => void,
-   * }} */
   let {
     notes = [],
     selectedId = null,
@@ -77,7 +65,6 @@ import { NotePayload } from '../api/http.gen.ts'
   } = $props()
 
   let search = $state('')
-  /** @type {Record<string, boolean>} — false = свёрнуто; по умолчанию развёрнуто */
   let treeOpen: Record<string, boolean> = $state({})
   /** Ссылки/Ссылаются — свёрнуты по умолчанию. */
   let refsOpen = $state(false)
@@ -111,7 +98,6 @@ import { NotePayload } from '../api/http.gen.ts'
     isPrivate: false,
     isCategory: false,
   })
-  /** @type {'raw' | 'combined' | 'formatted'} */
   let viewMode: 'raw' | 'combined' | 'formatted' = $state(loadViewMode())
   let ctxOpen = $state(false)
   let ctxX = $state(0)
@@ -240,7 +226,6 @@ import { NotePayload } from '../api/http.gen.ts'
   }
 
   let byParent = $derived.by(() => {
-    /** @type {Map<string, any[]>} */
     const m: Map<string, any[]> = new Map()
     for (const n of filtered) {
       const key = parentKeyOf(n)
@@ -248,13 +233,12 @@ import { NotePayload } from '../api/http.gen.ts'
       m.get(key).push(n)
     }
     // Notes with children first, then leaves; pin only breaks ties inside a group.
-    const hasKids = (/** @type {any} */ n: { id: any }) => (m.get(String(n.id))?.length ?? 0) > 0
+    const hasKids = (n: { id: any }) => (m.get(String(n.id))?.length ?? 0) > 0
     for (const list of m.values()) list.sort((a, b) => compareNotes(a, b, hasKids))
     return m
   })
 
-  /** Tree order: with children → pinned → sort_order → id.
-   * @param {any} a @param {any} b @param {(n: any) => boolean} hasKids */
+  /** Tree order: with children → pinned → sort_order → id. */
   function compareNotes(a: any, b: any, hasKids: (n: any) => boolean) {
     return (
       Number(hasKids(b)) - Number(hasKids(a)) ||
@@ -284,7 +268,6 @@ import { NotePayload } from '../api/http.gen.ts'
     return 'combined'
   }
 
-  /** @param {'raw' | 'combined' | 'formatted'} mode */
   function setViewMode(mode: 'raw' | 'combined' | 'formatted') {
     viewMode = mode
     try {
@@ -319,7 +302,7 @@ import { NotePayload } from '../api/http.gen.ts'
     }
   }
 
-  function applyForm(src: { title: any; description: any; parentId: any; pinned: any; isReadme: any; isPrivate: any; isCategory: any }) {
+  function applyForm(src: NoteForm) {
     title = src.title
     description = src.description
     parentId = src.parentId
@@ -589,7 +572,7 @@ import { NotePayload } from '../api/http.gen.ts'
     }
   }
 
-  async function addNote(parent = null) {
+  async function addNote(parent: number | null = null) {
     error = ''
     try {
       const created = await createNote({
@@ -732,7 +715,6 @@ import { NotePayload } from '../api/http.gen.ts'
     return previewEl?.querySelector?.('.md') ?? previewEl
   }
 
-  /** @param {MouseEvent} [event] */
   async function startBodyEdit(event?: MouseEvent) {
     if (viewMode !== 'formatted') return
     event?.preventDefault?.()
@@ -787,7 +769,6 @@ import { NotePayload } from '../api/http.gen.ts'
     return treeOpen[String(id)] === true
   }
 
-  /** @param {MouseEvent} event */
   function toggleTree(id: any, event: MouseEvent) {
     event.stopPropagation()
     event.preventDefault()
@@ -856,11 +837,9 @@ import { NotePayload } from '../api/http.gen.ts'
   })
 
   let crumbs = $derived.by(() => {
-    /** @type {{ id: number | null, title: string }[]} */
     const out: { id: number | null, title: string }[] = [{ id: null, title: 'Корень' }]
     const pid = parentId === '' ? null : Number(parentId)
     if (pid == null || Number.isNaN(pid)) return out
-    /** @type {{ id: number, title: string }[]} */
     const chain: { id: number, title: string }[] = []
     let cur = noteById(pid)
     const seen = new Set()
@@ -873,7 +852,6 @@ import { NotePayload } from '../api/http.gen.ts'
   })
 
   let parentMenuItems = $derived.by(() => {
-    /** @type {{ id: string, label: string }[]} */
     const items: { id: string, label: string }[] = [{ id: 'root', label: '— корень —' }]
     if (selectedId == null) return items
     for (const n of notes) {
@@ -884,7 +862,6 @@ import { NotePayload } from '../api/http.gen.ts'
     return items
   })
 
-  /** @param {MouseEvent} event */
   function openParentPicker(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
@@ -900,13 +877,11 @@ import { NotePayload } from '../api/http.gen.ts'
     reparentNote(selectedId, action === 'root' ? null : Number(action))
   }
 
-  /** @param {number | null} id */
   function setParentCrumb(id: number | null) {
     if (selectedId == null) return
     reparentNote(selectedId, id)
   }
 
-  /** @param {MouseEvent} event */
   function openExportMenu(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
@@ -973,7 +948,6 @@ import { NotePayload } from '../api/http.gen.ts'
   let ctxNote = $derived(ctxNoteId == null ? null : noteById(ctxNoteId))
 
   function moveTargets(note: { parent_id: null; id: null }) {
-    /** @type {{ id: string, label?: string, sep?: boolean, checked?: boolean }[]} */
     const items: { id: string, label?: string, sep?: boolean, checked?: boolean }[] = []
     if (note?.parent_id != null) {
       items.push({ id: 'move-up', label: 'На уровень вверх' })
@@ -988,8 +962,8 @@ import { NotePayload } from '../api/http.gen.ts'
     // Own descendants are excluded, so there is never an ambiguous re-parenting.
     const pid = note?.parent_id ?? null
     const parent = pid != null ? noteById(pid) : null
-    const hasKids = (/** @type {any} */ n: { id: any }) => hasChildren(n.id)
-    const level = (/** @type {number | null} */ parentOf: any) =>
+    const hasKids = (n: { id: any }) => hasChildren(n.id)
+    const level = (parentOf: any) =>
       notes
         .filter(
           (n) =>
@@ -1180,7 +1154,7 @@ import { NotePayload } from '../api/http.gen.ts'
     await reparentNote(id, parent?.parent_id ?? null)
   }
 
-  /** @param {number | null} targetId — null means "make it a root note" */
+  /** @param targetId — null means "make it a root note" */
   function canDropOn(targetId: number | null, draggedId = dragId) {
     if (draggedId == null) return false
     if (targetId === draggedId) return false
@@ -1189,8 +1163,7 @@ import { NotePayload } from '../api/http.gen.ts'
     return true
   }
 
-  /** Reparent from a tree drag — saved immediately, like the breadcrumb picker.
-   * @param {number} id @param {number | null} newParentId */
+  /** Reparent from a tree drag — saved immediately, like the breadcrumb picker. */
   function moveNoteTo(id: number, newParentId: number | null) {
     return reparentNote(id, newParentId)
   }
@@ -1386,7 +1359,7 @@ import { NotePayload } from '../api/http.gen.ts'
       {:else if roots.length === 0 && search}
         <p class="empty">Ничего не найдено</p>
       {:else}
-        {#snippet tree(nodes, depth)}
+        {#snippet tree(nodes: any[], depth: number)}
           {#each nodes as n (n.id)}
             <div class="notes__node" data-nav-node style:--notes-depth="{depth}">
               {#if hasChildren(n.id)}

@@ -8,14 +8,6 @@
    * questline and note-icon modals. The upload itself happens on the
    * parent's save: it reads `pendingFile` (upload it) and `clearCustom`
    * (drop the current custom icon).
-   * @type {{
-   *   color?: string,
-   *   icon?: string,
-   *   iconUrl?: string | null,
-   *   pendingFile?: File | null,
-   *   clearCustom?: boolean,
-   *   ownerLabel?: string,
-   * }}
    */
   let {
     color = $bindable('#9a9a9a'),

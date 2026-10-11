@@ -6,12 +6,6 @@
   /**
    * One filter axis: the name stays on the closed control, the choices
    * sit in a multi-select menu.
-   * @type {{
-   *   label: string,
-   *   options: { id: string, label: string, color?: string }[],
-   *   selected: Set<string>,
-   *   onChange: (next: Set<string>) => void,
-   * }}
    */
   let { label, options = [], selected, onChange }: {
     label: string,
@@ -56,7 +50,6 @@
     if (refocus) triggerEl?.focus()
   }
 
-  /** @param {string} id */
   function toggle(id: string) {
     const next = new Set(selected)
     if (next.has(id)) next.delete(id)
@@ -68,7 +61,6 @@
     onChange(new Set(options.map((o) => o.id)))
   }
 
-  /** @param {KeyboardEvent} event */
   function onTriggerKey(event: KeyboardEvent) {
     if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       event.preventDefault()
@@ -76,7 +68,6 @@
     }
   }
 
-  /** @param {KeyboardEvent} event */
   function onListKey(event: KeyboardEvent) {
     const last = options.length
     if (event.key === 'ArrowDown') {

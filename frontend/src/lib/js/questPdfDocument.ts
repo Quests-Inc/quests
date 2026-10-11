@@ -10,16 +10,12 @@ const STATUS_COLORS: Record<string, string> = {
   archived: '#8a8a8a',
 }
 
-/**
- * @typedef {{ significanceLabel: (q: any) => string, periodBadge: (q: any) => string | null, quantifiedProgress: (q: any) => string | null }} QuestFormat
- */
 export type QuestFormat = {
   significanceLabel: (q: any) => string
   periodBadge: (q: any) => string | null
   quantifiedProgress: (q: any) => string | null
 }
 
-/** @param {any} quest @param {QuestFormat} fmt */
 function metaChips(quest: any, fmt: QuestFormat) {
   const chips: { text: string; color?: string }[] = [
     { text: String(quest.status || ''), color: STATUS_COLORS[quest.status] },
@@ -64,9 +60,7 @@ function dateFacts(quest: { created_at: any; updated_at: any; deadline_at: any }
 /**
  * The quest as a document for the server: meta line, description, steps (each with its own
  * markdown), attachments and dates — the detail view's blocks, not one markdown stream.
- * @param {any} quest
- * @param {{ labels?: Record<string, string>, tzLabel?: string, attachments?: any[] }} opts
- * @param {QuestFormat} fmt label helpers (kept out of this module: they pull in the API client)
+ * @param fmt label helpers (kept out of this module: they pull in the API client)
  */
 export function buildQuestPdfDocument(
   quest: any,

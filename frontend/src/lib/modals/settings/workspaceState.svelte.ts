@@ -15,9 +15,9 @@ import {
 export const wsx = $state({
   enabled: false,
   loaded: false,
-  list: /** @type {{ id: number, name: string }[]} */ ([]),
+  list: [],
   current: 0,
-  members: /** @type {{ user_id: number, username: string, role: string }[]} */ ([]),
+  members: [],
   myRole: '',
   /** Attachment bytes the current workspace keeps, and its cap (0 = none). */
   attachmentsUsed: 0,
@@ -94,7 +94,7 @@ export async function removeCurrent(confirmName: string) {
   if (await act(() => deleteWorkspace(wsx.current, confirmName.trim()), 'не удалось удалить')) location.reload()
 }
 
-/** @returns {Promise<string>} the one-time link, or '' on failure */
+/** @returns the one-time link, or '' on failure */
 export async function newInvite(): Promise<string> {
   let url = ''
   await act(async () => {

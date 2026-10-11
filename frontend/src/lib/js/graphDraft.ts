@@ -6,11 +6,6 @@ import { parseRefs } from './refs.ts'
 
 const tmpKey = (type: string, opId: number) => `${type}:t${opId}`
 
-/**
- * @param {{ nodes: any[], edges: any[], roots?: string[], root?: string }} graph
- * @param {{ id: number, kind: string, payload: any }[]} ops
- * @returns {{ nodes: any[], edges: any[], ownerless: Set<string>, touched: Map<string, number[]> }}
- */
 export function applyDraft(
   graph: { nodes: any[]; edges: any[]; roots?: string[]; root?: string },
   ops: { id: number; kind: string; payload: any }[]
@@ -291,7 +286,7 @@ export function applyDraft(
   return { nodes, edges, ownerless, touched }
 }
 
-/** One line for the draft log. @param {any} op @param {(key: string) => string} title */
+/** One line for the draft log. */
 export function describeOp(op: any, title: (key: string) => string) {
   const p = op.payload || {}
   switch (op.kind) {

@@ -6,13 +6,6 @@
    * (`summary`, e.g. "активен · обычное"), so a form can stay short without
    * hiding its state. `aside` renders at the right of the header (a "?" or a
    * small action), outside the toggle button.
-   * @type {{
-   *   title: string,
-   *   summary?: string,
-   *   open?: boolean,
-   *   aside?: import('svelte').Snippet,
-   *   children?: import('svelte').Snippet,
-   * }}
    */
   let { title, summary = '', open = $bindable(false), aside, children }: {
     title: string,

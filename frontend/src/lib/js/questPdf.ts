@@ -8,10 +8,6 @@ const FONT_PX = 14
 const HEAD_H = 8
 const STEP_H = 7
 
-/**
- * @param {any} quest
- * @returns {{ title: string, exportedAt: string, steps: { title: string, progress: string, done: boolean }[] }}
- */
 export function buildQuestPdfPayload(quest: any): {
   title: string
   exportedAt: string
@@ -51,13 +47,7 @@ function pdfFilename(quest: { id: null; title: any }) {
   return `quest-${id}${raw ? `-${raw}` : ''}.pdf`
 }
 
-/**
- * jsPDF core fonts lack Cyrillic — draw via canvas using system UI fonts.
- * @param {CanvasRenderingContext2D} ctx
- * @param {string} text
- * @param {number} maxWidth
- * @param {string} font
- */
+/** jsPDF core fonts lack Cyrillic — draw via canvas using system UI fonts. */
 function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, font: string) {
   ctx.font = font
   const words = String(text || '')
@@ -82,7 +72,6 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 /**
  * Download a simple quest PDF: title with progress at the end of the same
  * line, export date at the end of the next line, then the step list.
- * @param {any} quest
  */
 export async function downloadQuestPdfSimple(quest: any) {
   if (!quest) return
@@ -103,7 +92,6 @@ export async function downloadQuestPdfSimple(quest: any) {
   const headPx = HEAD_H * pxPerMm
   const stepPx = STEP_H * pxPerMm
 
-  /** @type {{ left?: string, right?: string, font: string, h: number, color: string }[]} */
   const blocks: { left?: string; right?: string; font: string; h: number; color: string }[] = []
   blocks.push({ left: payload.title, right: payload.progress, font: boldFont, h: headPx, color: '#1a1a1a' })
   blocks.push({ right: `Выгрузка: ${payload.exportedAt}`, font, h: headPx, color: '#666666' })
@@ -120,8 +108,7 @@ export async function downloadQuestPdfSimple(quest: any) {
     })
   }
 
-  let pageBlocks: { left?: string; right?: string; font: string; h: number; color: string }[] =
-    /** @type {typeof blocks} */ ([])
+  let pageBlocks: { left?: string; right?: string; font: string; h: number; color: string }[] = []
   let used = 0
   let first = true
 

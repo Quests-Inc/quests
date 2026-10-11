@@ -47,7 +47,7 @@
   import terminal from '../../assets/icons/terminal.svg?raw'
   import undo from '../../assets/icons/undo.svg?raw'
 
-  const ICONS = {
+  const ICONS: Record<string, string> = {
     add,
     alert,
     arrange,
@@ -97,7 +97,6 @@
     undo,
   }
 
-  /** @type {{ name: string, size?: number, label?: string }} */
   let { name, size = 16, label = '' }: { name: string, size?: number, label?: string } = $props()
 
   let svg = $derived(ICONS[name] ?? '')

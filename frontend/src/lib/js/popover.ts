@@ -11,10 +11,6 @@ const EDGE = 8
 /**
  * Put `pop` under `anchor` (or above it when there's no room below), kept
  * inside the viewport.
- * @param {HTMLElement} anchor
- * @param {HTMLElement} pop
- * @param {{ gap?: number, matchWidth?: boolean, align?: 'start' | 'end' }} [opts]
- * @returns {'below' | 'above'}
  */
 export function placePopover(
   anchor: HTMLElement,
@@ -43,10 +39,7 @@ export function placePopover(
 /**
  * While a popover is open: close it on a pointer-down outside `nodes`, and
  * keep it attached to its anchor when anything scrolls or the window resizes.
- * @param {() => (Element | null | undefined)[]} nodes
- * @param {() => void} onOutside
- * @param {() => void} reposition
- * @returns {() => void} cleanup
+ * @returns cleanup
  */
 export function watchPopover(
   nodes: () => (Element | null | undefined)[],

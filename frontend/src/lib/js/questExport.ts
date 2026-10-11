@@ -4,9 +4,6 @@ import { downloadPdf } from './pdfExport.ts'
 import { significanceLabel, periodBadge, quantifiedProgress } from './questFormat.ts'
 import { buildQuestPdfDocument } from './questPdfDocument.ts'
 
-/**
- * @param {{ id?: number | null, title?: string }} quest
- */
 export function questExportFilename(quest: { id?: number | null; title?: string }, ext = 'pdf') {
   const id = quest?.id != null ? String(quest.id) : 'x'
   const raw = String(quest?.title || 'quest')
@@ -17,14 +14,10 @@ export function questExportFilename(quest: { id?: number | null; title?: string 
   return `quest-${id}${raw ? `-${raw}` : ''}.${ext}`
 }
 
-/**
- * Title, description, and steps as a markdown file.
- * @param {any} quest
- */
+/** Title, description, and steps as a markdown file. */
 export function downloadQuestMarkdown(quest: any) {
   if (!quest) return
   const title = String(quest.title || '').trim() || `quest=${quest.id ?? ''}`
-  /** @type {string[]} */
   const parts: string[] = [`# ${title}`, '']
   const body = String(quest.description || '').trim()
   if (body) parts.push(body, '')
@@ -53,11 +46,7 @@ export function downloadQuestMarkdown(quest: any) {
   URL.revokeObjectURL(url)
 }
 
-/**
- * Renders the quest to PDF on the server.
- * @param {any} quest
- * @param {{ labels?: Record<string, string>, tzLabel?: string }} [opts]
- */
+/** Renders the quest to PDF on the server. */
 export async function downloadQuestPdf(quest: any, opts: { labels?: Record<string, string>; tzLabel?: string } = {}) {
   if (!quest) return
   let attachments: AttachmentView[] = []

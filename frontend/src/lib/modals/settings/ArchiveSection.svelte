@@ -6,7 +6,6 @@
 
   let exportSecrets = $state(false)
   let importSecrets = $state(false)
-  /** @type {HTMLInputElement | null} */
   let fileInput: HTMLInputElement | null = $state(null)
 
   const isOwner = $derived(wsx.myRole === 'owner')

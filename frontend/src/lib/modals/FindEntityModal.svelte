@@ -5,17 +5,7 @@
   import FlagHints from '../ui/FlagHints.svelte'
   import { ENTITY_SPEC, findEntities } from '../js/entityFlags.ts'
 
-  /** Search box over quests and notes; picks one existing entity.
-   * @type {{
-   *   open: boolean,
-   *   title?: string,
-   *   types?: ('quest' | 'note' | 'questline')[],
-   *   quests?: any[],
-   *   notes?: any[],
-   *   questlines?: any[],
-   *   onClose: () => void,
-   *   onPick: (type: string, id: number) => void,
-   * }} */
+  /** Search box over quests and notes; picks one existing entity. */
   let {
     open = false,
     title = 'Добавить на карту',
@@ -36,7 +26,7 @@
     onPick: (type: string, id: number) => void,
   } = $props()
 
-  const LABEL = { quest: 'Квест', note: 'Заметка', questline: 'Квестлайн' }
+  const LABEL: Record<string, string> = { quest: 'Квест', note: 'Заметка', questline: 'Квестлайн' }
   let query = $state('')
   let input = $state((null as HTMLInputElement | null))
 

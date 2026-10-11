@@ -83,10 +83,6 @@ marked.use({
   },
 })
 
-/**
- * @param {string} code
- * @param {string} lang
- */
 function highlightFence(code: string, lang: string) {
   const src = String(code ?? '').replace(/\n$/, '')
   if (lang && hljs.getLanguage(lang)) {
@@ -147,7 +143,6 @@ export const ATTACHMENT_IMAGE_SRC_RE = /^\/api\/attachments\/(\d+)\/image$/
 /** `![alt](attachment=N)` — images come only from attachments (ClamAV-scanned at upload). */
 const ATTACHMENT_IMG_RE = /!\[([^\]\n]*)\]\(\s*attachment=(\d+)\s*\)/g
 
-/** @param {number | string} id */
 export function attachmentImageSrc(id: number | string) {
   return `/api/attachments/${id}/image`
 }
@@ -192,10 +187,6 @@ function splitCode(src: string) {
   return String(src || '').split(/(```[\s\S]*?```|`[^`]+`)/)
 }
 
-/**
- * @param {string} source
- * @param {{ labels?: Record<string, string> }} [opts]
- */
 function linkifyRefs(source: string, opts: { labels?: Record<string, string> } = {}) {
   const labels = opts.labels || {}
   const withMdLinks = splitCode(source)

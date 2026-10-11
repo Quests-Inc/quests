@@ -8,15 +8,6 @@
    * Never picks anything by itself: one click accepts, ✕ hides it for the
    * rest of this form. Waits for 3+ title characters and a 300 ms pause in
    * typing; once shown it holds on through small wobbles in confidence.
-   * @type {{
-   *   index: ReturnType<typeof import('../js/suggest.ts').buildSuggestIndex> | null,
-   *   title: string,
-   *   description?: string,
-   *   target: 'questline' | 'category',
-   *   options: { id: string, label: string, color?: string }[],
-   *   enabled?: boolean,
-   *   onAccept: (id: string) => void,
-   * }}
    */
   let { index, title, description = '', target, options, enabled = true, onAccept }: {
     index: ReturnType<typeof import('../js/suggest.ts').buildSuggestIndex> | null,

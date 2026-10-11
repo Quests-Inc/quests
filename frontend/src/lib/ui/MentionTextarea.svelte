@@ -2,21 +2,6 @@
   import { activeMentionToken, applyMention, matchMentions } from '../js/mentionSuggest.ts'
   import { templateStore } from '../js/templatesStore.svelte.ts'
 
-  /** @type {{
-   *   value?: string,
-   *   quests?: any[],
-   *   questlines?: any[],
-   *   notes?: any[],
-   *   attachments?: any[],
-   *   placeholder?: string,
-   *   rows?: number,
-   *   class?: string,
-   *   disabled?: boolean,
-   *   placement?: 'below' | 'inside',
-   *   el?: HTMLTextAreaElement | null,
-   *   onkeydown?: (event: KeyboardEvent) => void,
-   *   oninput?: (event: Event) => void,
-   * }} */
   let {
     value = $bindable(''),
     quests = [],

@@ -1,17 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
 
-  /**
-   * @typedef {{
-   *   id: string,
-   *   label?: string,
-   *   danger?: boolean,
-   *   sep?: boolean,
-   *   checked?: boolean,
-   *   disabled?: boolean,
-   *   children?: CtxItem[],
-   * }} CtxItem
-   */
   type CtxItem = {
     id: string,
     label?: string,
@@ -23,9 +12,6 @@
   }
 
 
-  /**
-   * @type {{ open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void }}
-   */
   let { open = false, x = 0, y = 0, items = [], onSelect, onClose }: { open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
 
   let menuEl = $state((null as HTMLDivElement | null))
@@ -36,7 +22,6 @@
   let subX = $state(0)
   let subY = $state(0)
   let subPlaced = $state(false)
-  /** @type {{ id: string, items: CtxItem[], left: number, right: number, top: number } | null} */
   let branch: { id: string, items: CtxItem[], left: number, right: number, top: number } | null = $state(null)
 
   const PAD = 8
@@ -60,10 +45,6 @@
     placed = true
   }
 
-  /**
-   * @param {CtxItem} item
-   * @param {HTMLElement} el
-   */
   function openBranch(item: CtxItem, el: HTMLElement) {
     if (!item.children?.length) return
     if (branch?.id === item.id) return
@@ -97,18 +78,12 @@
     subPlaced = true
   }
 
-  /**
-   * @param {CtxItem} item
-   * @param {HTMLElement} el
-   * @param {boolean} inSub
-   */
   function onRowEnter(item: CtxItem, el: HTMLElement, inSub: boolean) {
     if (item.sep || item.disabled) return
     if (!inSub && item.children?.length) openBranch(item, el)
     else if (!inSub) branch = null
   }
 
-  /** @param {CtxItem} item */
   function pick(item: CtxItem) {
     if (item.sep || item.disabled || item.children?.length) return
     onSelect(item.id)
@@ -193,7 +168,7 @@
   })
 </script>
 
-{#snippet rows(list, inSub)}
+{#snippet rows(list: CtxItem[], inSub: boolean)}
   {#each list as item (item.id)}
     {#if item.sep}
       <div class="ctx-menu__sep" role="separator"></div>

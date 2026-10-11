@@ -1,43 +1,34 @@
-# Svelte + Vite
+# Фронтенд
 
-This template should help get you started developing with Svelte in Vite.
+Svelte 5 (руны) + TypeScript, сборка Vite 8. Инструменты: **bun**, **oxlint**, **oxfmt**, **svelte-check**.
 
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
-
-## Need an official Svelte framework?
-
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
-
-## Technical considerations
-
-**Why use this over SvelteKit?**
-
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
-
-This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
-
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
-
-**Why include `.vscode/extensions.json`?**
-
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
-
-**Why enable `checkJs` in the JS template?**
-
-It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```js
-// store.js
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+```bash
+bun install --frozen-lockfile
+bun run dev          # Vite с HMR на :5173, /api проксируется на запущенный API
+bun run verify       # lint + format:check + check + test + build — то же, что гоняет CI
 ```
+
+| Команда | Что делает |
+|---|---|
+| `bun run lint` | oxlint (`correctness` и `suspicious` как ошибки), правила в `.oxlintrc.json` |
+| `bun run format` / `format:check` | oxfmt, настройки в `.oxfmtrc.jsonc` (`.svelte` он не форматирует) |
+| `bun run check` | svelte-check (`noImplicitAny`); число ошибок не должно расти относительно `.svelte-check-baseline` (сейчас 0) |
+| `bun run test` | `bun test tests` |
+
+## Типы API
+
+Типы ответов сервера **генерируются из Go-структур** (`go/tygo.yaml`), руками их не правят:
+
+```bash
+just gen-types       # пишет src/lib/api/*.gen.ts; CI падает, если файлы устарели
+```
+
+`src/lib/js/api.ts` — клиент; возвращаемые типы берёт из `src/lib/api/*.gen.ts`. Новый эндпоинт: сначала Go-структура с
+json-тегами (не `map[string]any`), потом `just gen-types`, потом функция в `api.ts` с `request<Тип>(…)`.
+
+## Заметки
+
+- Скрипты компонентов — `<script lang="ts">`; JSDoc-типов в коде не осталось, только аннотации TS.
+- `esrap` закреплён на 2.3.0 в `overrides` (`package.json`): 2.4.0 ломает разбор приведений типов в шаблонах Svelte.
+- svelte-check работает на TypeScript 5.9; нативный TS 7 его API пока не поддерживает.
+- Явные `any` (сейчас около 728 вхождений) — известный долг: ищутся поиском `: any`, будут сужаться по мере правок.

@@ -2,7 +2,6 @@
   /**
    * Hours + minutes, both optional (empty = unset). Values stay as the raw
    * input strings/numbers; callers turn them into seconds (js/duration.js).
-   * @type {{ hours?: string | number, minutes?: string | number, disabled?: boolean, label?: string }}
    */
   let {
     hours = $bindable(''),

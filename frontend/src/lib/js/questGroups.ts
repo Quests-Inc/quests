@@ -1,15 +1,9 @@
-/**
- * Group listed quests by category, then by questline within each category.
- * @param {any[]} list
- * @param {{ id: number, label: string, sort_order?: number, color?: string }[]} categories
- * @param {{ id: number, title: string, category_id?: number | null, color?: string, icon?: string }[]} questlines
- */
+/** Group listed quests by category, then by questline within each category. */
 export function groupQuestsByCategory(
   list: any[],
   categories: { id: number; label: string; sort_order?: number; color?: string }[],
   questlines: { id: number; title: string; category_id?: number | null; color?: string; icon?: string }[]
 ) {
-  /** @type {Map<string, any[]>} */
   const buckets: Map<string, any[]> = new Map()
   for (const q of list) {
     const key = q.category_id != null ? `c${q.category_id}` : 'none'
@@ -49,9 +43,7 @@ export function groupQuestsByCategory(
   return ordered
 }
 
-/** @param {any[]} items @param {any[]} questlines */
 export function partitionByQuestline(items: any[], questlines: any[]) {
-  /** @type {Map<number, any[]>} */
   const byLine: Map<number, any[]> = new Map()
   const alone = []
   for (const q of items) {

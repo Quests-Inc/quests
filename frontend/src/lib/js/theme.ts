@@ -5,10 +5,8 @@
 
 export const DEFAULT_THEME = 'gruvbox-yellow'
 
-/** @typedef {{ id: string, label: string, scheme: 'dark' | 'light', swatches: [string, string, string] }} ThemeMeta */
 export type ThemeMeta = { id: string; label: string; scheme: 'dark' | 'light'; swatches: [string, string, string] }
 
-/** @type {ThemeMeta[]} */
 export const THEMES: ThemeMeta[] = [
   {
     id: 'gruvbox-yellow',

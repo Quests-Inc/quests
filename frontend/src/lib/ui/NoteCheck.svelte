@@ -3,12 +3,13 @@
   import Icon from './Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '../js/api.ts'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
-import { NoteCheckView } from '../api/http.gen.ts'
+import type { NoteCheckView } from '../api/http.gen.ts'
 
-  /** A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer
+  /**
+   * A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer
    * is "out of date?" — a bare 0/1 or {"outdated": 0|1, "reason": "…"}. The state follows the server;
    * this block polls it while open.
-   * @type {{ noteId: number, onOpenSecrets?: () => void, onChanged?: () => void }} */
+   */
   let { noteId, onOpenSecrets, onChanged }: { noteId: number, onOpenSecrets?: () => void, onChanged?: () => void } = $props()
 
   let check = $state((null as any | null))

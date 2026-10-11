@@ -7,15 +7,6 @@
   import ModalHead from './ModalHead.svelte'
   import ModalFoot from './ModalFoot.svelte'
 
-  /** @type {{
-   *   open: boolean,
-   *   quests: any[],
-   *   questlines: any[],
-   *   notes?: any[],
-   *   attachments?: any[],
-   *   onClose: () => void,
-   *   onApplied: () => void,
-   * }} */
   let { open = false, quests = [], questlines = [], notes = [], attachments = [], onClose, onApplied }: {
     open: boolean,
     quests: any[],

@@ -3,13 +3,6 @@
   import { tailFade } from '../js/typewriter.ts'
   import { renderRefTextHtml, parseRefHref } from '../js/refs.ts'
 
-  /** @type {{
-   *   source?: string,
-   *   class?: string,
-   *   labels?: Record<string, string>,
-   *   onRef?: (kind: string, id: number) => void,
-   *   typing?: boolean,
-   * }} */
   let {
     source = '',
     class: className = '',
@@ -36,7 +29,7 @@
     return DOMPurify.sanitize(raw, PURIFY)
   })
 
-  function onClick(event: { target: { closest: (arg0: string) => any }; preventDefault: () => void; stopPropagation: () => void }) {
+  function onClick(event: MouseEvent) {
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
     const href = a.getAttribute('href') || ''

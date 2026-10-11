@@ -6,14 +6,13 @@
   import { parseApiDate } from '../js/time.ts'
   import { toast } from '../js/toasts.svelte.ts'
 
-  /** Devices that run checks for us, and what they are doing: who is online,
+  /**
+   * Devices that run checks for us, and what they are doing: who is online,
    * what runs where, what waits in the queue, how the latest jobs ended.
-   * @type {{ active?: boolean, onOpenQuest?: (id: number) => void }} */
+   */
   let { active = true, onOpenQuest }: { active?: boolean, onOpenQuest?: (id: number) => void } = $props()
 
-  /** @type {any[]} */
   let runners: any[] = $state([])
-  /** @type {any[]} */
   let jobs: any[] = $state([])
   let loaded = $state(false)
   let now = $state(Date.now())
@@ -23,7 +22,6 @@
   // --- adding a runner ---
   let newLabel = $state('')
   let adding = $state(false)
-  /** @type {{ label: string, token: string, hours: number } | null} */
   let fresh: { label: string, token: string, hours: number } | null = $state(null)
 
   const OPEN_STATES = ['queued', 'assigned', 'running']
@@ -56,7 +54,6 @@
     return () => clearInterval(t)
   })
 
-  /** @param {number} ms */
   function span(ms: number) {
     const s = Math.max(0, Math.round(ms / 1000))
     if (s < 60) return `${s} с`
@@ -67,10 +64,8 @@
     return `${Math.floor(h / 24)} дн`
   }
 
-  /** @param {string | null | undefined} iso */
   const at = (iso: string | null | undefined) => (iso ? parseApiDate(iso)?.getTime() ?? null : null)
 
-  /** @param {any} r */
   function presence(r: any) {
     if (r.revoked) return { cls: 'off', text: 'отозван' }
     if (!r.registered) return { cls: 'wait', text: 'ещё не подключён' }
@@ -79,7 +74,7 @@
     return { cls: 'off', text: seen ? `офлайн ${span(now - seen)}` : 'офлайн' }
   }
 
-  const STATE = {
+  const STATE: Record<string, { text: string; cls: string }> = {
     queued: { text: 'в очереди', cls: 'wait' },
     assigned: { text: 'взято', cls: 'run' },
     running: { text: 'идёт', cls: 'run' },
@@ -91,9 +86,8 @@
     abandoned: { text: 'результат неизвестен', cls: 'bad' },
     canceled: { text: 'отменено', cls: 'off' },
   }
-  const KIND = { poll: 'опрос', once: 'разово', emit_pool: 'шаблон' }
+  const KIND: Record<string, string> = { poll: 'опрос', once: 'разово', emit_pool: 'шаблон' }
 
-  /** @param {any} j */
   function took(j: any) {
     const a = at(j.started_at) ?? at(j.assigned_at)
     const b = at(j.finished_at)
@@ -129,7 +123,6 @@
     }
   }
 
-  /** @param {any} r */
   async function revoke(r: any) {
     if (!confirm(`Отозвать раннер «${r.label}»? Его задания в очереди будут отменены.`)) return
     try {
@@ -140,7 +133,6 @@
     }
   }
 
-  /** @param {any} j */
   async function cancel(j: any) {
     try {
       await cancelRunnerJob(j.id)

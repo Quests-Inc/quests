@@ -1,6 +1,5 @@
 <script lang="ts">
-  /** A titled group inside a settings section. `danger` frames it as the risky zone.
-   * @type {{ title?: string, hint?: string, danger?: boolean, children?: import('svelte').Snippet }} */
+  /** A titled group inside a settings section. `danger` frames it as the risky zone. */
   let { title = '', hint = '', danger = false, children }: { title?: string, hint?: string, danger?: boolean, children?: import('svelte').Snippet } = $props()
 </script>
 

@@ -2,7 +2,6 @@
 
 const STATUS_OF: Record<string, string> = { done: 'completed', overdue: 'expired' }
 
-/** @param {{ categories?: any[] }} ctx */
 export function questSpec({ categories = [] }: { categories?: any[] } = {}) {
   return {
     status: {

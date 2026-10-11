@@ -1,7 +1,6 @@
 /** Hours+minutes form fields ⇄ seconds, plus short Russian labels for the
  * collapsed-section summaries. */
 
-/** @param {number | null | undefined} seconds */
 export function secondsToParts(seconds: number | null | undefined) {
   const s = Number(seconds) || 0
   if (s <= 0) return { hours: '', minutes: '' }

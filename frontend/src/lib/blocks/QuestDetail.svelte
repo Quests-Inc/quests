@@ -23,38 +23,6 @@
   import { toastDone, toastProgress } from '../js/toasts.svelte.ts'
   import { animateText } from '../js/typewriter.ts'
 
-  /** @type {{
-   *   selected: any | null,
-   *   quests?: any[],
-   *   showAllQuests?: boolean,
-   *   nowMs: number,
-   *   statusBusy: boolean,
-   *   deleting: boolean,
-   *   deleteAnimActive?: boolean,
-   *   consumeRemoteEdit?: (questId: number | null) => boolean,
-   *   onDeleteAnimDone?: () => void,
-   *   stepBusyId: number | null,
-   *   stepEditId: number | null,
-   *   stepEditValue: string,
-   *   onToggleCompleted: (quest?: any) => void,
-   *   onOpenEdit: (quest?: any) => void,
-   *   onRequestDelete: (quest?: any) => void,
-   *   kbStepId?: number | null,   // step the keyboard cursor is on (highlight only)
-   *   onBumpStep: (step: any, delta: number, questId?: number | null) => void,
-   *   onBeginEditStep: (step: any, questId?: number | null) => void,
-   *   onStepEditKeydown: (event: KeyboardEvent, step: any) => void,
-   *   onStepEditBlur: (step: any) => void,
-   *   onStepEditInput: (value: string) => void,
-   *   onQuestTitleContextMenu?: (event: MouseEvent, quest: any) => void,
-   *   onLineHeadContextMenu?: (event: MouseEvent) => void,
-   *   onStepContextMenu?: (event: MouseEvent, step: any) => void,
-   *   onSelectQuest?: (id: number) => void,
-   *   notes?: any[],
-   *   questlines?: any[],
-   *   labels?: Record<string, string>,
-   *   onRef?: (kind: string, id: number) => void,
-   *   onOpenGraph?: (type: string, id: number) => void,
-   * }} */
   let {
     selected,
     quests = [],
@@ -225,9 +193,7 @@
   let displayDescription = $state('')
   let prevAutomatedTitle = (null as string | null)
   let prevAutomatedDescription = (null as string | null)
-  /** @type {AbortController | null} */
   let titleAnim: AbortController | null = null
-  /** @type {AbortController | null} */
   let descAnim: AbortController | null = null
 
   /** Same idea as displayTitle/displayDescription, per step.id — step
@@ -243,7 +209,15 @@
   /** Erase the old text (if any) then type the new one — only for a change
    * that arrived from outside the web UI (consumeRemoteEdit); never for the
    * user's own edits. */
-  async function retype(oldText: string, newText: string, granularity: string, setDisplay: { (t: string): string; (t: string): string; (t: any): Map<any,any> }, getCtrl: { (): AbortController; (): AbortController; (): any; (): AbortController }, setCtrl: { (c: AbortController): AbortController; (c: AbortController): AbortController; (c: any): void; (arg0: AbortController): void }, setTyping: { (v: boolean): boolean; (v: boolean): boolean; (v: any): void; (arg0: boolean): void }) {
+  async function retype(
+    oldText: string,
+    newText: string,
+    granularity: 'word' | 'char',
+    setDisplay: (t: string) => unknown,
+    getCtrl: () => AbortController | null | undefined,
+    setCtrl: (c: AbortController) => unknown,
+    setTyping: (v: boolean) => unknown,
+  ) {
     getCtrl()?.abort()
     const ac = new AbortController()
     setCtrl(ac)
@@ -397,7 +371,7 @@
   })
 </script>
 
-{#snippet questActions(q)}
+{#snippet questActions(q: any)}
   <div class="detail__actions">
     <button
       type="button"
@@ -462,7 +436,7 @@
   </div>
 {/snippet}
 
-{#snippet questEyebrow(q)}
+{#snippet questEyebrow(q: any)}
   {@const frac = quantifiedProgress(q)}
   <p class="detail__colophon">
     <span class="status" style:color={statusColor(q.status)}>{q.status}</span>
@@ -491,11 +465,11 @@
   {/if}
 {/snippet}
 
-{#snippet stepList(q)}
+{#snippet stepList(q: any)}
   {#if q.steps?.length}
     <!-- A pipeline is steps chained with wait_previous; auto-checks alone (poll/once/watch) are not one. -->
-    {@const pipe = q.steps.some((s) => s.wait_previous)}
-    {@const currentId = pipe ? q.steps.find((s) => !s.done)?.id : null}
+    {@const pipe = q.steps.some((s: any) => s.wait_previous)}
+    {@const currentId = pipe ? q.steps.find((s: any) => !s.done)?.id : null}
     <ol class="step-list" class:step-list--pipe={pipe}>
       {#each q.steps as step, i (step.id)}
         {@const waiting =
@@ -605,7 +579,7 @@
   {/if}
 {/snippet}
 
-{#snippet questBody(q)}
+{#snippet questBody(q: any)}
   {@const timer = questTimer(q, nowMs)}
   {#if q.description || displayDescription}
     <div class="block block--prose">

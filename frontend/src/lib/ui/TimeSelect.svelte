@@ -4,7 +4,6 @@
    * A button opens a popup: hours as a 6×4 grid, minutes in steps of 5 with
    * ±1 for the exact minute. With `allowNone`, "—" means "no time" and the
    * minutes go inert.
-   * @type {{ hour?: string, minute?: string, allowNone?: boolean, disabled?: boolean, label?: string }}
    */
   let {
     hour = $bindable('00'),
@@ -18,8 +17,8 @@
   const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
 
   let open = $state(false)
-  let root = $state()
-  let pop = $state()
+  let root: HTMLElement | undefined = $state()
+  let pop: HTMLElement | undefined = $state()
   let popStyle = $state('')
 
   const noTime = $derived(allowNone && !hour)
@@ -34,24 +33,23 @@
     open = true
   }
 
-  /** @param {number} delta */
   function nudge(delta: number) {
     const total = (((+minute + delta) % 60) + 60) % 60
     minute = String(total).padStart(2, '0')
   }
 
   /** Moves the popup to <body>: an ancestor with transform would re-anchor `fixed`. */
-  function portal(/** @type {HTMLElement} */ node: { remove: () => any }) {
+  function portal(node: HTMLElement) {
     document.body.appendChild(node)
     return { destroy: () => node.remove() }
   }
 
-  function onDocDown(/** @type {PointerEvent} */ e: { target: Node }) {
+  function onDocDown(e: PointerEvent) {
     const t = (e.target as Node)
     if (open && !root?.contains(t) && !pop?.contains(t)) open = false
   }
 
-  function onKey(/** @type {KeyboardEvent} */ e: { key: string; stopPropagation: () => void }) {
+  function onKey(e: { key: string; stopPropagation: () => void }) {
     if (e.key === 'Escape' && open) {
       open = false
       e.stopPropagation()

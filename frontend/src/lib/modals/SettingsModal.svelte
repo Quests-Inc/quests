@@ -11,7 +11,6 @@
   import AssistantSection from './settings/AssistantSection.svelte'
   import { wsx, loadWorkspaceState } from './settings/workspaceState.svelte.ts'
 
-  /** @type {{ open?: boolean, onClose: () => void, health?: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string, username?: string, onLogout?: (() => void) | null, section?: string | null }} */
   let {
     open = false,
     onClose,

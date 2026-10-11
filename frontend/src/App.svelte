@@ -75,7 +75,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
 
   let quests = $state([])
   let notes = $state([])
-  /** @type {Record<string, any> | null} */
   let attachmentIndex: Record<string, any> | null = $state(null)
   let selectedId = $state(null)
   let selectedNoteId = $state((null as number | null))
@@ -83,7 +82,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let loading = $state(true)
   let error = $state('')
   let liveStatus = $state('off')
-  /** @type {{ api: string, overlay: string, telegram: string, webdav: string, db?: string, detail?: Record<string, any> }} */
   let health: { api: string, overlay: string, telegram: string, webdav: string, db?: string, detail?: Record<string, any> } = $state({
     api: 'unknown',
     overlay: 'unknown',
@@ -96,7 +94,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     ('journal' as 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners'),
   )
   /** Sidebar visibility per view that has one — remembered across reloads. */
-  let sidebarCollapsed = $state(loadSidebarCollapsed())
+  let sidebarCollapsed: Record<string, boolean> = $state(loadSidebarCollapsed())
 
   function loadSidebarCollapsed() {
     try {
@@ -141,7 +139,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   function revealListOnNarrow(key: string) {
     if (isNarrowViewport()) setSidebarCollapsed(key, false)
   }
-  /** @type {{ id: number, slug: string, label: string, sort_order: number, color?: string }[]} */
   /** Centre of the relations map tab; null until picked or opened from a card. */
   let graphRoot = $state(
     ({ type: null, id: null } as { type: 'quest' | 'note' | 'questline' | null, id: number | null }),
@@ -151,7 +148,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   /** Bump to refresh the history feed after live events. */
   let historyNonce = $state(0)
   let categories = $state([])
-  /** @type {{ id: number, title: string, category_id?: number | null, color?: string, icon?: string }[]} */
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
   /** Open state for category subgroups: `${bucket}:${key}` → boolean (default true). */
   let categoryOpen = $state(({} as Record<string, boolean>))
@@ -186,7 +182,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
-  /** @type {'line' | 'quest' | 'step' | null} */
   let ctxKind: 'line' | 'quest' | 'step' | null = $state(null)
   let ctxLineId = $state((null as number | null))
   let ctxQuestId = $state((null as number | null))
@@ -197,12 +192,9 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let deleteConfirmOpen = $state(false)
   let stepDeleteOpen = $state(false)
   let stepDeleteBusy = $state(false)
-  /** @type {{ questId: number, stepId: number, title: string } | null} */
   let stepDelete: { questId: number, stepId: number, title: string } | null = $state(null)
   /** True while QuestDetail is playing its erase-before-delete animation. */
   let deleteAnimActive = $state(false)
-  /** @type {(() => void) | null} */
-  /** @type {((v?: unknown) => void) | null} */
   let deleteAnimResolve: ((v?: unknown) => void) | null = null
   /** quest id → when a live event from outside the web UI touched it. The
    * event lands before the refetched data, so QuestDetail picks the mark up
@@ -304,7 +296,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
       const quest = quests.find((q) => q.id === ctxQuestId)
       const status = quest?.status
       const significance = quest?.significance || 'common'
-      /** @type {{ id: string, label?: string, sep?: boolean, checked?: boolean }[]} */
       const delayChildren: { id: string, label?: string, sep?: boolean, checked?: boolean }[] = [
         { id: 'delay-15', label: '15 мин' },
         { id: 'delay-30', label: '30 мин' },
@@ -359,7 +350,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     if (ctxKind === 'step') {
       const found = findStepRef(ctxStepId)
       const total = Math.max(1, Number(found?.step?.progress_total) || 1)
-      /** @type {{ id: string, label?: string, sep?: boolean, danger?: boolean, children?: { id: string, label?: string, sep?: boolean }[] }[]} */
       const items: { id: string, label?: string, sep?: boolean, danger?: boolean, children?: { id: string, label?: string, sep?: boolean }[] }[] = [{ id: 'copy-id', label: `Копировать step=${ctxStepId}` }]
       if (total > 1) {
         items.push({
@@ -426,7 +416,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
   let attachments = $derived(allAttachments.filter((a) => !a.hidden))
   let refLabels = $derived.by(() => {
-    /** @type {Record<string, string>} */
     const m: Record<string, string> = {}
     for (const n of notes) m[`note:${n.id}`] = n.title || `note=${n.id}`
     for (const q of quests) {
@@ -469,8 +458,8 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
         listQuests({}),
         listCategories(),
         listQuestlines(),
-        listNotes().catch(() => []),
-        listAllAttachments().catch(() => null),
+        listNotes().catch((): any[] => []),
+        listAllAttachments().catch((): any => null),
       ])
       quests = next
       notes = Array.isArray(nextNotes) ? nextNotes : []
@@ -517,7 +506,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  function openCreate(defaults = null) {
+  function openCreate(defaults: any = null) {
     modalMode = 'create'
     modalDefaults =
       defaults && !(defaults instanceof Event)
@@ -534,7 +523,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     templatesOpen = true
   }
 
-  /** @param {{ kind: string, id: number } | null} [owner] */
   function openSecrets(owner: { kind: string, id: number } | null = null) {
     secretsOwner = owner
     secretsOpen = true
@@ -544,7 +532,6 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     tagsOpen = true
   }
 
-  /** @param {{ section?: string } | Event | null} [opts] */
   function openSettings(opts: { section?: string } | Event | null = null) {
     settingsSection = opts && !(opts instanceof Event) ? (opts.section ?? null) : null
     settingsOpen = true
@@ -556,7 +543,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     lineModalOpen = true
   }
 
-  function openEditQuestline(line: number) {
+  function openEditQuestline(line: any) {
     const row =
       typeof line === 'number' ? questlines.find((l) => l.id === line) : line
     if (!row) return
@@ -958,7 +945,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function setStepProgress(step: { progress_current?: any; id?: any; progress_total?: any }, value: string|number, questId = null) {
+  async function setStepProgress(step: { progress_current?: any; id?: any; progress_total?: any }, value: string|number, questId: number | null = null) {
     const qid = questId ?? selected?.id
     if (qid == null || stepBusyId != null) return
     const total = Math.max(0, Number(step.progress_total) || 0)
@@ -984,11 +971,11 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     }
   }
 
-  async function bumpStep(step: { progress_current: any }, delta: number, questId = null) {
+  async function bumpStep(step: { progress_current: any }, delta: number, questId: number | null = null) {
     await setStepProgress(step, step.progress_current + delta, questId)
   }
 
-  function beginEditStep(step: { id: number; progress_current: any }, questId = null) {
+  function beginEditStep(step: { id: number; progress_current: any }, questId: number | null = null) {
     if (stepBusyId != null) return
     stepEditId = step.id
     stepEditQuestId = questId ?? findQuestIdForStep(step.id) ?? selected?.id ?? null
@@ -1190,7 +1177,7 @@ import RunnersPage from './lib/blocks/RunnersPage.svelte'
     const from = TAB_ORDER.indexOf(view)
     const to = TAB_ORDER.indexOf(next)
     if (from !== -1 && to !== -1 && from !== to) navDir = to > from ? 1 : -1
-    view = next
+    view = next as typeof view
     replaceSearch(searchForView(next))
   }
 

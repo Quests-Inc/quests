@@ -3,7 +3,6 @@
   import ModalHead from './ModalHead.svelte'
   import ModalFoot from './ModalFoot.svelte'
 
-  /** @type {{ open?: boolean, title?: string, message?: string, confirmLabel?: string, cancelLabel?: string, busy?: boolean, onConfirm?: () => void, onCancel?: () => void }} */
   let {
     open = false,
     title = 'Подтверждение',

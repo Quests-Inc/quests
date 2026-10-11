@@ -24,17 +24,14 @@
     onAttachmentLiveInvalidate,
   } from '../js/attachmentCache.ts'
 
-  /** @type {{ ownerType: 'quest' | 'questline' | 'note', ownerId: number, onOpenOwner?: (kind: string, id: number) => void, label?: string, labelClass?: string }} */
   let { ownerType, ownerId, onOpenOwner, label = 'Вложения', labelClass = 'block__label' }: { ownerType: 'quest' | 'questline' | 'note', ownerId: number, onOpenOwner?: (kind: string, id: number) => void, label?: string, labelClass?: string } = $props()
 
   /** Файлы свёрнуты по умолчанию; строка «Прикрепить файл» видна всегда. */
   let open = $state(false)
 
-  /** @type {any[]} */
   let items: any[] = $state([])
   /** Hidden cards live only on the Attachments tab. */
   let visible = $derived(items.filter((a) => !a.hidden))
-  /** @type {{ att: any, revision: number | null } | null} */
   let pendingDelete: { att: any, revision: number | null } | null = $state(null)
   let deleteBusy = $state(false)
   let uploading = $state(false)
@@ -42,15 +39,10 @@
   let dragOver = $state(false)
   let fileInput = $state((null as HTMLInputElement | null))
   let versionInput = $state((null as HTMLInputElement | null))
-  /** @type {number | null} */
   let versionForId: number | null = $state(null)
-  /** @type {Record<number, string>} */
   let commentDraft: Record<number, string> = $state({})
-  /** @type {number | null} */
   let commentBusy: number | null = $state(null)
-  /** @type {number | null} */
   let historyOpenId: number | null = $state(null)
-  /** @type {Record<number, any[]>} */
   let historyById: Record<number, any[]> = $state({})
   let historyBusy = $state(false)
   let ctxOpen = $state(false)
@@ -61,7 +53,6 @@
   let ctxItems = $derived.by(() => {
     const a = ctxAtt
     if (!a) return []
-    /** @type {{ id: string, label?: string, sep?: boolean, danger?: boolean, disabled?: boolean }[]} */
     const items: { id: string, label?: string, sep?: boolean, danger?: boolean, disabled?: boolean }[] = [
       { id: 'download', label: 'Скачать', disabled: a.available === false },
       { id: 'new-version', label: 'Новая версия…' },
@@ -82,7 +73,6 @@
     return items
   })
 
-  /** @param {MouseEvent} event @param {any} a */
   function openAttMenu(event: MouseEvent, a: any) {
     const target = event.target
     if (target instanceof Element && target.closest('a, button, input, textarea')) return
@@ -94,7 +84,7 @@
     ctxOpen = true
   }
 
-  function downloadAtt(a: { id: number; filename: string }, revision = null) {
+  function downloadAtt(a: { id: number; filename: string }, revision: number | string | null = null) {
     const link = document.createElement('a')
     link.href = attachmentDownloadUrl(ownerType, ownerId, a.id, revision)
     link.download = a.filename || ''
@@ -309,7 +299,7 @@
     }
   }
 
-  async function onVersionPick(event: { currentTarget: { files: any[] } }) {
+  async function onVersionPick(event: Event & { currentTarget: HTMLInputElement }) {
     const file = event.currentTarget.files?.[0]
     const aid = versionForId
     versionForId = null

@@ -11,14 +11,6 @@
    * The ⚙ lights up when a folded step has something set in there.
    *
    * Steps are drafts from js/steps.js; untitled ones are dropped on save.
-   * @type {{
-   *   steps: any[],
-   *   variant?: 'quest' | 'template',
-   *   quests?: any[],
-   *   questlines?: any[],
-   *   notes?: any[],
-   *   attachments?: any[],
-   * }}
    */
   let {
     steps = $bindable([]),

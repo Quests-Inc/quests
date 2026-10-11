@@ -1,6 +1,5 @@
 /** Семейства файлов для вложений. Классификация: content_type_detected, затем расширение; declared не используется. */
 
-/** @type {Record<string, { label: string, color: string }>} */
 export const FILE_KINDS: Record<string, { label: string; color: string }> = {
   word: { label: 'Текстовый документ', color: 'var(--ft-word, #3a63c8)' },
   doc: { label: 'Документ', color: 'var(--ft-doc, #d2605a)' },
@@ -26,7 +25,6 @@ const EXT = {
 const BY_EXT = new Map()
 for (const [k, v] of Object.entries(EXT)) for (const e of v.split(' ')) BY_EXT.set(e, k)
 
-/** @param {string} mime */
 function byMime(mime: string) {
   if (!mime) return ''
   if (mime.startsWith('image/')) return 'image'
@@ -42,7 +40,7 @@ function byMime(mime: string) {
   return ''
 }
 
-/** @param {any} a attachment @returns {{ kind: string, label: string, color: string, ext: string }} */
+/** @param a attachment */
 export function fileKind(a: any): { kind: string; label: string; color: string; ext: string } {
   const ext = ((/\.([A-Za-z0-9]{1,8})$/.exec(a?.filename || '') || [])[1] || '').toLowerCase()
   const mime = (a?.content_type_detected || '').split(';')[0].trim().toLowerCase()

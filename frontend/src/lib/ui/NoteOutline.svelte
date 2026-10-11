@@ -2,17 +2,11 @@
   import { onMount, tick } from 'svelte'
   import Icon from './Icon.svelte'
 
-  /** Table of contents that floats over a note being read: shown while the
+  /**
+   * Table of contents that floats over a note being read: shown while the
    * page is scrolled past a threshold, then fades out a couple of seconds
    * after scrolling stops. Landscape screens only.
-   * @type {{
-   *   scroller: HTMLElement | null,
-   *   content: HTMLElement | null,
-   *   enabled?: boolean,
-   *   dep?: string,
-   *   threshold?: number,
-   *   hold?: number,
-   * }} */
+   */
   let { scroller, content, enabled = true, dep = '', threshold = 280, hold = 2400 }: {
     scroller: HTMLElement | null,
     content: HTMLElement | null,
@@ -24,7 +18,6 @@
 
   const WIDE = '(orientation: landscape) and (min-width: 820px)'
   let wide = $state(false)
-  /** @type {{ el: HTMLElement, text: string, level: number }[]} */
   let heads: { el: HTMLElement, text: string, level: number }[] = $state([])
   let current = $state(-1)
   let visible = $state(false)
@@ -48,7 +41,6 @@
       /* the choice is just not remembered */
     }
   }
-  /** @type {number | undefined} */
   let timer: number | undefined
 
   onMount(() => {
@@ -133,7 +125,6 @@
 
   const minLevel = $derived(heads.length ? Math.min(...heads.map((h) => h.level)) : 1)
 
-  /** @param {{ el: HTMLElement }} h */
   function go(h: { el: HTMLElement }) {
     h.el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }

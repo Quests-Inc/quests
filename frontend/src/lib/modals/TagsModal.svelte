@@ -6,7 +6,6 @@
   import ConfirmModal from './ConfirmModal.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{ open: boolean, onClose: () => void }} */
   let { open = false, onClose }: { open: boolean, onClose: () => void } = $props()
 
   let loading = $state(false)
@@ -18,13 +17,11 @@
   let newLabel = $state('')
   let newColor = $state('')
 
-  /** @type {number | null} */
   let editingId: number | null = $state(null)
   let editLabel = $state('')
   let editColor = $state('')
 
   let deleteOpen = $state(false)
-  /** @type {{ id: number, slug: string, label: string } | null} */
   let deleteTarget: { id: number, slug: string, label: string } | null = $state(null)
 
   function normalizeSlug(raw: string) {
@@ -94,7 +91,7 @@
     }
   }
 
-  function startEdit(tag: { id: number; label: string; color: string }) {
+  function startEdit(tag: { id: number; label: string; color?: string }) {
     editingId = tag.id
     editLabel = tag.label || ''
     editColor = tag.color || ''

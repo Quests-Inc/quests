@@ -1,7 +1,7 @@
 // Presentation of change-log kinds, shared by the History screen and per-entity timelines.
 
 /** kind → [label, icon, tone] */
-export const KINDS = {
+export const KINDS: Record<string, [string, string, string]> = {
   quest_created: ['создан квест', 'add', 'new'],
   quest_appeared: ['появился квест', 'add', 'new'],
   quest_completed: ['квест выполнен', 'checkmark', 'ok'],
@@ -38,7 +38,6 @@ const GENERIC = new Set([
   'создано',
 ])
 
-/** @param {any} r */
 export function detailOf(r: any) {
   const d = (r.detail || '').trim()
   if (!d || d === r.title || GENERIC.has(d.toLowerCase())) return ''

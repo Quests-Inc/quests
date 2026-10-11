@@ -33,7 +33,6 @@ const TEXT_INPUT_TYPES = new Set([
   'week',
 ])
 
-/** @type {Map<string, any>} */
 const registry: Map<string, any> = new Map()
 
 /** True when the event target is somewhere the user types. */
@@ -69,10 +68,7 @@ function matches(action: { codes: string[]; shift?: boolean | 'any' }, event: Ke
   return event.shiftKey === shift
 }
 
-/**
- * Add actions to the registry. Returns a function that removes them again.
- * @param {any[]} actions
- */
+/** Add actions to the registry. Returns a function that removes them again. */
 export function registerHotkeys(actions: any[]) {
   for (const a of actions) registry.set(a.id, a)
   return () => {
@@ -82,7 +78,6 @@ export function registerHotkeys(actions: any[]) {
 
 /** Registered actions grouped for the help screen, in registration order. */
 export function hotkeyGroups() {
-  /** @type {Map<string, any[]>} */
   const groups: Map<string, any[]> = new Map()
   for (const a of registry.values()) {
     if (!groups.has(a.group)) groups.set(a.group, [])
@@ -91,7 +86,6 @@ export function hotkeyGroups() {
   return [...groups].map(([title, items]) => ({ title, items }))
 }
 
-/** @param {KeyboardEvent} event */
 export function handleKeydown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return
   if (event.ctrlKey || event.altKey || event.metaKey) return

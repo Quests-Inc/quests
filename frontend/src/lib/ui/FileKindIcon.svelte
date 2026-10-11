@@ -1,7 +1,6 @@
 <script lang="ts">
   import { fileKind } from '../js/fileKind.ts'
 
-  /** @type {{ att: any, size?: number }} */
   let { att, size = 18 }: { att: any, size?: number } = $props()
   let k = $derived(fileKind(att))
 </script>

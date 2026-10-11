@@ -1,8 +1,7 @@
 <script lang="ts">
   import { suggestions, completeToken } from '../js/searchFlags.ts'
 
-  /** Chips under a search box while a `key:…` token is being typed, and a warning for an unknown value.
-   * @type {{ value: string, spec: Record<string, any>, parsed: { unknown: string[] }, onPick: (next: string) => void }} */
+  /** Chips under a search box while a `key:…` token is being typed, and a warning for an unknown value. */
   let { value, spec, parsed, onPick }: { value: string, spec: Record<string, any>, parsed: { unknown: string[] }, onPick: (next: string) => void } = $props()
   let hints = $derived(suggestions(value, spec))
 </script>

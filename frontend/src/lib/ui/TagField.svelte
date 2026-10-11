@@ -4,16 +4,6 @@
 
   const MAX = 5
 
-  /** @type {{
-   *   catalog?: { id: number, slug: string, label: string, color?: string }[],
-   *   value?: { id: number, slug: string, label: string, color?: string }[],
-   *   title?: string,
-   *   description?: string,
-   *   quests?: any[],
-   *   enabled?: boolean,
-   *   onChange: (tags: { id: number, slug: string, label: string, color?: string }[]) => void,
-   *   onCatalog?: (tags: { id: number, slug: string, label: string, color?: string }[]) => void,
-   * }} */
   let {
     catalog = [],
     value = [],
@@ -56,7 +46,6 @@
     const raw = draft.trim().toLowerCase().replace(/ё/g, 'е')
     if (!q && !raw) return []
     const taken = new Set(selected.map((t) => t.id))
-    /** @type {{ tag: any, rank: number }[]} */
     const out: { tag: any, rank: number }[] = []
     for (const c of catalog) {
       if (taken.has(c.id)) continue
@@ -174,13 +163,13 @@
   }
 
   /** Accept a typed match: clears the draft so the next tag can be typed. */
-  function pick(tag: { id: any; slug?: string; label?: string; color?: string }) {
+  function pick(tag: { id: number; slug: string; label: string; color?: string }) {
     acceptHint(tag)
     draft = ''
     active = -1
   }
 
-  function acceptHint(tag: { id: any; slug?: string; label?: string; color?: string }) {
+  function acceptHint(tag: { id: number; slug: string; label: string; color?: string }) {
     if (selected.length >= MAX) {
       err = `Не больше ${MAX} тегов`
       return

@@ -6,7 +6,6 @@
   import ModalFoot from './ModalFoot.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{ open: boolean, note?: any | null, onClose: () => void, onSaved: (row: any) => void }} */
   let { open = false, note = null, onClose, onSaved }: { open: boolean, note?: any | null, onClose: () => void, onSaved: (row: any) => void } = $props()
 
   let color = $state('#9a9a9a')

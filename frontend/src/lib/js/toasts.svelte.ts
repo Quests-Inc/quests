@@ -15,15 +15,7 @@ function clearTimer(id: string) {
   }
 }
 
-/**
- * @param {string} message
- * @param {{
- *   id?: string
- *   kind?: ToastKind
- *   ttl?: number | null
- * }} [opts]
- * @returns {string} toast id
- */
+/** @returns toast id */
 export function toast(message: string, opts: { id?: string; kind?: ToastKind; ttl?: number | null } = {}): string {
   const id = opts.id ?? `t${++seq}`
   const kind = opts.kind ?? 'info'
@@ -48,19 +40,16 @@ export function toast(message: string, opts: { id?: string; kind?: ToastKind; tt
   return id
 }
 
-/** @param {string} id */
 export function dismissToast(id: string) {
   clearTimer(id)
   const i = toasts.findIndex((t) => t.id === id)
   if (i >= 0) toasts.splice(i, 1)
 }
 
-/** @param {string} id @param {string} message */
 export function toastProgress(id: string, message: string) {
   return toast(message, { id, kind: 'progress', ttl: null })
 }
 
-/** @param {string} id @param {string} message @param {ToastKind} [kind] */
 export function toastDone(id: string, message: string, kind: ToastKind = 'success') {
   return toast(message, {
     id,
@@ -78,7 +67,6 @@ const STATUS_RU: Record<string, string> = {
   archived: 'в архиве',
 }
 
-/** @param {string} status */
 export function statusToastLabel(status: string) {
   return STATUS_RU[status] || status
 }

@@ -1,7 +1,6 @@
 <script lang="ts">
   import SettingsBlock from './SettingsBlock.svelte'
 
-  /** @type {{ health: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string }} */
   let { health, liveStatus = 'off' }: { health: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string } = $props()
 
   function statusLabel(s: string) {
@@ -32,7 +31,7 @@
   }
 
   function probeStatus(comp: string) {
-    return health?.detail?.components?.[comp]?.status || health[comp] || 'unknown'
+    return health?.detail?.components?.[comp]?.status || (health as Record<string, any>)[comp] || 'unknown'
   }
 
   function chipOf(s: string) {

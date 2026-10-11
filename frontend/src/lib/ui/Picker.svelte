@@ -10,15 +10,6 @@
    * `''` is the "none" choice and always comes first.
    *
    * Keyboard: ↓ opens; in the list ↑/↓ move, Enter picks, Escape closes.
-   * @type {{
-   *   options: { id: string, label: string, color?: string }[],
-   *   value?: string,
-   *   noneLabel?: string,
-   *   label?: string,
-   *   disabled?: boolean,
-   *   id?: string,
-   *   onChange?: (id: string) => void,
-   * }}
    */
   let {
     options,

@@ -4,18 +4,13 @@
 /** Ideal edge length by kind: ownership hugs, references stand off. */
 const LEN: Record<string, number> = { structure: 110, dependency: 150, reference: 210 }
 
-/**
- * Lays out nodes in place (sets x/y). Root sits at the origin.
- * @param {{ key: string, depth: number, x?: number, y?: number }[]} nodes
- * @param {{ from: string, to: string, kind: string }[]} edges
- * @param {{ iterations?: number, sizeOf?: (n: any) => { w: number, h: number } }} [opts]
- */
+/** Lays out nodes in place (sets x/y). Root sits at the origin. */
 export function layoutGraph(
   nodes: { key: string; depth: number; x?: number; y?: number }[],
   edges: { from: string; to: string; kind: string }[],
   {
     iterations = 320,
-    sizeOf = (_n: any) => ({ w: 120, h: 26 }),
+    sizeOf = () => ({ w: 120, h: 26 }),
   }: { iterations?: number; sizeOf?: (n: any) => { w: number; h: number } } = {}
 ) {
   const n = nodes.length
@@ -151,7 +146,6 @@ const BALL_MIN = 6
  * Packs boxes into a compact block: rows wrapped to a wide-ish rectangle,
  * reading order kept (left to right, top to bottom), with a header strip on
  * top for the group's label. Offsets are from the block centre.
- * @param {{ w: number, h: number }[]} items
  */
 export function packBall(items: { w: number; h: number }[], gap = 12, pad = 14, head = 30) {
   const area = items.reduce((a, b) => a + (b.w + gap) * (b.h + gap), 0)
@@ -193,10 +187,7 @@ export function packBall(items: { w: number; h: number }[], gap = 12, pad = 14, 
  * (ownership first, then dependency, then reference). Many leaf steps or
  * files under one owner are packed into a block instead of a tall column.
  * Sets x/y as the node centre (nodes carry w/h); returns the balls.
- * @param {{ key: string, depth: number, type: string, title?: string, w: number, h: number, x?: number, y?: number, group?: string }[]} nodes
- * @param {{ from: string, to: string, kind: string }[]} edges
- * @param {{ hgap?: number, vgap?: number, balls?: boolean, loose?: Set<string> | null }} [opts] `loose`: owners whose files are never packed
- * @returns {{ key: string, owner: string, type: string, title: string, x: number, y: number, w: number, h: number, count: number }[]}
+ * @param opts `loose`: owners whose files are never packed
  */
 export function layoutTree(
   nodes: {
@@ -249,7 +240,6 @@ export function layoutTree(
       if (!cur || rank < cur.rank) parentOf.set(c, { p, rank })
     }
   }
-  /** @type {Map<string, any[]>} */
   const kids: Map<string, any[]> = new Map(nodes.map((n): [string, any[]] => [n.key, []]))
   for (const n of nodes) {
     if (isRoot.has(n)) continue
@@ -385,7 +375,6 @@ export function layoutTree(
 /**
  * The same tree, top to bottom: the layout runs on transposed boxes (no
  * balls), then the axes are swapped back.
- * @param {any[]} nodes @param {any[]} edges
  */
 export function layoutTreeDown(nodes: any[], edges: any[]): any[] {
   for (const n of nodes) [n.w, n.h] = [n.h, n.w]
@@ -400,11 +389,9 @@ export function layoutTreeDown(nodes: any[], edges: any[]): any[] {
 /**
  * Columns by kind of thing (questlines, quests, steps, notes, files, templates),
  * each stacked top to bottom: shows what the map is made of, not how it hangs.
- * @param {any[]} nodes
  */
 export function layoutLayers(nodes: any[], { hgap = 90, vgap = 14 } = {}): any[] {
   const ORDER = ['questline', 'quest', 'step', 'note', 'attachment', 'template']
-  /** @type {Map<string, any>} */
   const cols: Map<string, any> = new Map(ORDER.map((t): [string, any[]] => [t, []]))
   for (const n of nodes) (cols.get(n.type) ?? cols.get('template')).push(n)
   let x = 0
@@ -434,7 +421,6 @@ export function layoutLayers(nodes: any[], { hgap = 90, vgap = 14 } = {}): any[]
 /**
  * Rings around the centre by depth; each branch gets an angular sector as wide
  * as its number of leaves. Several centres sit side by side.
- * @param {any[]} nodes @param {any[]} edges
  */
 export function layoutRadial(nodes: any[], edges: any[], { gap = 50 } = {}): any[] {
   const byKey = new Map(nodes.map((n) => [n.key, n]))

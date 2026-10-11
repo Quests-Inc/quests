@@ -16,7 +16,6 @@ export function newStepKey() {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-/** @param {any} mode */
 function normalizeRunMode(mode: any) {
   return mode === 'once' || mode === 'watch' ? mode : 'poll'
 }
@@ -37,7 +36,7 @@ function checkDraft(s: {
   }
 }
 
-/** @param {any} [s] API quest step, or nothing for a blank one. */
+/** @param s API quest step, or nothing for a blank one. */
 export function questStepDraft(s: any = null) {
   const description = s?.description ?? ''
   const check = checkDraft(s)
@@ -53,7 +52,7 @@ export function questStepDraft(s: any = null) {
   }
 }
 
-/** @param {any} [s] API template step, or nothing for a blank one. */
+/** @param s API template step, or nothing for a blank one. */
 export function templateStepDraft(s: any = null) {
   const check = checkDraft(s)
   return {
@@ -153,8 +152,6 @@ export function parseProgressRange(raw: any) {
 /**
  * First quest=N in the given texts (a step's title and description): that step
  * can mirror the quest with `quests progress N`.
- * @param {...string} texts
- * @returns {number | null}
  */
 export function mirrorQuestId(...texts: string[]): number | null {
   const hit = parseRefs(texts.map((t) => String(t || '')).join('\n')).find((r) => r.kind === 'quest')

@@ -3,14 +3,8 @@
  * Not a full source-map — local substring match with proportional fallback.
  */
 
-/**
- * @param {ParentNode} root
- * @param {number} clientX
- * @param {number} clientY
- * @returns {number} offset into root.textContent
- */
+/** @returns offset into root.textContent */
 export function caretOffsetFromPoint(root: ParentNode, clientX: number, clientY: number): number {
-  /** @type {Range | null} */
   let range: Range | null = null
   if (typeof document.caretRangeFromPoint === 'function') {
     range = document.caretRangeFromPoint(clientX, clientY)
@@ -27,15 +21,9 @@ export function caretOffsetFromPoint(root: ParentNode, clientX: number, clientY:
   return offsetInRoot(root, range.startContainer, range.startOffset)
 }
 
-/**
- * @param {ParentNode} root
- * @param {Node} node
- * @param {number} offset
- */
 function offsetInRoot(root: ParentNode, node: Node, offset: number) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let count = 0
-  /** @type {Node | null} */
   let n: Node | null
   while ((n = walker.nextNode())) {
     if (n === node) return count + offset
@@ -44,17 +32,10 @@ function offsetInRoot(root: ParentNode, node: Node, offset: number) {
   return count
 }
 
-/**
- * @param {ParentNode} root
- * @param {number} offset
- * @returns {Range | null}
- */
 export function rangeFromTextOffset(root: ParentNode, offset: number): Range | null {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let left = Math.max(0, offset)
-  /** @type {Node | null} */
   let n: Node | null
-  /** @type {Text | null} */
   let last: Text | null = null
   while ((n = walker.nextNode())) {
     last = n as Text
@@ -74,11 +55,6 @@ export function rangeFromTextOffset(root: ParentNode, offset: number): Range | n
   return range
 }
 
-/**
- * @param {string} source
- * @param {string} rendered
- * @param {number} renderedOffset
- */
 export function mapRenderedOffsetToSource(source: string, rendered: string, renderedOffset: number) {
   const src = source ?? ''
   const ren = rendered ?? ''
@@ -105,11 +81,6 @@ export function mapRenderedOffsetToSource(source: string, rendered: string, rend
   return Math.round((pos / Math.max(ren.length, 1)) * src.length)
 }
 
-/**
- * @param {string} source
- * @param {string} rendered
- * @param {number} sourceOffset
- */
 export function mapSourceOffsetToRendered(source: string, rendered: string, sourceOffset: number) {
   const src = source ?? ''
   const ren = rendered ?? ''
@@ -134,11 +105,6 @@ export function mapSourceOffsetToRendered(source: string, rendered: string, sour
   return Math.round((pos / Math.max(src.length, 1)) * ren.length)
 }
 
-/**
- * @param {ParentNode} root
- * @param {number} renderedOffset
- * @param {{ block?: ScrollLogicalPosition }} [opts]
- */
 export function scrollRootToTextOffset(
   root: ParentNode,
   renderedOffset: number,
@@ -151,10 +117,6 @@ export function scrollRootToTextOffset(
   el?.scrollIntoView({ block: opts.block ?? 'center', inline: 'nearest' })
 }
 
-/**
- * @param {HTMLTextAreaElement} ta
- * @param {number} offset
- */
 export function placeTextareaCaret(ta: HTMLTextAreaElement, offset: number) {
   const o = clamp(offset, 0, ta.value.length)
   ta.focus()
@@ -167,13 +129,6 @@ export function placeTextareaCaret(ta: HTMLTextAreaElement, offset: number) {
   ta.scrollTop = Math.max(0, line * lineHeight - pad)
 }
 
-/**
- * @param {string} src
- * @param {string} ren
- * @param {number} pos
- * @param {number} len
- * @returns {number | null}
- */
 function locateByPrefix(src: string, ren: string, pos: number, len: number): number | null {
   if (pos < 3) return null
   let start = Math.max(0, pos - len)

@@ -7,14 +7,6 @@
   import DateInput from '../ui/DateInput.svelte'
   import RefText from '../ui/RefText.svelte'
 
-  /** @type {{
-   *   quests?: any[],
-   *   labels?: Record<string, string>,
-   *   onRef?: (kind: string, id: number) => void,
-   *   onSelectQuest?: (id: number) => void,
-   *   onQuestContextMenu?: (event: MouseEvent, id: number) => void,
-   *   onOpenHistory?: (dayKey: string) => void,
-   * }} */
   let { quests = [], labels = {}, onRef, onSelectQuest, onQuestContextMenu, onOpenHistory }: {
     quests?: any[],
     labels?: Record<string, string>,
@@ -24,7 +16,6 @@
     onOpenHistory?: (dayKey: string) => void,
   } = $props()
 
-  /** @param {MouseEvent} event @param {number} id */
   function openQuestMenu(event: MouseEvent, id: number) {
     event.preventDefault()
     event.stopPropagation()
@@ -34,16 +25,11 @@
   const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
   const HOUR_TICKS = [0, 6, 12, 18, 24]
 
-  /** @type {string} YYYY-MM-DD — same picker as quest modal (`type=date`) */
   let rangeFrom: string = $state(monthStartKey(new Date()))
-  /** @type {string} YYYY-MM-DD */
   let rangeTo: string = $state(monthEndKey(new Date()))
-  /** @type {string | null} YYYY-MM-DD */
   let selectedKey: string | null = $state(null)
-  /** @type {number | null} hovered quest id (timeline ↔ event list) */
   let hoveredId: number | null = $state(null)
 
-  /** @type {HTMLElement | null} */
   let rootEl: HTMLElement | null = $state(null)
 
   function monthKey(d: Date) {
@@ -65,13 +51,11 @@
     return dayKey(new Date(d.getFullYear(), d.getMonth() + 1, 0))
   }
 
-  /** @param {string} key */
   function parseDayKey(key: string) {
     const [y, m, d] = key.split('-').map(Number)
     return new Date(y, m - 1, d)
   }
 
-  /** @param {string} key */
   function dayBounds(key: string) {
     const start = parseDayKey(key)
     start.setHours(0, 0, 0, 0)
@@ -99,11 +83,7 @@
     return 'common'
   }
 
-  /**
-   * Urgent window [deadline − duration, deadline]. Point if no duration.
-   * @param {any} q
-   * @returns {{ start: Date, end: Date } | null}
-   */
+  /** Urgent window [deadline − duration, deadline]. Point if no duration. */
   function questWindow(q: any): { start: Date, end: Date } | null {
     const deadline = parseApiDate(q?.deadline_at)
     if (!deadline) return null
@@ -114,18 +94,12 @@
     return { start: deadline, end: deadline }
   }
 
-  /**
-   * Planned urgent window, clipped to actual finish when completed/failed.
-   * @param {any} q
-   * @returns {{ start: Date, end: Date, finish: Date | null, markKind: 'completed' | 'failed' | null } | null}
-   */
+  /** Planned urgent window, clipped to actual finish when completed/failed. */
   function actualWindow(q: any): { start: Date, end: Date, finish: Date | null, markKind: 'completed' | 'failed' | null } | null {
     const planned = questWindow(q)
     if (!planned) return null
     const status = String(q.status || '')
-    /** @type {Date | null} */
     let finish: Date | null = null
-    /** @type {'completed' | 'failed' | null} */
     let markKind: 'completed' | 'failed' | null = null
     if (status === 'completed') {
       finish = parseApiDate(q.completed_at)
@@ -147,11 +121,6 @@
     return { start, end, finish, markKind }
   }
 
-  /**
-   * @param {{ start: Date, end: Date }} win
-   * @param {Date} dayStart
-   * @param {Date} dayEnd
-   */
   function clipToDay(win: { start: Date, end: Date }, dayStart: Date, dayEnd: Date) {
     const s = Math.max(win.start.getTime(), dayStart.getTime())
     const e = Math.min(win.end.getTime(), dayEnd.getTime())
@@ -172,12 +141,8 @@
     return { from, to }
   })
 
-  /**
-   * Cards on the month grid: deadline day, else created day.
-   * @type {Record<string, { id: number, title: string, status: string, significance: string, timeMs: number, timeLabel: string, done: boolean }[]>}
-   */
+  /** Cards on the month grid: deadline day, else created day. */
   let questsByDay: Record<string, { id: number, title: string, status: string, significance: string, timeMs: number, timeLabel: string, done: boolean }[]> = $derived.by(() => {
-    /** @type {Record<string, any[]>} */
     const map: Record<string, any[]> = {}
     for (const q of quests) {
       const raw = q?.deadline_at || q?.created_at
@@ -203,15 +168,11 @@
     return map
   })
 
-  /**
-   * @param {number} year
-   * @param {number} month 0-based
-   */
+  /** @param month 0-based */
   function buildMonth(year: number, month: number) {
     const first = new Date(year, month, 1)
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     const startPad = (first.getDay() + 6) % 7
-    /** @type {({ key: string, day: number, items: typeof questsByDay[string] } | null)[]} */
     const cells: ({ key: string, day: number, items: typeof questsByDay[string] } | null)[] = []
     for (let i = 0; i < startPad; i++) cells.push(null)
     for (let day = 1; day <= daysInMonth; day++) {
@@ -233,7 +194,6 @@
     const toD = parseDayKey(period.to)
     const [fy, fm] = [fromD.getFullYear(), fromD.getMonth()]
     const [ty, tm] = [toD.getFullYear(), toD.getMonth()]
-    /** @type {ReturnType<typeof buildMonth>[]} */
     const out: ReturnType<typeof buildMonth>[] = []
     let y = fy
     let m = fm
@@ -259,9 +219,7 @@
     const { start: dayStart, end: dayEnd } = dayBounds(selectedKey)
     const dayMs = dayEnd.getTime() - dayStart.getTime()
 
-    /** @type {Set<number>} */
     const onBoard: Set<number> = new Set()
-    /** @type {any[]} */
     const rows: any[] = []
     for (const q of quests) {
       const win = actualWindow(q)
@@ -274,9 +232,7 @@
       const toNext = win.end >= dayEnd
       const endToday = win.end >= dayStart && win.end < dayEnd
 
-      /** @type {number | null} */
       let markMs: number | null = null
-      /** @type {'deadline' | 'completed' | 'failed' | null} */
       let markKind: 'deadline' | 'completed' | 'failed' | null = null
       if (win.finish && win.finish >= dayStart && win.finish < dayEnd) {
         markMs = win.finish.getTime()
@@ -318,7 +274,6 @@
 
     // Concurrent count at midpoints of LOAD_BUCKETS slots across the day.
     const LOAD_BUCKETS = 48
-    /** @type {number[]} */
     const load: number[] = new Array(LOAD_BUCKETS).fill(0)
     for (let i = 0; i < LOAD_BUCKETS; i++) {
       const t0 = dayStart.getTime() + (dayMs * i) / LOAD_BUCKETS
@@ -337,7 +292,6 @@
     const loadMax = Math.max(1, ...load)
 
     /** Created today, no board row (load undefined — keep off the strip). */
-    /** @type {any[]} */
     const noWindow: any[] = []
     for (const q of quests) {
       if (q?.id == null) continue
@@ -355,7 +309,6 @@
     }
     noWindow.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel) || a.id - b.id)
 
-    /** @type {any[]} */
     const events: any[] = []
     for (const q of quests) {
       if (q?.id == null) continue
@@ -419,13 +372,6 @@
     dayLoad?.rows.find((b) => b.id === hoveredId) ?? null,
   )
 
-  /**
-   * @param {any} q
-   * @param {{ start: Date, end: Date, finish: Date | null }} win
-   * @param {boolean} fromPrev
-   * @param {boolean} endToday
-   * @param {string | null} markKind
-   */
   function buildBarCaption(q: any, win: { start: Date, end: Date, finish: Date | null }, fromPrev: boolean, endToday: boolean, markKind: string | null) {
     const title = String(q.title || '?')
     const endLabel = formatTime(win.end)
@@ -437,12 +383,6 @@
     return `${title} · ${span}`
   }
 
-  /**
-   * @param {any} q
-   * @param {{ start: Date, end: Date }} win
-   * @param {boolean} fromPrev
-   * @param {boolean} endToday
-   */
   function buildBarTip(q: any, win: { start: Date, end: Date }, fromPrev: boolean, endToday: boolean) {
     const parts = [String(q.title || '?')]
     if (fromPrev) parts.push(`с ${formatTime(win.start)} (${dayKey(win.start)})`)
@@ -451,7 +391,7 @@
     return parts.join(' · ')
   }
 
-  /** @param {string} key @returns {boolean} whether day is now selected */
+  /** @returns whether day is now selected */
   function selectDay(key: string): boolean {
     const next = selectedKey === key ? null : key
     selectedKey = next
@@ -459,7 +399,6 @@
     return next != null
   }
 
-  /** @param {number} delta */
   async function shiftSelectedDay(delta: number) {
     if (!selectedKey) return
     const d = parseDayKey(selectedKey)
@@ -485,7 +424,6 @@
     panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
-  /** @param {string} key @param {MouseEvent} e */
   async function onCellClick(key: string, e: MouseEvent) {
     const t = (e.target as HTMLElement)
     if (t.closest?.('.cal-card')) return

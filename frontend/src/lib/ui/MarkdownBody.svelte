@@ -7,13 +7,6 @@
   import copySvg from '../../assets/icons/copy.svg?raw'
   import checkSvg from '../../assets/icons/checkmark.svg?raw'
 
-  /** @type {{
-   *   source?: string,
-   *   class?: string,
-   *   labels?: Record<string, string>,
-   *   onRef?: (kind: string, id: number) => void,
-   *   typing?: boolean,
-   * }} */
   let {
     source = '',
     class: className = '',
@@ -29,7 +22,6 @@
   } = $props()
 
   let html = $derived(renderMarkdown(source, { labels }))
-  /** @type {HTMLDivElement | undefined} */
   let root: HTMLDivElement | undefined = $state()
 
   $effect(() => {
@@ -39,9 +31,6 @@
     untrack(() => enhanceCodeBlocks(el))
   })
 
-  /**
-   * @param {HTMLElement} rootEl
-   */
   function enhanceCodeBlocks(rootEl: HTMLElement) {
     for (const block of rootEl.querySelectorAll('.md-codeblock')) {
       if (block.querySelector(':scope > .md-codeblock__copy')) continue
@@ -85,7 +74,6 @@
    * `error` doesn't bubble, so listen in the capture phase: a removed/missing
    * attachment (or a non-image one) becomes a visible placeholder instead of a
    * blank hole.
-   * @param {Event} event
    */
   function onImgError(event: Event) {
     const img = event.target
@@ -98,13 +86,12 @@
     img.replaceWith(ph)
   }
 
-  /** @param {HTMLElement} node */
   function captureImgErrors(node: HTMLElement) {
     node.addEventListener('error', onImgError, true)
     return { destroy: () => node.removeEventListener('error', onImgError, true) }
   }
 
-  function onClick(event: { target: { closest: (arg0: string) => any }; preventDefault: () => void }) {
+  function onClick(event: MouseEvent) {
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
     const href = a.getAttribute('href') || ''

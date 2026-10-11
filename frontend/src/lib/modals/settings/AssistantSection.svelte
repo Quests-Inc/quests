@@ -2,7 +2,6 @@
   import SettingsBlock from './SettingsBlock.svelte'
   import { getMyLLM, saveMyLLM, deleteMyLLM, testMyLLM } from '../../js/api.ts'
 
-  /** @type {any} */
   let info: any = $state(null)
   let loadError = $state('')
   let provider = $state('groq')
@@ -10,11 +9,10 @@
   let model = $state('')
   let apiKey = $state('')
   let busy = $state(false)
-  /** @type {{ kind: 'ok' | 'err', text: string } | null} */
   let note: { kind: 'ok' | 'err', text: string } | null = $state(null)
 
   const preset = $derived(info?.providers?.find((p: { id: string }) => p.id === provider))
-  const SOURCE = {
+  const SOURCE: Record<string, string> = {
     own: 'Используется ваш ключ',
     server: 'Используется ключ сервера',
     none: 'Ассистент не настроен',

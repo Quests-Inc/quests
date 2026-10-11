@@ -61,7 +61,7 @@
     }
   }
 
-  function when(iso: string|number|Date) {
+  function when(iso: string | null | undefined) {
     if (!iso) return 'ни разу'
     const d = new Date(iso.endsWith('Z') ? iso : iso.replace(' ', 'T') + 'Z')
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })

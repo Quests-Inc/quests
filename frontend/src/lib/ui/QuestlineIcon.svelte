@@ -1,12 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
 
-  /** @type {{
-   *   icon?: string | null,
-   *   iconUrl?: string | null,
-   *   size?: 'sm' | 'md' | 'lg',
-   *   alt?: string,
-   * }} */
   let {
     icon = 'document',
     iconUrl = null,

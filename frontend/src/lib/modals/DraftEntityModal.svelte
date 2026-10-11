@@ -5,18 +5,10 @@
   import ModalHead from './ModalHead.svelte'
   import ModalFoot from './ModalFoot.svelte'
 
-  /** Title + description for a note or step created on the map; goes into the
+  /**
+   * Title + description for a note or step created on the map; goes into the
    * draft, nothing is saved yet.
-   * @type {{
-   *   open: boolean,
-   *   kind: 'note' | 'step' | 'questline',
-   *   initial?: { title: string, description: string } | null,
-   *   heading?: string,
-   *   quests?: any[],
-   *   notes?: any[],
-   *   onClose: () => void,
-   *   onSubmit: (fields: { title: string, description: string }) => void,
-   * }} */
+   */
   let { open = false, kind = 'note', initial = null, heading = '', quests = [], notes = [], onClose, onSubmit }: {
     open: boolean,
     kind: 'note' | 'step' | 'questline',

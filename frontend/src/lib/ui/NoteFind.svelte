@@ -1,9 +1,10 @@
 <script lang="ts">
   import { searchInNote } from '../js/api.ts'
 
-  /** Search inside the open note with the notes search's rules (word forms, prefix, other layout…):
+  /**
+   * Search inside the open note with the notes search's rules (word forms, prefix, other layout…):
    * the server says which words matched, this marks them in the rendered text and steps through them.
-   * @type {{ noteId: number, container: HTMLElement | null, dep?: string, onClose: () => void }} */
+   */
   let { noteId, container, dep = '', onClose }: { noteId: number, container: HTMLElement | null, dep?: string, onClose: () => void } = $props()
 
   let q = $state('')

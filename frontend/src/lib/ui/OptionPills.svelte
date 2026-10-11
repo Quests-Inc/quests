@@ -4,14 +4,6 @@
    * significance, frequency…). Single-choice by default (`bind:value`); pass
    * `selected` + `onToggle` for multi-choice (TOC filters, weekdays).
    * Layout lives in styles/modal.css, per-option colour in theme-accents.css.
-   *
-   * @typedef {{
-   *   id: string,
-   *   label: string,
-   *   kind?: 'status' | 'sig' | 'cat',
-   *   color?: string,
-   *   none?: boolean,
-   * }} PillOption
    */
   type PillOption = {
     id: string,
@@ -22,18 +14,6 @@
   }
 
 
-  /**
-   * @type {{
-   *   options: PillOption[],
-   *   value?: string,
-   *   selected?: Set<string> | null,
-   *   onToggle?: (id: string) => void,
-   *   label?: string,
-   *   wrap?: boolean,
-   *   compact?: boolean,
-   *   disabled?: boolean,
-   * }}
-   */
   let {
     options,
     value = $bindable(''),

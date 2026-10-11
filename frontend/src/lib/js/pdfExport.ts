@@ -4,15 +4,13 @@
  * request: attachment images are fetched by the server under the caller's own session.
  */
 
-/** @returns {string} */
 export function exportedAtLabel(): string {
   return `Выгрузка: ${new Date().toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' })}`
 }
 
 /**
  * POST the document and download the PDF it comes back as.
- * @param {object} document pdfdoc.Document
- * @param {string} filename
+ * @param document pdfdoc.Document
  */
 export async function downloadPdf(
   document_: {

@@ -8,18 +8,6 @@
   import ModalFoot from './ModalFoot.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{
-   *   open: boolean,
-   *   questId?: number | null,
-   *   step?: any | null,
-   *   quests?: any[],
-   *   questlines?: any[],
-   *   notes?: any[],
-   *   attachments?: any[],
-   *   onClose: () => void,
-   *   onSaved: (q: any) => void,
-   *   onDraft?: ((payload: any) => void) | null,
-   * }} */
   let {
     open = false,
     questId = null,

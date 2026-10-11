@@ -1,16 +1,10 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
 
-  /** Dialog title bar: icon + title on the left, close (and optional extra
+  /**
+   * Dialog title bar: icon + title on the left, close (and optional extra
    * `actions`) on the right. `id` is what ModalShell's `labelledby` points at.
-   * @type {{
-   *   id: string,
-   *   title: string,
-   *   icon?: string,
-   *   onClose: () => void,
-   *   closeDisabled?: boolean,
-   *   actions?: import('svelte').Snippet,
-   * }} */
+   */
   let { id, title, icon = '', onClose, closeDisabled = false, actions }: {
     id: string,
     title: string,

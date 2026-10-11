@@ -37,7 +37,7 @@ function selectedRow(rows: any[]) {
 export function moveRow(dir: number) {
   const rows = visibleRows()
   if (rows.length === 0) return false
-  const at = rows.indexOf(/** @type {HTMLElement} */ (document.activeElement))
+  const at = rows.indexOf(document.activeElement)
   let next
   if (at !== -1) {
     next = rows[Math.min(rows.length - 1, Math.max(0, at + dir))]

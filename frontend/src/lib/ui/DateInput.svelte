@@ -2,7 +2,6 @@
   /**
    * Date as YYYY-MM-DD with a Monday-first month popup — no native date input,
    * whose first weekday follows the browser locale and cannot be overridden.
-   * @type {{ value?: string, label?: string, clearable?: boolean }}
    */
   let { value = $bindable(''), label = 'Дата', clearable = false }: { value?: string, label?: string, clearable?: boolean } = $props()
 
@@ -18,8 +17,8 @@
   }
 
   let open = $state(false)
-  let root = $state()
-  let pop = $state()
+  let root: HTMLElement | undefined = $state()
+  let pop: HTMLElement | undefined = $state()
   let popStyle = $state('')
   let viewY = $state(0)
   let viewM = $state(0)
@@ -64,7 +63,7 @@
   }
 
   /** Moves the popup to <body>: an ancestor with transform would re-anchor `fixed`. */
-  function portal(node: { remove: () => any }) {
+  function portal(node: HTMLElement) {
     document.body.appendChild(node)
     return { destroy: () => node.remove() }
   }

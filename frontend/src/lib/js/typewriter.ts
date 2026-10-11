@@ -20,17 +20,7 @@ function wordChunks(text: string) {
   return text.match(/\S+\s*|\s+/g) || []
 }
 
-/**
- * @param {string} text
- * @param {{
- *   mode?: 'reveal' | 'erase',
- *   granularity?: 'char' | 'word',
- *   stepMs?: number,
- *   onUpdate: (partial: string) => void,
- *   signal?: AbortSignal,
- * }} opts
- * @returns {Promise<void>} resolves when done or aborted
- */
+/** @returns resolves when done or aborted */
 export function animateText(
   text: string,
   opts: {
@@ -104,13 +94,13 @@ const TAIL_CHARS = 10
 const DRAIN_STEP_MS = 36
 let tailFadeUid = 0
 
-/** Svelte action: while `active`, the last few characters of the element's
+/**
+ * Svelte action: while `active`, the last few characters of the element's
  * text fade in (older ones more opaque than newer), and when `active` drops
  * the tail finishes fading out instead of snapping to full ink. Uses the CSS
  * Custom Highlight API, so the DOM — which Svelte owns via {@html} — is never
  * touched; browsers without it simply get no fade.
- * @param {HTMLElement} node
- * @param {boolean} active */
+ */
 export function tailFade(node: HTMLElement, active: boolean) {
   if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') {
     return {}
@@ -122,7 +112,6 @@ export function tailFade(node: HTMLElement, active: boolean) {
   const observer = new MutationObserver(() => paint())
   let on = false
   let shift = 0
-  /** @type {number | null} */
   let drain: number | null = null
 
   function clear() {

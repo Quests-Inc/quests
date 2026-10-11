@@ -19,16 +19,6 @@
   import { copyText } from '../js/clipboard.ts'
   import { toast } from '../js/toasts.svelte.ts'
 
-  /** @type {{
-   *   attachments?: any[],
-   *   quests?: any[],
-   *   questlines?: any[],
-   *   notes?: any[],
-   *   selectedId?: number | null,
-   *   onSelect?: (id: number | null) => void,
-   *   onOpenOwner?: (kind: string, id: number) => void,
-   *   onChanged?: () => void,
-   * }} */
   let {
     attachments = [],
     quests = [],
@@ -55,7 +45,7 @@
     { id: 'questline', label: 'Квестлайны' },
     { id: 'note', label: 'Заметки' },
   ]
-  const KIND_ONE = { quest: 'Квест', questline: 'Квестлайн', note: 'Заметка' }
+  const KIND_ONE: Record<string, string> = { quest: 'Квест', questline: 'Квестлайн', note: 'Заметка' }
   const SORTS = [
     { id: 'new', label: 'Сначала новые' },
     { id: 'old', label: 'Сначала старые' },
@@ -77,7 +67,6 @@
   let revs = $state(([] as any[]))
   let revsFor = $state((null as number | null))
   let revsBusy = $state(false)
-  /** @type {{ att: any, revision: number | null } | null} */
   let pendingDelete: { att: any, revision: number | null } | null = $state(null)
   let deleteBusy = $state(false)
   let versionInput = $state((null as HTMLInputElement | null))
@@ -88,11 +77,9 @@
   let ctxY = $state(0)
   let ctxAtt = $state((null as any | null))
 
-  /** @param {any} a */
   const ownerKind = (a: any) => a.owner_type || 'quest'
 
   let titles = $derived.by(() => {
-    /** @type {Record<string, string>} */
     const m: Record<string, string> = {}
     for (const q of quests) m[`quest:${q.id}`] = q.title || `quest=${q.id}`
     for (const l of questlines) m[`questline:${l.id}`] = l.title || `questline=${l.id}`
@@ -100,24 +87,20 @@
     return m
   })
 
-  /** @param {any} a */
   function ownerLabel(a: any) {
     const kind = ownerKind(a)
     return titles[`${kind}:${a.owner_id}`] || `${kind}=${a.owner_id}`
   }
 
-  /** @param {any} a */
   function isRaster(a: any) {
     const t = (a.content_type_detected || '').split(';')[0].trim().toLowerCase()
     return t === 'image/png' || t === 'image/jpeg' || t === 'image/gif' || t === 'image/webp'
   }
 
-  /** @param {any} a */
   function thumbSrc(a: any) {
     return `/api/attachments/${a.id}/image?preview=1&revision=${a.revision || 1}`
   }
 
-  /** @param {any} a */
   function extOf(a: any) {
     const m = /\.([A-Za-z0-9]{1,6})$/.exec(a.filename || '')
     return m ? m[1].toUpperCase() : ''
@@ -193,7 +176,6 @@
 
   let groups = $derived.by(() => {
     if (!grouped) return []
-    /** @type {Map<string, { key: string, kind: string, id: number, title: string, files: any[] }>} */
     const m: Map<string, { key: string, kind: string, id: number, title: string, files: any[] }> = new Map()
     for (const a of filtered) {
       const kind = ownerKind(a)
@@ -238,7 +220,6 @@
     })
   })
 
-  /** @param {any} a */
   async function loadRevs(a: any) {
     revsBusy = true
     try {
@@ -252,7 +233,7 @@
   }
 
   /** Run a mutation, then refresh the index (and the open card's versions). */
-  async function run(a: { id: number }, fn: { (): Promise<any>; (): Promise<any>; (): Promise<any>; (): Promise<any>; (): any }, okMessage: string) {
+  async function run(a: { id: number }, fn: () => Promise<unknown>, okMessage?: string) {
     busyId = a.id
     try {
       await fn()
@@ -266,7 +247,6 @@
     }
   }
 
-  /** @param {any} a */
   function toggleHidden(a: any) {
     return run(
       a,
@@ -275,7 +255,6 @@
     )
   }
 
-  /** @param {any} a @param {number} revision */
   function makeCurrent(a: any, revision: number) {
     return run(
       a,
@@ -284,7 +263,6 @@
     )
   }
 
-  /** @param {any} a */
   function saveComment(a: any) {
     const next = commentDraft.trim()
     if (next === (a.comment || '')) return
@@ -316,13 +294,12 @@
     }
   }
 
-  /** @param {any} a */
   function pickVersion(a: any) {
     versionFor = a
     versionInput?.click()
   }
 
-  async function onVersionPick(event: { currentTarget: { files: any[]; value: string } }) {
+  async function onVersionPick(event: Event & { currentTarget: HTMLInputElement }) {
     const file = event.currentTarget.files?.[0]
     const a = versionFor
     versionFor = null
@@ -331,7 +308,6 @@
     await run(a, () => uploadAttachmentRevision(ownerKind(a), a.owner_id, a.id, file), 'Новая версия загружена')
   }
 
-  /** @param {any} a @param {number | null} [revision] */
   function downloadAtt(a: any, revision: number | null = null) {
     const link = document.createElement('a')
     link.href = attachmentDownloadUrl(ownerKind(a), a.owner_id, a.id, revision)
@@ -342,7 +318,6 @@
     link.remove()
   }
 
-  /** @param {any} a */
   async function copyRef(a: any) {
     try {
       const text = `attachment=${a.id}`
@@ -367,7 +342,6 @@
     ]
   })
 
-  /** @param {MouseEvent} event @param {any} a */
   function openAttMenu(event: MouseEvent, a: any) {
     const target = event.target
     if (target instanceof Element && target.closest('a, button, input, textarea')) return
@@ -379,7 +353,6 @@
     ctxOpen = true
   }
 
-  /** @param {string} action */
   function onAttSelect(action: string) {
     const a = ctxAtt
     if (!a) return
@@ -391,7 +364,6 @@
     else if (action === 'delete') pendingDelete = { att: a, revision: null }
   }
 
-  /** @param {number} n */
   function formatSize(n: number) {
     const bytes = Number(n) || 0
     if (bytes < 1024) return `${bytes} B`
@@ -399,7 +371,6 @@
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  /** @param {string} iso @param {boolean} [full] */
   function formatWhen(iso: string, full: boolean = false) {
     if (!iso) return '—'
     try {
@@ -414,7 +385,6 @@
     }
   }
 
-  /** @param {KeyboardEvent} e */
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape' && selectedId != null && !pendingDelete) {
       const t = e.target
@@ -636,7 +606,7 @@
   </div>
 </div>
 
-{#snippet row(a, showOwner)}
+{#snippet row(a: any, showOwner: boolean)}
   <article
     class="attpage__item"
     class:attpage__item--on={a.id === selectedId}

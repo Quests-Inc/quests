@@ -7,13 +7,6 @@
   import { parseApiDate } from '../js/time.ts'
   import { KINDS, detailOf } from '../js/historyKinds.ts'
 
-  /** @type {{
-   *   active?: boolean,
-   *   nonce?: number,
-   *   categories?: any[],
-   *   questlines?: any[],
-   *   onOpen?: (kind: string, id: number) => void,
-   * }} */
   let { active = true, nonce = 0, categories = [], questlines = [], onOpen }: {
     active?: boolean,
     nonce?: number,
@@ -66,7 +59,6 @@
     { id: '30', label: '30 дней' },
   ]
 
-  /** @param {string} key @param {string} fallback */
   function param(key: string, fallback: string = '') {
     try {
       return new URL(location.href).searchParams.get(key) ?? fallback
@@ -158,7 +150,6 @@
     return { from: null, to: null }
   }
 
-  /** @param {boolean} append */
   async function load(append: boolean = false) {
     const mine = ++seq
     loading = true
@@ -211,7 +202,6 @@
     search = ''
   }
 
-  /** @param {string} iso */
   function localDay(iso: string) {
     const d = parseApiDate(iso)
     if (!d) return ''
@@ -219,7 +209,6 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
   }
 
-  /** @param {string} key */
   function dayLabel(key: string) {
     const d = dayStart(key)
     const now = new Date()
@@ -236,14 +225,12 @@
     return base
   }
 
-  /** @param {string} iso */
   function timeLabel(iso: string) {
     const d = parseApiDate(iso)
     return d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''
   }
 
   let groups = $derived.by(() => {
-    /** @type {{ key: string, items: any[] }[]} */
     const out: { key: string, items: any[] }[] = []
     for (const r of rows) {
       const key = localDay(r.at)
@@ -265,7 +252,6 @@
     return null
   }
 
-  /** @param {any} r */
   function open(r: any) {
     const t = target(r)
     if (t) onOpen?.(t[0], t[1])

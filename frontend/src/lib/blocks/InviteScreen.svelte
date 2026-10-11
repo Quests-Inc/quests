@@ -5,7 +5,6 @@
   import { fetchInvite, acceptInvite } from '../js/api.ts'
   import LoginScreen from './LoginScreen.svelte'
 
-  /** @type {{ token: string }} */
   let { token }: { token: string } = $props()
 
   let info = $state((null as { workspace: string, authenticated: boolean } | null))

@@ -2,7 +2,6 @@
   import SettingsBlock from './SettingsBlock.svelte'
   import { getMyMfa, setupMyMfa, enableMyMfa, disableMyMfa, regenerateRecoveryCodes } from '../../js/api.ts'
 
-  /** @type {any} */
   let st: any = $state(null)
   let loadError = $state('')
   let busy = $state(false)

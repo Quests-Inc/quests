@@ -5,9 +5,9 @@ import { listTemplates } from './api.ts'
  * them everywhere (template=N), and threading a prop through every form that
  * has a MentionTextarea would be far noisier than one store.
  */
-export const templateStore = $state({ list: /** @type {any[]} */ ([]), loaded: false })
+export const templateStore = $state({ list: [], loaded: false })
 
-let inflight: Promise<void> = /** @type {Promise<void> | null} */ (null)
+let inflight: Promise<void> = null
 
 export function refreshTemplates() {
   if (inflight) return inflight

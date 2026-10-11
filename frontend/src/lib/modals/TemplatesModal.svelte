@@ -38,9 +38,10 @@
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
 
-  /** `focusId` opens that template for editing (a template=N link);
+  /**
+   * `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
-   * @type {{ open: boolean, quests?: any[], notes?: any[], attachments?: any[], focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void }} */
+   */
   let { open = false, quests = [], notes = [], attachments = [], focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, quests?: any[], notes?: any[], attachments?: any[], focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
 
   const LOCAL_TZ = localTimeZone() || 'Europe/Moscow'
@@ -54,9 +55,7 @@
 
   let title = $state('')
   let description = $state('')
-  /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let tagCatalog: { id: number, slug: string, label: string, color?: string }[] = $state([])
-  /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let selectedTags: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** HUD presence of created quests: 'default' | 'always' | 'never'. */
   let overlayMode = $state('default')
@@ -73,9 +72,7 @@
   /** Empty string = no category / no questline. */
   let categoryId = $state('')
   let questlineId = $state('')
-  /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let categories: { id: number, slug: string, label: string, color?: string }[] = $state([])
-  /** @type {{ id: number, title: string, category_id?: number | null, color?: string }[]} */
   let questlines: { id: number, title: string, category_id?: number | null, color?: string }[] = $state([])
   /** 0..100 for UI; sent as 0..1 */
   let emitChancePct = $state(100)
@@ -83,7 +80,6 @@
   let windowStartMinute = $state('00')
   let windowEndHour = $state('18')
   let windowEndMinute = $state('00')
-  /** @type {Set<number>} */
   let weekdays: Set<number> = $state(new Set(WORKDAYS))
   let timezone = $state(LOCAL_TZ)
   let tzEditing = $state(false)
@@ -136,7 +132,6 @@
     }
   })
 
-  /** @param {string} text */
   function parseLimits(text: string) {
     try {
       const v = JSON.parse(text)
@@ -158,7 +153,7 @@
     categoryId === '' ? null : categories.find((c) => String(c.id) === categoryId) ?? null,
   )
 
-  function daysLabel(set: Set<unknown>) {
+  function daysLabel(set: Set<number>) {
     const ids = [...set].sort((a, b) => a - b)
     if (ids.length === 7) return 'каждый день'
     if (ids.join() === WORKDAYS.join()) return 'по будням'
@@ -225,7 +220,7 @@
   }
 
   function parseWeekdays(raw: any) {
-    const set = new Set()
+    const set = new Set<number>()
     for (const part of String(raw || '').split(',')) {
       const n = Number(part.trim())
       if (Number.isInteger(n) && n >= 0 && n <= 6) set.add(n)
@@ -233,7 +228,7 @@
     return set.size ? set : new Set(WORKDAYS)
   }
 
-  function resetForm(t = null) {
+  function resetForm(t: any = null) {
     formError = ''
     title = t?.title ?? ''
     description = t?.description ?? ''
@@ -283,7 +278,6 @@
   /** Per-template close streaks, loaded after the list so rows render at once. */
   let streaks = $state(({} as Record<number, any>))
 
-  /** @param {any[]} tpls */
   async function loadStreaks(tpls: any[]) {
     const out = ({} as Record<number, any>)
     await Promise.all(
@@ -298,7 +292,6 @@
     streaks = out
   }
 
-  /** @param {number} id */
   function streakLabel(id: number) {
     const st = streaks[id]
     if (!st || !st.closed) return ''
@@ -398,7 +391,7 @@
         emit_chance: Math.max(0, Math.min(100, Number(emitChancePct) || 0)) / 100,
         emit_window_start: `${windowStartHour}:${windowStartMinute}`,
         emit_window_end: `${windowEndHour}:${windowEndMinute}`,
-        deadline_time: null,
+        deadline_time: null as string | null,
         duration_seconds,
       }
     }
@@ -471,7 +464,6 @@
       : [],
   )
 
-  /** @param {MouseEvent} event @param {any} t */
   function openTemplateMenu(event: MouseEvent, t: any) {
     event.preventDefault()
     event.stopPropagation()
@@ -523,7 +515,7 @@
     }
   }
 
-  async function onCopy(t: { id: number }, event: { stopPropagation: () => void }) {
+  async function onCopy(t: { id: number }, event?: Event) {
     event?.stopPropagation?.()
     try {
       await copyTemplate(t.id)
@@ -534,7 +526,6 @@
     }
   }
 
-  /** @param {any} t @param {Event} [event] */
   async function onEmit(t: any, event?: Event) {
     event?.stopPropagation?.()
     error = ''

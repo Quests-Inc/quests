@@ -1,22 +1,12 @@
 <script lang="ts">
   import Icon from '../ui/Icon.svelte'
 
-  /** The one dialog footer: secondary/destructive actions on the left
+  /**
+   * The one dialog footer: secondary/destructive actions on the left
    * (`left` snippet — Удалить, Копировать…), Cancel + the primary action on
    * the right, both always labelled. Without `onSubmit` the primary button is
    * type=submit for the surrounding <form>.
-   * @type {{
-   *   onCancel: () => void,
-   *   cancelLabel?: string,
-   *   submitLabel: string,
-   *   submitIcon?: string,
-   *   submitVariant?: 'accent' | 'danger-solid',
-   *   onSubmit?: () => void,
-   *   busy?: boolean,
-   *   busyLabel?: string,
-   *   disabled?: boolean,
-   *   left?: import('svelte').Snippet,
-   * }} */
+   */
   let {
     onCancel,
     cancelLabel = 'Отмена',

@@ -40,7 +40,6 @@
   import ModalFoot from './ModalFoot.svelte'
   import { untrack } from 'svelte'
 
-  /** @type {{ open: boolean, mode: 'create' | 'edit', quest?: any, defaults?: { questline_id?: number | null, category_id?: number | null, description?: string } | null, quests?: any[], notes?: any[], attachments?: any[], onClose: () => void, onSaved: (q: any, meta?: { mode: string }) => void, onDeleted?: (id: number) => void, onDraft?: (payload: any) => void }} */
   let {
     open = false,
     mode = 'create',
@@ -72,13 +71,9 @@
   let categoryId = $state('')
   /** Empty string = no questline. */
   let questlineId = $state('')
-  /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let categories: { id: number, slug: string, label: string, color?: string }[] = $state([])
-  /** @type {{ id: number, title: string, category_id?: number | null, color?: string }[]} */
   let questlines: { id: number, title: string, category_id?: number | null, color?: string }[] = $state([])
-  /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let tagCatalog: { id: number, slug: string, label: string, color?: string }[] = $state([])
-  /** @type {{ id: number, slug: string, label: string, color?: string }[]} */
   let selectedTags: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** Local date YYYY-MM-DD + 24h clock. */
   let deadlineDate = $state('')
@@ -270,7 +265,6 @@
       const deadline_at = deadlineOn
         ? localInputToUtcIso(`${deadlineDate}T${deadlineHour}:${deadlineMinute}`)
         : null
-      /** @type {Record<string, any>} */
       const payload: Record<string, any> = {
         title: title.trim(),
         description: description.trim(),

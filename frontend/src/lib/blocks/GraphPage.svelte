@@ -32,20 +32,11 @@
   import { applyDraft, describeOp } from '../js/graphDraft.ts'
   import { layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown } from '../js/graphLayout.ts'
 
-  /** Relations map tab: what a quest/note is connected to, drawn from existing
+  /**
+   * Relations map tab: what a quest/note is connected to, drawn from existing
    * ownership, step order and reference tokens. Nodes are HTML cards (so
    * markdown renders and long text scrolls); the SVG layer only draws edges.
-   * @type {{
-   *   active?: boolean,
-   *   rootType?: 'quest' | 'note' | 'questline' | null,
-   *   rootId?: number | null,
-   *   nonce?: number,
-   *   quests?: any[],
-   *   notes?: any[],
-   *   questlines?: any[],
-   *   onCenter?: (type: string | null, id: number | null) => void,
-   *   onOpen?: (kind: string, id: number) => void,
-   * }} */
+   */
   let {
     active = true,
     rootType = null,
@@ -68,7 +59,7 @@
     onOpen?: (kind: string, id: number) => void,
   } = $props()
 
-  const TYPES = {
+  const TYPES: Record<string, any> = {
     quest: { label: 'Квест', glyph: '◆', color: '#c9a227' },
     step: { label: 'Шаг', glyph: '•', color: '#8c97a8' },
     note: { label: 'Заметка', glyph: '¶', color: '#b48ad6' },
@@ -77,7 +68,7 @@
     template: { label: 'Шаблон', glyph: '⟳', color: '#d9894a' },
     cluster: { label: 'Вложения', glyph: '⎘', color: '#4f9fc7' },
   }
-  const EDGES = {
+  const EDGES: Record<string, any> = {
     structure: { label: 'Принадлежность', color: '#6e6e6e', dash: '' },
     reference: { label: 'Ссылка', color: '#c9a227', dash: '6 4' },
     dependency: { label: 'Зависимость', color: '#d0699b', dash: '' },
@@ -85,7 +76,7 @@
   /** Attachments of one owner collapse into a cluster beyond this many. */
   const CLUSTER_MIN = 6
   /** Card width / max height (px) by kind; text beyond the height scrolls. */
-  const CARD = {
+  const CARD: Record<string, any> = {
     quest: { w: 300, max: 260 },
     note: { w: 320, max: 300 },
     stepBody: { w: 240, max: 120 },
@@ -119,7 +110,7 @@
   let loading = $state(false)
   let error = $state('')
   let selectedKey = $state((null as string | null))
-  let showEdge = $state({ structure: true, reference: true, dependency: true })
+  let showEdge: Record<string, boolean> = $state({ structure: true, reference: true, dependency: true })
   let expanded = $state((new Set() as Set<string>))
   /** Owners whose files are laid out one by one: never a folded group or a block. */
   let loose = $state((new Set() as Set<string>))
@@ -191,7 +182,6 @@
       await loadDraft()
       reloadTick += 1
     } catch (e) {
-      /** @type {Record<number, string>} */
       const problems: Record<number, string> = {}
       // @ts-ignore
       for (const p of e.problems ?? []) problems[p.op] = p.message
@@ -307,7 +297,7 @@
 
   /** Keys that never reach the map: typing in a field, or a dialog on top. */
   const typing = (e: { key?: string; altKey?: any; ctrlKey?: any; metaKey?: any; code?: string; preventDefault?: () => void; shiftKey?: any; target?: any }) =>
-    e.target instanceof Element && (e.target.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('.backdrop [role="dialog"]'))
+    e.target instanceof Element && ((e.target as Element).closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('.backdrop [role="dialog"]'))
 
   /** Map shortcuts (by physical key, so they work in any keyboard layout):
    * Ctrl+S save, Ctrl+Z undo the last change, V select, F fit, R untangle, Shift+Del clear. */
@@ -376,8 +366,8 @@
   function prepare(g: { root?: any; nodes?: any; edges?: any }, open_: Set<string>) {
     const nodes = g.nodes.map((n: any) => ({ ...n, x: 0, y: 0, w: 0, h: 0 }))
     const edges = g.edges.map((e: any) => ({ ...e }))
-    const byKey = new Map(nodes.map((n: { key: any }) => [n.key, n]))
-    const owners = new Map()
+    const byKey = new Map<string, any>(nodes.map((n: { key: any }): [string, any] => [n.key, n]))
+    const owners = new Map<string, any[]>()
     for (const e of edges) {
       const to = byKey.get(e.to)
       if (e.kind === 'structure' && to?.type === 'attachment' && to.links === 0 && !to.draft && !e.draft) {
@@ -548,7 +538,7 @@
 
   // Which kinds of things the map shows (the centre and draft things always stay).
   const ENTITY_TYPES = ['questline', 'quest', 'step', 'note', 'attachment']
-  const ENTITY_LABELS = { questline: 'Квестлайны', quest: 'Квесты', step: 'Шаги', note: 'Заметки', attachment: 'Вложения' }
+  const ENTITY_LABELS: Record<string, string> = { questline: 'Квестлайны', quest: 'Квесты', step: 'Шаги', note: 'Заметки', attachment: 'Вложения' }
   const TYPES_KEY = 'quests.graph.types'
   const loadTypes = () => {
     try {
@@ -609,9 +599,9 @@
   /** Cards the user took off the map, per neighbour still on it: key → type → keys.
    * They are links like any other not shown yet, so they count in the circles. */
   let hiddenAdj = $derived.by(() => {
-    const out = new Map()
+    const out = new Map<string, Record<string, string[]>>()
     if (!hidden.size) return out
-    const add = (from: unknown, other: unknown) => {
+    const add = (from: string, other: string) => {
       if (!hidden.has(other) || hidden.has(from)) return
       const type = other.slice(0, other.indexOf(':'))
       if (!out.has(from)) out.set(from, {})
@@ -631,8 +621,8 @@
    * quests outside the status filter are not counted — opening them shows nothing. */
   function moreOf(n: { draft: any; more: {}; key: any }) {
     if (n.draft) return []
-    const own = n.more ?? {}
-    const gone = hiddenAdj.get(n.key) ?? {}
+    const own: Record<string, string[]> = n.more ?? {}
+    const gone: Record<string, string[]> = hiddenAdj.get(n.key) ?? {}
     const out = []
     for (const type of ENTITY_TYPES) {
       if (!shownTypes.has(type)) continue
@@ -659,7 +649,7 @@
 
   // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
   let selectMode = $state(false)
-  let picked = $state((new Set() as Set<string>))
+  let picked: Set<string> = $state(new Set())
   let marquee = $state((null as { x0: number, y0: number, x1: number, y1: number } | null))
 
   function toggleSelectMode() {
@@ -681,7 +671,6 @@
    * remembered as "hidden" (so it can be brought back); a card with no link
    * left to anything that stays simply goes. If nothing is left, the map is
    * cleared. Draft cards are not hidden (drop them from the log instead).
-   * @param {string[]} keys
    */
   async function hideKeys(keys: string[]) {
     const gone = new Set(keys)
@@ -733,7 +722,7 @@
   let touched = $state((new Map() as Map<string, number[]>))
   /** The log row shown briefly after clicking a card's change marker. */
   let flashOp = $state((null as number | null))
-  let flashTimer = 0
+  let flashTimer: number = 0
 
   /** Opens the log on the last change that wrote into this card. */
   function showChanges(key: string) {
@@ -742,7 +731,9 @@
     draftOpen = true
     flashOp = ops[ops.length - 1]
     clearTimeout(flashTimer)
-    flashTimer = window.setTimeout(() => (flashOp = null), 2800)
+    flashTimer = window.setTimeout((): void => {
+          flashOp = null
+        }, 2800)
     void tick().then(() => {
       document.querySelector(`.gdraft__list [data-op="${flashOp}"]`)?.scrollIntoView({ block: 'nearest' })
     })
@@ -1085,14 +1076,12 @@
    * Gives every edge end its own point on the card side: outgoing edges share
    * the upper/left half, incoming the lower/right half, each ordered by where
    * the other end is, so lines do not cross needlessly.
-   * @param {{ e: any, a: any, b: any }[]} items
    */
   function spreadEnds(items: { e: any, a: any, b: any }[]) {
-    /** @type {Map<string, { item: any, end: 'a' | 'b', other: number }[]>} */
     const groups: Map<string, { item: any, end: 'a' | 'b', other: number }[]> = new Map()
-    const push = (key: string, item: { e: any; a: any; b: any }, end: string, other: any) => {
+    const push = (key: string, item: { e: any; a: any; b: any }, end: 'a' | 'b', other: any) => {
       if (!groups.has(key)) groups.set(key, [])
-      groups.get(key).push({ item, end, other })
+      groups.get(key)!.push({ item, end, other })
     }
     for (const item of items) {
       const { vertical, sa, sb } = sidesOf(item.a, item.b)
@@ -1141,7 +1130,6 @@
     ),
   )
   let drawEdges = $derived.by(() => {
-    /** @type {{ e: any, a: any, b: any, oa?: number, ob?: number }[]} */
     const items: { e: any, a: any, b: any, oa?: number, ob?: number }[] = []
     for (const e of view?.edges ?? []) {
       if (!showEdge[e.kind]) continue
@@ -1218,8 +1206,8 @@
     pinchStart()
     stageEl?.setPointerCapture(e.pointerId)
   }
-  function onBgDown(e: { target: { closest: (arg0: string) => any }; button: number; preventDefault: () => void; clientX: number; clientY: number; pointerId: number; shiftKey: any; ctrlKey: any; metaKey: any }) {
-    if (e.target.closest('[data-gkey]')) return
+  function onBgDown(e: PointerEvent) {
+    if ((e.target as Element).closest('[data-gkey]')) return
     // Middle button always pans, also in selection mode.
     if (e.button === 1) {
       e.preventDefault()
@@ -1241,7 +1229,7 @@
     drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
     stageEl?.setPointerCapture(e.pointerId)
   }
-  function onCardDown(e: { button: number; stopPropagation: () => void; target: { closest: (arg0: string) => any }; clientX: any; clientY: any; pointerId: number; offsetX: number }, n: { key: any; x?: any; y?: any }) {
+  function onCardDown(e: PointerEvent, n: { key: any; x?: any; y?: any }) {
     if (linking) {
       if (e.button === 0) {
         e.stopPropagation()
@@ -1250,7 +1238,7 @@
       return
     }
     if (selectMode) {
-      if (e.button !== 0 || e.target.closest('textarea, input, .gcard__editbar, .gcard__changed')) return
+      if (e.button !== 0 || (e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__changed')) return
       e.stopPropagation()
       const group = picked.has(n.key)
         ? [...picked].map((k) => nodeMap.get(k)).filter(Boolean)
@@ -1267,8 +1255,8 @@
       return
     }
     if (e.button !== 0) return
-    if (e.target.closest('textarea, input, .gcard__editbar, .gcard__body a, .gcard__body button, .gcard__body pre')) return
-    const body = e.target.closest('.gcard__body')
+    if ((e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__body a, .gcard__body button, .gcard__body pre')) return
+    const body = (e.target as Element).closest('.gcard__body')
     // Inside the text area: let selection/scrolling happen; only the frame drags.
     if (body && body.scrollHeight > body.clientHeight + 1 && e.offsetX > body.clientWidth - 14) return
     e.stopPropagation()
@@ -1361,7 +1349,7 @@
         const x1 = (Math.max(m.x0, m.x1) - cam.x) / cam.k
         const y0 = (Math.min(m.y0, m.y1) - cam.y) / cam.k
         const y1 = (Math.max(m.y0, m.y1) - cam.y) / cam.k
-        const next = drag.additive ? new Set(picked) : new Set()
+        const next: Set<string> = drag.additive ? new Set(picked) : new Set()
         for (const n of view?.nodes ?? []) {
           if (n.x + n.w / 2 >= x0 && n.x - n.w / 2 <= x1 && n.y + n.h / 2 >= y0 && n.y - n.h / 2 <= y1) next.add(n.key)
         }
@@ -1385,9 +1373,9 @@
     if (drag?.kind === 'node' && !drag.moved) select(drag.n)
     drag = null
   }
-  function onWheel(e: { target: { closest: (arg0: string) => any }; preventDefault: () => void; ctrlKey: any; deltaY: number; clientX: number; clientY: number }) {
+  function onWheel(e: WheelEvent) {
     // Over a card's scrollable text the wheel scrolls the text, not the map.
-    const body = e.target instanceof Element ? e.target.closest('.gcard__body, textarea') : null
+    const body = e.target instanceof Element ? (e.target as Element).closest('.gcard__body, textarea') : null
     if (body && body.scrollHeight > body.clientHeight + 1) return
     e.preventDefault()
     const r = stageEl?.getBoundingClientRect()
@@ -1489,7 +1477,6 @@
 
   // --- Link mode: a line follows the cursor from a card; click a target to
   // make the link, right-click or Esc to cancel. Also used for "attach to". ---
-  /** @type {{ mode: 'to' | 'from' | 'attach', anchor: string } | null} */
   let linking: { mode: 'to' | 'from' | 'attach', anchor: string } | null = $state(null)
   let linkCursor = $state({ x: 0, y: 0 })
 
@@ -1536,7 +1523,7 @@
   const parentNote = (n: { key: any }) =>
     (view?.edges ?? []).find((e) => e.kind === 'structure' && e.to === n.key && e.from.startsWith('note:') && e.draft !== 'remove')?.from ?? null
 
-  function startLink(mode: string, n: { key: any }) {
+  function startLink(mode: 'to' | 'from' | 'attach', n: { key: any }) {
     const a = nodeMap.get(n.key)
     linking = { mode, anchor: n.key }
     linkCursor = a ? { x: a.x, y: a.y } : { x: 0, y: 0 }
@@ -1597,7 +1584,6 @@
   }
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
-  /** @type {{ open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any }} */
   let ctx: { open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any } = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
 
   /** Screen point → world coordinates (where a new thing should land). */
@@ -1607,7 +1593,7 @@
     return { x: (e.clientX - r.left - cam.x) / cam.k, y: (e.clientY - r.top - cam.y) / cam.k }
   }
 
-  function onCtx(e: { preventDefault: () => void; stopPropagation: () => void; clientX: any; clientY: any }, n = null) {
+  function onCtx(e: MouseEvent, n: any = null) {
     e.preventDefault()
     e.stopPropagation()
     if (linking) {
@@ -1775,7 +1761,7 @@
   async function onCtxSelect(id: string) {
     const n = ctx.node
     const at = ctx.at
-    const plain = { owner: '', linkFrom: '', edit: null }
+    const plain: any = { owner: '', linkFrom: '', edit: null }
     if (id === 'hide-picked') await hidePicked()
     else if (id === 'select-mode') toggleSelectMode()
     else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
@@ -1844,9 +1830,7 @@
     if (key.endsWith('_at')) return new Date(a).getTime() === new Date(b).getTime()
     return JSON.stringify(a) === JSON.stringify(b)
   }
-  /** @param {Record<string, any>} orig @param {Record<string, any>} payload @param {string[]} keys */
   const diffFields = (orig: Record<string, any>, payload: Record<string, any>, keys: string[]) => {
-    /** @type {Record<string, any>} */
     const out: Record<string, any> = {}
     for (const k of keys) if (k in payload && !sameVal(orig[k], payload[k], k)) out[k] = payload[k]
     return out
@@ -1892,7 +1876,6 @@
     }
   }
 
-  /** @param {Record<string, any>} payload */
   async function draftEditQuest(payload: Record<string, any>) {
     const orig = editQuest.quest
     if (!orig) return
@@ -2006,7 +1989,7 @@
     const e = editing
     editing = null
     if (!saveIt || !e) return
-    const changed = {}
+    const changed: Record<string, any> = {}
     if (e.title.trim() && e.title.trim() !== e.orig.title) changed.title = e.title.trim()
     if (e.text !== e.orig.description) changed.description = e.text
     if (!Object.keys(changed).length) return
@@ -2031,7 +2014,7 @@
   }
 
   /** Title of a brand-new note: focused with the whole text selected. */
-  const focusSelect = (node: Element) => {
+  const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     // The card is mounted while the map is still hidden for measuring, and a
     // hidden field cannot take focus — keep trying until it shows.
     let tries = 0
@@ -2094,7 +2077,7 @@
   const rasterOf = (n: { type: string; mime: any }) => n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
 </script>
 
-{#snippet glyph(n, t)}
+{#snippet glyph(n: any, t: any)}
   {#if (n.type === 'quest' || n.type === 'note' || n.type === 'questline') && (n.icon || n.icon_url)}
     <span class="gcard__icon" style:--line-color={n.color || t.color}>
       <QuestlineIcon icon={n.icon || 'document'} iconUrl={n.icon_url || null} size="sm" />
@@ -2336,7 +2319,7 @@
           onpointerdown={(e) => onCardDown(e, n)}
           oncontextmenu={(e) => onCtx(e, n)}
           ondblclick={(e) => {
-            if (n.type === 'note' && !(e.target instanceof Element && e.target.closest('a, button, textarea, input'))) void startEditNote(n)
+            if (n.type === 'note' && !(e.target instanceof Element && (e.target as Element).closest('a, button, textarea, input'))) void startEditNote(n)
           }}
         >
           {#if square}
