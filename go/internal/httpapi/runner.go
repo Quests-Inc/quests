@@ -247,9 +247,9 @@ func (s *Server) runnerComplete(w http.ResponseWriter, r *http.Request) {
 
 // --- user-facing management ---
 
-type runnerView struct {
-	store.Runner
-	Online bool `json:"online"`
+type RunnerView struct {
+	store.Runner `tstype:",extends"`
+	Online       bool `json:"online"`
 	// Queued / Running count the runner's unfinished jobs.
 	Queued  int `json:"queued"`
 	Running int `json:"running"`
@@ -263,9 +263,9 @@ func (s *Server) listRunners(w http.ResponseWriter, r *http.Request) {
 	}
 	jobs, _ := s.Store.ListRunnerJobs(r.Context(), store.JobFilter{States: []string{store.JobQueued, store.JobAssigned, store.JobRunning}, Limit: 500})
 	now := timeutil.NowUTC()
-	out := make([]runnerView, 0, len(runners))
+	out := make([]RunnerView, 0, len(runners))
 	for _, run := range runners {
-		v := runnerView{Runner: run, Online: store.RunnerOnline(run, now)}
+		v := RunnerView{Runner: run, Online: store.RunnerOnline(run, now)}
 		for _, j := range jobs {
 			if j.RunnerLabel != run.Label {
 				continue

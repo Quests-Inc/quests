@@ -60,7 +60,7 @@ func (s *Server) llmSettingsFor(ctx context.Context, r *http.Request) (llmassist
 	return base, "", errNoLLM
 }
 
-type llmView struct {
+type LLMView struct {
 	Providers      []llmassist.Provider `json:"providers"`
 	Provider       string               `json:"provider"`
 	BaseURL        string               `json:"base_url"`
@@ -73,8 +73,8 @@ type llmView struct {
 	TextLimit      int                  `json:"text_limit"`
 }
 
-func (s *Server) llmView(r *http.Request) (llmView, error) {
-	v := llmView{Providers: llmassist.Providers, Provider: "groq", TextLimit: maxAssistantText}
+func (s *Server) LLMView(r *http.Request) (LLMView, error) {
+	v := LLMView{Providers: llmassist.Providers, Provider: "groq", TextLimit: maxAssistantText}
 	if p, ok := PrincipalFrom(r.Context()); ok && p.User.ID != 0 && s.Secrets != nil {
 		v.Storage = true
 		row, err := s.Store.GetUserLLM(r.Context(), p.User.ID)
@@ -99,7 +99,7 @@ func (s *Server) llmView(r *http.Request) (llmView, error) {
 }
 
 func (s *Server) getMyLLM(w http.ResponseWriter, r *http.Request) {
-	v, err := s.llmView(r)
+	v, err := s.LLMView(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

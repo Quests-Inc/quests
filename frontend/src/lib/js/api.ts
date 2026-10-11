@@ -1,4 +1,5 @@
 import type { Category, QuestRead, Tag } from '../api/domain.gen'
+import type { LLMView, RunnerView } from '../api/http.gen'
 import type { RunnerJob } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
@@ -789,7 +790,7 @@ export function putGraphDraftOp(id, payload) {
 // --- Runners: devices that execute checks (quests-runner), and their job queue.
 
 export function getRunners() {
-  return request('/api/runners')
+  return request<RunnerView[]>('/api/runners')
 }
 
 /** @param {string} label @returns {Promise<{ label: string, registration_token: string, valid_hours: number }>} */
@@ -819,7 +820,7 @@ export function cancelRunnerJob(id) {
 
 /** The account's assistant provider/key state (the key itself never comes back, only a hint). */
 export function getMyLLM() {
-  return request('/api/me/llm')
+  return request<LLMView>('/api/me/llm')
 }
 
 /** Save provider, address, model and (when typed) the key. An empty `api_key` keeps the stored one. */

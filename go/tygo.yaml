@@ -15,3 +15,21 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
+  - path: "github.com/valirum/quests/go/internal/httpapi"
+    output_path: "../frontend/src/lib/api/http.gen.ts"
+    include_files:
+      - "runner.go"
+      - "llm_settings.go"
+    frontmatter: |
+      import type { Runner } from "./store.gen";
+      import type { Provider } from "./llm.gen";
+    type_mappings:
+      time.Time: "string"
+      time.Duration: "number"
+      json.RawMessage: "unknown"
+      llmassist.Provider: "Provider"
+      store.Runner: "Runner"
+  - path: "github.com/valirum/quests/go/internal/llmassist"
+    output_path: "../frontend/src/lib/api/llm.gen.ts"
+    include_files:
+      - "provider.go"
