@@ -3,12 +3,12 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/httpx"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/valirum/quests/go/internal/identity"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -44,7 +44,7 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 		}
 
 		ws := int64(identity.DefaultWorkspaceID)
-		p, hasUser := PrincipalFrom(r.Context())
+		p, hasUser := identity.PrincipalFrom(r.Context())
 		if p.TokenName == "internal" && strings.TrimSpace(r.Header.Get(WorkspaceHeader)) == "" {
 			// The loopback token is not a person: falling back to the default workspace would
 			// let whoever triggered the call act on someone else's data.
@@ -98,7 +98,7 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 // requireOwner lets only an owner of the caller's current workspace through. Callers
 // without an account (auth off, the in-process token) pass: there is nobody to tell apart.
 func (s *Server) requireOwner(w http.ResponseWriter, r *http.Request, what string) bool {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 {
 		return true
 	}
@@ -132,7 +132,7 @@ func (s *Server) registerWorkspaces(mux *http.ServeMux) {
 // and invitations only make sense with accounts.
 func (s *Server) memberOf(w http.ResponseWriter, r *http.Request) (int64, string, identity.User, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if err != nil || id <= 0 || !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "needs an account and a workspace id")
 		return 0, "", identity.User{}, false
@@ -319,12 +319,12 @@ type WorkspacesView struct {
 
 func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	cur := wsctx.From(r.Context())
-	if p, ok := PrincipalFrom(r.Context()); cur == 0 && (!ok || p.User.ID == 0) {
+	if p, ok := identity.PrincipalFrom(r.Context()); cur == 0 && (!ok || p.User.ID == 0) {
 		cur = identity.DefaultWorkspaceID
 	}
 	var list []identity.Workspace
 	var err error
-	if p, ok := PrincipalFrom(r.Context()); ok && p.User.ID != 0 {
+	if p, ok := identity.PrincipalFrom(r.Context()); ok && p.User.ID != 0 {
 		list, err = s.Store.Identity().UserWorkspaces(r.Context(), p.User.ID)
 	} else {
 		list, err = s.Store.Identity().AllWorkspaces(r.Context())
@@ -344,7 +344,7 @@ func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "creating a workspace needs an account")
 		return
@@ -380,7 +380,7 @@ func (s *Server) switchWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid workspace id")
 		return
 	}
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.Via != "session" {
 		writeErr(w, http.StatusBadRequest, "only a logged-in browser session can switch workspace")
 		return

@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/platform/apperr"
 	"strings"
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/platform/apperr"
 	"github.com/valirum/quests/go/internal/platform/secretbox"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/valirum/quests/go/internal/identity"
 )
 
 // Self-service API tokens: the signed-in user mints tokens for their own integrations
@@ -18,7 +20,7 @@ func (s *Server) registerTokens(mux *http.ServeMux) {
 }
 
 func (s *Server) sessionUser(w http.ResponseWriter, r *http.Request) (userID, workspaceID int64, ok bool) {
-	p, has := PrincipalFrom(r.Context())
+	p, has := identity.PrincipalFrom(r.Context())
 	if !has || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "tokens need an account")
 		return 0, 0, false

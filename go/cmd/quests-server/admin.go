@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/httpapi"
 	"os"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/valirum/quests/go/internal/httpapi"
 	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/config"
 	"github.com/valirum/quests/go/internal/platform/db"

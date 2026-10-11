@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/httpx"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/identity"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 )
 
 // Two-factor sign-in (quest=359). Password first; an account with a second factor gets a
@@ -149,7 +149,7 @@ func (s *Server) postLoginMFA(w http.ResponseWriter, r *http.Request) {
 // mfaSessionUser returns the account behind a browser session: the second factor is managed
 // from the web interface, never with a token.
 func (s *Server) mfaSessionUser(w http.ResponseWriter, r *http.Request) (identity.User, bool) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 || p.Via != "session" {
 		writeErr(w, http.StatusForbidden, "two-factor sign-in is managed from the web interface, not with a token")
 		return identity.User{}, false

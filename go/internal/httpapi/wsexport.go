@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/valirum/quests/go/internal/identity"
 	"io"
 	"log"
 	"net/http"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -179,7 +179,7 @@ func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
 
 // importWorkspace creates a new workspace from an uploaded archive.
 func (s *Server) importWorkspace(w http.ResponseWriter, r *http.Request) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "import needs an account")
 		return

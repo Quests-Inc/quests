@@ -3,8 +3,6 @@ package httpapi
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/ratelimit"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -12,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/valirum/quests/go/internal/identity"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/pgtest"
+	"github.com/valirum/quests/go/internal/platform/ratelimit"
 )
 
 // newTestServer wires just enough of Server to exercise requireAuth + the

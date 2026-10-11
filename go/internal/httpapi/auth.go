@@ -1,11 +1,8 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"github.com/valirum/quests/go/internal/platform/httpx"
-	"github.com/valirum/quests/go/internal/platform/ratelimit"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,21 +10,13 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/identity"
+	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/valirum/quests/go/internal/platform/ratelimit"
 	"github.com/valirum/quests/go/internal/platform/tokens"
 )
 
 // SessionCookie holds the opaque session secret for the SPA.
 const SessionCookie = "quests_session"
-
-type ctxKey string
-
-const principalKey ctxKey = "quests.principal"
-
-// PrincipalFrom returns the authenticated caller, if any.
-func PrincipalFrom(ctx context.Context) (identity.Principal, bool) {
-	p, ok := ctx.Value(principalKey).(identity.Principal)
-	return p, ok
-}
 
 // publicPaths never require authentication: the login endpoint itself, the
 // auth-state probe the SPA uses to decide whether to show the login screen,
@@ -76,7 +65,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			writeErr(w, http.StatusForbidden, "cross-origin request rejected")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
+		next.ServeHTTP(w, r.WithContext(identity.WithPrincipal(r.Context(), p)))
 	})
 }
 

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/llmassist"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -41,7 +42,7 @@ var errNoLLM = errors.New("ассистент не настроен: задай�
 // when it has them, else the server's key if this caller may use it. source is "own" or "server".
 func (s *Server) llmSettingsFor(ctx context.Context, r *http.Request) (llmassist.Settings, string, error) {
 	base := llmassist.LoadSettings()
-	if p, ok := PrincipalFrom(ctx); ok && p.User.ID != 0 && s.Secrets != nil {
+	if p, ok := identity.PrincipalFrom(ctx); ok && p.User.ID != 0 && s.Secrets != nil {
 		row, err := s.Store.GetUserLLM(ctx, p.User.ID)
 		switch {
 		case err == nil && row.KeySealed != "":
@@ -75,7 +76,7 @@ type LLMView struct {
 
 func (s *Server) LLMView(r *http.Request) (LLMView, error) {
 	v := LLMView{Providers: llmassist.Providers, Provider: "groq", TextLimit: maxAssistantText}
-	if p, ok := PrincipalFrom(r.Context()); ok && p.User.ID != 0 && s.Secrets != nil {
+	if p, ok := identity.PrincipalFrom(r.Context()); ok && p.User.ID != 0 && s.Secrets != nil {
 		v.Storage = true
 		row, err := s.Store.GetUserLLM(r.Context(), p.User.ID)
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
@@ -109,7 +110,7 @@ func (s *Server) getMyLLM(w http.ResponseWriter, r *http.Request) {
 
 // sessionUser returns the account behind a browser session; keys are not set from tokens.
 func (s *Server) llmSessionUser(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	p, ok := PrincipalFrom(r.Context())
+	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 || p.Via != "session" {
 		writeErr(w, http.StatusForbidden, "the assistant key is managed from the web interface, not with a token")
 		return 0, false

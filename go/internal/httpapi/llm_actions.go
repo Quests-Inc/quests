@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/llmassist"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
@@ -46,7 +47,7 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, serr.Error())
 		return
 	}
-	if p, ok := PrincipalFrom(r.Context()); ok && !s.limiter().TryLLM(strconv.FormatInt(p.User.ID, 10)) {
+	if p, ok := identity.PrincipalFrom(r.Context()); ok && !s.limiter().TryLLM(strconv.FormatInt(p.User.ID, 10)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов к ассистенту, повторите позже")
 		return
 	}
