@@ -13,6 +13,8 @@
     listTemplates,
     updateTemplate,
   } from '@/shared/api/client.ts'
+  import { rowMeta, templateMenuItems } from '../model/rowInfo.ts'
+  import { createTemplateActions } from '../model/templateActions.ts'
   import { defaultLocalDeadlineParts, localTimeZone } from '@/shared/lib/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '@/shared/lib/duration.ts'
   import { templateStepDraft, templateStepsPayload, StepsEditor } from '@/entities/quest'
@@ -254,12 +256,6 @@
     streaks = out
   }
 
-  function streakLabel(id: number) {
-    const st = streaks[id]
-    if (!st || !st.closed) return ''
-    const pct = Math.round((st.close_rate || 0) * 100)
-    return `серия ${st.current_streak} · лучшая ${st.longest_streak} · ${pct}%`
-  }
 
   async function refresh() {
     loading = true
@@ -411,20 +407,7 @@
   let ctxY = $state(0)
   let ctxId = $state((null as number | null))
   let ctxTemplate = $derived(templates.find((t) => t.id === ctxId) ?? null)
-  let ctxItems = $derived(
-    ctxTemplate
-      ? [
-          { id: 'copy-id', label: `Копировать template=${ctxTemplate.id}` },
-          { id: 'sep-copy', sep: true },
-          { id: 'edit', label: 'Редактировать' },
-          { id: 'emit', label: 'Эмитировать сейчас' },
-          { id: 'duplicate', label: 'Дублировать (копия выключена)' },
-          { id: 'toggle', label: ctxTemplate.enabled ? 'Выключить' : 'Включить' },
-          { id: 'sep-secrets', sep: true },
-          { id: 'secrets', label: 'Секреты' },
-        ]
-      : [],
-  )
+  let ctxItems = $derived(templateMenuItems(ctxTemplate))
 
   function openTemplateMenu(event: MouseEvent, t: any) {
     event.preventDefault()
@@ -438,14 +421,8 @@
   async function onTemplateMenuSelect(action: string) {
     const t = ctxTemplate
     if (!t) return
-    if (action === 'copy-id') {
-      try {
-        await copyText(`template=${t.id}`)
-        toast(`Скопировано template=${t.id}`, { kind: 'success', ttl: 1600 })
-      } catch (e) {
-        toast(e.message || String(e), { kind: 'error' })
-      }
-    } else if (action === 'edit') openEdit(t)
+    if (action === 'copy-id') await actions.copyRef(t)
+    else if (action === 'edit') openEdit(t)
     else if (action === 'emit') await onEmit(t)
     else if (action === 'duplicate') await onCopy(t)
     else if (action === 'toggle') await onToggleEnabled(t)
@@ -467,39 +444,22 @@
     untrack(() => openEdit(t))
   })
 
-  async function onToggleEnabled(t: { id: number; enabled: any }) {
-    try {
-      await updateTemplate(t.id, { enabled: !t.enabled })
-      onChanged()
-      await refresh()
-    } catch (e) {
-      error = e.message || String(e)
-    }
-  }
-
-  async function onCopy(t: { id: number }, event?: Event) {
+  const actions = createTemplateActions({
+    api: { update: updateTemplate, copy: copyTemplate, emit: emitTemplate },
+    refresh: () => refresh(),
+    onChanged: () => onChanged(),
+    setError: (m) => (error = m),
+    notify: (m, kind, ttl) => toast(m, { kind, ttl }),
+    copyText,
+  })
+  const onToggleEnabled = actions.toggleEnabled
+  function onCopy(t: { id: number }, event?: Event) {
     event?.stopPropagation?.()
-    try {
-      await copyTemplate(t.id)
-      onChanged()
-      await refresh()
-    } catch (e) {
-      error = e.message || String(e)
-    }
+    return actions.duplicate(t)
   }
-
-  async function onEmit(t: any, event?: Event) {
+  function onEmit(t: any, event?: Event) {
     event?.stopPropagation?.()
-    error = ''
-    try {
-      const q = await emitTemplate(t.id)
-      onChanged()
-      toast(`Эмит: «${q.title || t.title}»`, { kind: 'success' })
-    } catch (e) {
-      const msg = e.message || String(e)
-      error = msg
-      toast(msg, { kind: 'error' })
-    }
+    return actions.emit(t)
   }
 
   async function confirmDelete() {
@@ -522,24 +482,7 @@
     }
   }
 
-  function rowMeta(t: TemplateRead) {
-    const mode = t.emit_mode === 'surprise' ? 'случайно' : 'по расписанию'
-    const days = t.freq === 'weekly' ? daysLabel(parseWeekdays(t.weekdays)) : 'каждый день'
-    return [
-      days,
-      mode,
-      t.emit_pool_command && 'команда',
-      t.questline_title,
-      t.category_label,
-      QUEST_SIGNIFICANCES.find((x) => x.id === t.significance)?.label || 'обычное',
-      t.pinned && 'закреплён',
-      t.overlay_hidden && 'не в оверлее',
-      streakLabel(t.id),
-      `${t.steps?.length ?? 0} ${plural(t.steps?.length ?? 0, ['шаг', 'шага', 'шагов'])}`,
-    ]
-      .filter(Boolean)
-      .join(' · ')
-  }
+  const metaOf = (t: TemplateRead) => rowMeta(t, streaks[t.id])
 </script>
 
 <ModalShell {open} onClose={handleClose} labelledby="templates-modal-title" zIndex={40} maxWidth="36rem">
@@ -551,7 +494,7 @@
   />
 
   {#if view === 'list'}
-    <TemplateList {error} {loading} {templates} {rowMeta} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
+    <TemplateList {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
   {:else}
     {#if formError}
       <p class="modal__error">{formError}</p>
