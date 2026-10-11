@@ -37,8 +37,9 @@
   import { createGraphPrefs } from '../model/prefs.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
+  import { createLinkMode } from '../model/linking.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, planHide, canPickTarget, freshTitle, noteEditChanges, questEditFields, stepEditFields, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -102,9 +103,9 @@
     touchView: () => {
       view = view && { ...view }
     },
-    isLinking: () => !!linking,
-    finishLink: (n) => finishLink(n),
-    setLinkCursor: (p) => (linkCursor = p),
+    isLinking: () => !!lk.linking,
+    finishLink: (n) => lk.finish(n),
+    setLinkCursor: (p) => (lk.cursor = p),
     selectMode: () => selectMode,
     getPicked: () => picked,
     setPicked: (s) => (picked = s),
@@ -417,47 +418,28 @@
    * cleared. Draft cards are not hidden (drop them from the log instead).
    */
   async function hideKeys(keys: string[]) {
-    const gone = new Set(keys)
-    const shown = view?.nodes ?? []
-    const left = shown.filter((n) => !gone.has(n.key) && !n.draft)
-    // Everything real is being removed, the centre included: start over.
-    if (gone.has(data?.root) && !left.length) {
+    const plan = planHide({
+      keys,
+      nodes: view?.nodes ?? [],
+      edges: view?.edges ?? [],
+      rootKey: data?.root,
+      hidden,
+      roots: draft.roots,
+    })
+    if (plan.clearAll) {
       await clearMap()
       return
     }
-    const stays = new Set(shown.filter((n) => !gone.has(n.key)).map((n) => n.key))
-    const linked = new Set()
-    for (const e of view?.edges ?? []) {
-      if (gone.has(e.from) && stays.has(e.to)) linked.add(e.from)
-      if (gone.has(e.to) && stays.has(e.from)) linked.add(e.to)
-    }
-    const hide = new Set(hidden)
-    const roots = [...draft.roots]
-    let rootsChanged = false
-    let skipped = 0
-    for (const k of gone) {
-      const n = nodeMap.get(k)
-      if (!n || k === data?.root) continue
-      if (n.draft) {
-        skipped += 1
-        continue
-      }
-      const at = roots.findIndex((r) => `${r.type}:${r.id}` === k)
-      if (at >= 0) {
-        roots.splice(at, 1)
-        rootsChanged = true
-      } else if (linked.has(k)) hide.add(k)
-    }
-    saveHidden(hide)
-    if (rootsChanged) {
+    saveHidden(plan.hidden)
+    if (plan.rootsChanged) {
       try {
-        await putGraphDraftRoots(roots)
+        await putGraphDraftRoots(plan.roots)
         await gd.load()
       } catch {
         /* toast already shown */
       }
     }
-    if (skipped) toast('Карточки черновика не скрываются: уберите их из журнала', { kind: 'info' })
+    if (plan.skippedDraft) toast('Карточки черновика не скрываются: уберите их из журнала', { kind: 'info' })
   }
 
   /** New steps / files with no owner: drawn red, they block saving. */
@@ -780,72 +762,34 @@
 
   // --- Link mode: a line follows the cursor from a card; click a target to
   // make the link, right-click or Esc to cancel. Also used for "attach to". ---
-  let linking: { mode: 'to' | 'from' | 'attach', anchor: string } | null = $state(null)
-  let linkCursor = $state({ x: 0, y: 0 })
-
+  const lk = createLinkMode({
+    getNodeMap: () => nodeMap,
+    getEdges: () => view?.edges ?? [],
+    addOp: (kind, payload) => gd.addOp(kind, payload),
+    askDrop: (op) => gd.askDrop(op),
+    onStart: () => (ctx = { ...ctx, open: false }),
+  })
+  let linking = $derived(lk.linking)
+  let linkCursor = $derived(lk.cursor)
 
   const edgesNow = () => view?.edges ?? []
-  /** Whether the card can be picked as the other end in the current link mode. */
-  const canPick = (n: { key: string; type?: string }) => canPickTarget(linking, n, nodeMap, edgesNow())
+  const canPick = lk.canPick
   const noteDescendants = (key: string) => noteDescendantKeys(edgesNow(), key)
   /** Cards of one kind that belong to this card (steps of a quest, quests of a questline), as shown. */
   const childKeys = (n: { key: string }, type: string) => childKeysOf(edgesNow(), nodeMap, n.key, type)
   /** The note this one hangs under, on the map. */
   const parentNote = (n: { key: string }) => parentNoteOf(edgesNow(), n.key)
 
-  function startLink(mode: 'to' | 'from' | 'attach', n: { key: any }) {
-    const a = nodeMap.get(n.key)
-    linking = { mode, anchor: n.key }
-    linkCursor = a ? { x: a.x, y: a.y } : { x: 0, y: 0 }
-    ctx = { ...ctx, open: false }
-  }
+  const startLink = lk.start
+  const cancelLink = lk.cancel
 
-  function cancelLink() {
-    linking = null
-  }
 
-  const hasRef = (from: string, to: string) => hasRefEdge(edgesNow(), from, to)
-
-  async function finishLink(target: { key: any }) {
-    const l = linking
-    if (!l || !canPick(target)) return
-    linking = null
-    if (l.mode === 'attach') {
-      const owned = (view?.edges ?? []).some((e) => e.kind === 'structure' && e.from === target.key && e.to === l.anchor)
-      if (owned) {
-        toast('Уже прикреплено сюда', { kind: 'info' })
-        return
-      }
-      if (nodeMap.get(l.anchor)?.type === 'note') {
-        await gd.addOp('set_parent', { id: l.anchor, parent: target.key, was: parentNote(nodeMap.get(l.anchor)) ?? '' })
-        return
-      }
-      await gd.addOp('attach', { item: l.anchor, owner: target.key })
-      return
-    }
-    const from = l.mode === 'to' ? l.anchor : target.key
-    const to = l.mode === 'to' ? target.key : l.anchor
-    if (hasRef(from, to)) {
-      toast('Такая ссылка уже есть', { kind: 'info' })
-      return
-    }
-    await gd.addOp('add_ref', { from, to })
-  }
+  const finishLink = lk.finish
 
   /** Links written in this card's own text, as targets still visible on the map. */
   const outgoingRefs = (n: { key: string }) => outgoingRefKeys(edgesNow(), nodeMap, n.key)
 
-  async function unlinkRef(n: { key: any }, targetKey: string) {
-    const e = (view?.edges ?? []).find(
-      (x) => x.kind === 'reference' && x.from === n.key && x.to === targetKey && x.draft !== 'remove',
-    )
-    // A link made earlier in this draft is undone by dropping that step of the log.
-    if (e?.draft === 'add' && e.op) {
-      await gd.askDrop({ id: e.op })
-      return
-    }
-    await gd.addOp('remove_ref', { from: n.key, to: targetKey })
-  }
+  const unlinkRef = lk.unlinkRef
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
   let ctx: { open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any } = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
@@ -1162,7 +1106,7 @@
     selectedKey = null
     expanded = new Set()
     loose = new Set()
-    linking = null
+    lk.cancel()
     editing = null
     resetPositions()
     setExpand([])
