@@ -176,8 +176,10 @@ export function createGraphMenu(deps: {
     const n = ctx.node
     const at = ctx.at
     if (id === 'hide-picked') await deps.hidePicked()
-    else if (id === 'select-mode') deps.toggleSelectMode()
-    else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
+    else if (id === 'select-mode') {
+      close()
+      deps.toggleSelectMode()
+    } else if (id === 'new-quest') questModal = { open: true, desc: '', at, questlineId: null }
     else if (id === 'new-quest-ref' && n) questModal = { open: true, desc: `${n.type}=${n.id}`, at, questlineId: null }
     else if (id === 'add-quest-line' && n && typeof n.id === 'number')
       questModal = { open: true, desc: '', at, questlineId: n.id }
@@ -193,10 +195,16 @@ export function createGraphMenu(deps: {
       fileOwner = id === 'add-file' && n ? n.key : ''
       fileInput?.click()
     } else if (id === 'find') findOpen = true
-    else if (id === 'link-to' && n) deps.startLink('to', n)
-    else if (id === 'link-from' && n) deps.startLink('from', n)
-    else if (id === 'attach' && n) deps.startLink('attach', n)
-    else if (id === 'cl-open' && ctx.cluster?.node) deps.select(ctx.cluster.node)
+    else if (id === 'link-to' && n) {
+      close()
+      deps.startLink('to', n)
+    } else if (id === 'link-from' && n) {
+      close()
+      deps.startLink('from', n)
+    } else if (id === 'attach' && n) {
+      close()
+      deps.startLink('attach', n)
+    } else if (id === 'cl-open' && ctx.cluster?.node) deps.select(ctx.cluster.node)
     else if (id === 'cl-fold' && ctx.cluster?.key) deps.collapse(ctx.cluster.key)
     else if (id === 'cl-disband' && ctx.cluster) deps.disband(ctx.cluster.owner)
     else if (id === 'edge-unref' && ctx.edge) await deps.unlinkRef({ key: ctx.edge.from }, ctx.edge.to)

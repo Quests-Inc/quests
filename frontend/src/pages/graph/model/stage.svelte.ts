@@ -8,7 +8,6 @@ import {
   CENTERABLE,
   borderMarks,
   childKeysOf,
-  computeTiers,
   drawableEdges,
   hiddenNeighbors,
   minimapModel,
@@ -57,11 +56,7 @@ export function createGraphStage(deps: {
   getCam: () => Cam
   setCam: (cam: Cam) => void
   clearMarquee: () => void
-  closeMenu: () => void
-  getEditingKey: () => string | undefined
   loadDraft: () => Promise<void>
-  clearMap: () => Promise<void>
-  openDraftLog: () => void
   writeRoots?: (roots: Root[]) => Promise<unknown>
 }) {
   const writeRoots = deps.writeRoots ?? putGraphDraftRoots
@@ -86,7 +81,10 @@ export function createGraphStage(deps: {
   let lastFitKey = ''
   let flashTimer = 0
   let nativeFull = false
-  let prevTier = new Map<string, string>()
+  let mapView: LaidOut | null | undefined
+  let mapCache = new Map<string, GraphNodeView>()
+  let groupView: LaidOut | null | undefined
+  let groupCache: GraphGroupView[] = []
 
   function nodes(): GraphNodeView[] {
     return view?.nodes ?? []
@@ -94,11 +92,20 @@ export function createGraphStage(deps: {
   function edges(): ViewEdge[] {
     return view?.edges ?? []
   }
+  /** Пока view тот же объект, повторные чтения отдают тот же Map. */
   function nodesByKey() {
-    return new Map(nodes().map((n) => [n.key, n]))
+    if (mapView !== view) {
+      mapView = view
+      mapCache = new Map((view?.nodes ?? []).map((n) => [n.key, n]))
+    }
+    return mapCache
   }
   function groupsNow() {
-    return placedGroups(view?.groups ?? [], nodes())
+    if (groupView !== view) {
+      groupView = view
+      groupCache = placedGroups(view?.groups ?? [], nodes())
+    }
+    return groupCache
   }
 
   function touch() {
@@ -239,7 +246,6 @@ export function createGraphStage(deps: {
     selectMode = !selectMode
     if (!selectMode) picked = new Set()
     deps.clearMarquee()
-    deps.closeMenu()
   }
 
   function clearPicked() {
@@ -255,10 +261,8 @@ export function createGraphStage(deps: {
       hidden: deps.prefs.hidden,
       roots: deps.getDraft().roots,
     })
-    if (plan.clearAll) {
-      await deps.clearMap()
-      return
-    }
+    // Центр снят и прятать больше нечего: страницу просят очистить карту, сами поля не трогаем.
+    if (plan.clearAll) return true
     deps.prefs.saveHidden(plan.hidden)
     if (plan.rootsChanged) {
       try {
@@ -269,12 +273,13 @@ export function createGraphStage(deps: {
       }
     }
     if (plan.skippedDraft) toast('Карточки черновика не скрываются: уберите их из журнала', { kind: 'info' })
+    return false
   }
 
   async function hidePicked() {
     const keys = [...picked]
     picked = new Set()
-    await hideKeys(keys)
+    return hideKeys(keys)
   }
 
   function select(n: { type: string; key: string; x: number; y: number }) {
@@ -287,8 +292,7 @@ export function createGraphStage(deps: {
 
   function showChanges(key: string) {
     const ops = touched.get(key)
-    if (!ops?.length) return
-    deps.openDraftLog()
+    if (!ops?.length) return false
     flashOp = ops[ops.length - 1] ?? null
     clearTimeout(flashTimer)
     flashTimer = window.setTimeout(() => {
@@ -297,6 +301,7 @@ export function createGraphStage(deps: {
     void tick().then(() => {
       document.querySelector(`.gdraft__list [data-op="${flashOp}"]`)?.scrollIntoView({ block: 'nearest' })
     })
+    return true
   }
 
   function toggleFull() {
@@ -418,18 +423,8 @@ export function createGraphStage(deps: {
     get full() {
       return full
     },
-    get tier() {
-      const cam = deps.getCam()
-      const next = computeTiers({
-        nodes: view?.nodes,
-        cam: { k: cam.k, x: cam.x, y: cam.y },
-        stage: stageSize,
-        ready,
-        editingKey: deps.getEditingKey(),
-        prev: prevTier,
-      })
-      prevTier = next
-      return next
+    get stageSize() {
+      return stageSize
     },
     get moreMap() {
       const adj = hiddenNeighbors(deps.getData()?.edges ?? [], deps.prefs.hidden)

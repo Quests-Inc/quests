@@ -3,13 +3,12 @@
   import { EntityHistory } from '@/entities/history'
   import { NoteCheck, NoteFind } from '@/entities/note'
   import { MentionTextarea } from '@/entities/template'
-  import { createNoteEditor } from '../model/noteEditor.svelte.ts'
+  import type { NoteEditor } from '../model/noteEditor.svelte.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
   import NoteHead from './NoteHead.svelte'
   import NoteLinks from './NoteLinks.svelte'
 
-  type Editor = ReturnType<typeof createNoteEditor>
   type Ref = { kind: string; id: number; title?: string }
   type Crumb = { id: number | null; title: string }
 
@@ -56,7 +55,7 @@
     onChanged,
     onOpenSecrets,
   }: {
-    ed: Editor
+    ed: NoteEditor
     selectedId: number | null
     titleEl?: HTMLInputElement | null
     editEl?: HTMLTextAreaElement | null

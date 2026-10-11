@@ -405,10 +405,6 @@
 
   .notes__unsaved {
     flex-shrink: 0;
-    color: var(--color-accent, #c9a227);
-    font-weight: 700;
-    line-height: 1;
-    animation: notes-unsaved-glow 1.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
   }
 
   .notes__row-status {
@@ -420,62 +416,5 @@
 
   .notes__status-dot {
     display: inline-flex;
-  }
-
-  .notes__status-dot--readme {
-    color: #d14343;
-    animation: notes-readme-blink 1.4s steps(1, end) infinite;
-  }
-
-  /* Жёлтый: README не у этой заметки, а у скрытого потомка. */
-  .notes__status-dot--readme-bubble {
-    color: #d1a33a;
-    animation: notes-readme-blink 1.4s steps(1, end) infinite;
-  }
-
-  .notes__status-dot--private {
-    color: #9a9a9a;
-  }
-
-  .notes__status-dot--category {
-    color: #b5651d;
-  }
-
-  .notes__status-dot--outdated {
-    color: #d14343;
-  }
-
-  @keyframes notes-readme-blink {
-    0%,
-    49% {
-      opacity: 1;
-    }
-    50%,
-    100% {
-      opacity: 0.25;
-    }
-  }
-
-  @keyframes notes-unsaved-glow {
-    0%,
-    100% {
-      opacity: 0.28;
-      text-shadow: 0 0 0.05em color-mix(in srgb, var(--color-accent, #c9a227) 15%, transparent);
-    }
-    50% {
-      opacity: 1;
-      text-shadow:
-        0 0 0.12em var(--color-accent, #c9a227),
-        0 0 0.45em color-mix(in srgb, var(--color-accent, #c9a227) 85%, transparent);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .notes__unsaved,
-    .notes__status-dot--readme,
-    .notes__status-dot--readme-bubble {
-      animation: none;
-      opacity: 1;
-    }
   }
 </style>

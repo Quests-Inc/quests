@@ -28,6 +28,7 @@
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import { NoteIconModal } from '@/features/note-icon'
   import NoteCanvas from './NoteCanvas.svelte'
+  import './noteStatus.css'
   import NotesTree from './NotesTree.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
 import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'

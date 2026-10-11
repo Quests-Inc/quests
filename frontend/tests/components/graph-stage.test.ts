@@ -59,7 +59,6 @@ function make() {
     },
   }
   const data = graph()
-  const cleared: string[] = []
   const el = document.createElement('div')
   el.getBoundingClientRect = () =>
     ({ width: 800, height: 600, left: 0, top: 0, right: 800, bottom: 600, x: 0, y: 0, toJSON() {} }) as DOMRect
@@ -78,16 +77,10 @@ function make() {
       cam = next
     },
     clearMarquee: () => {},
-    closeMenu: () => cleared.push('menu'),
-    getEditingKey: () => undefined,
     loadDraft: async () => {},
-    clearMap: async () => {
-      cleared.push('clear')
-    },
-    openDraftLog: () => cleared.push('log'),
   })
   stage.el = el
-  return { stage, prefs, cam: () => cam, cleared, setActive: (v: boolean) => (active = v), data }
+  return { stage, prefs, cam: () => cam, setActive: (v: boolean) => (active = v), data }
 }
 
 async function flush() {
@@ -121,16 +114,17 @@ test('скрытая вкладка откладывает сборку, poke е
 })
 
 test('выделение снимается вместе с режимом, скрытие связанной карточки запоминается', async () => {
-  const { stage, prefs, cleared } = make()
+  const { stage, prefs } = make()
   stage.compose()
   await flush()
+  const firstMap = stage.nodeMap
+  expect(stage.nodeMap).toBe(firstMap)
   stage.toggleSelectMode()
   expect(stage.selectMode).toBe(true)
   stage.setPicked(new Set(['note:4']))
   stage.toggleSelectMode()
   expect(stage.selectMode).toBe(false)
   expect(stage.picked.size).toBe(0)
-  expect(cleared).toEqual(['menu', 'menu'])
   stage.toggleSelectMode()
   await stage.hideKeys(['note:4'])
   expect([...prefs.hidden]).toEqual(['note:4'])

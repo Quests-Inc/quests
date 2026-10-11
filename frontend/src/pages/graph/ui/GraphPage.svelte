@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RASTER } from '@/entities/graph'
+  import { computeTiers, RASTER } from '@/entities/graph'
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
   import { FindEntityModal } from '@/features/find-entity'
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
@@ -54,173 +54,168 @@
 
   const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
   const saved = new Map<string, { x: number; y: number }>()
-  // Контроллеры ссылаются друг на друга; методы зовутся после того, как все собраны.
-  const late = {
-    query: null as unknown as ReturnType<typeof createGraphQuery>,
-    stage: null as unknown as ReturnType<typeof createGraphStage>,
-    gest: null as unknown as ReturnType<typeof createGraphGestures>,
-    folds: null as unknown as ReturnType<typeof createClusterFolds>,
-    gd: null as unknown as ReturnType<typeof createGraphDraft>,
-    lk: null as unknown as ReturnType<typeof createLinkMode>,
-    edits: null as unknown as ReturnType<typeof createGraphEdits>,
-    menu: null as unknown as ReturnType<typeof createGraphMenu>,
-  }
+  // Поле, черновик и жесты читают друг друга только после сборки. Методы до этого не зовутся.
+  let stage: ReturnType<typeof createGraphStage>
+  let query: ReturnType<typeof createGraphQuery>
+  let gest: ReturnType<typeof createGraphGestures>
+  let gd: ReturnType<typeof createGraphDraft>
+  let lk: ReturnType<typeof createLinkMode>
+  let edits: ReturnType<typeof createGraphEdits>
 
-  late.gd = createGraphDraft({
-    getCenter: () => late.query.center,
-    setCenter: (c) => late.query.setCenter(c),
-    getNodes: () => late.stage.nodes,
-    getSaved: () => saved,
-    resetPositions: () => late.folds.forgetPositions(),
-  })
-  late.folds = createClusterFolds({
+  const folds = createClusterFolds({
     saved,
-    getNodes: () => late.stage.nodes,
-    getGroups: () => late.stage.groups,
+    getNodes: () => stage.nodes,
+    getGroups: () => stage.groups,
   })
-  late.gest = createGraphGestures({
-    getStage: () => late.stage.el,
-    nodes: () => late.stage.nodes,
-    nodeMap: () => late.stage.nodeMap,
-    touchView: () => late.stage.touch(),
-    isLinking: () => !!late.lk.linking,
-    finishLink: (n) => late.lk.finish(n),
-    setLinkCursor: (p) => {
-      late.lk.cursor = p
-    },
-    selectMode: () => late.stage.selectMode,
-    getPicked: () => late.stage.picked,
-    setPicked: (s) => late.stage.setPicked(s),
+  gd = createGraphDraft({
+    getCenter: () => query.center,
+    setCenter: (c) => query.setCenter(c),
+    getNodes: () => stage.nodes,
     getSaved: () => saved,
-    select: (n) => late.stage.select(n),
+    resetPositions: () => folds.forgetPositions(),
   })
-  late.lk = createLinkMode({
-    getNodeMap: () => late.stage.nodeMap,
-    getEdges: () => late.stage.edges,
-    addOp: (kind, payload) => late.gd.addOp(kind, payload),
-    askDrop: (op) => late.gd.askDrop(op),
-    onStart: () => late.menu.close(),
+  gest = createGraphGestures({
+    getStage: () => stage.el,
+    nodes: () => stage.nodes,
+    nodeMap: () => stage.nodeMap,
+    touchView: () => stage.touch(),
+    isLinking: () => !!lk.linking,
+    finishLink: (n) => lk.finish(n),
+    setLinkCursor: (p) => {
+      lk.cursor = p
+    },
+    selectMode: () => stage.selectMode,
+    getPicked: () => stage.picked,
+    setPicked: (s) => stage.setPicked(s),
+    getSaved: () => saved,
+    select: (n) => stage.select(n),
   })
-  late.query = createGraphQuery({
+  lk = createLinkMode({
+    getNodeMap: () => stage.nodeMap,
+    getEdges: () => stage.edges,
+    addOp: (kind, payload) => gd.addOp(kind, payload),
+    askDrop: (op) => gd.askDrop(op),
+  })
+  query = createGraphQuery({
     getActive: () => active,
     getRootType: () => rootType ?? null,
     getRootId: () => rootId ?? null,
     getNonce: () => nonce,
     getExpandKeys: () => prefs.expandKeys,
-    getReloadTick: () => late.gd.reloadTick,
-    getDraftRoots: () => late.gd.draft.roots,
+    getReloadTick: () => gd.reloadTick,
+    getDraftRoots: () => gd.draft.roots,
     getHiddenSize: () => prefs.hidden.size,
     getQuests: () => quests,
     getNotes: () => notes,
     getQuestlines: () => questlines,
     onCenter: (type, id) => onCenter?.(type, id),
     onRetarget: () => {
-      late.stage.selectedKey = null
-      late.folds.reset()
+      stage.selectedKey = null
+      folds.reset()
       prefs.setExpand([])
-      late.folds.forgetPositions()
+      folds.forgetPositions()
     },
     prepareFresh: () => {
-      late.stage.selectedKey = null
-      late.folds.forgetPositions()
+      stage.selectedKey = null
+      folds.forgetPositions()
       prefs.setExpand([])
     },
-    forgetPositions: () => late.folds.forgetPositions(),
-    resetFolds: () => late.folds.reset(),
+    forgetPositions: () => folds.forgetPositions(),
+    resetFolds: () => folds.reset(),
     setExpand: (keys) => prefs.setExpand(keys),
     saveHidden: (hidden) => prefs.saveHidden(hidden),
-    cancelLink: () => late.lk.cancel(),
+    cancelLink: () => lk.cancel(),
     clearEditing: () => {
-      late.edits.editing = null
+      edits.editing = null
     },
     clearSelection: () => {
-      late.stage.selectedKey = null
+      stage.selectedKey = null
     },
-    loadDraft: () => late.gd.load(),
+    loadDraft: () => gd.load(),
   })
-  late.stage = createGraphStage({
+  stage = createGraphStage({
     getActive: () => active,
-    getData: () => late.query.data,
-    getDraft: () => late.gd.draft,
-    getDepth: () => late.query.depth,
+    getData: () => query.data,
+    getDraft: () => gd.draft,
+    getDepth: () => query.depth,
     getQuests: () => quests,
     prefs,
     saved,
-    folds: late.folds,
+    folds,
     initialLayout: prefs.layoutMode,
-    getCam: () => late.gest.cam,
+    getCam: () => gest.cam,
     setCam: (cam) => {
-      late.gest.cam = cam
+      gest.cam = cam
     },
     clearMarquee: () => {
-      late.gest.marquee = null
+      gest.marquee = null
     },
-    closeMenu: () => late.menu.close(),
-    getEditingKey: () => late.edits.editing?.key,
-    loadDraft: () => late.gd.load(),
-    clearMap: () => late.query.clearMap(),
-    openDraftLog: () => {
-      late.gd.open = true
-    },
-    writeRoots: putGraphDraftRoots,
+    loadDraft: () => gd.load(),
   })
-  late.edits = createGraphEdits({
-    ops: () => late.gd.draft.ops,
-    addOp: (kind, payload) => late.gd.addOp(kind, payload),
-    reloadDraft: () => late.gd.load(),
-    edges: () => late.stage.edges,
-    noteTitles: () => [...notes.map((x) => x.title), ...late.stage.nodes.filter((x) => x.type === 'note').map((x) => x.title)],
+  edits = createGraphEdits({
+    ops: () => gd.draft.ops,
+    addOp: (kind, payload) => gd.addOp(kind, payload),
+    reloadDraft: () => gd.load(),
+    edges: () => stage.edges,
+    noteTitles: () => [...notes.map((x) => x.title), ...stage.nodes.filter((x) => x.type === 'note').map((x) => x.title)],
   })
-  late.menu = createGraphMenu({
-    worldAt: (e) => late.gest.worldAt(e),
-    isLinking: () => !!late.lk.linking,
-    cancelLink: () => late.lk.cancel(),
-    selectMode: () => late.stage.selectMode,
-    pickedHas: (key) => late.stage.picked.has(key),
-    pickedSize: () => late.stage.picked.size,
+
+  async function hideKeys(keys: string[]) {
+    if (await stage.hideKeys(keys)) await query.clearMap()
+  }
+  async function hidePicked() {
+    if (await stage.hidePicked()) await query.clearMap()
+  }
+  function showChanges(key: string) {
+    if (stage.showChanges(key)) gd.open = true
+  }
+
+  const menu = createGraphMenu({
+    worldAt: (e) => gest.worldAt(e),
+    isLinking: () => !!lk.linking,
+    cancelLink: () => lk.cancel(),
+    selectMode: () => stage.selectMode,
+    pickedHas: (key) => stage.picked.has(key),
+    pickedSize: () => stage.picked.size,
     setSelectedKey: (key) => {
-      late.stage.selectedKey = key
+      stage.selectedKey = key
     },
-    select: (n) => late.stage.select(n),
-    collapseKey: (g) => late.stage.collapseKey(g),
-    getDraftRoots: () => late.gd.draft.roots,
-    getRootKey: () => late.query.data?.root,
-    getNodes: () => late.stage.nodes,
+    select: (n) => stage.select(n),
+    collapseKey: (g) => stage.collapseKey(g),
+    getDraftRoots: () => gd.draft.roots,
+    getRootKey: () => query.data?.root,
+    getNodes: () => stage.nodes,
     getExpandKeys: () => prefs.expandKeys,
-    openTarget: (n) => late.stage.openTarget(n),
+    openTarget: (n) => stage.openTarget(n),
     ownExpand: (key) => prefs.ownExpand(key),
-    outgoingRefs: (n) => late.stage.outgoingRefs(n),
-    childKeys: (n, type) => late.stage.childKeys(n, type),
-    parentNote: (n) => late.stage.parentNote(n),
-    titleOf: (key) => late.stage.titleOf(key),
-    hidePicked: () => late.stage.hidePicked(),
-    toggleSelectMode: () => late.stage.toggleSelectMode(),
-    hideKeys: (keys) => late.stage.hideKeys(keys),
-    createNoteHere: (at, linkFrom) => late.edits.createNoteHere(at, linkFrom),
-    openEntity: (kind, at, extra) => late.edits.openEntity(kind, at, extra),
-    startEdit: (n, at) => late.edits.startEdit(n, at),
-    addOp: (kind, payload) => late.gd.addOp(kind, payload),
-    askDrop: (op) => late.gd.askDrop(op),
-    startLink: (mode, n) => late.lk.start(mode, n),
-    collapse: (key) => late.folds.collapse(key),
-    disband: (owner) => late.folds.disband(owner),
-    unlinkRef: (n, target) => late.lk.unlinkRef(n, target),
+    outgoingRefs: (n) => stage.outgoingRefs(n),
+    childKeys: (n, type) => stage.childKeys(n, type),
+    parentNote: (n) => stage.parentNote(n),
+    titleOf: (key) => stage.titleOf(key),
+    hidePicked,
+    toggleSelectMode: () => stage.toggleSelectMode(),
+    hideKeys,
+    createNoteHere: (at, linkFrom) => edits.createNoteHere(at, linkFrom),
+    openEntity: (kind, at, extra) => edits.openEntity(kind, at, extra),
+    startEdit: (n, at) => edits.startEdit(n, at),
+    addOp: (kind, payload) => gd.addOp(kind, payload),
+    askDrop: (op) => gd.askDrop(op),
+    startLink: (mode, n) => lk.start(mode, n),
+    collapse: (key) => folds.collapse(key),
+    disband: (owner) => folds.disband(owner),
+    unlinkRef: (n, target) => lk.unlinkRef(n, target),
     setExpand: (keys) => prefs.setExpand(keys),
-    loadDraft: () => late.gd.load(),
+    loadDraft: () => gd.load(),
     putRoots: putGraphDraftRoots,
     onOpen,
-    recenter: (n) => late.query.recenter(n),
+    recenter: (n) => query.recenter(n),
     saved,
   })
 
-  const query = late.query
-  const stage = late.stage
-  const gest = late.gest
-  const folds = late.folds
-  const gd = late.gd
-  const lk = late.lk
-  const edits = late.edits
-  const menu = late.menu
+  function toggleSelectMode() {
+    stage.toggleSelectMode()
+    menu.close()
+  }
 
   let view = $derived(stage.view)
   let ready = $derived(stage.ready)
@@ -246,7 +241,20 @@
   let drawEdges = $derived(stage.drawEdges)
   let nodeMap = $derived(stage.nodeMap)
   let groups = $derived(stage.groups)
-  let tier = $derived(stage.tier)
+  let prevTier = new Map<string, string>()
+  let tier = $derived.by(() => {
+    const camNow = gest.cam
+    const next = computeTiers({
+      nodes: stage.view?.nodes,
+      cam: { k: camNow.k, x: camNow.x, y: camNow.y },
+      stage: stage.stageSize,
+      ready: stage.ready,
+      editingKey: edits.editing?.key,
+      prev: prevTier,
+    })
+    prevTier = next
+    return next
+  })
   let moreMap = $derived(stage.moreMap)
   let mini = $derived(stage.mini)
   let flashOp = $derived(stage.flashOp)
@@ -276,11 +284,8 @@
   const collapseKey = stage.collapseKey
   const titleOf = stage.titleOf
   const openMore = stage.openMore
-  const showChanges = stage.showChanges
   const miniGo = stage.miniGo
-  const hidePicked = stage.hidePicked
   const clearPicked = stage.clearPicked
-  const toggleSelectMode = stage.toggleSelectMode
   const fit = stage.fit
   const relayout = stage.relayout
   const toggleFull = stage.toggleFull

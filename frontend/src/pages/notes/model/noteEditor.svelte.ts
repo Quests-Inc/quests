@@ -330,3 +330,5 @@ export function createNoteEditor(deps: {
     adoptExternal,
   }
 }
+
+export type NoteEditor = ReturnType<typeof createNoteEditor>

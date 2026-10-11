@@ -25,8 +25,7 @@ import { RunnersPage } from '@/pages/runners'
     deleteQuest,
     deleteQuestStep,
     deleteQuestline,
-    listCategories,
-    listQuestlines,
+    listAllAttachments, listCategories, listNotes, listQuestlines, listQuests,
     updateQuest,
     updateQuestStep,
     QUEST_STATUSES,
@@ -38,9 +37,9 @@ import { RunnersPage } from '@/pages/runners'
     setUnauthorizedHandler,
   } from '@/shared/api/client.ts'
   import { subscribeQuestEvents } from '@/shared/lib/live.ts'
-  import { attachmentCatalog, clearAttachmentIndex, fetchAttachmentIndex, flattenAttachmentIndex, invalidateAttachmentLiveFlags, seedAttachmentIndex, setAttachmentIndex } from '@/entities/attachment'
-  import { clearNotes, fetchNoteList, noteCatalog, setNotes } from '@/entities/note'
-  import { clearQuests, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple, fetchQuestList, groupQuestsByCategory, inScope, listOpenOrAll, questCatalog, questSpec, scopeQuestlineChoices, setQuests, upsertQuest } from '@/entities/quest'
+  import { attachmentCatalog, clearAttachmentIndex, flattenAttachmentIndex, invalidateAttachmentLiveFlags, seedAttachmentIndex, setAttachmentIndex } from '@/entities/attachment'
+  import { clearNotes, noteCatalog, setNotes } from '@/entities/note'
+  import { clearQuests, downloadQuestMarkdown, downloadQuestPdf, downloadQuestPdfSimple, groupQuestsByCategory, inScope, listOpenOrAll, questCatalog, questSpec, replaceQuest, scopeQuestlineChoices, setQuests } from '@/entities/quest'
   import { applyTheme, loadSavedTheme } from '@/shared/lib/theme.ts'
   import { questMatchesQuery } from '@/shared/lib/search.ts'
   import { parseQuery, passes, tokenValues, setToken } from '@/shared/lib/searchFlags.ts'
@@ -274,11 +273,11 @@ import { RunnersPage } from '@/pages/runners'
     if (!silent) error = ''
     try {
       const [next, cats, lines, nextNotes, attIndex] = await Promise.all([
-        fetchQuestList(),
+        listQuests({}),
         listCategories(),
         listQuestlines(),
-        fetchNoteList().catch((): any[] => []),
-        fetchAttachmentIndex().catch((): any => null),
+        listNotes().catch((): any[] => []),
+        listAllAttachments().catch((): any => null),
       ])
       setQuests(next)
       setNotes(Array.isArray(nextNotes) ? nextNotes : [])
@@ -489,7 +488,7 @@ import { RunnersPage } from '@/pages/runners'
   })
 
   function applyQuest(quest: { id: any }, { select = true } = {}) {
-    if (!upsertQuest(quest)) load({ silent: true })
+    if (!replaceQuest(quest)) load({ silent: true })
     if (select) nav.selectedId = quest.id
   }
 
