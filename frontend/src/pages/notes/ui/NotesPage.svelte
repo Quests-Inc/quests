@@ -9,6 +9,7 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
+  import { createNoteEditor } from '../model/noteEditor.svelte.ts'
   import { createNoteRename } from '../model/noteRename.svelte.ts'
   import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
   import { createNoteExport } from '../model/noteExport.svelte.ts'
@@ -72,35 +73,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   /** Ссылки/Ссылаются — свёрнуты по умолчанию. */
   let refsOpen = $state(false)
   let backlinksOpen = $state(false)
-  let detail = $state((null as any | null))
-  let title = $state('')
-  let description = $state('')
-  let parentId = $state('')
-  let pinned = $state(false)
-  let isReadme = $state(false)
-  let isPrivate = $state(false)
-  let isCategory = $state(false)
-  /** Private note: description stays collapsed until explicitly revealed. */
-  let privateRevealed = $state(false)
-  let saving = $state(false)
-  /** The open note was changed from outside (agent, another tab, the bot)
-   * while it has unsaved edits here — the incoming version waits for the
-   * user's say instead of replacing their text. */
-  let external = $state((null as ReturnType<typeof fromRow> | null))
-  let flashing = $state(false)
+  const ed = createNoteEditor({ selectedId: () => selectedId, notes: () => notes, onChanged: () => onChanged() })
+  const save = ed.save
+  const revert = ed.revert
   let deleting = $state(false)
   let deleteOpen = $state(false)
   let deleteTargetId = $state((null as number | null))
-  let error = $state('')
-  let saved = $state({
-    title: '',
-    description: '',
-    parentId: '',
-    pinned: false,
-    isReadme: false,
-    isPrivate: false,
-    isCategory: false,
-  })
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
@@ -111,16 +89,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let iconModalOpen = $state(false)
   let iconModalNoteId = $state((null as number | null))
   /** Inline rename in the tree — id of the row being renamed, or null. */
-  let dirty = $derived(
-    title !== saved.title ||
-      description !== saved.description ||
-      parentId !== saved.parentId ||
-      pinned !== saved.pinned ||
-      isReadme !== saved.isReadme ||
-      isPrivate !== saved.isPrivate ||
-      isCategory !== saved.isCategory,
-  )
-
   let parsedSearch = $derived(parseQuery(search, NOTE_SPEC))
   let searchText = $derived(parsedSearch.text)
   const flagOk = (n: any) => passes(parsedSearch, NOTE_SPEC, n)
@@ -159,21 +127,21 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     }
   })
 
-  /** Grouping key for the tree: the open note's own live `parentId` field
+  /** Grouping key for the tree: the open note's own live `ed.parentId` field
    * (even before it's written into noteDrafts — that only happens once the
-   * whole form differs from `saved`), else its draft if one exists, else the
+   * whole form differs from `ed.saved`), else its draft if one exists, else the
    * server's own `parent_id`. Lets picking a new parent move the row in the
    * sidebar immediately — parentMenuItems already excludes self/descendants,
    * so this can't introduce a cycle.
    *
-   * Only trust `parentId` once it's actually loaded for this note
-   * (loadedId === selectedId) — right after switching notes, selectedId has
+   * Only trust `ed.parentId` once it's actually loaded for this note
+   * (ed.loadedId === selectedId) — right after switching notes, selectedId has
    * already moved on but the async getNote() fetch hasn't landed yet, so
-   * `parentId` still holds the *previous* note's value. Using it anyway for
+   * `ed.parentId` still holds the *previous* note's value. Using it anyway for
    * that one tick drew the row at a wrong/stale spot that then snapped to
    * the right one a moment later — the flash this was fixing. */
   function parentKeyOf(n: { id: number; parent_id: null }) {
-    if (n.id === selectedId && loadedId === selectedId) return parentId === '' ? 'root' : parentId
+    if (n.id === selectedId && ed.loadedId === selectedId) return ed.parentId === '' ? 'root' : ed.parentId
     const draft = noteDrafts[String(n.id)]
     if (draft) return draft.parentId === '' ? 'root' : draft.parentId
     return n.parent_id == null ? 'root' : String(n.parent_id)
@@ -194,44 +162,10 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let roots = $derived(byParent.get('root') || [])
 
-  let loadedId = $state((null as number | null))
-
   const view = createViewMode()
   const VIEW_MODES = VIEW_MODE_OPTIONS
   let viewMode = $derived(view.mode)
   const setViewMode = view.set
-
-  const fromRow = noteFormFromRow
-
-  function applyForm(src: NoteForm) {
-    title = src.title
-    description = src.description
-    parentId = src.parentId
-    pinned = src.pinned
-    isReadme = src.isReadme
-    isPrivate = src.isPrivate
-    isCategory = src.isCategory
-    privateRevealed = false
-  }
-
-  function formDraft() {
-    return { title, description, parentId, pinned, isReadme, isPrivate, isCategory }
-  }
-
-  const draftsEqual = noteFormsEqual
-
-  function syncDraft(id: number) {
-    if (id == null) return
-    const form = formDraft()
-    if (draftsEqual(form, saved)) clearNoteDraft(id)
-    else putNoteDraft(id, form)
-  }
-
-  function revert() {
-    external = null
-    applyForm(saved)
-    if (selectedId != null) clearNoteDraft(selectedId)
-  }
 
   function rowTitle(n: { id: number; title: any }) {
     if (n.id === rename.id) return rename.value
@@ -246,44 +180,19 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     updateNote,
     /** Переименование из дерева не должно затереть заголовок, который в открытой заметке сейчас правят руками. */
     onSaved: (id, t, savedRow) => {
-      if (id === selectedId) {
-        const titleWasUntouched = title === saved.title
-        detail = savedRow
-        saved = { ...saved, title: t }
-        if (titleWasUntouched) title = t
-        const draft = getNoteDraft(id)
-        if (draft) putNoteDraft(id, { ...draft, title: t })
-      }
+      ed.patched(id, savedRow, { title: t }, true)
       onChanged()
     },
-    setError: (message) => (error = message),
+    setError: (message) => (ed.error = message),
   })
   const startRename = rename.start
   const cancelRename = rename.cancel
   const commitRename = rename.commit
 
-  /** Title commits on blur/Enter, independent of the description draft. */
+  /** Title commits on blur/Enter, independent of the ed.description draft. */
   async function commitTitle() {
-    const id = selectedId
-    if (id == null || titleReadonly) return
-    const t = title.trim()
-    if (t === saved.title) {
-      title = saved.title
-      return
-    }
-    if (!t) {
-      title = saved.title
-      return
-    }
-    try {
-      detail = await updateNote(id, { title: t })
-      saved = { ...saved, title: t }
-      title = t
-      onChanged()
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    }
+    if (selectedId == null || titleReadonly) return
+    await ed.commitTitle()
   }
 
   function onTitleKeydown(event: { key: string; preventDefault: () => void }) {
@@ -294,143 +203,11 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   function rowDirty(n: { id: number }) {
-    return n.id === selectedId ? dirty : noteDrafts[String(n.id)] != null
-  }
-
-  $effect(() => {
-    const id = selectedId
-    untrack(() => {
-      if (loadedId != null && loadedId !== id) syncDraft(loadedId)
-    })
-    if (id == null) {
-      detail = null
-      const empty = {
-        title: '',
-        description: '',
-        parentId: '',
-        pinned: false,
-        isReadme: false,
-        isPrivate: false,
-        isCategory: false,
-      }
-      applyForm(empty)
-      saved = empty
-      loadedId = null
-      return
-    }
-    let cancelled = false
-    getNote(id)
-      .then((row) => {
-        if (cancelled) return
-        detail = row
-        const next = fromRow(row)
-        const draft = getNoteDraft(id)
-        applyForm(draft || next)
-        saved = next
-        loadedId = id
-        error = ''
-      })
-      .catch((e) => {
-        if (cancelled) return
-        error = e.message || String(e)
-      })
-    return () => {
-      cancelled = true
-      untrack(() => syncDraft(id))
-    }
-  })
-
-  $effect(() => {
-    const id = selectedId
-    const loaded = loadedId
-    if (id == null || loaded !== id) return
-    const form = { title, description, parentId, pinned, isReadme, isPrivate, isCategory }
-    untrack(() => {
-      if (draftsEqual(form, saved)) clearNoteDraft(id)
-      else putNoteDraft(id, form)
-    })
-  })
-
-  /** Brief highlight of the body when a live update lands. */
-  async function flashBody() {
-    flashing = false
-    await tick()
-    flashing = true
-    setTimeout(() => (flashing = false), 1500)
-  }
-
-  /** Take the server's current version of the open note as the form. */
-  async function adoptExternal(id: number) {
-    try {
-      const row = await getNote(id)
-      if (selectedId !== id) return
-      detail = row
-      const next = fromRow(row)
-      applyForm(next)
-      saved = next
-      clearNoteDraft(id)
-      external = null
-      void flashBody()
-    } catch (e) {
-      error = e.message || String(e)
-    }
-  }
-
-  // Live updates: the journal reloads the notes list on every server event, so
-  // the open note is compared with its row there. A newer row that differs
-  // from what was loaded means someone else edited it.
-  $effect(() => {
-    const id = loadedId
-    const row = id != null ? notes.find((n) => n.id === id) : null
-    if (!row) return
-    untrack(() => {
-      if (saving) return
-      // A list fetched before our own save landed carries an older row.
-      if (detail?.updated_at && row.updated_at <= detail.updated_at) return
-      const next = fromRow(row)
-      if (draftsEqual(next, saved)) return
-      if (draftsEqual(formDraft(), saved)) void adoptExternal(id)
-      else external = next
-    })
-  })
-
-  async function save() {
-    if (selectedId == null || saving) return
-    const t = title.trim()
-    if (!t) {
-      error = 'Нужен заголовок'
-      toast(error, { kind: 'error' })
-      return
-    }
-    saving = true
-    error = ''
-    try {
-      const savedRow = await updateNote(selectedId, {
-        title: t,
-        description,
-        pinned,
-        is_readme: isReadme,
-        is_private: isPrivate,
-        is_category: isCategory,
-        parent_id: parentId === '' ? null : Number(parentId),
-      })
-      detail = savedRow
-      saved = fromRow(savedRow)
-      applyForm(saved)
-      clearNoteDraft(selectedId)
-      external = null
-      onChanged()
-      toast('Сохранено', { kind: 'success', ttl: 1400 })
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      saving = false
-    }
+    return n.id === selectedId ? ed.dirty : noteDrafts[String(n.id)] != null
   }
 
   async function addNote(parent: number | null = null) {
-    error = ''
+    ed.error = ''
     try {
       const created = await createNote({
         title: 'Новая заметка',
@@ -441,8 +218,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       onSelect(created.id)
       toast('Заметка создана', { kind: 'success' })
     } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
+      ed.error = e.message || String(e)
+      toast(ed.error, { kind: 'error' })
     }
   }
 
@@ -450,7 +227,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const id = deleteTargetId ?? selectedId
     if (id == null || deleting) return
     deleting = true
-    error = ''
+    ed.error = ''
     try {
       await deleteNote(id)
       clearNoteDraft(id)
@@ -460,8 +237,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       onChanged()
       toast('Заметка удалена', { kind: 'success' })
     } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
+      ed.error = e.message || String(e)
+      toast(ed.error, { kind: 'error' })
     } finally {
       deleting = false
     }
@@ -476,7 +253,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     // Перехват браузерного «Сохранить страницу» — keydown + preventDefault.
     event.preventDefault()
     event.stopPropagation()
-    if (dirty && selectedId != null) save()
+    if (ed.dirty && selectedId != null) save()
   }
 
   $effect(() => {
@@ -487,7 +264,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let editEl = $state((null as HTMLTextAreaElement | null))
   let titleEl = $state((null as HTMLInputElement | null))
   let findOpen = $state(false)
-  let noteIsOutdated = $derived(selectedId != null && !!(detail?.id === selectedId ? detail.outdated : noteById(selectedId)?.outdated))
+  let noteIsOutdated = $derived(selectedId != null && !!(ed.detail?.id === selectedId ? ed.detail.outdated : noteById(selectedId)?.outdated))
   function onFindKey(e: { ctrlKey: any; metaKey: any; shiftKey: any; altKey: any; key: string; preventDefault: () => void }) {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && selectedId) {
       e.preventDefault()
@@ -536,7 +313,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     // Re-measure whenever the text or the mode changes (mode switch remounts
     // the textarea, so editEl is a dependency too). A second pass next frame
     // catches the reflow when the mono webfont finishes loading.
-    void description
+    void ed.description
     void viewMode
     if (!editEl) return
     tick().then(() => {
@@ -575,12 +352,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   async function startBodyEdit(event?: MouseEvent) {
     if (viewMode !== 'formatted') return
     event?.preventDefault?.()
-    let offset = description.length
+    let offset = ed.description.length
     const mdRoot = previewMdRoot()
     if (event && mdRoot) {
       const rendered = mdRoot.textContent ?? ''
       const renOff = caretOffsetFromPoint(mdRoot, event.clientX, event.clientY)
-      offset = mapRenderedOffsetToSource(description, rendered, renOff)
+      offset = mapRenderedOffsetToSource(ed.description, rendered, renOff)
     }
     setViewMode('raw')
     await tick()
@@ -601,7 +378,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (viewMode === 'formatted') return
     event.preventDefault()
     const caret = editEl?.selectionStart ?? 0
-    const src = description
+    const src = ed.description
     setViewMode('formatted')
     await tick()
     await tick()
@@ -644,7 +421,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   let readmeBubbleIds = $derived(readmeBubbles(notes, showChildren))
-  let crumbs = $derived(noteCrumbs(notes, parentId))
+  let crumbs = $derived(noteCrumbs(notes, ed.parentId))
   let parentMenuItems = $derived(parentMenu(notes, selectedId))
 
 
@@ -671,7 +448,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   const noteExport = createNoteExport({
     downloadMarkdown: downloadNoteMarkdown,
     downloadPdf: (payload) => downloadNotePdf(payload, { labels }),
-    setError: (message) => (error = message),
+    setError: (message) => (ed.error = message),
   })
   let exportBusy = $derived(noteExport.busy)
   const openExportMenu = noteExport.openMenu
@@ -683,7 +460,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const n = noteById(id)
     const payload =
       id === selectedId
-        ? { id, title: title.trim() || detail?.title || n?.title || `note=${id}`, description }
+        ? { id, title: ed.title.trim() || ed.detail?.title || n?.title || `note=${id}`, description: ed.description }
         : { id, title: n?.title || `note=${id}`, description: n?.description || '' }
     return noteExport.run(payload, action)
   }
@@ -725,8 +502,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       await copyText(text)
       toast(`Скопировано ${text}`, { kind: 'success', ttl: 1600 })
     } catch (e) {
-      error = e?.message || String(e)
-      toast(error, { kind: 'error' })
+      ed.error = e?.message || String(e)
+      toast(ed.error, { kind: 'error' })
     }
   }
 
@@ -736,20 +513,13 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const current = n.parent_id ?? null
     if (current === nextParent) return
     if (nextParent != null && (nextParent === id || isUnder(notes, nextParent, id))) return
-    error = ''
+    ed.error = ''
     try {
       const savedRow = await updateNote(id, { parent_id: nextParent })
-      const pid = nextParent == null ? '' : String(nextParent)
-      if (id === selectedId) {
-        saved = { ...saved, parentId: pid }
-        parentId = pid
-        detail = savedRow
-        const draft = getNoteDraft(id)
-        if (draft) putNoteDraft(id, { ...draft, parentId: pid })
-      }
+      ed.patched(id, savedRow, { parentId: nextParent == null ? '' : String(nextParent) })
       onChanged()
     } catch (e) {
-      error = e.message || String(e)
+      ed.error = e.message || String(e)
     }
   }
 
@@ -757,68 +527,55 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const n = noteById(id)
     if (!n) return
     const next = !n.pinned
-    error = ''
+    ed.error = ''
     try {
       const savedRow = await updateNote(id, { pinned: next })
-      if (id === selectedId) {
-        saved = { ...saved, pinned: next }
-        pinned = next
-        detail = savedRow
-        const draft = getNoteDraft(id)
-        if (draft) putNoteDraft(id, { ...draft, pinned: next })
-      }
+      ed.patched(id, savedRow, { pinned: next })
       onChanged()
     } catch (e) {
-      error = e.message || String(e)
+      ed.error = e.message || String(e)
     }
   }
 
   /** Shared body for the three status toggles below — same immediate-save
    * shape as togglePinNote, just parameterised over which field flips. */
-  async function toggleNoteFlag(id: number, apiField: string, stateVar: string, setState: { (v: boolean): boolean; (v: boolean): boolean; (v: boolean): boolean; (arg0: boolean): void }) {
+  async function toggleNoteFlag(id: number, apiField: string, stateVar: 'isReadme' | 'isPrivate' | 'isCategory') {
     const n = noteById(id)
     if (!n) return
-    const current = apiField === 'is_readme' ? n.is_readme : apiField === 'is_private' ? n.is_private : n.is_category
-    const next = !current
-    error = ''
+    const next = !n[apiField]
+    ed.error = ''
     try {
       const savedRow = await updateNote(id, { [apiField]: next })
-      if (id === selectedId) {
-        saved = { ...saved, [stateVar]: next }
-        setState(next)
-        detail = savedRow
-        const draft = getNoteDraft(id)
-        if (draft) putNoteDraft(id, { ...draft, [stateVar]: next })
-      }
+      ed.patched(id, savedRow, { [stateVar]: next })
       onChanged()
     } catch (e) {
-      error = e.message || String(e)
+      ed.error = e.message || String(e)
     }
   }
 
   async function toggleOutdatedNote(id: number) {
     const n = noteById(id)
     if (!n) return
-    error = ''
+    ed.error = ''
     try {
       await setNoteOutdated(id, !n.outdated)
-      if (id === selectedId) detail = await getNote(id)
+      if (id === selectedId) ed.detail = await getNote(id)
       onChanged()
     } catch (e) {
-      error = e.message || String(e)
+      ed.error = e.message || String(e)
     }
   }
 
   function toggleReadmeNote(id: number) {
-    return toggleNoteFlag(id, 'is_readme', 'isReadme', (v: boolean) => (isReadme = v))
+    return toggleNoteFlag(id, 'is_readme', 'isReadme')
   }
 
   function togglePrivateNote(id: number) {
-    return toggleNoteFlag(id, 'is_private', 'isPrivate', (v: boolean) => (isPrivate = v))
+    return toggleNoteFlag(id, 'is_private', 'isPrivate')
   }
 
   function toggleCategoryNote(id: number) {
-    return toggleNoteFlag(id, 'is_category', 'isCategory', (v: boolean) => (isCategory = v))
+    return toggleNoteFlag(id, 'is_category', 'isCategory')
   }
 
   async function moveNoteUp(id: number) {
@@ -905,9 +662,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     iconModalNoteId == null ? null : noteById(iconModalNoteId),
   )
 
-  function onIconSaved(row: { id: number }) {
+  function onIconSaved(row: NotePayload) {
     if (selectedId === row?.id) {
-      detail = row
+      ed.detail = row
     }
     onChanged()
   }
@@ -957,35 +714,35 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   />
 
   <section class="notes__page" bind:this={pageEl}>
-    {#if error}
-      <p class="notes__error">{error}</p>
+    {#if ed.error}
+      <p class="notes__error">{ed.error}</p>
     {/if}
     {#if selectedId == null}
       <p class="notes__empty">Выберите заметку или создайте новую</p>
     {:else}
-      {#if external}
+      {#if ed.external}
         <div class="notes__external" role="status">
           <span>Заметку изменили снаружи, а у вас есть несохранённые правки.</span>
-          <button type="button" class="notes__external-btn" onclick={() => adoptExternal(selectedId)}>
+          <button type="button" class="notes__external-btn" onclick={() => ed.adoptExternal(selectedId)}>
             Загрузить новую версию
           </button>
-          <button type="button" class="notes__external-btn" onclick={() => (external = null)}>
+          <button type="button" class="notes__external-btn" onclick={() => (ed.external = null)}>
             Оставить мою
           </button>
         </div>
       {/if}
       <NoteHead
-        bind:title
+        bind:title={ed.title}
         bind:titleEl
         {titleReadonly}
-        {dirty}
-        {pinned}
-        {isReadme}
-        {isPrivate}
-        {isCategory}
+        dirty={ed.dirty}
+        pinned={ed.pinned}
+        isReadme={ed.isReadme}
+        isPrivate={ed.isPrivate}
+        isCategory={ed.isCategory}
         outdated={noteIsOutdated}
-        outdatedReason={detail?.outdated_reason ?? ''}
-        {saving}
+        outdatedReason={ed.detail?.outdated_reason ?? ''}
+        saving={ed.saving}
         {exportBusy}
         {crumbs}
         {labels}
@@ -1013,30 +770,30 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
         onParentPicker={openParentPicker}
         onViewMode={setViewMode}
       />
-      {#if isPrivate && !privateRevealed}
+      {#if ed.isPrivate && !ed.privateRevealed}
         <div class="notes__private-gate">
           <Icon name="lock" size={20} />
           <p>Приватная заметка — содержимое скрыто от случайного взгляда.</p>
-          <button type="button" class="btn" onclick={() => (privateRevealed = true)}>
+          <button type="button" class="btn" onclick={() => (ed.privateRevealed = true)}>
             Показать
           </button>
         </div>
       {:else}
       {#if findOpen}
-        <NoteFind noteId={selectedId} container={viewMode === 'raw' ? null : previewEl} dep={description} onClose={() => (findOpen = false)} />
+        <NoteFind noteId={selectedId} container={viewMode === 'raw' ? null : previewEl} dep={ed.description} onClose={() => (findOpen = false)} />
       {/if}
       <div
         class="notes__split"
         class:notes__split--raw={viewMode === 'raw'}
         class:notes__split--combined={viewMode === 'combined'}
         class:notes__split--formatted={viewMode === 'formatted'}
-        class:notes__split--flash={flashing}
+        class:notes__split--flash={ed.flashing}
       >
         {#if viewMode !== 'formatted'}
           <MentionTextarea
             class="notes__edit"
             placement="inside"
-            bind:value={description}
+            bind:value={ed.description}
             bind:el={editEl}
             {quests}
             {questlines}
@@ -1055,12 +812,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
             title={viewMode === 'formatted' ? 'Двойной клик — править' : undefined}
             ondblclick={startBodyEdit}
           >
-            <MarkdownBody source={description} {labels} {onRef} />
+            <MarkdownBody source={ed.description} {labels} {onRef} />
           </div>
         {/if}
       </div>
       {/if}
-      <NoteLinks refs={detail?.refs ?? []} backlinks={detail?.backlinks ?? []} bind:refsOpen bind:backlinksOpen {onRef} />
+      <NoteLinks refs={ed.detail?.refs ?? []} backlinks={ed.detail?.backlinks ?? []} bind:refsOpen bind:backlinksOpen {onRef} />
       {#if selectedId}
         <div class="block notes__attach">
           <NoteCheck noteId={selectedId} onChanged={onChanged} onOpenSecrets={() => onOpenSecrets?.(selectedId)} />
@@ -1069,12 +826,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
           <AttachmentsBlock ownerType="note" ownerId={selectedId} onOpenOwner={onRef} />
         </div>
         <div class="block notes__attach">
-          <EntityHistory entityType="note" entityId={selectedId} version={detail?.updated_at} />
+          <EntityHistory entityType="note" entityId={selectedId} version={ed.detail?.updated_at} />
         </div>
       {/if}
     {/if}
   </section>
-  <NoteOutline scroller={pageEl} content={previewEl} enabled={viewMode === 'formatted'} dep={`${selectedId}:${description}`} />
+  <NoteOutline scroller={pageEl} content={previewEl} enabled={viewMode === 'formatted'} dep={`${selectedId}:${ed.description}`} />
 </div>
 
 <ContextMenu
