@@ -34,6 +34,7 @@
     putGraphDraftRoots,
     uploadGraphDraftFile,
   } from '@/shared/api/client.ts'
+  import { createGraphGestures } from '../model/gestures.svelte.ts'
   import { createGraphDraft } from '../model/draft.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { type GraphGroupView, CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, REF_FROM, CENTERABLE, applyDraft, canPickTarget, computeTiers, minimapModel, restoreHandPlaced, edgeMenuItems, graphMenuItems, childKeysOf, clampK, hasRefEdge, noteDescendantKeys, outgoingRefKeys, parentNoteOf, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
@@ -103,8 +104,26 @@
   })
   let draft = $derived(gd.draft)
 
-  // Camera: pan (x, y) and zoom (k) of the world.
-  let cam = $state({ x: 0, y: 0, k: 1 })
+  // Camera and gestures (see model/gestures.svelte.ts).
+  const gest = createGraphGestures({
+    getStage: () => stageEl,
+    nodes: () => view?.nodes ?? [],
+    nodeMap: () => nodeMap,
+    touchView: () => {
+      view = view && { ...view }
+    },
+    isLinking: () => !!linking,
+    finishLink: (n) => finishLink(n),
+    setLinkCursor: (p) => (linkCursor = p),
+    selectMode: () => selectMode,
+    getPicked: () => picked,
+    setPicked: (s) => (picked = s),
+    getSaved: () => saved,
+    select: (n) => select(n),
+  })
+  let cam = $derived(gest.cam)
+  let marquee = $derived(gest.marquee)
+  const { worldAt, zoomAt, onTouchDown, onBgDown, onCardDown, onGroupDown, onMove, onUp, onWheel } = gest
   let stageEl = $state((null as HTMLDivElement | null))
   /** Laid-out view model: nodes with x/y (centre) and w/h, edges. */
   let view = $state((null as { nodes: any[], edges: any[], groups?: any[] } | null))
@@ -483,12 +502,11 @@
   // --- Selection mode: a marquee or clicks pick cards; the group moves together or leaves the map. ---
   let selectMode = $state(false)
   let picked: Set<string> = $state(new Set())
-  let marquee = $state((null as { x0: number, y0: number, x1: number, y1: number } | null))
 
   function toggleSelectMode() {
     selectMode = !selectMode
     if (!selectMode) picked = new Set()
-    marquee = null
+    gest.marquee = null
     ctx = { ...ctx, open: false }
   }
 
@@ -676,7 +694,7 @@
       const prev = untrack(() => stageSize)
       if (prev.w && prev.h && w && h) {
         const c = untrack(() => cam)
-        cam = { ...c, x: c.x + (w - prev.w) / 2, y: c.y + (h - prev.h) / 2 }
+        gest.cam = { ...c, x: c.x + (w - prev.w) / 2, y: c.y + (h - prev.h) / 2 }
       }
       if (w && h) stageSize = { w, h }
     })
@@ -711,7 +729,7 @@
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const wx = (e.clientX - r.left) / m.sc + m.x0
     const wy = (e.clientY - r.top) / m.sc + m.y0
-    cam = { ...cam, x: stageSize.w / 2 - wx * cam.k, y: stageSize.h / 2 - wy * cam.k }
+    gest.cam = { ...cam, x: stageSize.w / 2 - wx * cam.k, y: stageSize.h / 2 - wy * cam.k }
   }
 
   function fit() {
@@ -729,10 +747,11 @@
       y1 = Math.max(y1, n.y + n.h / 2)
     }
     const k = Math.min(1, (r.width - 40) / Math.max(1, x1 - x0), (r.height - 40) / Math.max(1, y1 - y0))
-    cam = { k, x: r.width / 2 - ((x0 + x1) / 2) * k, y: r.height / 2 - ((y0 + y1) / 2) * k }
+    gest.cam = { k, x: r.width / 2 - ((x0 + x1) / 2) * k, y: r.height / 2 - ((y0 + y1) / 2) * k }
   }
 
   let nodeMap = $derived(new Map((view?.nodes ?? []).map((n) => [n.key, n])))
+
   /** Balls follow their members while those are dragged. */
   let groups = $derived(
     (view?.groups ?? []).map((g) => {
@@ -779,238 +798,6 @@
     return items.map((it) => ({ ...it.e, ...edgePath(it.a, it.b, it.oa ?? 0, it.ob ?? 0) }))
   })
   let selected = $derived(selectedKey ? (nodeMap.get(selectedKey) ?? null) : null)
-
-  // Pan / zoom / card drag. Dragging a card works from anywhere except its
-  // scrollable text and links, so reading and scrolling are not hijacked.
-  let drag: { moved?: any; kind: any; n?: any; nx?: any; ny?: any; items?: any; members?: any; k?: any; d?: any; wx?: any; wy?: any; x?: any; y?: any; cx?: any; cy?: any; additive?: any; key?: any } = null
-  /** Zooms to `k` keeping the stage point (px, py) on the same world point. */
-  function zoomAt(k: number, px: number, py: number) {
-    k = clampK(k, cam.k)
-    cam = { k, x: px - ((px - cam.x) / cam.k) * k, y: py - ((py - cam.y) / cam.k) * k }
-  }
-
-  // Touch pointers currently down on the stage; two of them make a pinch.
-  const touches = new Map()
-  /** Puts cards moved by an interrupted drag back where they started. */
-  function undoDrag() {
-    if (!drag?.moved) return
-    if (drag.kind === 'node') {
-      drag.n.x = drag.nx
-      drag.n.y = drag.ny
-    }
-    for (const s of drag.items ?? drag.members ?? []) {
-      s.m.x = s.x
-      s.m.y = s.y
-    }
-    view = view && { ...view }
-  }
-  function pinchStart() {
-    const [a, b] = [...touches.values()]
-    const r = stageEl?.getBoundingClientRect()
-    if (!r) return
-    drag = {
-      kind: 'pinch',
-      d: Math.hypot(a.x - b.x, a.y - b.y) || 1,
-      // World point under the midpoint: it stays under the fingers' midpoint.
-      wx: ((a.x + b.x) / 2 - r.left - cam.x) / cam.k,
-      wy: ((a.y + b.y) / 2 - r.top - cam.y) / cam.k,
-      k: cam.k,
-    }
-  }
-  /** Capture phase, so a second finger on a card starts a pinch, not a card drag. */
-  function onTouchDown(e: { pointerType: string; pointerId: number; clientX: any; clientY: any; stopPropagation: () => void; preventDefault: () => void }) {
-    if (e.pointerType !== 'touch') return
-    touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (touches.size !== 2) return
-    e.stopPropagation()
-    e.preventDefault()
-    undoDrag()
-    marquee = null
-    pinchStart()
-    stageEl?.setPointerCapture(e.pointerId)
-  }
-  function onBgDown(e: PointerEvent) {
-    if ((e.target as Element).closest('[data-gkey]')) return
-    // Middle button always pans, also in selection mode.
-    if (e.button === 1) {
-      e.preventDefault()
-      drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
-      stageEl?.setPointerCapture(e.pointerId)
-      return
-    }
-    if (e.button !== 0) return
-    if (selectMode) {
-      const r = stageEl?.getBoundingClientRect()
-      if (!r) return
-      const x = e.clientX - r.left
-      const y = e.clientY - r.top
-      drag = { kind: 'marquee', additive: e.shiftKey || e.ctrlKey || e.metaKey }
-      marquee = { x0: x, y0: y, x1: x, y1: y }
-      stageEl?.setPointerCapture(e.pointerId)
-      return
-    }
-    drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
-    stageEl?.setPointerCapture(e.pointerId)
-  }
-  function onCardDown(e: PointerEvent, n: { key: any; x?: any; y?: any }) {
-    if (linking) {
-      if (e.button === 0) {
-        e.stopPropagation()
-        void finishLink(n)
-      }
-      return
-    }
-    if (selectMode) {
-      if (e.button !== 0 || (e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__changed')) return
-      e.stopPropagation()
-      const group = picked.has(n.key)
-        ? [...picked].map((k) => nodeMap.get(k)).filter(Boolean)
-        : [n]
-      drag = {
-        kind: 'multi',
-        key: n.key,
-        x: e.clientX,
-        y: e.clientY,
-        moved: false,
-        items: group.map((m) => ({ m, x: m.x, y: m.y })),
-      }
-      stageEl?.setPointerCapture(e.pointerId)
-      return
-    }
-    if (e.button !== 0) return
-    if ((e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__body a, .gcard__body button, .gcard__body pre')) return
-    const body = (e.target as Element).closest('.gcard__body')
-    // Inside the text area: let selection/scrolling happen; only the frame drags.
-    if (body && body.scrollHeight > body.clientHeight + 1 && e.offsetX > body.clientWidth - 14) return
-    e.stopPropagation()
-    drag = { kind: 'node', n, x: e.clientX, y: e.clientY, nx: n.x, ny: n.y, moved: false }
-    stageEl?.setPointerCapture(e.pointerId)
-  }
-  /** Dragging an expanded block by its frame moves all its cards together. */
-  function onGroupDown(e: { button: number; stopPropagation: () => void; clientX: any; clientY: any; pointerId: number }, g: { key: any }) {
-    if (e.button !== 0 || linking || selectMode) return
-    e.stopPropagation()
-    const members = (view?.nodes ?? []).filter((n) => n.group === g.key)
-    drag = {
-      kind: 'group',
-      members: members.map((m) => ({ m, x: m.x, y: m.y })),
-      x: e.clientX,
-      y: e.clientY,
-      moved: false,
-    }
-    stageEl?.setPointerCapture(e.pointerId)
-  }
-  function onMove(e: { pointerId?: any; clientX: any; clientY: any; preventDefault?: (() => void)|(() => void)|(() => void); stopPropagation?: (() => void)|(() => void)|(() => void) }) {
-    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (drag?.kind === 'pinch') {
-      if (touches.size < 2) return
-      const [a, b] = [...touches.values()]
-      const r = stageEl?.getBoundingClientRect()
-      if (!r) return
-      const k = clampK((drag.k * Math.hypot(a.x - b.x, a.y - b.y)) / drag.d, drag.k)
-      cam = {
-        k,
-        x: (a.x + b.x) / 2 - r.left - drag.wx * k,
-        y: (a.y + b.y) / 2 - r.top - drag.wy * k,
-      }
-      return
-    }
-    if (linking) linkCursor = worldAt(e)
-    if (!drag) return
-    if (drag.kind === 'marquee') {
-      const r = stageEl?.getBoundingClientRect()
-      if (r && marquee) marquee = { ...marquee, x1: e.clientX - r.left, y1: e.clientY - r.top }
-      return
-    }
-    const dx = e.clientX - drag.x
-    const dy = e.clientY - drag.y
-    if (drag.kind === 'multi') {
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
-      if (!drag.moved) return
-      for (const s of drag.items) {
-        s.m.x = s.x + dx / cam.k
-        s.m.y = s.y + dy / cam.k
-      }
-      view = view && { ...view }
-      return
-    }
-    if (drag.kind === 'pan') {
-      cam = { ...cam, x: drag.cx + dx, y: drag.cy + dy }
-    } else if (drag.kind === 'group') {
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
-      if (!drag.moved) return
-      for (const s of drag.members) {
-        s.m.x = s.x + dx / cam.k
-        s.m.y = s.y + dy / cam.k
-      }
-      view = view && { ...view }
-    } else {
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
-      if (!drag.moved) return
-      drag.n.x = drag.nx + dx / cam.k
-      drag.n.y = drag.ny + dy / cam.k
-      view = view && { ...view }
-    }
-  }
-  function onUp(e: { pointerId: any }) {
-    touches.delete(e.pointerId)
-    if (drag?.kind === 'pinch') {
-      // Lifting one finger keeps panning with the other one.
-      const rest = [...touches.values()][0]
-      drag = rest ? { kind: 'pan', x: rest.x, y: rest.y, cx: cam.x, cy: cam.y } : null
-      return
-    }
-    if (drag?.kind === 'marquee' && marquee) {
-      const m = marquee
-      marquee = null
-      const w = Math.abs(m.x1 - m.x0)
-      const h = Math.abs(m.y1 - m.y0)
-      if (w < 4 && h < 4) {
-        if (!drag.additive) picked = new Set()
-      } else {
-        const x0 = (Math.min(m.x0, m.x1) - cam.x) / cam.k
-        const x1 = (Math.max(m.x0, m.x1) - cam.x) / cam.k
-        const y0 = (Math.min(m.y0, m.y1) - cam.y) / cam.k
-        const y1 = (Math.max(m.y0, m.y1) - cam.y) / cam.k
-        const next: Set<string> = drag.additive ? new Set(picked) : new Set()
-        for (const n of view?.nodes ?? []) {
-          if (n.x + n.w / 2 >= x0 && n.x - n.w / 2 <= x1 && n.y + n.h / 2 >= y0 && n.y - n.h / 2 <= y1) next.add(n.key)
-        }
-        picked = next
-      }
-    }
-    if (drag?.kind === 'multi') {
-      if (drag.moved) {
-        for (const s of drag.items) saved.set(s.m.key, { x: s.m.x, y: s.m.y })
-      } else {
-        const next = new Set(picked)
-        if (next.has(drag.key)) next.delete(drag.key)
-        else next.add(drag.key)
-        picked = next
-      }
-    }
-    if (drag?.kind === 'group' && drag.moved) {
-      for (const s of drag.members) saved.set(s.m.key, { x: s.m.x, y: s.m.y })
-    }
-    if (drag?.kind === 'node' && drag.moved) saved.set(drag.n.key, { x: drag.n.x, y: drag.n.y })
-    if (drag?.kind === 'node' && !drag.moved) select(drag.n)
-    drag = null
-  }
-  function onWheel(e: WheelEvent) {
-    // Over a card's scrollable text the wheel scrolls the text, not the map.
-    const body = e.target instanceof Element ? (e.target as Element).closest('.gcard__body, textarea') : null
-    if (body && body.scrollHeight > body.clientHeight + 1) return
-    e.preventDefault()
-    const r = stageEl?.getBoundingClientRect()
-    if (!r) return
-    // A touchpad pinch arrives as ctrl+wheel with small, frequent deltas:
-    // follow them proportionally instead of a fixed step per event (capped,
-    // so a ctrl+mouse-wheel notch is no bigger than a plain one).
-    const f = e.ctrlKey
-      ? Math.exp(-Math.max(-11, Math.min(11, e.deltaY)) * 0.01)
-      : e.deltaY < 0 ? 1.12 : 1 / 1.12
-    zoomAt(cam.k * f, e.clientX - r.left, e.clientY - r.top)
-  }
 
   /** Folds an expanded attachment group back into its cluster node. */
   /** Centre of a group's cards (not of its frame, which has a header strip). */
@@ -1169,13 +956,6 @@
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
   let ctx: { open: boolean, x: number, y: number, node: any, at: { x: number, y: number }, group: boolean, cluster?: any, edge?: any } = $state({ open: false, x: 0, y: 0, node: null, at: { x: 0, y: 0 }, group: false })
-
-  /** Screen point → world coordinates (where a new thing should land). */
-  function worldAt(e: { preventDefault?: (() => void)|(() => void)|(() => void); stopPropagation?: (() => void)|(() => void)|(() => void); clientX: any; clientY: any }) {
-    const r = stageEl?.getBoundingClientRect()
-    if (!r) return { x: 0, y: 0 }
-    return { x: (e.clientX - r.left - cam.x) / cam.k, y: (e.clientY - r.top - cam.y) / cam.k }
-  }
 
   function onCtx(e: MouseEvent, n: any = null) {
     e.preventDefault()
