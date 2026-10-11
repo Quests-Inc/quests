@@ -1,0 +1,235 @@
+/* Journal layout + sidebar + detail — from App.svelte */
+
+.journal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg, #121212);
+}
+
+/* Tab switches slide (see {#key view} in App.svelte). During the
+     transition the outgoing and incoming views coexist; stacking both in
+     one grid cell keeps them overlapping instead of the new one sitting
+     below the old and jumping up when it's removed. */
+.journal__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.journal__viewport {
+  grid-area: 1 / 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.journal__header {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+  min-height: var(--header-height, 3.25rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-bottom: 1px solid var(--color-border, #333);
+  background: color-mix(in srgb, var(--color-bg-raised, #1a1a1a) 92%, transparent);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  /* nowrap: wrapping chips under the action row was one way they
+       "competed" for space and visually collided with the gear. */
+  flex-wrap: nowrap;
+  gap: var(--space-3, 0.75rem);
+  min-width: 0;
+  /* Yield width to header-actions if both claim space — actions stay
+       clickable; health collapses / clips rather than painting over gear. */
+  flex: 1 1 auto;
+  z-index: 1;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  min-height: var(--nav-control-h, 2rem);
+}
+
+.journal__header .sidebar-toggle {
+  width: var(--nav-control-h, 2rem);
+  height: var(--nav-control-h, 2rem);
+  padding: 0;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  /* Above health if a residual overlap remains — clicks stay on actions. */
+  position: relative;
+  z-index: 2;
+  font-family: var(--font-display, Georgia, serif);
+}
+
+.header-actions .btn {
+  height: var(--nav-control-h, 2rem);
+  min-height: 0;
+  padding: 0 0.5rem;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-fg-muted, #9a9a9a);
+  font-family: var(--font-display, Georgia, serif);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.header-actions .btn:hover,
+.header-actions .btn:focus-visible {
+  background: transparent;
+  color: var(--color-fg, #e8e8e8);
+}
+
+.header-actions .btn:focus-visible {
+  outline: 1px solid var(--color-fg-muted, #9a9a9a);
+  outline-offset: 2px;
+}
+
+.header-actions .btn--accent {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent, #c9a227);
+}
+
+.header-actions .btn--accent:hover,
+.header-actions .btn--accent:focus-visible {
+  background: transparent;
+  color: var(--color-accent, #c9a227);
+}
+
+.header-actions .btn--icon-only {
+  width: var(--nav-control-h, 2rem);
+  min-width: var(--nav-control-h, 2rem);
+  padding: 0;
+}
+
+.header-actions--icons .btn__text {
+  display: none;
+}
+
+.header-actions--icons .btn {
+  width: var(--nav-control-h, 2rem);
+  min-width: var(--nav-control-h, 2rem);
+  padding: 0;
+  gap: 0;
+}
+
+.header-actions .btn--overflow .icon {
+  transform: rotate(90deg);
+}
+
+/* Off-screen twin used only to measure whether the full labeled row
+     would fit — never shown, never wraps (nowrap so its scrollWidth is
+     the row's true natural width). See JournalHeader's ResizeObserver. */
+.header-actions--measure {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  flex-wrap: nowrap;
+  pointer-events: none;
+}
+
+.btn--icon-only {
+  width: 2.25rem;
+  padding: 0;
+  gap: 0;
+}
+
+/* True page-center regardless of how wide header-left/actions end up —
+     a shared grid track for centering only works when both sides are the
+     same width, which stopped being true once actions/health got their
+     own content-driven widths. */
+.view-tabs {
+  display: inline-flex;
+  align-items: stretch;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  /* Above header-left (z-index: 1): that flex cluster stretches across
+       the header and was eating clicks on the centered tabs. */
+  z-index: 3;
+  gap: 0.15rem;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--nav-control-h, 2rem);
+  gap: 0.35rem;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--color-fg-muted, #9a9a9a);
+  padding: 0 0.7rem;
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: var(--text-sm, 0.875rem);
+  letter-spacing: 0.02em;
+}
+
+/* Icon rides along in the markup but only earns its keep once labels
+     get cut off on a very narrow screen — see the 480px override below. */
+.view-tabs .view-tab .icon {
+  display: none;
+}
+
+.view-tab + .view-tab {
+  border-left: 0;
+}
+
+.view-tab--on {
+  background: transparent;
+  color: var(--color-fg, #e8e8e8);
+  border-bottom-color: var(--color-fg, #e8e8e8);
+}
+
+.journal__calendar {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.journal__calendar {
+  padding: var(--space-5, 1.5rem) var(--space-6, 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.journal__notes {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

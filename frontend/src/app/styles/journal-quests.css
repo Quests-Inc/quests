@@ -1,0 +1,441 @@
+.btn--accent:hover {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 28%, var(--color-bg-muted, #242424));
+}
+
+/* Detail header actions: icons only; hover follows quest significance */
+.detail__actions .btn {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-fg, #e8e8e8);
+  padding: 0.35rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  justify-content: center;
+}
+
+.detail__actions .btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sig-color, var(--color-accent, #c9a227)) 22%, transparent);
+  color: var(--sig-color, var(--color-accent, #c9a227));
+}
+
+.detail__actions .btn--danger {
+  color: var(--color-danger, #b54a3a);
+  background: transparent;
+  border-color: transparent;
+}
+
+.detail__actions .btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger, #b54a3a) 16%, transparent);
+  color: var(--color-danger, #b54a3a);
+}
+
+.quest-subgroup {
+  display: grid;
+  gap: 0.1rem;
+  border-left: 2px solid var(--cat-color, var(--color-border, #333));
+  background: transparent;
+  border-radius: 0;
+  padding: 0.1rem 0 0.45rem;
+  margin: 0 0.35rem 0 0.45rem;
+}
+
+.quest-subgroup--plain {
+  border-left-color: var(--color-border, #333);
+  background: transparent;
+}
+
+.quest-subgroup + .quest-subgroup {
+  margin-top: 0.45rem;
+}
+
+.quest-subgroup__toggle {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.35rem 0.55rem 0.2rem 0.55rem;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.quest-subgroup__swatch {
+  display: none;
+}
+
+.quest-subgroup--plain .quest-subgroup__swatch {
+  display: none;
+}
+
+.quest-subgroup__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-variant: small-caps;
+  font-weight: 500;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.quest-subgroup--plain .quest-subgroup__label {
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.quest-subgroup__hint {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-subgroup__chevron {
+  display: inline-flex;
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-subgroup__body {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.1rem 0.4rem 0.25rem;
+}
+
+.quest-line {
+  display: grid;
+  gap: 0;
+  margin: 0.1rem 0.2rem 0.2rem 0.85rem;
+  border-left: 2px solid var(--line-color, var(--color-border, #333));
+  background: transparent;
+  border-radius: 0;
+}
+
+.quest-line + .quest-line {
+  margin-top: 0.15rem;
+}
+
+.quest-line--alone {
+  border-left-color: var(--color-border, #333);
+  background: transparent;
+}
+
+.quest-line__toggle {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.22rem 0.45rem 0.18rem 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.quest-line__icon {
+  display: inline-flex;
+  color: var(--line-color, var(--color-fg-muted, #9a9a9a));
+  opacity: 0.85;
+}
+
+.quest-line__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant: small-caps;
+  color: var(--color-fg-muted, #9a9a9a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quest-line__hint {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-line__chevron {
+  display: inline-flex;
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-line__alone-label {
+  padding: 0.2rem 0.5rem;
+  font-size: var(--text-xs, 0.75rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-line__body {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.2rem 0.4rem 0.35rem;
+}
+
+.quest-row {
+  display: grid;
+  gap: 0.12rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--color-border, #333) 40%, transparent);
+  border-radius: 0 5px 5px 0;
+  background: linear-gradient(
+    to right,
+    var(--color-bg-raised, #1a1a1a),
+    color-mix(in srgb, var(--color-bg, #121212) 35%, var(--color-bg-raised, #1a1a1a))
+  );
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  position: relative;
+  /* Let bookmark tags peek past the card edge without clipping. */
+  overflow: visible;
+}
+
+/* Paper bookmarks on the row’s right edge — overlay, don’t steal title width. */
+.quest-row__tags {
+  position: absolute;
+  top: 0.28rem;
+  right: -1px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 1;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+/* Clear the right edge on hover so the pin is readable. */
+.quest-row:hover .quest-row__tags,
+.quest-row:focus-within .quest-row__tags {
+  opacity: 0;
+  transform: translateX(0.7rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-row__tags {
+    transition: none;
+  }
+}
+
+.quest-row__tag {
+  display: block;
+  box-sizing: border-box;
+  max-width: 5.5rem;
+  padding: 0.12rem 0.38rem 0.12rem 0.5rem;
+  border-radius: 0 2px 2px 0;
+  font-family: var(--font-ui, sans-serif);
+  font-size: 0.6rem;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--tag, #9a9a9a) 18%, var(--color-fg, #e8e8e8));
+  background: color-mix(in srgb, var(--tag, #9a9a9a) 62%, var(--color-bg-raised, #1a1a1a));
+  box-shadow:
+    -1px 0 0 color-mix(in srgb, var(--tag, #9a9a9a) 35%, transparent),
+    -2px 1px 3px color-mix(in srgb, var(--color-bg, #121212) 55%, transparent);
+  /* Tucked left tip — the part that goes into the “book”. */
+  clip-path: polygon(0.4rem 0, 100% 0, 100% 100%, 0.4rem 100%, 0 50%);
+}
+
+/* Only grow for stacked bookmarks; title keeps normal row padding. */
+.quest-row:has(.quest-row__tags) {
+  min-height: calc(0.5rem + var(--tag-n, 1) * 1rem);
+}
+
+.quest-subgroup__body > .quest-row {
+  padding-left: 0.85rem;
+}
+
+.sidebar__frozen-body > .quest-row {
+  padding-left: 0.85rem;
+}
+
+.quest-line__body .quest-row {
+  padding-left: 0.55rem;
+}
+
+.quest-row:hover {
+  background: linear-gradient(
+    to right,
+    var(--color-bg-raised, #1a1a1a),
+    color-mix(in srgb, var(--color-fg, #e8e8e8) 5%, var(--color-bg-raised, #1a1a1a))
+  );
+  border-right-color: color-mix(in srgb, var(--color-border, #333) 65%, transparent);
+}
+
+.quest-row--active {
+  background: linear-gradient(
+    to right,
+    var(--color-bg-raised, #1a1a1a),
+    color-mix(in srgb, var(--color-fg, #e8e8e8) 8%, var(--color-bg-raised, #1a1a1a))
+  );
+  border-right-color: color-mix(in srgb, var(--color-fg-muted, #9a9a9a) 40%, transparent);
+}
+
+.quest-row--inactive {
+  opacity: 0.62;
+}
+
+.quest-row--inactive .quest-row__title {
+  text-decoration: line-through;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.quest-row__top {
+  display: flex;
+  /* The pin sits in the top corner, not centred on a multi-line title. */
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+}
+
+.quest-row__title {
+  font-family: var(--font-body, Georgia, serif);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--color-fg, #e8e8e8);
+  min-width: 0;
+}
+
+.quest-row__sig {
+  display: block;
+  font-family: var(--font-ui, sans-serif);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-row__sig[data-sig='uncommon'] {
+  color: var(--color-sig-uncommon, #8ec07c);
+}
+
+.quest-row__sig[data-sig='epic'] {
+  color: var(--color-sig-epic, #d3869b);
+}
+
+.quest-row__sig[data-sig='legendary'] {
+  color: var(--color-sig-legendary, #fe8019);
+}
+
+.quest-row__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  font-family: var(--font-ui, sans-serif);
+  font-size: 0.68rem;
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.quest-row__meta-left {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  min-width: 0;
+}
+
+.row-timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent, #c9a227);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.quest-row:hover .pin-btn,
+.pin-btn--on,
+.pin-btn--off,
+.pin-btn:focus-visible {
+  opacity: 1;
+}
+
+/* Crossed-out pin: never in the HUD — muted, so it reads as "off", not as "pinned". */
+.pin-btn--off {
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.pin-btn:hover {
+  color: color-mix(in srgb, var(--color-accent, #c9a227) 80%, #fff);
+}
+
+.pinned-label {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent, #c9a227);
+}
+
+.auto-label {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted, #9a9a9a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 2px;
+  padding: 0.05rem 0.3rem;
+}
+
+.period-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg-muted, #9a9a9a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 2px;
+  padding: 0.05rem 0.35rem;
+}
+
+.sig-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 0.05rem 0.35rem;
+}
+
+.progress {
+  font-variant-numeric: tabular-nums;
+}
+
+.empty,
+.detail__empty {
+  padding: var(--space-5, 1.5rem);
+  color: var(--color-fg-muted, #9a9a9a);
+  font-family: var(--font-ui, sans-serif);
+  font-size: var(--text-sm, 0.875rem);
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}

@@ -1,0 +1,222 @@
+.detail__line-attach .block__label {
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.attach {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+}
+
+.attach--over {
+  outline: 1px dashed var(--color-accent, #c9a227);
+  outline-offset: 4px;
+  border-radius: var(--radius-md, 4px);
+}
+
+.attach__error {
+  margin: 0;
+  color: var(--color-danger, #c45c5c);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.attach__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+
+.attach__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto auto auto;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+  /* One pill per file: name, comment and actions read as a single unit
+       instead of floating apart on wide screens. Darker than the surface in
+       any theme (mixed from --color-bg, not a fixed black). */
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--pill-radius, 12px);
+  background: var(--pill-bg, #0f0f0f);
+  box-shadow: var(--pill-shadow, none);
+}
+
+.attach__row--off {
+  opacity: 0.55;
+}
+
+.attach__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.attach__rev {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border, #3a3a3a);
+  background: transparent;
+  color: var(--color-fg-muted, #9a9a9a);
+  font: inherit;
+  font-size: 0.7rem;
+  font-family: var(--font-mono, monospace);
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-sm, 3px);
+  cursor: pointer;
+}
+
+.attach__rev:hover {
+  color: var(--color-fg, #e8e8e8);
+}
+
+.attach__history {
+  list-style: none;
+  margin: -0.25rem 0 0.25rem;
+  padding: 0 0 0 0.5rem;
+}
+
+.attach__rev-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.attach__rev-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.attach__rev-row--cur {
+  color: var(--color-fg, #e8e8e8);
+}
+
+.attach__rev-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.attach__file {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.attach__meta {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.attach__flag {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent, #c9a227);
+}
+
+.attach__flag--muted {
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.attach__comment {
+  width: 100%;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--color-border, #333);
+  border-radius: var(--radius-md, 4px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+}
+
+/* Download + delete share one look: a bare icon, no border or fill.
+     Transparent box, muted resting color, a soft tint on hover — matching
+     the note-header icon actions rather than a boxed button. */
+.attach__act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg-muted, #9a9a9a);
+  cursor: pointer;
+  border-radius: var(--radius-md, 4px);
+  text-decoration: none;
+}
+
+.attach__act:hover {
+  color: var(--color-fg, #e8e8e8);
+  background: color-mix(in srgb, var(--color-fg, #e8e8e8) 8%, transparent);
+}
+
+.attach__act--danger:hover {
+  color: var(--color-danger, #b54a3a);
+  background: color-mix(in srgb, var(--color-danger, #b54a3a) 14%, transparent);
+}
+
+.attach__act--off {
+  color: var(--color-fg-subtle, #6e6e6e);
+  cursor: default;
+}
+
+.attach__act--off:hover {
+  color: var(--color-fg-subtle, #6e6e6e);
+  background: transparent;
+}
+
+.attach__drop {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+/* Reads as a sentence — "Прикрепить файл или перетащить сюда" — so the
+     first half is a link, not a button box stacked above its own caption. */
+.attach__pick {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent, #c9a227);
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.attach__pick:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--color-accent, #c9a227) 75%, #fff);
+}
+
+.attach__pick:disabled {
+  color: var(--color-fg-muted, #9a9a9a);
+  text-decoration: none;
+  cursor: default;
+}
+
+.attach__hint {
+  color: var(--color-fg-muted, #9a9a9a);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.attach__input {
+  display: none;
+}

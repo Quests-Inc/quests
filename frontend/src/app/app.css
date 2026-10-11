@@ -13,7 +13,15 @@
 @import '@/app/styles/themes/parchment.css';
 @import '@/app/styles/themes/solarized-light.css';
 @import '@/app/styles/theme-accents.css';
-@import '@/app/styles/journal.css';
+@import '@/app/styles/journal-shell.css';
+@import '@/app/styles/journal-health.css';
+@import '@/app/styles/journal-sidebar.css';
+@import '@/app/styles/journal-quests.css';
+@import '@/app/styles/journal-calendar.css';
+@import '@/app/styles/journal-detail.css';
+@import '@/app/styles/journal-markdown.css';
+@import '@/app/styles/journal-attachments.css';
+@import '@/app/styles/journal-steps.css';
 @import '@/app/styles/modal.css';
 
 *,

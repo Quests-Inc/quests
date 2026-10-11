@@ -1,0 +1,426 @@
+@media (max-width: 720px) {
+  .attach__row {
+    grid-template-columns: 1fr auto auto auto auto;
+  }
+
+  .attach__comment {
+    grid-column: 1 / -1;
+  }
+}
+
+.step-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-2, 0.5rem);
+  border: 0;
+  border-radius: var(--radius-md, 4px);
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.step:hover {
+  background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, transparent);
+}
+
+.step--done .step__title {
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+/* Animated strike bar — replaces instant text-decoration: line-through so
+     completion reads as an action, not a static label. Mounts already-struck
+     with no animation (nothing to transition from); only a live toggle
+     while mounted animates. */
+/* An inline span with a line painted as its background: with the default
+     box-decoration-break: slice the fragments of a wrapped span behave as one
+     long strip, so the line grows through the first row, then the next. */
+.strike {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-size: 0% 2px;
+  /* ~x-height midpoint, like native text-decoration: line-through. */
+  background-position: 0 62%;
+  transition: background-size 480ms ease;
+}
+
+.strike--done {
+  background-size: 100% 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strike {
+    transition: none;
+  }
+}
+
+.step-list--pipe {
+  position: relative;
+  gap: 0.15rem;
+}
+
+.step--current {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-accent, #c9a227);
+}
+
+.step--kb {
+  outline: 1px solid color-mix(in srgb, var(--color-accent, #c9a227) 70%, transparent);
+  outline-offset: -1px;
+}
+
+.step--current .step__title {
+  color: inherit;
+  text-decoration: none;
+}
+
+.step--current-run .step__mark {
+  color: var(--color-accent, #c9a227);
+}
+
+.step__auto--run {
+  color: var(--color-accent, #c9a227);
+  border-color: var(--color-accent, #c9a227);
+  animation: step-run-pulse 1.4s ease-in-out infinite;
+}
+
+.step__auto--wait {
+  opacity: 0.85;
+}
+
+@keyframes step-run-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.step__mark {
+  color: var(--color-accent, #c9a227);
+  font-family: var(--font-mono, monospace);
+}
+
+.step__main {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.step__title {
+  font-family: var(--font-body, Georgia, serif);
+  font-weight: 500;
+}
+
+.step__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-family: var(--font-ui, sans-serif);
+}
+
+.step__auto {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  color: var(--color-fg-muted, #9a9a9a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 2px;
+  padding: 0.05rem 0.3rem;
+}
+
+.step__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 2px);
+  background: transparent;
+  color: var(--color-fg-muted, #9a9a9a);
+  cursor: pointer;
+}
+
+.step__btn-slot {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.step__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 16%, transparent);
+  color: var(--color-accent, #c9a227);
+}
+
+.step__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.step__progress {
+  min-width: 2.75rem;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-fg-muted, #9a9a9a);
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: text;
+}
+
+.step__progress:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.step__progress-input {
+  width: 3.25rem;
+  min-width: 0;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg, #e8e8e8);
+  background: var(--color-bg-muted, #242424);
+  border: 1px solid var(--color-accent, #c9a227);
+  border-radius: var(--radius-sm, 2px);
+  padding: 0.1rem 0.2rem;
+}
+
+.step__progress-input:focus {
+  outline: none;
+}
+
+.step__progress-total {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-fg-muted, #9a9a9a);
+  font-variant-numeric: tabular-nums;
+}
+
+.step__desc {
+  grid-column: 2 / -1;
+  justify-self: start;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--pill-radius, 12px);
+  background: var(--pill-bg, #0f0f0f);
+  box-shadow: var(--pill-shadow, none);
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  margin: var(--space-5, 1.5rem) 0 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-ui, sans-serif);
+}
+
+.dates > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.dates dt {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant: small-caps;
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+
+.dates dd {
+  margin: 0;
+  font-family: var(--font-ui, sans-serif);
+  font-size: 0.72rem;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.deadline-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+  margin-top: var(--space-5, 1.5rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border: 1px solid var(--color-border, #333);
+  border-radius: var(--radius-md, 4px);
+  font-family: var(--font-mono, monospace);
+  background: color-mix(in srgb, var(--tone, var(--color-fg-muted)) 12%, var(--color-bg-raised, #1a1a1a));
+  border-color: color-mix(in srgb, var(--tone, var(--color-border)) 55%, var(--color-border, #333));
+}
+
+.deadline-timer[data-tone='green'] {
+  --tone: var(--color-success, #7a9e3a);
+}
+
+.deadline-timer[data-tone='orange'] {
+  --tone: var(--color-warning, #c47a20);
+}
+
+.deadline-timer[data-tone='red'] {
+  --tone: var(--color-danger, #b54a3a);
+}
+
+.deadline-timer__label {
+  font-family: var(--font-ui, sans-serif);
+  font-size: var(--text-xs, 0.75rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+.deadline-timer__value {
+  font-size: var(--text-lg, 1.25rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--tone, var(--color-fg));
+}
+
+@media (max-width: 760px) {
+  /* Stay side-by-side and just shrink — no stacking, which pushed the
+       detail pane below a full-height sidebar and made it feel lost. */
+  .journal__body {
+    grid-template-columns: minmax(7rem, 30%) 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Too narrow for a side-by-side list + detail — go one pane at a time,
+       full screen, toggled by the same sidebar-collapse state/button.
+       selectQuestFromUi/clearSelectedQuest (App.svelte) flip it on pick/back. */
+  .journal__body {
+    grid-template-columns: 1fr;
+  }
+
+  .journal__body .detail {
+    display: none;
+  }
+
+  .journal__body--sidebar-collapsed .sidebar {
+    display: none;
+  }
+
+  .journal__body--sidebar-collapsed .detail {
+    display: block;
+  }
+
+  /* The desktop 2rem gutters and roomy step grid left step titles ~45%
+       of a phone's width, wrapping a word per line. */
+  .detail {
+    padding: var(--space-4, 1rem);
+  }
+
+  /* Title gets the whole line; icon actions drop under it, right-aligned —
+       four of them beside a two-line title pushed Delete off-screen. */
+  .detail__head-row {
+    flex-wrap: wrap;
+    row-gap: var(--space-2, 0.5rem);
+  }
+
+  .detail__head-row > .detail__actions {
+    margin-left: auto;
+  }
+
+  .step {
+    gap: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    padding: var(--space-2, 0.5rem) 0.25rem;
+  }
+
+  .step__btn,
+  .step__btn-slot {
+    width: 1.35rem;
+  }
+
+  .step__progress {
+    min-width: 2.25rem;
+  }
+
+  /* Labels get cut off at this width regardless of centering — icons only,
+       tab-icons stay recognizable even though several tabs are functionally
+       similar (journal/toc/notes are all "a list of text"). */
+  .view-tab {
+    padding: 0 0.5rem;
+  }
+
+  .view-tabs .view-tab .icon {
+    display: inline-flex;
+  }
+
+  .view-tab__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+@media (orientation: portrait) {
+  .journal__header {
+    flex-wrap: wrap;
+  }
+
+  /* Centered on row 1 itself — level with the sidebar toggle and the
+       header-actions buttons, not dropped onto its own line below them.
+       top is row 1's vertical *center* (half its height), not its bottom
+       edge — that earlier attempt put health at the same top as
+       .view-tabs' own row (order: 3, which starts right at the full
+       row-1 height), one row too low. */
+  .health {
+    position: absolute;
+    left: 50%;
+    /* Row 1's actual center: header top padding + half a control. The old
+         header-height/2 assumed a single-row header and sat 4px high. */
+    top: calc(var(--space-3, 0.75rem) + var(--nav-control-h, 2rem) / 2);
+    transform: translate(-50%, -50%);
+  }
+
+  /* No room to float the tabs centered over one line — drop them onto
+       their own full-width row below brand/actions instead. */
+  .view-tabs {
+    position: static;
+    left: auto;
+    top: auto;
+    transform: none;
+    margin: 0;
+    order: 3;
+    flex: 1 1 100%;
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    border-top: 1px solid var(--color-border, #333);
+  }
+
+  .view-tab {
+    flex: 0 1 auto;
+    text-align: left;
+  }
+}
