@@ -9,16 +9,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/pgtest"
 )
 
 // newTestServer wires just enough of Server to exercise requireAuth + the
 // auth endpoints — no Store/Health/Hub, since login/logout/state/gating
 // never touch them.
-func newTestServer(t *testing.T, authRequired bool) (*Server, *auth.Store) {
+func newTestServer(t *testing.T, authRequired bool) (*Server, *identity.Store) {
 	t.Helper()
-	authStore := &auth.Store{DB: pgtest.New(t)}
+	authStore := &identity.Store{DB: pgtest.New(t)}
 	s := &Server{Auth: authStore, AuthRequired: authRequired}
 	return s, authStore
 }

@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/identity"
 )
 
 // SessionCookie holds the opaque session secret for the SPA.
@@ -21,8 +22,8 @@ type ctxKey string
 const principalKey ctxKey = "quests.principal"
 
 // PrincipalFrom returns the authenticated caller, if any.
-func PrincipalFrom(ctx context.Context) (auth.Principal, bool) {
-	p, ok := ctx.Value(principalKey).(auth.Principal)
+func PrincipalFrom(ctx context.Context) (identity.Principal, bool) {
+	p, ok := ctx.Value(principalKey).(identity.Principal)
 	return p, ok
 }
 
@@ -77,27 +78,27 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) principal(r *http.Request) (auth.Principal, bool) {
+func (s *Server) principal(r *http.Request) (identity.Principal, bool) {
 	if secret := bearerToken(r); secret != "" {
 		// The in-process token the LLM assistant uses to call our own API over
 		// loopback. Never persisted, never handed out.
 		if s.InternalToken != "" && subtleEqual(secret, s.InternalToken) {
-			return auth.Principal{
-				User: auth.User{Username: "internal", IsActive: true},
+			return identity.Principal{
+				User: identity.User{Username: "internal", IsActive: true},
 				Via:  "token", TokenName: "internal",
 			}, true
 		}
 		if u, name, err := s.Auth.LookupAPIToken(secret); err == nil {
-			return auth.Principal{User: u, Via: "token", TokenName: name}, true
+			return identity.Principal{User: u, Via: "token", TokenName: name}, true
 		}
-		return auth.Principal{}, false
+		return identity.Principal{}, false
 	}
 	if c, err := r.Cookie(SessionCookie); err == nil && c.Value != "" {
 		if u, err := s.Auth.LookupSession(c.Value); err == nil {
-			return auth.Principal{User: u, Via: "session"}, true
+			return identity.Principal{User: u, Via: "session"}, true
 		}
 	}
-	return auth.Principal{}, false
+	return identity.Principal{}, false
 }
 
 func bearerToken(r *http.Request) string {
@@ -112,7 +113,7 @@ func bearerToken(r *http.Request) string {
 }
 
 func subtleEqual(a, b string) bool {
-	return len(a) == len(b) && auth.HashToken(a) == auth.HashToken(b)
+	return len(a) == len(b) && tokens.Hash(a) == tokens.Hash(b)
 }
 
 func formatRetryAfter(d time.Duration) string {
@@ -214,7 +215,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.limiter().recordFailure(key)
 		s.limiter().recordUserFailure(user)
-		if errors.Is(err, auth.ErrBadPassword) {
+		if errors.Is(err, identity.ErrBadPassword) {
 			writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
 			return
 		}

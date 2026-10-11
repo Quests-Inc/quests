@@ -1,10 +1,11 @@
-package auth
+package identity
 
 import (
 	"database/sql"
 	"errors"
 	"github.com/valirum/quests/go/internal/platform/db"
 	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"strings"
 	"sync"
 	"time"
@@ -88,7 +89,7 @@ func (s *Store) SetSessionWorkspace(secret string, userID, workspaceID int64) er
 	if !ok {
 		return ErrNotMember
 	}
-	_, err = s.DB.Exec(`UPDATE usersession SET workspace_id = ? WHERE token_hash = ?`, workspaceID, HashToken(secret))
+	_, err = s.DB.Exec(`UPDATE usersession SET workspace_id = ? WHERE token_hash = ?`, workspaceID, tokens.Hash(secret))
 	return err
 }
 
@@ -247,7 +248,7 @@ func (s *Store) Authenticate(username, password string) (User, error) {
 // --- sessions ---
 
 func (s *Store) CreateSession(userID int64, userAgent string) (secret string, expires time.Time, err error) {
-	secret, hash, err := NewToken()
+	secret, hash, err := tokens.New()
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -276,7 +277,7 @@ func (s *Store) LookupSession(secret string) (User, error) {
 		`SELECT u.id, u.username, u.is_active, s.expires_at, s.workspace_id
 		   FROM usersession s JOIN appuser u ON u.id = s.user_id
 		  WHERE s.token_hash = ?`,
-		HashToken(secret),
+		tokens.Hash(secret),
 	).Scan(&u.ID, &u.Username, &u.IsActive, &expiresAt, &pinned)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNoUser
@@ -295,12 +296,12 @@ func (s *Store) LookupSession(secret string) (User, error) {
 		return User{}, ErrNoUser
 	}
 	_, _ = s.DB.Exec(`UPDATE usersession SET last_seen_at = ? WHERE token_hash = ?`,
-		timeutil.ToDBUTC(timeutil.NowUTC()), HashToken(secret))
+		timeutil.ToDBUTC(timeutil.NowUTC()), tokens.Hash(secret))
 	return u, nil
 }
 
 func (s *Store) DeleteSession(secret string) error {
-	_, err := s.DB.Exec(`DELETE FROM usersession WHERE token_hash = ?`, HashToken(secret))
+	_, err := s.DB.Exec(`DELETE FROM usersession WHERE token_hash = ?`, tokens.Hash(secret))
 	return err
 }
 
@@ -327,7 +328,7 @@ func (s *Store) CreateAPIToken(userID int64, name string, workspaceID int64) (st
 	if name == "" {
 		name = "unnamed"
 	}
-	secret, hash, err := NewToken()
+	secret, hash, err := tokens.New()
 	if err != nil {
 		return "", err
 	}
@@ -365,7 +366,7 @@ func (s *Store) LookupAPIToken(secret string) (User, string, error) {
 		name   string
 		pinned sql.NullInt64
 	)
-	hash := HashToken(secret)
+	hash := tokens.Hash(secret)
 	err := s.DB.QueryRow(
 		`SELECT u.id, u.username, u.is_active, t.name, t.workspace_id
 		   FROM apitoken t JOIN appuser u ON u.id = t.user_id
@@ -495,6 +496,6 @@ func (s *Store) RevokeUserToken(userID, tokenID int64) error {
 // DeleteOtherSessions ends every session of the account except the one holding keepSecret
 // (a fresh second factor should not leave an older, possibly stolen, session logged in).
 func (s *Store) DeleteOtherSessions(userID int64, keepSecret string) error {
-	_, err := s.DB.Exec(`DELETE FROM usersession WHERE user_id = ? AND token_hash <> ?`, userID, HashToken(keepSecret))
+	_, err := s.DB.Exec(`DELETE FROM usersession WHERE user_id = ? AND token_hash <> ?`, userID, tokens.Hash(keepSecret))
 	return err
 }

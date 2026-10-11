@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/auth"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
@@ -219,7 +219,7 @@ func (s *Store) RunnerWorkspaceByToken(ctx context.Context, token string) (int64
 		return 0, ErrRunnerAuth
 	}
 	var id sql.NullInt64
-	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_token(?)`, auth.HashToken(token)).Scan(&id); err != nil || !id.Valid {
+	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_token(?)`, tokens.Hash(token)).Scan(&id); err != nil || !id.Valid {
 		return 0, ErrRunnerAuth
 	}
 	return id.Int64, nil
@@ -228,7 +228,7 @@ func (s *Store) RunnerWorkspaceByToken(ctx context.Context, token string) (int64
 // RunnerWorkspaceByReg is the same for a one-time registration token.
 func (s *Store) RunnerWorkspaceByReg(ctx context.Context, token string) (int64, error) {
 	var id sql.NullInt64
-	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_reg(?)`, auth.HashToken(token)).Scan(&id); err != nil || !id.Valid {
+	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_reg(?)`, tokens.Hash(token)).Scan(&id); err != nil || !id.Valid {
 		return 0, ErrRunnerToken
 	}
 	return id.Int64, nil

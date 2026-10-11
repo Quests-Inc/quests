@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/valirum/quests/go/internal/platform/db"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/valirum/quests/go/internal/auth"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
@@ -125,7 +125,7 @@ func (s *Store) CreateRunner(ctx context.Context, label string) (string, error) 
 	if !runnerLabelRe.MatchString(label) {
 		return "", ErrBadRunnerLabel
 	}
-	secret, hash, err := auth.NewToken()
+	secret, hash, err := tokens.New()
 	if err != nil {
 		return "", err
 	}
@@ -144,7 +144,7 @@ func (s *Store) CreateRunner(ctx context.Context, label string) (string, error) 
 
 // RegisterRunner swaps a registration token for the runner's permanent token.
 func (s *Store) RegisterRunner(ctx context.Context, regToken, hostname, version string) (token string, r Runner, err error) {
-	row := s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+`, reg_expires_at FROM runner WHERE reg_hash = ? AND revoked = 0`, auth.HashToken(regToken))
+	row := s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+`, reg_expires_at FROM runner WHERE reg_hash = ? AND revoked = 0`, tokens.Hash(regToken))
 	var seen sql.NullString
 	var created string
 	var exp sql.NullString
@@ -156,7 +156,7 @@ func (s *Store) RegisterRunner(ctx context.Context, regToken, hostname, version 
 			return "", Runner{}, ErrRunnerToken
 		}
 	}
-	secret, hash, err := auth.NewToken()
+	secret, hash, err := tokens.New()
 	if err != nil {
 		return "", Runner{}, err
 	}
@@ -188,7 +188,7 @@ func (s *Store) AuthRunner(ctx context.Context, token string) (Runner, error) {
 	if token == "" {
 		return Runner{}, ErrRunnerAuth
 	}
-	r, err := scanRunner(s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+` FROM runner WHERE token_hash = ? AND revoked = 0`, auth.HashToken(token)))
+	r, err := scanRunner(s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+` FROM runner WHERE token_hash = ? AND revoked = 0`, tokens.Hash(token)))
 	if err != nil {
 		return Runner{}, ErrRunnerAuth
 	}

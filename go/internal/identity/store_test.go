@@ -1,6 +1,7 @@
-package auth
+package identity
 
 import (
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"testing"
 	"time"
 
@@ -194,7 +195,7 @@ func TestSessionExpiry(t *testing.T) {
 	// Back-date the session past its expiry directly — CreateSession always
 	// mints a live one, so this is the only way to exercise the expiry path.
 	past := time.Now().UTC().Add(-time.Hour).Format("2006-01-02 15:04:05.000000")
-	if _, err := s.DB.Exec(`UPDATE usersession SET expires_at = ? WHERE token_hash = ?`, past, HashToken(secret)); err != nil {
+	if _, err := s.DB.Exec(`UPDATE usersession SET expires_at = ? WHERE token_hash = ?`, past, tokens.Hash(secret)); err != nil {
 		t.Fatalf("backdate session: %v", err)
 	}
 
@@ -218,7 +219,7 @@ func TestPurgeExpiredSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	past := time.Now().UTC().Add(-time.Hour).Format("2006-01-02 15:04:05.000000")
-	if _, err := s.DB.Exec(`UPDATE usersession SET expires_at = ? WHERE token_hash = ?`, past, HashToken(expiredSecret)); err != nil {
+	if _, err := s.DB.Exec(`UPDATE usersession SET expires_at = ? WHERE token_hash = ?`, past, tokens.Hash(expiredSecret)); err != nil {
 		t.Fatal(err)
 	}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"log"
 	"net/http"
 	"os"
@@ -10,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/valirum/quests/go/internal/auth"
 	"github.com/valirum/quests/go/internal/httpapi"
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/clamav"
 	"github.com/valirum/quests/go/internal/platform/config"
 	"github.com/valirum/quests/go/internal/platform/db"
@@ -78,7 +79,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("secrets: %v", err)
 	}
-	authStore := &auth.Store{DB: sqlDB, Box: secrets}
+	authStore := &identity.Store{DB: sqlDB, Box: secrets}
 	userCount, err := authStore.CountUsers()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
@@ -102,7 +103,7 @@ func main() {
 			"(or set QUESTS_AUTH=off deliberately for a trusted private network)", cfg.Addr())
 	}
 
-	internalToken, _, err := auth.NewToken()
+	internalToken, _, err := tokens.New()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
 	}

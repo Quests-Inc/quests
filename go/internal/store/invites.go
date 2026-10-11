@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"time"
 
-	"github.com/valirum/quests/go/internal/auth"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
@@ -87,7 +87,7 @@ func (s *Store) CreateInvite(ctx context.Context, workspaceID, createdBy int64) 
 	if err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM workspace WHERE id = ? AND deleted_at IS NULL`, workspaceID).Scan(&live); err != nil {
 		return "", time.Time{}, err
 	}
-	secret, hash, err := auth.NewToken()
+	secret, hash, err := tokens.New()
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -110,7 +110,7 @@ func (s *Store) InviteInfo(ctx context.Context, secret string) (name string, exp
 		SELECT w.name, i.expires_at
 		FROM workspace_invite i JOIN workspace w ON w.id = i.workspace_id
 		WHERE i.token_hash = ? AND i.used_at IS NULL AND i.expires_at > ? AND w.deleted_at IS NULL`,
-		auth.HashToken(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&name, &exp)
+		tokens.Hash(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&name, &exp)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", time.Time{}, ErrInviteInvalid
 	}
@@ -131,7 +131,7 @@ func (s *Store) ClaimInvite(ctx context.Context, secret string, userID int64) (i
 		WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
 		  AND workspace_id IN (SELECT id FROM workspace WHERE deleted_at IS NULL)
 		RETURNING workspace_id, role`,
-		timeutil.ToDBUTC(timeutil.NowUTC()), userID, auth.HashToken(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&wsID, &role)
+		timeutil.ToDBUTC(timeutil.NowUTC()), userID, tokens.Hash(secret), timeutil.ToDBUTC(timeutil.NowUTC())).Scan(&wsID, &role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrInviteInvalid
 	}

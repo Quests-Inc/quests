@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/identity"
 )
 
 // Two-factor sign-in (quest=359). Password first; an account with a second factor gets a
@@ -129,7 +129,7 @@ func (s *Server) postLoginMFA(w http.ResponseWriter, r *http.Request) {
 	if err := s.Auth.VerifySecondFactor(tk.userID, body.Code); err != nil {
 		s.limiter().recordFailure(key)
 		s.limiter().recordUserFailure(user)
-		if errors.Is(err, auth.ErrBadCode) {
+		if errors.Is(err, identity.ErrBadCode) {
 			writeErr(w, http.StatusUnauthorized, "Неверный код")
 			return
 		}
@@ -147,11 +147,11 @@ func (s *Server) postLoginMFA(w http.ResponseWriter, r *http.Request) {
 
 // mfaSessionUser returns the account behind a browser session: the second factor is managed
 // from the web interface, never with a token.
-func (s *Server) mfaSessionUser(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
+func (s *Server) mfaSessionUser(w http.ResponseWriter, r *http.Request) (identity.User, bool) {
 	p, ok := PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 || p.Via != "session" {
 		writeErr(w, http.StatusForbidden, "two-factor sign-in is managed from the web interface, not with a token")
-		return auth.User{}, false
+		return identity.User{}, false
 	}
 	return p.User, true
 }
@@ -170,21 +170,21 @@ func readCode(w http.ResponseWriter, r *http.Request) (string, bool) {
 }
 
 // mfaFail answers a wrong code and slows repeated guessing on the account.
-func (s *Server) mfaFail(w http.ResponseWriter, u auth.User, err error) {
+func (s *Server) mfaFail(w http.ResponseWriter, u identity.User, err error) {
 	switch {
-	case errors.Is(err, auth.ErrBadCode):
+	case errors.Is(err, identity.ErrBadCode):
 		s.limiter().recordUserFailure("mfa:" + strconv.FormatInt(u.ID, 10))
 		writeErr(w, http.StatusUnprocessableEntity, "Неверный код")
-	case errors.Is(err, auth.ErrMFAUnavailable):
+	case errors.Is(err, identity.ErrMFAUnavailable):
 		writeErr(w, http.StatusConflict, err.Error())
-	case errors.Is(err, auth.ErrMFAEnabled), errors.Is(err, auth.ErrMFANotPending):
+	case errors.Is(err, identity.ErrMFAEnabled), errors.Is(err, identity.ErrMFANotPending):
 		writeErr(w, http.StatusConflict, err.Error())
 	default:
 		writeErr(w, http.StatusInternalServerError, err.Error())
 	}
 }
 
-func (s *Server) stallMFA(u auth.User) {
+func (s *Server) stallMFA(u identity.User) {
 	if d := s.limiter().userPenalty("mfa:" + strconv.FormatInt(u.ID, 10)); d > 0 {
 		time.Sleep(d)
 	}
@@ -196,7 +196,7 @@ func (s *Server) getMyMFA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, err := s.Auth.MFAStatus(u.ID)
-	if errors.Is(err, auth.ErrMFAUnavailable) {
+	if errors.Is(err, identity.ErrMFAUnavailable) {
 		writeJSON(w, http.StatusOK, map[string]any{"available": false})
 		return
 	}
@@ -218,7 +218,7 @@ func (s *Server) setupMyMFA(w http.ResponseWriter, r *http.Request) {
 		s.mfaFail(w, u, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"secret": secret, "uri": auth.TOTPURI(mfaIssuer, u.Username, secret)})
+	writeJSON(w, http.StatusOK, map[string]any{"secret": secret, "uri": identity.TOTPURI(mfaIssuer, u.Username, secret)})
 }
 
 // enableMyMFA confirms the secret with a code, switches the second factor on and returns the

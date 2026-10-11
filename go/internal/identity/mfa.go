@@ -1,10 +1,11 @@
-package auth
+package identity
 
 import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
 	"github.com/valirum/quests/go/internal/platform/secretbox"
+	"github.com/valirum/quests/go/internal/platform/tokens"
 	"strings"
 
 	"github.com/valirum/quests/go/internal/platform/timeutil"
@@ -228,7 +229,7 @@ func (s *Store) newRecoveryCodes(userID int64) ([]string, error) {
 			return nil, err
 		}
 		if _, err := s.DB.Exec(`INSERT INTO user_recovery_code (user_id, code_hash, created_at) VALUES (?, ?, ?)`,
-			userID, HashToken(normRecovery(c)), now); err != nil {
+			userID, tokens.Hash(normRecovery(c)), now); err != nil {
 			return nil, err
 		}
 		codes = append(codes, c)
@@ -238,7 +239,7 @@ func (s *Store) newRecoveryCodes(userID int64) ([]string, error) {
 
 func (s *Store) spendRecoveryCode(userID int64, code string) error {
 	res, err := s.DB.Exec(`UPDATE user_recovery_code SET used_at = ? WHERE user_id = ? AND code_hash = ? AND used_at IS NULL`,
-		timeutil.ToDBUTC(timeutil.NowUTC()), userID, HashToken(normRecovery(code)))
+		timeutil.ToDBUTC(timeutil.NowUTC()), userID, tokens.Hash(normRecovery(code)))
 	if err != nil {
 		return err
 	}

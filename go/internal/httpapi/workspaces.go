@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -129,22 +129,22 @@ func (s *Server) registerWorkspaces(mux *http.ServeMux) {
 // memberOf checks that the caller belongs to workspace {id} and returns the id
 // and their role. Callers without an account (auth off) are refused: members
 // and invitations only make sense with accounts.
-func (s *Server) memberOf(w http.ResponseWriter, r *http.Request) (int64, string, auth.User, bool) {
+func (s *Server) memberOf(w http.ResponseWriter, r *http.Request) (int64, string, identity.User, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	p, ok := PrincipalFrom(r.Context())
 	if err != nil || id <= 0 || !ok || p.User.ID == 0 {
 		writeErr(w, http.StatusBadRequest, "needs an account and a workspace id")
-		return 0, "", auth.User{}, false
+		return 0, "", identity.User{}, false
 	}
 	role, err := s.Store.MemberRole(r.Context(), id, p.User.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
-		return 0, "", auth.User{}, false
+		return 0, "", identity.User{}, false
 	}
 	if role == "" {
 		// Do not reveal whether the workspace exists.
 		writeErr(w, http.StatusNotFound, "workspace not found")
-		return 0, "", auth.User{}, false
+		return 0, "", identity.User{}, false
 	}
 	return id, role, p.User, true
 }
@@ -255,7 +255,7 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user auth.User
+	var user identity.User
 	created := false
 	if p, ok := s.principal(r); ok && p.User.ID != 0 {
 		user = p.User
@@ -270,10 +270,10 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 		}
 		u, err := s.Auth.CreateUser(body.Username, body.Password)
 		switch {
-		case errors.Is(err, auth.ErrUserExists):
+		case errors.Is(err, identity.ErrUserExists):
 			writeErr(w, http.StatusConflict, "такой логин уже занят — войдите и откройте ссылку снова")
 			return
-		case errors.Is(err, auth.ErrWeakPassword):
+		case errors.Is(err, identity.ErrWeakPassword):
 			writeErr(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		case err != nil:
@@ -390,7 +390,7 @@ func (s *Server) switchWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Auth.SetSessionWorkspace(c.Value, p.User.ID, id); err != nil {
-		if errors.Is(err, auth.ErrNotMember) {
+		if errors.Is(err, identity.ErrNotMember) {
 			writeErr(w, http.StatusForbidden, err.Error())
 			return
 		}

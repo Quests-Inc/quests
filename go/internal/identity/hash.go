@@ -1,7 +1,7 @@
-// Package auth holds password hashing, opaque token generation and the
+// Package identity holds password hashing, opaque token generation and the
 // user/session/token store. Data in Quests is shared — this gates access to
 // the instance, it does not scope rows to an owner.
-package auth
+package identity
 
 import (
 	"crypto/pbkdf2"
@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -67,22 +66,4 @@ func VerifyPassword(password, encoded string) bool {
 		return false
 	}
 	return subtle.ConstantTimeCompare(got, want) == 1
-}
-
-// NewToken returns a fresh opaque secret (32 random bytes, base64url) together
-// with the hash stored in the DB. The secret is shown to the user once.
-func NewToken() (secret string, hash string, err error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", "", err
-	}
-	secret = base64.RawURLEncoding.EncodeToString(raw)
-	return secret, HashToken(secret), nil
-}
-
-// HashToken is a plain SHA-256 of the secret. Unlike a password, the secret is
-// already 256 bits of entropy, so there is nothing for a slow KDF to protect.
-func HashToken(secret string) string {
-	sum := sha256.Sum256([]byte(secret))
-	return hex.EncodeToString(sum[:])
 }

@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/valirum/quests/go/internal/auth"
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/config"
 	"github.com/valirum/quests/go/internal/platform/db"
 	"github.com/valirum/quests/go/internal/platform/health"
@@ -103,7 +103,7 @@ func runAdmin(args []string) bool {
 	if berr != nil {
 		fatal("secrets: %v", berr)
 	}
-	st := &auth.Store{DB: sqlDB, Box: box}
+	st := &identity.Store{DB: sqlDB, Box: box}
 	wst := &store.Store{DB: sqlDB, DatabaseURL: cfg.DatabaseURL, Box: box}
 
 	switch args[0] {
@@ -114,7 +114,7 @@ func runAdmin(args []string) bool {
 		pw := promptNewPassword()
 		u, err := st.CreateUser(args[1], pw)
 		if err != nil {
-			if errors.Is(err, auth.ErrUserExists) {
+			if errors.Is(err, identity.ErrUserExists) {
 				fatal("account %q already exists", args[1])
 			}
 			fatal("%v", err)
@@ -244,7 +244,7 @@ func runBackupNow(cfg config.Config, sqlDB *sql.DB) {
 		remote.Configured(), cfg.BackupRemoteHost, cfg.BackupRemoteDir)
 }
 
-func runTokenCmd(st *auth.Store, args []string) {
+func runTokenCmd(st *identity.Store, args []string) {
 	if len(args) == 0 {
 		fatal("usage: quests-server token add|ls|rm")
 	}
@@ -276,7 +276,7 @@ func runTokenCmd(st *auth.Store, args []string) {
 		}
 		owner := users[0]
 		if len(pos) >= 2 {
-			owner = auth.User{}
+			owner = identity.User{}
 			for _, u := range users {
 				if u.Username == strings.ToLower(pos[1]) {
 					owner = u
@@ -432,9 +432,9 @@ func runRunnerCmd(st *store.Store, args []string) {
 	}
 }
 
-func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
+func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 	ctx := context.Background()
-	userByName := func(name string) auth.User {
+	userByName := func(name string) identity.User {
 		users, err := st.ListUsers()
 		if err != nil {
 			fatal("%v", err)
@@ -445,7 +445,7 @@ func runWorkspaceCmd(st *auth.Store, wst *store.Store, args []string) {
 			}
 		}
 		fatal("no such account: %s", name)
-		return auth.User{}
+		return identity.User{}
 	}
 	if len(args) == 0 {
 		fatal("usage: quests-server workspace ls|add|member")

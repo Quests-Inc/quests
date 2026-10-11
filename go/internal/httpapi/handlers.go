@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/valirum/quests/go/internal/auth"
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/clamav"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/health"
@@ -38,7 +38,7 @@ type Server struct {
 	DataDir      string
 	Root         string
 	// Auth backs login, sessions and API tokens.
-	Auth *auth.Store
+	Auth *identity.Store
 	// AuthRequired gates every /api/ route and /ws. Off only for a bootstrap
 	// instance with no accounts yet, bound to loopback.
 	AuthRequired bool

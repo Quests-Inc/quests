@@ -1,4 +1,4 @@
-package auth
+package identity
 
 import (
 	"strings"
@@ -55,29 +55,5 @@ func TestVerifyPasswordRejectsMalformed(t *testing.T) {
 		if VerifyPassword("anything", encoded) {
 			t.Errorf("%s: malformed hash accepted", name)
 		}
-	}
-}
-
-func TestNewTokenIsUniqueAndHashed(t *testing.T) {
-	secret, hash, err := NewToken()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(secret) < 40 {
-		t.Errorf("token too short (%d chars) — not 256 bits of entropy", len(secret))
-	}
-	if secret == hash {
-		t.Error("stored hash equals the secret — a DB read would leak usable tokens")
-	}
-	if HashToken(secret) != hash {
-		t.Error("HashToken does not reproduce the stored hash")
-	}
-
-	other, _, err := NewToken()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if other == secret {
-		t.Error("two tokens collided")
 	}
 }
