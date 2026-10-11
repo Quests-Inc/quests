@@ -16,15 +16,32 @@ bun run verify       # lint + format:check + check + test + build — то же,
 | `bun run check:any`               | число явных `any` не должно расти относительно `.any-baseline`                                                |
 | `bun run test`                    | `bun test tests`                                                                                              |
 
+## Структура (FSD, ADR-0001)
+
+```
+src/
+  main.ts        точка входа (монтирует app/App.svelte)
+  app/           оболочка: App.svelte, глобальные стили и темы (app/styles)
+  pages/         экраны: graph, notes, attachments, history, runners, auth
+  widgets/       крупные блоки страницы: journal-header, quest-sidebar, quest-detail, activity-calendar
+  features/      пользовательские сценарии (модалки): quest-edit, questline-edit, templates, secrets, tags, settings, assistant, find-entity, note-icon
+  entities/      предметные сущности: quest, note, attachment, template, runner, questline, tag, history, graph (ui/ + model/)
+  shared/        ui, api (клиент и сгенерированные типы), lib (утилиты без предметной области)
+```
+
+Импорт — только вниз по слоям (`app → pages → widgets → features → entities → shared`), в слайс заходят через его `index.ts`,
+слайсы одного слоя друг друга не знают; между сущностями — только через `@x` (`entities/runner/@x/note.ts`).
+Алиас `@/` указывает на `src/`. Проверяет `bun run check:fsd` (входит в `verify`); сейчас нарушений 0.
+
 ## Типы API
 
 Типы ответов сервера **генерируются из Go-структур** (`go/tygo.yaml`), руками их не правят:
 
 ```bash
-just gen-types       # пишет src/lib/api/*.gen.ts; CI падает, если файлы устарели
+just gen-types       # пишет src/shared/api/*.gen.ts; CI падает, если файлы устарели
 ```
 
-`src/lib/js/api.ts` — клиент; возвращаемые типы берёт из `src/lib/api/*.gen.ts`. Новый эндпоинт: сначала Go-структура с
+`src/shared/api/client.ts` — клиент; возвращаемые типы берёт из `src/shared/api/*.gen.ts`. Новый эндпоинт: сначала Go-структура с
 json-тегами (не `map[string]any`), потом `just gen-types`, потом функция в `api.ts` с `request<Тип>(…)`.
 
 ## Заметки

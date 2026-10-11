@@ -242,7 +242,7 @@ release version:
 # --- quality ---------------------------------------------------------------
 
 # Everything CI checks, in the same order.
-# Regenerate frontend/src/lib/api/*.gen.ts (TypeScript types) from the Go structs.
+# Regenerate frontend/src/shared/api/*.gen.ts (TypeScript types) from the Go structs.
 gen-types:
     cd go && go tool tygo generate
 

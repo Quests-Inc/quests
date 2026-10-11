@@ -1,0 +1,75 @@
+@import '@/app/styles/tokens.css';
+@import '@/app/styles/themes/gruvbox-yellow.css';
+@import '@/app/styles/themes/gruvbox-dark.css';
+@import '@/app/styles/themes/gruvbox-green.css';
+@import '@/app/styles/themes/gruvbox-light.css';
+@import '@/app/styles/themes/nord.css';
+@import '@/app/styles/themes/catppuccin-mocha.css';
+@import '@/app/styles/themes/cyberpunk.css';
+@import '@/app/styles/themes/monokai.css';
+@import '@/app/styles/themes/rose-pine.css';
+@import '@/app/styles/themes/forest.css';
+@import '@/app/styles/themes/neon-grove.css';
+@import '@/app/styles/themes/parchment.css';
+@import '@/app/styles/themes/solarized-light.css';
+@import '@/app/styles/theme-accents.css';
+@import '@/app/styles/journal.css';
+@import '@/app/styles/modal.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg, #121212);
+  color: var(--color-fg, #e8e8e8);
+  font-family: var(--font-body, Georgia, serif);
+  font-size: var(--text-md, 1rem);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+/* Non-portrait: lock the viewport so the quest list fills the screen and scrolls inside. */
+@media (orientation: landscape) {
+  html,
+  body,
+  #app {
+    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--color-accent, #c9a227);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 35%, transparent);
+  color: var(--color-fg, #e8e8e8);
+}

@@ -84,7 +84,7 @@ jobs:
         working-directory: go
         run: |
           go tool tygo generate
-          git diff --exit-code -- ../frontend/src/lib/api
+          git diff --exit-code -- ../frontend/src/shared/api
 
       - name: Sync + pytest
         run: |

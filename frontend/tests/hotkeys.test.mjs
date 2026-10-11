@@ -24,7 +24,7 @@ let overlay = false
 globalThis.document = { querySelector: () => (overlay ? {} : null) }
 globalThis.window = { addEventListener() {}, removeEventListener() {} }
 
-const { handleKeydown, registerHotkeys, hotkeyGroups } = await import('../src/lib/js/hotkeys.ts')
+const { handleKeydown, registerHotkeys, hotkeyGroups } = await import('../src/shared/lib/hotkeys.ts')
 
 function press(code, { target = new FakeEl(), ...mods } = {}) {
   const ev = {
