@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/clamav"
 	"github.com/valirum/quests/go/internal/platform/events"
@@ -160,13 +160,13 @@ func newAttachmentServer(t *testing.T, davURL, clamAddr string, maxUpload int64)
 func seedQuest(t *testing.T, s *Server) int64 {
 	t.Helper()
 	now := timeutil.NowUTC()
-	q, err := s.Store.CreateQuest(t.Context(), domain.Quest{
+	q, err := s.Store.CreateQuest(t.Context(), journal.Quest{
 		Title:        "with files",
-		Status:       domain.StatusActive,
-		Significance: domain.SigCommon,
+		Status:       journal.StatusActive,
+		Significance: journal.SigCommon,
 		CreatedAt:    now,
 		UpdatedAt:    now,
-		Steps:        []domain.Step{{Title: "one", ProgressTotal: 1}},
+		Steps:        []journal.Step{{Title: "one", ProgressTotal: 1}},
 	})
 	if err != nil {
 		t.Fatalf("create quest: %v", err)

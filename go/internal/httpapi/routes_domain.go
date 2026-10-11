@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
@@ -346,7 +346,7 @@ func (s *Server) emitTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out := domain.ToQuestRead(q, timeutil.NowUTC())
+	out := journal.ToQuestRead(q, timeutil.NowUTC())
 	out.Refs = s.resolveRefs(r, refs.Parse(q.Title+"\n"+q.Description))
 	writeJSON(w, http.StatusCreated, out)
 }
@@ -523,7 +523,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var lineID *int64
-	var quests []domain.Quest
+	var quests []journal.Quest
 	switch focusType {
 	case "questline":
 		lineID = &focusID
@@ -539,7 +539,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 		}
 		lineID = qq.QuestlineID
 		if lineID == nil {
-			quests = []domain.Quest{qq}
+			quests = []journal.Quest{qq}
 		}
 	case "step":
 		qid, err := s.Store.QuestIDForStep(r.Context(), focusID)
@@ -558,7 +558,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 		}
 		lineID = qq.QuestlineID
 		if lineID == nil {
-			quests = []domain.Quest{qq}
+			quests = []journal.Quest{qq}
 		}
 	}
 	var line any
@@ -579,9 +579,9 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 		}
 		quests = qs
 	}
-	reads := make([]domain.QuestRead, 0, len(quests))
+	reads := make([]journal.QuestRead, 0, len(quests))
 	for _, qq := range quests {
-		reads = append(reads, domain.ToQuestRead(qq, timeutil.NowUTC()))
+		reads = append(reads, journal.ToQuestRead(qq, timeutil.NowUTC()))
 	}
 	attachments := map[string]any{
 		"questline": []knowledgehttp.AttachmentView{},

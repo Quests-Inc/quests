@@ -47,7 +47,7 @@ linters:
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
@@ -108,7 +108,7 @@ linters:
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
@@ -135,7 +135,7 @@ linters:
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "db зависит только от wsctx (ADR-0001)"
@@ -171,65 +171,25 @@ linters:
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "db зависит только от wsctx (ADR-0001)"
-        domain:
+        journal:
           files:
-            - "**/internal/domain/**"
+            - "**/internal/journal/**"
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/store
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/identity
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/knowledge
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/domain
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/kernel
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
-              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
         dbx:
           files:
             - "**/internal/platform/dbx/**"
@@ -253,7 +213,7 @@ linters:
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "dbx зависит только от timeutil"
@@ -312,7 +272,7 @@ linters:
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "pgtest зависит только от db"
@@ -371,7 +331,7 @@ linters:
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
@@ -426,7 +386,7 @@ linters:
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
@@ -529,7 +489,7 @@ linters:
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
         kernel:
           files:
@@ -552,7 +512,7 @@ linters:
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
         cli:
           files:
@@ -577,7 +537,7 @@ linters:
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
@@ -634,7 +594,7 @@ linters:
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "llmassist → cli исключение, снимается в #23"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "llmassist → cli исключение, снимается в #23"
@@ -695,7 +655,7 @@ linters:
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/refs
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/domain
+            - pkg: github.com/valirum/quests/go/internal/journal
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/kernel
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"

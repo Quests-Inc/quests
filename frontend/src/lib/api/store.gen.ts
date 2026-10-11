@@ -544,7 +544,7 @@ export interface TemplateRead {
   created_at?: string;
   updated_at?: string;
   steps: TemplateStepRead[];
-  tags: any /* domain.Tag */[];
+  tags: any /* journal.Tag */[];
 }
 /**
  * TemplateStepRead is one step of a template.

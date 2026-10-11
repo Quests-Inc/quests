@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/identity"
 	identityhttp "github.com/valirum/quests/go/internal/identity/http"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/kernel"
 	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/clamav"
@@ -234,7 +234,7 @@ func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rows == nil {
-		rows = []domain.Category{}
+		rows = []journal.Category{}
 	}
 	writeJSON(w, http.StatusOK, rows)
 }
@@ -242,9 +242,9 @@ func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listQuests(w http.ResponseWriter, r *http.Request) {
 	var f store.ListFilter
 	if st := r.URL.Query().Get("status"); st != "" {
-		s := domain.QuestStatus(st)
+		s := journal.QuestStatus(st)
 		if !s.Valid() {
-			writeErr(w, http.StatusUnprocessableEntity, domain.InvalidStatusMsg(st))
+			writeErr(w, http.StatusUnprocessableEntity, journal.InvalidStatusMsg(st))
 			return
 		}
 		f.Status = &s
@@ -264,9 +264,9 @@ func (s *Server) listQuests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := timeutil.NowUTC()
-	out := make([]domain.QuestRead, 0, len(quests))
+	out := make([]journal.QuestRead, 0, len(quests))
 	for _, q := range quests {
-		out = append(out, domain.ToQuestRead(q, now))
+		out = append(out, journal.ToQuestRead(q, now))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -286,7 +286,7 @@ func (s *Server) getQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out := domain.ToQuestRead(q, timeutil.NowUTC())
+	out := journal.ToQuestRead(q, timeutil.NowUTC())
 	out.Refs = s.resolveRefs(r, refs.Parse(q.Title+"\n"+q.Description))
 	writeJSON(w, http.StatusOK, out)
 }
@@ -299,7 +299,7 @@ var sourcePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,31}$`)
 var requestSource = httpx.RequestSource
 
 func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
-	var body domain.QuestCreate
+	var body journal.QuestCreate
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
@@ -310,17 +310,17 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Status == "" {
-		body.Status = domain.StatusActive
+		body.Status = journal.StatusActive
 	}
 	if !body.Status.Valid() {
-		writeErr(w, http.StatusUnprocessableEntity, domain.InvalidStatusMsg(string(body.Status)))
+		writeErr(w, http.StatusUnprocessableEntity, journal.InvalidStatusMsg(string(body.Status)))
 		return
 	}
 	if body.Significance == "" {
-		body.Significance = domain.SigCommon
+		body.Significance = journal.SigCommon
 	}
 	if !body.Significance.Valid() {
-		writeErr(w, http.StatusUnprocessableEntity, domain.InvalidSignificanceMsg(string(body.Significance)))
+		writeErr(w, http.StatusUnprocessableEntity, journal.InvalidSignificanceMsg(string(body.Significance)))
 		return
 	}
 	now := timeutil.NowUTC()
@@ -354,7 +354,7 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 			catID = c
 		}
 	}
-	q := domain.Quest{
+	q := journal.Quest{
 		Title:           body.Title,
 		Description:     body.Description,
 		Status:          body.Status,
@@ -372,7 +372,7 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 		Source:          requestSource(r),
 	}
 	if len(body.Steps) == 0 {
-		q.Steps = []domain.Step{{Title: body.Title, ProgressTotal: 1, SortOrder: 0}}
+		q.Steps = []journal.Step{{Title: body.Title, ProgressTotal: 1, SortOrder: 0}}
 	} else {
 		for i, sc := range body.Steps {
 			ord := i
@@ -380,7 +380,7 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 				ord = *sc.SortOrder
 			}
 			cmd, iv := store.NormalizeCheck(sc.CheckCommand, sc.CheckIntervalSeconds)
-			st := domain.Step{
+			st := journal.Step{
 				Title: sc.Title, Description: sc.Description,
 				ProgressCurrent: sc.ProgressCurrent, ProgressTotal: sc.ProgressTotal,
 				SortOrder: ord, CheckCommand: cmd, CheckIntervalSeconds: iv,
@@ -428,7 +428,7 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 		Significance: string(created.Significance),
 		Automated:    created.Automated,
 	})
-	writeJSON(w, http.StatusCreated, domain.ToQuestRead(created, timeutil.NowUTC()))
+	writeJSON(w, http.StatusCreated, journal.ToQuestRead(created, timeutil.NowUTC()))
 }
 
 func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
@@ -465,19 +465,19 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(v, &q.Description)
 	}
 	if v, ok := raw["status"]; ok {
-		var st domain.QuestStatus
+		var st journal.QuestStatus
 		_ = json.Unmarshal(v, &st)
 		if !st.Valid() {
-			writeErr(w, http.StatusUnprocessableEntity, domain.InvalidStatusMsg(string(st)))
+			writeErr(w, http.StatusUnprocessableEntity, journal.InvalidStatusMsg(string(st)))
 			return
 		}
 		q.Status = st
 	}
 	if v, ok := raw["significance"]; ok {
-		var sg domain.Significance
+		var sg journal.Significance
 		_ = json.Unmarshal(v, &sg)
 		if !sg.Valid() {
-			writeErr(w, http.StatusUnprocessableEntity, domain.InvalidSignificanceMsg(string(sg)))
+			writeErr(w, http.StatusUnprocessableEntity, journal.InvalidSignificanceMsg(string(sg)))
 			return
 		}
 		q.Significance = sg
@@ -552,10 +552,10 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 	}
 	now := timeutil.NowUTC()
 	q.UpdatedAt = now
-	if q.Status == domain.StatusCompleted && q.CompletedAt == nil {
+	if q.Status == journal.StatusCompleted && q.CompletedAt == nil {
 		q.CompletedAt = &now
 	}
-	if q.Status != domain.StatusCompleted {
+	if q.Status != journal.StatusCompleted {
 		q.CompletedAt = nil
 	}
 	if deadlineTouched || durationExplicit || (q.DeadlineAt != nil && q.DurationSeconds == nil) {
@@ -568,11 +568,11 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 	toast := false
 	if q.Status != beforeStatus {
 		switch q.Status {
-		case domain.StatusCompleted:
+		case journal.StatusCompleted:
 			kind, detail, toast = "quest_completed", "завершено", true
-		case domain.StatusFailed:
+		case journal.StatusFailed:
 			kind, detail, toast = "quest_failed", "провалено", true
-		case domain.StatusExpired:
+		case journal.StatusExpired:
 			kind, detail, toast = "quest_expired", "просрочено", true
 		default:
 			kind, detail, toast = "status_changed", string(beforeStatus)+" → "+string(q.Status), true
@@ -608,7 +608,7 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 		Significance: string(updated.Significance),
 		Automated:    updated.Automated,
 	})
-	writeJSON(w, http.StatusOK, domain.ToQuestRead(updated, timeutil.NowUTC()))
+	writeJSON(w, http.StatusOK, journal.ToQuestRead(updated, timeutil.NowUTC()))
 }
 
 func (s *Server) deleteQuest(w http.ResponseWriter, r *http.Request) {
@@ -647,7 +647,7 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	var body domain.StepCreate
+	var body journal.StepCreate
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
@@ -672,7 +672,7 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cmd, iv := store.NormalizeCheck(body.CheckCommand, body.CheckIntervalSeconds)
-	st := domain.Step{
+	st := journal.Step{
 		QuestID: qid, Title: strings.TrimSpace(body.Title), Description: body.Description,
 		ProgressCurrent: body.ProgressCurrent, ProgressTotal: body.ProgressTotal,
 		SortOrder: ord, CheckCommand: cmd, CheckIntervalSeconds: iv,
@@ -698,7 +698,7 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 	}
 	q.Steps = append(q.Steps, st)
 	now := timeutil.NowUTC()
-	domain.SyncStatusFromSteps(&q, now)
+	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
 	updated, err := s.Store.AddStep(r.Context(), qid, st, q)
 	if err != nil {
@@ -714,13 +714,13 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 		Toast: false, Source: source, Significance: string(updated.Significance),
 		Automated: updated.Automated,
 	})
-	writeJSON(w, http.StatusCreated, domain.ToQuestRead(updated, timeutil.NowUTC()))
+	writeJSON(w, http.StatusCreated, journal.ToQuestRead(updated, timeutil.NowUTC()))
 }
 
 func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 	qid, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	sid, _ := strconv.ParseInt(r.PathValue("step_id"), 10, 64)
-	var body domain.StepUpdate
+	var body journal.StepUpdate
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
@@ -734,7 +734,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	var st *domain.Step
+	var st *journal.Step
 	for i := range q.Steps {
 		if q.Steps[i].ID == sid {
 			st = &q.Steps[i]
@@ -786,9 +786,9 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	store.NormalizeStepCheck(st)
-	domain.ClampStep(st)
+	journal.ClampStep(st)
 	now := timeutil.NowUTC()
-	domain.SyncStatusFromSteps(&q, now)
+	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
 	kind := "quest_updated"
 	detail := "изменено"
@@ -813,7 +813,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		Toast: !quiet && toast, Source: source, Significance: string(updated.Significance),
 		StepTitle: st.Title, Automated: updated.Automated,
 	})
-	writeJSON(w, http.StatusOK, domain.ToQuestRead(updated, timeutil.NowUTC()))
+	writeJSON(w, http.StatusOK, journal.ToQuestRead(updated, timeutil.NowUTC()))
 }
 
 func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
@@ -833,7 +833,7 @@ func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	found := false
-	var next []domain.Step
+	var next []journal.Step
 	for _, st := range q.Steps {
 		if st.ID == sid {
 			found = true
@@ -847,7 +847,7 @@ func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
 	}
 	q.Steps = next
 	now := timeutil.NowUTC()
-	domain.SyncStatusFromSteps(&q, now)
+	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
 	updated, err := s.Store.DeleteStep(r.Context(), qid, sid, q)
 	if errors.Is(err, store.ErrNotFound) {
@@ -867,5 +867,5 @@ func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
 		Toast: false, Source: source, Significance: string(updated.Significance),
 		Automated: updated.Automated,
 	})
-	writeJSON(w, http.StatusOK, domain.ToQuestRead(updated, timeutil.NowUTC()))
+	writeJSON(w, http.StatusOK, journal.ToQuestRead(updated, timeutil.NowUTC()))
 }

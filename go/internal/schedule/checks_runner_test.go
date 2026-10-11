@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -14,13 +14,13 @@ func openRunnerChecksDB(t *testing.T) *store.Store {
 	return openChecksDB(t)
 }
 
-func remoteStep(title, cmd, label, mode string) domain.Step {
+func remoteStep(title, cmd, label, mode string) journal.Step {
 	iv := 15
-	step := domain.Step{Title: title, ProgressTotal: 5, CheckCommand: &cmd, RunOn: &label, RunMode: mode}
-	if mode == domain.RunModePoll {
+	step := journal.Step{Title: title, ProgressTotal: 5, CheckCommand: &cmd, RunOn: &label, RunMode: mode}
+	if mode == journal.RunModePoll {
 		step.CheckIntervalSeconds = &iv
 	}
-	if mode == domain.RunModeOnce {
+	if mode == journal.RunModeOnce {
 		step.ProgressTotal = 1
 	}
 	return step
@@ -31,7 +31,7 @@ func remoteStep(title, cmd, label, mode string) domain.Step {
 func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 	st := openRunnerChecksDB(t)
 	ctx := bg()
-	q := seedQuest(t, st, []domain.Step{remoteStep("poll", "echo 3", "home", domain.RunModePoll)})
+	q := seedQuest(t, st, []journal.Step{remoteStep("poll", "echo 3", "home", journal.RunModePoll)})
 	r := NewCheckRunner(st, events.New())
 
 	r.Tick(ctx)
@@ -74,16 +74,16 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 	st := openRunnerChecksDB(t)
 	ctx := bg()
-	idle := domain.RunIdle
-	step := remoteStep("once", "true", "laptop", domain.RunModeOnce)
+	idle := journal.RunIdle
+	step := remoteStep("once", "true", "laptop", journal.RunModeOnce)
 	step.RunStatus = &idle
-	q := seedQuest(t, st, []domain.Step{step})
+	q := seedQuest(t, st, []journal.Step{step})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(ctx)
 	r.Wait()
 
 	got, _ := st.GetQuest(ctx, q.ID)
-	if got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != domain.RunRunning {
+	if got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != journal.RunRunning {
 		t.Fatalf("run_status=%v, want running (queued for the device)", got.Steps[0].RunStatus)
 	}
 	// Nobody picked it up for a day: the step is released, the quest stays active.
@@ -92,10 +92,10 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 	}
 	r.ExpireRunnerJobs(ctx)
 	got, _ = st.GetQuest(ctx, q.ID)
-	if got.Status != domain.StatusActive {
+	if got.Status != journal.StatusActive {
 		t.Fatalf("quest status=%s: an unreachable device must not fail it", got.Status)
 	}
-	if rs := got.Steps[0].RunStatus; rs != nil && *rs != domain.RunIdle {
+	if rs := got.Steps[0].RunStatus; rs != nil && *rs != journal.RunIdle {
 		t.Fatalf("run_status=%v, want released (idle) so it is queued again", *rs)
 	}
 }
@@ -103,10 +103,10 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 	st := openRunnerChecksDB(t)
 	ctx := bg()
-	idle := domain.RunIdle
-	step := remoteStep("once", "true", "laptop", domain.RunModeOnce)
+	idle := journal.RunIdle
+	step := remoteStep("once", "true", "laptop", journal.RunModeOnce)
 	step.RunStatus = &idle
-	q := seedQuest(t, st, []domain.Step{step})
+	q := seedQuest(t, st, []journal.Step{step})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(ctx)
 	r.Wait()
@@ -121,7 +121,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 	}
 	r.ExpireRunnerJobs(ctx)
 	got, _ := st.GetQuest(ctx, q.ID)
-	if got.Status != domain.StatusActive {
+	if got.Status != journal.StatusActive {
 		t.Fatalf("lost lease alone must not fail the quest, status=%s", got.Status)
 	}
 	if _, err := st.DB.Exec(`UPDATE runner_job SET valid_until = '2000-01-01 00:00:00.000000'`); err != nil {
@@ -129,7 +129,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 	}
 	r.ExpireRunnerJobs(ctx)
 	got, _ = st.GetQuest(ctx, q.ID)
-	if got.Status != domain.StatusFailed {
+	if got.Status != journal.StatusFailed {
 		t.Fatalf("status=%s want failed (result unknown, not re-run)", got.Status)
 	}
 }
@@ -137,13 +137,13 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 	st := openRunnerChecksDB(t)
 	ctx := bg()
-	running := domain.RunRunning
-	step := remoteStep("once", "true", "laptop", domain.RunModeOnce)
+	running := journal.RunRunning
+	step := remoteStep("once", "true", "laptop", journal.RunModeOnce)
 	step.RunStatus = &running
-	q := seedQuest(t, st, []domain.Step{step})
+	q := seedQuest(t, st, []journal.Step{step})
 	NewCheckRunner(st, events.New()).FailStaleRunning(ctx)
 	got, _ := st.GetQuest(ctx, q.ID)
-	if got.Status != domain.StatusActive {
+	if got.Status != journal.StatusActive {
 		t.Fatalf("a job on a device outlives the server restart, status=%s", got.Status)
 	}
 }
@@ -152,12 +152,12 @@ func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
 	st := openRunnerChecksDB(t)
 	ctx := bg()
-	idle := domain.RunIdle
-	a := remoteStep("waits", "true", "ghost", domain.RunModeOnce)
+	idle := journal.RunIdle
+	a := remoteStep("waits", "true", "ghost", journal.RunModeOnce)
 	a.RunStatus = &idle
-	b := remoteStep("runs", "true", "home", domain.RunModeOnce)
+	b := remoteStep("runs", "true", "home", journal.RunModeOnce)
 	b.RunStatus = &idle
-	q := seedQuest(t, st, []domain.Step{a, b})
+	q := seedQuest(t, st, []journal.Step{a, b})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(ctx)
 	r.Wait()

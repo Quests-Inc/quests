@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
@@ -49,7 +49,7 @@ type TemplateRead struct {
 	CreatedAt           *string            `json:"created_at"`
 	UpdatedAt           *string            `json:"updated_at"`
 	Steps               []TemplateStepRead `json:"steps"`
-	Tags                []domain.Tag       `json:"tags"`
+	Tags                []journal.Tag      `json:"tags"`
 }
 
 // TemplateStepRead is one step of a template.
@@ -145,7 +145,7 @@ func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRea
 	for i := range out {
 		tags := tagMap[out[i].ID]
 		if tags == nil {
-			tags = []domain.Tag{}
+			tags = []journal.Tag{}
 		}
 		out[i].Tags = tags
 	}
@@ -209,7 +209,7 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 	}
 	tags := tagMap[id]
 	if tags == nil {
-		tags = []domain.Tag{}
+		tags = []journal.Tag{}
 	}
 	tr.Tags = tags
 	return tr, nil
@@ -223,15 +223,15 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 		return TemplateRead{}, errBad("title required")
 	}
 	desc, _ := asString(body["description"])
-	pinned := domain.PinState(asBool(body["pinned"], false), asBool(body["overlay_hidden"], false))
+	pinned := journal.PinState(asBool(body["pinned"], false), asBool(body["overlay_hidden"], false))
 	sortOrder := asInt(body["sort_order"], 0)
 	freq := asStringDef(body["freq"], "daily")
 	weekdays := asStringDef(body["weekdays"], "0,1,2,3,4,5,6")
 	enabled := asBool(body["enabled"], true)
 	tz := asStringDef(body["timezone"], "Europe/Moscow")
 	sig := asStringDef(body["significance"], "common")
-	if !domain.Significance(sig).Valid() {
-		return TemplateRead{}, errBad(domain.InvalidSignificanceMsg(sig))
+	if !journal.Significance(sig).Valid() {
+		return TemplateRead{}, errBad(journal.InvalidSignificanceMsg(sig))
 	}
 	emitMode := asStringDef(body["emit_mode"], "fixed")
 	emitChance := asFloat(body["emit_chance"], 1.0)
@@ -288,8 +288,8 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 
 func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]any) (TemplateRead, error) {
 	if v, ok := body["significance"]; ok {
-		if sg, _ := v.(string); !domain.Significance(sg).Valid() {
-			return TemplateRead{}, errBad(domain.InvalidSignificanceMsg(sg))
+		if sg, _ := v.(string); !journal.Significance(sg).Valid() {
+			return TemplateRead{}, errBad(journal.InvalidSignificanceMsg(sg))
 		}
 	}
 	cur, err := s.GetTemplate(ctx, id)
@@ -330,7 +330,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 			updated_at=?, automated=?
 		WHERE id=?`,
 		asStringDef(merged["title"], ""), asStringDef(merged["description"], ""),
-		domain.PinState(asBool(merged["pinned"], false), asBool(merged["overlay_hidden"], false)), asInt(merged["sort_order"], 0),
+		journal.PinState(asBool(merged["pinned"], false), asBool(merged["overlay_hidden"], false)), asInt(merged["sort_order"], 0),
 		nullInt(asIntPtr(merged["duration_seconds"])), asStringDef(merged["freq"], "daily"),
 		asStringDef(merged["weekdays"], "0,1,2,3,4,5,6"), boolInt(asBool(merged["enabled"], true)),
 		asStringDef(merged["timezone"], "Europe/Moscow"), nullStr(asStringPtr(merged["deadline_time"])),
@@ -553,7 +553,7 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tid, title, asStringDef(m["description"], ""), ord, pmin, pmax,
 			nullStr(asStringPtr(m["check_command"])), nullInt(asIntPtr(m["check_interval_seconds"])),
-			boolInt(asBool(m["wait_previous"], false)), nullRunMode(asStringDef(m["run_mode"], domain.RunModePoll)),
+			boolInt(asBool(m["wait_previous"], false)), nullRunMode(asStringDef(m["run_mode"], journal.RunModePoll)),
 			nullStr(NormalizeRunOn(asStringPtr(m["run_on"]))),
 		)
 		if err != nil {
@@ -583,7 +583,7 @@ func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]Templat
 			return nil, err
 		}
 		m.WaitPrevious = waitPrev != 0
-		m.RunMode = domain.RunModePoll
+		m.RunMode = journal.RunModePoll
 		if runOn.Valid && strings.TrimSpace(runOn.String) != "" {
 			v := strings.TrimSpace(runOn.String)
 			m.RunOn = &v

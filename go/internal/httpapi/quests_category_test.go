@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
@@ -109,14 +109,14 @@ func TestGetQuestResolvesRefs(t *testing.T) {
 	noteID, _ := res.LastInsertId()
 
 	now := timeutil.NowUTC()
-	q, err := s.Store.CreateQuest(t.Context(), domain.Quest{
+	q, err := s.Store.CreateQuest(t.Context(), journal.Quest{
 		Title:        "refs test",
 		Description:  fmt.Sprintf("see note=%d", noteID),
-		Status:       domain.StatusActive,
-		Significance: domain.SigCommon,
+		Status:       journal.StatusActive,
+		Significance: journal.SigCommon,
 		CreatedAt:    now,
 		UpdatedAt:    now,
-		Steps:        []domain.Step{{Title: "one", ProgressTotal: 1}},
+		Steps:        []journal.Step{{Title: "one", ProgressTotal: 1}},
 	})
 	if err != nil {
 		t.Fatalf("create quest: %v", err)

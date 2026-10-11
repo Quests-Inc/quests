@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/store"
 )
 
@@ -28,13 +28,13 @@ func poolTemplate(id int64, command string, _ ...int) templateRow {
 
 // resolveEmitPool / resolveEmitPoolOpts keep the older tests' shape: the steps
 // of the quest the command printed (nil when there is none this tick).
-func resolveEmitPool(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, rng *rand.Rand) ([]domain.Step, int64, string, error) {
+func resolveEmitPool(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, rng *rand.Rand) ([]journal.Step, int64, string, error) {
 	return resolveEmitPoolOpts(t, ctx, st, tmpl, period, now, rng, poolOpts{})
 }
 
-func resolveEmitPoolOpts(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, _ *rand.Rand, opts poolOpts) ([]domain.Step, int64, string, error) {
+func resolveEmitPoolOpts(t *testing.T, ctx context.Context, st *store.Store, tmpl templateRow, period string, now time.Time, _ *rand.Rand, opts poolOpts) ([]journal.Step, int64, string, error) {
 	res, err := tickAndRun(t, ctx, st, tmpl, period, now, opts)
-	var steps []domain.Step
+	var steps []journal.Step
 	if res.Spec != nil {
 		steps = res.Spec.Steps
 	}

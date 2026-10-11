@@ -17,7 +17,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/knowledge"
 	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/events"
@@ -789,8 +789,8 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 422, "нельзя унести последний шаг квеста")
 		return
 	}
-	var moved domain.Step
-	var rest []domain.Step
+	var moved journal.Step
+	var rest []journal.Step
 	for _, st := range from.Steps {
 		if st.ID == stepID {
 			moved = st
@@ -812,8 +812,8 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 	now := timeutil.NowUTC()
 	from.Steps = rest
 	to.Steps = append(to.Steps, moved)
-	domain.SyncStatusFromSteps(&from, now)
-	domain.SyncStatusFromSteps(&to, now)
+	journal.SyncStatusFromSteps(&from, now)
+	journal.SyncStatusFromSteps(&to, now)
 	from.UpdatedAt, to.UpdatedAt = now, now
 	if err := s.Store.MoveStep(r.Context(), stepID, from, to, order); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -823,7 +823,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	for _, q := range []domain.Quest{from, to} {
+	for _, q := range []journal.Quest{from, to} {
 		id := q.ID
 		s.Hub.Publish("quest_updated", events.PublishOpts{
 			Workspace: wsctx.From(r.Context()),
@@ -833,8 +833,8 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 	nf, _ := s.Store.GetQuest(r.Context(), fromID)
 	nt, _ := s.Store.GetQuest(r.Context(), in.QuestID)
 	writeJSON(w, 200, map[string]any{
-		"from": domain.ToQuestRead(nf, timeutil.NowUTC()),
-		"to":   domain.ToQuestRead(nt, timeutil.NowUTC()),
+		"from": journal.ToQuestRead(nf, timeutil.NowUTC()),
+		"to":   journal.ToQuestRead(nt, timeutil.NowUTC()),
 	})
 }
 

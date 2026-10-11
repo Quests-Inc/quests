@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 )
 
@@ -53,7 +53,7 @@ func RandomTagColor() string {
 	return tagPalette[int(b[0])%len(tagPalette)]
 }
 
-func (s *Store) ListTags(ctx context.Context, q string) ([]domain.Tag, error) {
+func (s *Store) ListTags(ctx context.Context, q string) ([]journal.Tag, error) {
 	sqlq := `SELECT id, slug, label, color FROM tag`
 	args := []any{}
 	q = strings.TrimSpace(q)
@@ -68,9 +68,9 @@ func (s *Store) ListTags(ctx context.Context, q string) ([]domain.Tag, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	out := make([]domain.Tag, 0)
+	out := make([]journal.Tag, 0)
 	for rows.Next() {
-		var t domain.Tag
+		var t journal.Tag
 		if err := rows.Scan(&t.ID, &t.Slug, &t.Label, &t.Color); err != nil {
 			return nil, err
 		}
@@ -79,23 +79,23 @@ func (s *Store) ListTags(ctx context.Context, q string) ([]domain.Tag, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) GetTag(ctx context.Context, id int64) (domain.Tag, error) {
-	var t domain.Tag
+func (s *Store) GetTag(ctx context.Context, id int64) (journal.Tag, error) {
+	var t journal.Tag
 	err := s.DB.QueryRowContext(ctx, `SELECT id, slug, label, color FROM tag WHERE id = ?`, id).
 		Scan(&t.ID, &t.Slug, &t.Label, &t.Color)
 	if err == sql.ErrNoRows {
-		return domain.Tag{}, ErrNotFound
+		return journal.Tag{}, ErrNotFound
 	}
 	return t, err
 }
 
-func (s *Store) GetTagBySlug(ctx context.Context, slug string) (domain.Tag, error) {
+func (s *Store) GetTagBySlug(ctx context.Context, slug string) (journal.Tag, error) {
 	slug = NormalizeTagSlug(slug)
-	var t domain.Tag
+	var t journal.Tag
 	err := s.DB.QueryRowContext(ctx, `SELECT id, slug, label, color FROM tag WHERE slug = ?`, slug).
 		Scan(&t.ID, &t.Slug, &t.Label, &t.Color)
 	if err == sql.ErrNoRows {
-		return domain.Tag{}, ErrNotFound
+		return journal.Tag{}, ErrNotFound
 	}
 	return t, err
 }
@@ -106,13 +106,13 @@ type TagCreate struct {
 	Color string
 }
 
-func (s *Store) CreateTag(ctx context.Context, in TagCreate) (domain.Tag, error) {
+func (s *Store) CreateTag(ctx context.Context, in TagCreate) (journal.Tag, error) {
 	slug := NormalizeTagSlug(in.Slug)
 	if slug == "" {
 		slug = NormalizeTagSlug(in.Label)
 	}
 	if slug == "" {
-		return domain.Tag{}, ErrBadSlug
+		return journal.Tag{}, ErrBadSlug
 	}
 	label := strings.TrimSpace(in.Label)
 	if label == "" {
@@ -135,21 +135,21 @@ func (s *Store) CreateTag(ctx context.Context, in TagCreate) (domain.Tag, error)
 			if gerr == nil {
 				return existing, ErrConflict
 			}
-			return domain.Tag{}, ErrConflict
+			return journal.Tag{}, ErrConflict
 		}
-		return domain.Tag{}, err
+		return journal.Tag{}, err
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return domain.Tag{}, err
+		return journal.Tag{}, err
 	}
-	return domain.Tag{ID: id, Slug: slug, Label: label, Color: color}, nil
+	return journal.Tag{ID: id, Slug: slug, Label: label, Color: color}, nil
 }
 
-func (s *Store) UpdateTag(ctx context.Context, id int64, label, color *string) (domain.Tag, error) {
+func (s *Store) UpdateTag(ctx context.Context, id int64, label, color *string) (journal.Tag, error) {
 	t, err := s.GetTag(ctx, id)
 	if err != nil {
-		return domain.Tag{}, err
+		return journal.Tag{}, err
 	}
 	if label != nil {
 		l := strings.TrimSpace(*label)
@@ -168,7 +168,7 @@ func (s *Store) UpdateTag(ctx context.Context, id int64, label, color *string) (
 	}
 	_, err = s.DB.ExecContext(ctx, `UPDATE tag SET label = ?, color = ? WHERE id = ?`, t.Label, t.Color, id)
 	if err != nil {
-		return domain.Tag{}, err
+		return journal.Tag{}, err
 	}
 	return t, nil
 }
@@ -185,8 +185,8 @@ func (s *Store) DeleteTag(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *Store) loadTagsForQuests(ctx context.Context, questIDs []int64) (map[int64][]domain.Tag, error) {
-	out := map[int64][]domain.Tag{}
+func (s *Store) loadTagsForQuests(ctx context.Context, questIDs []int64) (map[int64][]journal.Tag, error) {
+	out := map[int64][]journal.Tag{}
 	if len(questIDs) == 0 {
 		return out, nil
 	}
@@ -209,7 +209,7 @@ func (s *Store) loadTagsForQuests(ctx context.Context, questIDs []int64) (map[in
 	defer rows.Close()
 	for rows.Next() {
 		var qid int64
-		var t domain.Tag
+		var t journal.Tag
 		if err := rows.Scan(&qid, &t.ID, &t.Slug, &t.Label, &t.Color); err != nil {
 			return nil, err
 		}
@@ -218,8 +218,8 @@ func (s *Store) loadTagsForQuests(ctx context.Context, questIDs []int64) (map[in
 	return out, rows.Err()
 }
 
-func (s *Store) loadTagsForTemplates(ctx context.Context, templateIDs []int64) (map[int64][]domain.Tag, error) {
-	out := map[int64][]domain.Tag{}
+func (s *Store) loadTagsForTemplates(ctx context.Context, templateIDs []int64) (map[int64][]journal.Tag, error) {
+	out := map[int64][]journal.Tag{}
 	if len(templateIDs) == 0 {
 		return out, nil
 	}
@@ -242,7 +242,7 @@ func (s *Store) loadTagsForTemplates(ctx context.Context, templateIDs []int64) (
 	defer rows.Close()
 	for rows.Next() {
 		var tid int64
-		var t domain.Tag
+		var t journal.Tag
 		if err := rows.Scan(&tid, &t.ID, &t.Slug, &t.Label, &t.Color); err != nil {
 			return nil, err
 		}
@@ -251,7 +251,7 @@ func (s *Store) loadTagsForTemplates(ctx context.Context, templateIDs []int64) (
 	return out, rows.Err()
 }
 
-func (s *Store) attachTagsToQuests(ctx context.Context, quests []domain.Quest) error {
+func (s *Store) attachTagsToQuests(ctx context.Context, quests []journal.Quest) error {
 	ids := make([]int64, len(quests))
 	for i := range quests {
 		ids[i] = quests[i].ID
@@ -263,7 +263,7 @@ func (s *Store) attachTagsToQuests(ctx context.Context, quests []domain.Quest) e
 	for i := range quests {
 		tags := m[quests[i].ID]
 		if tags == nil {
-			tags = []domain.Tag{}
+			tags = []journal.Tag{}
 		}
 		quests[i].Tags = tags
 	}
@@ -399,14 +399,14 @@ func (s *Store) ResolveTagIDs(ctx context.Context, refs []string) ([]int64, erro
 	return out, nil
 }
 
-func (s *Store) findTagByLabel(ctx context.Context, label string) (domain.Tag, error) {
+func (s *Store) findTagByLabel(ctx context.Context, label string) (journal.Tag, error) {
 	label = strings.TrimSpace(label)
-	var t domain.Tag
+	var t journal.Tag
 	err := s.DB.QueryRowContext(ctx, `
 		SELECT id, slug, label, color FROM tag WHERE lower(label) = lower(?) LIMIT 1`, label).
 		Scan(&t.ID, &t.Slug, &t.Label, &t.Color)
 	if err == sql.ErrNoRows {
-		return domain.Tag{}, ErrNotFound
+		return journal.Tag{}, ErrNotFound
 	}
 	return t, err
 }

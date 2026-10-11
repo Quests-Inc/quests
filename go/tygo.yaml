@@ -1,8 +1,8 @@
 # TypeScript types of the HTTP API, generated from the Go structs: `just gen-types`
 # (frontend/src/lib/api/*.gen.ts; CI fails when they are stale).
 packages:
-  - path: "github.com/valirum/quests/go/internal/domain"
-    output_path: "../frontend/src/lib/api/domain.gen.ts"
+  - path: "github.com/valirum/quests/go/internal/journal"
+    output_path: "../frontend/src/lib/api/journal.gen.ts"
     frontmatter: |
       import type { Resolved } from "./refs.gen";
     type_mappings:

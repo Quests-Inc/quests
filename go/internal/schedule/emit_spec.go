@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/store"
 )
@@ -192,7 +192,7 @@ type resolvedSpec struct {
 	TagIDs          []int64
 	TagsSet         bool
 	Automated       *bool
-	Steps           []domain.Step
+	Steps           []journal.Step
 	Ignored         []string
 }
 
@@ -217,9 +217,9 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 		rs.Description = *spec.Description
 	}
 	if spec.Significance != nil && strings.TrimSpace(*spec.Significance) != "" {
-		sig := domain.Significance(strings.ToLower(strings.TrimSpace(*spec.Significance)))
+		sig := journal.Significance(strings.ToLower(strings.TrimSpace(*spec.Significance)))
 		if !sig.Valid() {
-			return nil, fmt.Errorf("%s", domain.InvalidSignificanceMsg(string(sig)))
+			return nil, fmt.Errorf("%s", journal.InvalidSignificanceMsg(string(sig)))
 		}
 		rs.Significance = string(sig)
 	}
@@ -251,7 +251,7 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 		if runeLen(ss.Description) > lim.MaxDescription {
 			return nil, fmt.Errorf("steps[%d]: description is %d characters, limit %d", i, runeLen(ss.Description), lim.MaxDescription)
 		}
-		step := domain.Step{Title: title, Description: ss.Description, ProgressTotal: 1, SortOrder: i}
+		step := journal.Step{Title: title, Description: ss.Description, ProgressTotal: 1, SortOrder: i}
 		if ss.ProgressTotal != nil {
 			step.ProgressTotal = *ss.ProgressTotal
 		}
@@ -279,7 +279,7 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 			}
 		}
 		store.NormalizeStepCheck(&step)
-		domain.ClampStep(&step)
+		journal.ClampStep(&step)
 		rs.Steps = append(rs.Steps, step)
 	}
 
@@ -340,7 +340,7 @@ func resolveRefField(ctx context.Context, raw json.RawMessage, what string, reso
 
 // applyResolvedSpec overlays what the command printed on the quest built from
 // the template: whatever the quest object set wins, the rest stays the template's.
-func applyResolvedSpec(ctx context.Context, st *store.Store, q *domain.Quest, tmpl templateRow, rs *resolvedSpec, now time.Time) {
+func applyResolvedSpec(ctx context.Context, st *store.Store, q *journal.Quest, tmpl templateRow, rs *resolvedSpec, now time.Time) {
 	if rs.Title != "" {
 		q.Title = rs.Title
 	}
@@ -348,7 +348,7 @@ func applyResolvedSpec(ctx context.Context, st *store.Store, q *domain.Quest, tm
 		q.Description = rs.Description
 	}
 	if rs.Significance != "" {
-		q.Significance = domain.Significance(rs.Significance)
+		q.Significance = journal.Significance(rs.Significance)
 	}
 	if rs.Pinned != nil {
 		q.Pinned = *rs.Pinned
@@ -403,7 +403,7 @@ func attachTags(ctx context.Context, st *store.Store, tmpl templateRow, questID 
 // followQuestlineCategory enforces the same rule as the REST API: a quest in a
 // questline always carries that questline's category, whatever the template or
 // the emitted spec said. A questline without a category leaves it alone.
-func followQuestlineCategory(ctx context.Context, st *store.Store, q *domain.Quest) {
+func followQuestlineCategory(ctx context.Context, st *store.Store, q *journal.Quest) {
 	if q.QuestlineID == nil {
 		return
 	}

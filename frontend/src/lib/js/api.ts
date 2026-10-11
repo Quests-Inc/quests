@@ -1,6 +1,6 @@
-import type { Category, QuestRead, Tag } from '../api/domain.gen'
 import type { GraphDraftView, LLMView, RunnerView } from '../api/http.gen'
 import type { WorkspacesView } from '../api/identity_http.gen'
+import type { Category, QuestRead, Tag } from '../api/journal.gen'
 import type {
   AttachmentRevisions,
   AttachmentView,

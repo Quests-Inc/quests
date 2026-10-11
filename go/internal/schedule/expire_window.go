@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -22,7 +22,7 @@ const windowStartSynthSkew = 3 * time.Second
 // open (within skew) at the quest's last update — typical of postponeQuest.
 // Natural case: deadline written earlier, clock later crosses window_start
 // → window_start is well after UpdatedAt → false → fire quest_started.
-func deadlineSetWithOpenWindow(q domain.Quest) bool {
+func deadlineSetWithOpenWindow(q journal.Quest) bool {
 	if q.DeadlineAt == nil || q.DurationSeconds == nil || *q.DurationSeconds <= 0 {
 		return false
 	}
@@ -67,10 +67,10 @@ func ExpireOverdue(ctx context.Context, st *store.Store, hub *events.Hub) ([]int
 		if err != nil {
 			continue
 		}
-		if q.Status != domain.StatusActive {
+		if q.Status != journal.StatusActive {
 			continue
 		}
-		q.Status = domain.StatusExpired
+		q.Status = journal.StatusExpired
 		q.UpdatedAt = now
 		updated, err := st.UpdateQuest(ctx, q, "quest_expired", "просрочено")
 		if err != nil {
@@ -122,10 +122,10 @@ func (w *WindowNotifier) Notify(ctx context.Context, st *store.Store, hub *event
 		w.spaces[ws] = sp
 	}
 	now := timeutil.NowUTC()
-	inWindow := make([]domain.Quest, 0)
+	inWindow := make([]journal.Quest, 0)
 	live := map[int64]struct{}{}
 	for _, q := range quests {
-		if q.Status != domain.StatusActive || q.DeadlineAt == nil || q.DurationSeconds == nil {
+		if q.Status != journal.StatusActive || q.DeadlineAt == nil || q.DurationSeconds == nil {
 			continue
 		}
 		rem := timeutil.RemainingSeconds(q.DeadlineAt, now)

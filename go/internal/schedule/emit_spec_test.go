@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/pgtest"
 	"github.com/valirum/quests/go/internal/store"
@@ -168,7 +168,7 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q.Title != "Счёт МТС" || q.Significance != domain.SigUncommon || !q.Pinned || !q.Automated {
+	if q.Title != "Счёт МТС" || q.Significance != journal.SigUncommon || !q.Pinned || !q.Automated {
 		t.Fatalf("title/significance/template defaults wrong: %+v", q)
 	}
 	if q.Description != "описание шаблона" {

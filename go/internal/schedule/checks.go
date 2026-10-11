@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -62,7 +62,7 @@ func (r *CheckRunner) Wait() {
 
 // FailStaleRunning marks in-progress one-shots as failed after a server restart.
 func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
-	active := domain.StatusActive
+	active := journal.StatusActive
 	quests, err := r.Store.ListQuests(ctx, store.ListFilter{Status: &active})
 	if err != nil {
 		log.Printf("checks: list stale: %v", err)
@@ -72,18 +72,18 @@ func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 	for _, q := range quests {
 		for i := range q.Steps {
 			st := q.Steps[i]
-			if st.RunStatus == nil || *st.RunStatus != domain.RunRunning {
+			if st.RunStatus == nil || *st.RunStatus != journal.RunRunning {
 				continue
 			}
 			// A job on a runner outlives a server restart: its result still arrives.
 			if st.RunOn != nil {
 				continue
 			}
-			fail := domain.RunFail
+			fail := journal.RunFail
 			st.RunStatus = &fail
 			st.CheckLastRunAt = &now
 			qq := q
-			qq.Status = domain.StatusFailed
+			qq.Status = journal.StatusFailed
 			qq.UpdatedAt = now
 			qq.CompletedAt = nil
 			comment := "автошаг «" + st.Title + "»: прервано перезапуском сервера"
@@ -110,7 +110,7 @@ const watchDoneInterval = 60
 
 func (r *CheckRunner) Tick(ctx context.Context) {
 	defer r.TickNotes(ctx) // note checks follow the step checks
-	active := domain.StatusActive
+	active := journal.StatusActive
 	quests, err := r.Store.ListQuests(ctx, store.ListFilter{Status: &active})
 	if err != nil {
 		log.Printf("checks: list: %v", err)
@@ -125,9 +125,9 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 			}
 			mode := st.RunMode
 			if mode == "" {
-				mode = domain.RunModePoll
+				mode = journal.RunModePoll
 			}
-			watch := mode == domain.RunModeWatch
+			watch := mode == journal.RunModeWatch
 			// A closed step is final — except a watch step, which keeps following
 			// whatever it mirrors (only while its quest is active: Tick lists
 			// active quests only, on purpose, to bound the polling).
@@ -137,10 +137,10 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 			if st.WaitPrevious && i > 0 && !q.Steps[i-1].Done {
 				continue
 			}
-			if mode == domain.RunModeOnce {
+			if mode == journal.RunModeOnce {
 				if st.RunStatus != nil {
 					switch *st.RunStatus {
-					case domain.RunRunning, domain.RunSuccess, domain.RunFail:
+					case journal.RunRunning, journal.RunSuccess, journal.RunFail:
 						continue
 					}
 				}
@@ -162,7 +162,7 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 	}
 }
 
-func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step, once bool) {
+func (r *CheckRunner) spawn(ctx context.Context, q journal.Quest, st journal.Step, once bool) {
 	// Commands run on runners only. A step that still has a command and no runner (stored before
 	// server-side execution was removed) stays idle until a runner is chosen for it.
 	if st.RunOn == nil {
@@ -174,7 +174,7 @@ func (r *CheckRunner) spawn(ctx context.Context, q domain.Quest, st domain.Step,
 	now := timeutil.NowUTC()
 	st.CheckLastRunAt = &now
 	if once {
-		run := domain.RunRunning
+		run := journal.RunRunning
 		st.RunStatus = &run
 	}
 	if _, err := r.Store.UpdateStep(ctx, st, q, "step_progress", st.Title); err != nil {
@@ -194,7 +194,7 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		log.Printf("checks: reload quest %d: %v", questID, err)
 		return
 	}
-	var st *domain.Step
+	var st *journal.Step
 	for i := range q.Steps {
 		if q.Steps[i].ID == stepID {
 			st = &q.Steps[i]
@@ -244,8 +244,8 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		return
 	}
 	st.ProgressCurrent = n
-	domain.ClampStep(st)
-	domain.SyncStatusFromSteps(&q, now)
+	journal.ClampStep(st)
+	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
 	kind := "step_progress"
 	detail := st.Title
@@ -254,7 +254,7 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		kind = "step_completed"
 		toast = true
 	}
-	if q.Status == domain.StatusCompleted {
+	if q.Status == journal.StatusCompleted {
 		kind = "quest_completed"
 		detail = "завершено"
 		toast = true
@@ -274,19 +274,19 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 	})
 }
 
-func (r *CheckRunner) applyOnce(ctx context.Context, q domain.Quest, st *domain.Step, exit int, stdout, stderr string, timedOut bool) {
+func (r *CheckRunner) applyOnce(ctx context.Context, q journal.Quest, st *journal.Step, exit int, stdout, stderr string, timedOut bool) {
 	now := timeutil.NowUTC()
 	st.CheckLastRunAt = &now
 	if exit == 0 && !timedOut {
-		ok := domain.RunSuccess
+		ok := journal.RunSuccess
 		st.RunStatus = &ok
 		st.ProgressCurrent = st.ProgressTotal
-		domain.ClampStep(st)
-		domain.SyncStatusFromSteps(&q, now)
+		journal.ClampStep(st)
+		journal.SyncStatusFromSteps(&q, now)
 		q.UpdatedAt = now
 		kind := "step_completed"
 		detail := st.Title
-		if q.Status == domain.StatusCompleted {
+		if q.Status == journal.StatusCompleted {
 			kind = "quest_completed"
 			detail = "завершено"
 		}
@@ -306,9 +306,9 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q domain.Quest, st *domain.
 		return
 	}
 
-	fail := domain.RunFail
+	fail := journal.RunFail
 	st.RunStatus = &fail
-	q.Status = domain.StatusFailed
+	q.Status = journal.StatusFailed
 	q.UpdatedAt = now
 	q.CompletedAt = nil
 	why := "код " + strconv.Itoa(exit)
@@ -432,7 +432,7 @@ const (
 // dispatch queues the step's check for its runner instead of running it here.
 // At most one job per step and mode is open at a time, so nothing piles up
 // while the device is away.
-func (r *CheckRunner) dispatch(ctx context.Context, q domain.Quest, st domain.Step, once bool) {
+func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.Step, once bool) {
 	kind, valid, timeout := store.JobKindPoll, pollJobValidFor, pollTimeout
 	if once {
 		kind, valid, timeout = store.JobKindOnce, onceJobValidFor, onceSafetyTimeout
@@ -491,7 +491,7 @@ func (r *CheckRunner) JobFinished(ctx context.Context, j store.RunnerJob) {
 	// lost / poll skips: nothing to do — the lease lapse is reported by the jobs list, and a poll tries again.
 }
 
-func (r *CheckRunner) stepOf(ctx context.Context, j store.RunnerJob) (domain.Quest, *domain.Step, bool) {
+func (r *CheckRunner) stepOf(ctx context.Context, j store.RunnerJob) (journal.Quest, *journal.Step, bool) {
 	q, err := r.Store.GetQuest(ctx, *j.QuestID)
 	if err != nil {
 		return q, nil, false
@@ -510,7 +510,7 @@ func (r *CheckRunner) releaseOnce(ctx context.Context, j store.RunnerJob, why st
 	if !ok || st.Done {
 		return
 	}
-	idle := domain.RunIdle
+	idle := journal.RunIdle
 	st.RunStatus = &idle
 	if _, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_updated", "устройство недоступно", "автошаг «"+st.Title+"»: "+why); err != nil {
 		log.Printf("checks: release step %d: %v", st.ID, err)
@@ -523,7 +523,7 @@ func (r *CheckRunner) stopOnce(ctx context.Context, j store.RunnerJob, why strin
 	if !ok || st.Done {
 		return
 	}
-	fail := domain.RunFail
+	fail := journal.RunFail
 	st.RunStatus = &fail
 	if _, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_updated", "автошаг остановлен", "автошаг «"+st.Title+"»: "+why); err != nil {
 		log.Printf("checks: stop step %d: %v", st.ID, err)

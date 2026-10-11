@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -18,7 +18,7 @@ func TestDeadlineSetWithOpenWindow(t *testing.T) {
 	t.Run("postpone_style", func(t *testing.T) {
 		// deadline=now+N, duration=N → window_start==now==updated_at
 		deadline := now.Add(30 * time.Minute)
-		q := domain.Quest{
+		q := journal.Quest{
 			DeadlineAt:      &deadline,
 			DurationSeconds: &dur,
 			UpdatedAt:       now,
@@ -31,7 +31,7 @@ func TestDeadlineSetWithOpenWindow(t *testing.T) {
 	t.Run("natural_crossing", func(t *testing.T) {
 		// Deadline written yesterday; window opens now.
 		deadline := now.Add(30 * time.Minute)
-		q := domain.Quest{
+		q := journal.Quest{
 			DeadlineAt:      &deadline,
 			DurationSeconds: &dur,
 			UpdatedAt:       now.Add(-24 * time.Hour),
@@ -43,7 +43,7 @@ func TestDeadlineSetWithOpenWindow(t *testing.T) {
 
 	t.Run("within_skew", func(t *testing.T) {
 		deadline := now.Add(30 * time.Minute)
-		q := domain.Quest{
+		q := journal.Quest{
 			DeadlineAt:      &deadline,
 			DurationSeconds: &dur,
 			// Scheduler tick a couple of seconds after the PATCH.
@@ -56,7 +56,7 @@ func TestDeadlineSetWithOpenWindow(t *testing.T) {
 
 	t.Run("beyond_skew", func(t *testing.T) {
 		deadline := now.Add(30 * time.Minute)
-		q := domain.Quest{
+		q := journal.Quest{
 			DeadlineAt:      &deadline,
 			DurationSeconds: &dur,
 			UpdatedAt:       now.Add(-10 * time.Second),
@@ -77,17 +77,17 @@ func countStarted(hub *events.Hub) int {
 	return n
 }
 
-func seedWindowQuest(t *testing.T, st *store.Store, deadline time.Time, duration int, updatedAt time.Time) domain.Quest {
+func seedWindowQuest(t *testing.T, st *store.Store, deadline time.Time, duration int, updatedAt time.Time) journal.Quest {
 	t.Helper()
-	q, err := st.CreateQuest(bg(), domain.Quest{
+	q, err := st.CreateQuest(bg(), journal.Quest{
 		Title:           "window",
-		Status:          domain.StatusActive,
-		Significance:    domain.SigCommon,
+		Status:          journal.StatusActive,
+		Significance:    journal.SigCommon,
 		DeadlineAt:      &deadline,
 		DurationSeconds: &duration,
 		CreatedAt:       updatedAt,
 		UpdatedAt:       updatedAt,
-		Steps:           []domain.Step{{Title: "s", ProgressTotal: 1}},
+		Steps:           []journal.Step{{Title: "s", ProgressTotal: 1}},
 	})
 	if err != nil {
 		t.Fatal(err)

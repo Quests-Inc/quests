@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/pgtest"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
@@ -91,7 +91,7 @@ func TestParseCheckOutputJSON(t *testing.T) {
 	}
 }
 
-func seedQuest(t *testing.T, st *store.Store, steps []domain.Step) domain.Quest {
+func seedQuest(t *testing.T, st *store.Store, steps []journal.Step) journal.Quest {
 	t.Helper()
 	now := timeutil.NowUTC()
 	label := testLabel
@@ -100,8 +100,8 @@ func seedQuest(t *testing.T, st *store.Store, steps []domain.Step) domain.Quest 
 			steps[i].RunOn = &label
 		}
 	}
-	q, err := st.CreateQuest(bg(), domain.Quest{
-		Title: "auto", Status: domain.StatusActive, Significance: domain.SigCommon,
+	q, err := st.CreateQuest(bg(), journal.Quest{
+		Title: "auto", Status: journal.StatusActive, Significance: journal.SigCommon,
 		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: steps,
 	})
 	if err != nil {
@@ -114,9 +114,9 @@ func TestCheckPollProgress(t *testing.T) {
 	st := openChecksDB(t)
 	cmd := "echo 2"
 	iv := 15
-	q := seedQuest(t, st, []domain.Step{{
+	q := seedQuest(t, st, []journal.Step{{
 		Title: "poll", ProgressTotal: 5, SortOrder: 0,
-		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
+		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: journal.RunModePoll,
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
@@ -134,9 +134,9 @@ func TestCheckPollJSON(t *testing.T) {
 	st := openChecksDB(t)
 	cmd := `printf '{"progress":1,"description":"из JSON"}'`
 	iv := 15
-	q := seedQuest(t, st, []domain.Step{{
+	q := seedQuest(t, st, []journal.Step{{
 		Title: "poll-json", ProgressTotal: 2, SortOrder: 0,
-		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
+		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: journal.RunModePoll,
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
@@ -151,7 +151,7 @@ func TestCheckPollJSON(t *testing.T) {
 	if got.Steps[0].Description != "из JSON" {
 		t.Fatalf("description=%q", got.Steps[0].Description)
 	}
-	if got.Status != domain.StatusActive {
+	if got.Status != journal.StatusActive {
 		t.Fatalf("status=%s", got.Status)
 	}
 }
@@ -160,9 +160,9 @@ func TestCheckPollJSONBrokenKeepsDescription(t *testing.T) {
 	st := openChecksDB(t)
 	cmd := `printf 'not-json'`
 	iv := 15
-	q := seedQuest(t, st, []domain.Step{{
+	q := seedQuest(t, st, []journal.Step{{
 		Title: "poll-broken", Description: "оставить", ProgressTotal: 2, SortOrder: 0,
-		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
+		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: journal.RunModePoll,
 		ProgressCurrent: 1,
 	}})
 	r := NewCheckRunner(st, events.New())
@@ -184,15 +184,15 @@ func TestCheckWaitPrevious(t *testing.T) {
 	st := openChecksDB(t)
 	cmd1 := "true"
 	cmd2 := "true"
-	idle := domain.RunIdle
-	q := seedQuest(t, st, []domain.Step{
+	idle := journal.RunIdle
+	q := seedQuest(t, st, []journal.Step{
 		{
 			Title: "one", ProgressTotal: 1, SortOrder: 0,
-			CheckCommand: &cmd1, RunMode: domain.RunModeOnce, RunStatus: &idle,
+			CheckCommand: &cmd1, RunMode: journal.RunModeOnce, RunStatus: &idle,
 		},
 		{
 			Title: "two", ProgressTotal: 1, SortOrder: 1,
-			CheckCommand: &cmd2, RunMode: domain.RunModeOnce, RunStatus: &idle,
+			CheckCommand: &cmd2, RunMode: journal.RunModeOnce, RunStatus: &idle,
 			WaitPrevious: true,
 		},
 	})
@@ -223,10 +223,10 @@ func TestCheckWaitPrevious(t *testing.T) {
 func TestCheckOnceFailQuest(t *testing.T) {
 	st := openChecksDB(t)
 	cmd := "false"
-	idle := domain.RunIdle
-	q := seedQuest(t, st, []domain.Step{{
+	idle := journal.RunIdle
+	q := seedQuest(t, st, []journal.Step{{
 		Title: "boom", ProgressTotal: 1, SortOrder: 0,
-		CheckCommand: &cmd, RunMode: domain.RunModeOnce, RunStatus: &idle,
+		CheckCommand: &cmd, RunMode: journal.RunModeOnce, RunStatus: &idle,
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
@@ -235,10 +235,10 @@ func TestCheckOnceFailQuest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != domain.StatusFailed {
+	if got.Status != journal.StatusFailed {
 		t.Fatalf("status=%s want failed", got.Status)
 	}
-	if got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != domain.RunFail {
+	if got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != journal.RunFail {
 		t.Fatalf("run_status=%v", got.Steps[0].RunStatus)
 	}
 	var comment sql.NullString
@@ -253,9 +253,9 @@ func TestCheckOnceFailQuest(t *testing.T) {
 func TestFailStaleRunning(t *testing.T) {
 	st := openChecksDB(t)
 	cmd := "sleep 99"
-	run := domain.RunRunning
-	q := seedQuest(t, st, []domain.Step{{
-		Title: "stuck", ProgressTotal: 1, CheckCommand: &cmd, RunMode: domain.RunModeOnce, RunStatus: &run,
+	run := journal.RunRunning
+	q := seedQuest(t, st, []journal.Step{{
+		Title: "stuck", ProgressTotal: 1, CheckCommand: &cmd, RunMode: journal.RunModeOnce, RunStatus: &run,
 	}})
 	// the way such a step is stored from before: a command and no runner
 	if _, err := st.DB.Exec(`UPDATE queststep SET run_on = NULL WHERE quest_id = ?`, q.ID); err != nil {
@@ -267,18 +267,18 @@ func TestFailStaleRunning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != domain.StatusFailed {
+	if got.Status != journal.StatusFailed {
 		t.Fatalf("status=%s", got.Status)
 	}
 	_ = time.Second
 }
 
-func pollStep(t *testing.T, st *store.Store, cmd string, total, current int) domain.Quest {
+func pollStep(t *testing.T, st *store.Store, cmd string, total, current int) journal.Quest {
 	t.Helper()
 	iv := 15
-	q := seedQuest(t, st, []domain.Step{{
+	q := seedQuest(t, st, []journal.Step{{
 		Title: "mirror", ProgressTotal: total, ProgressCurrent: current, SortOrder: 0,
-		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: domain.RunModePoll,
+		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: journal.RunModePoll,
 	}})
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
@@ -318,7 +318,7 @@ func TestCheckPollTotalShrinkClampsProgressAndCompletes(t *testing.T) {
 	if step.ProgressTotal != 2 || step.ProgressCurrent != 2 || !step.Done {
 		t.Fatalf("want 2/2 done, got %d/%d done=%v", step.ProgressCurrent, step.ProgressTotal, step.Done)
 	}
-	if got.Status != domain.StatusCompleted {
+	if got.Status != journal.StatusCompleted {
 		t.Fatalf("status=%s, want completed", got.Status)
 	}
 }
@@ -333,16 +333,16 @@ func TestCheckPollInvalidTotalIgnored(t *testing.T) {
 	}
 }
 
-func watchStep(cmd string, total, current int, mode string) domain.Step {
+func watchStep(cmd string, total, current int, mode string) journal.Step {
 	iv := 15
 	label := testLabel
-	return domain.Step{
+	return journal.Step{
 		Title: "mirror", ProgressTotal: total, ProgressCurrent: current, SortOrder: 0,
 		CheckCommand: &cmd, CheckIntervalSeconds: &iv, RunMode: mode, RunOn: &label,
 	}
 }
 
-func tickAndGet(t *testing.T, st *store.Store, id int64) domain.Quest {
+func tickAndGet(t *testing.T, st *store.Store, id int64) journal.Quest {
 	t.Helper()
 	r := NewCheckRunner(st, events.New())
 	r.Tick(bg())
@@ -358,13 +358,13 @@ func tickAndGet(t *testing.T, st *store.Store, id int64) domain.Quest {
 // followed quest grows, the step re-opens (and so does its quest).
 func TestCheckWatchReopensClosedStepWhenTotalGrows(t *testing.T) {
 	st := openChecksDB(t)
-	q := seedQuest(t, st, []domain.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, domain.RunModeWatch)})
+	q := seedQuest(t, st, []journal.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, journal.RunModeWatch)})
 	got := tickAndGet(t, st, q.ID)
 	step := got.Steps[0]
 	if step.ProgressTotal != 5 || step.ProgressCurrent != 3 || step.Done {
 		t.Fatalf("want 3/5 re-opened, got %d/%d done=%v", step.ProgressCurrent, step.ProgressTotal, step.Done)
 	}
-	if got.Status != domain.StatusActive {
+	if got.Status != journal.StatusActive {
 		t.Fatalf("status=%s, want active", got.Status)
 	}
 }
@@ -372,7 +372,7 @@ func TestCheckWatchReopensClosedStepWhenTotalGrows(t *testing.T) {
 // Plain poll steps stay final once closed — the old behaviour.
 func TestCheckPollKeepsClosedStepFinal(t *testing.T) {
 	st := openChecksDB(t)
-	q := seedQuest(t, st, []domain.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, domain.RunModePoll)})
+	q := seedQuest(t, st, []journal.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, journal.RunModePoll)})
 	step := tickAndGet(t, st, q.ID).Steps[0]
 	if step.ProgressTotal != 3 || !step.Done {
 		t.Fatalf("closed poll step must not be polled, got %d/%d done=%v", step.ProgressCurrent, step.ProgressTotal, step.Done)
@@ -384,17 +384,17 @@ func TestCheckPollKeepsClosedStepFinal(t *testing.T) {
 func TestCheckWatchIgnoresInactiveQuests(t *testing.T) {
 	st := openChecksDB(t)
 	now := timeutil.NowUTC()
-	step := watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, domain.RunModeWatch)
+	step := watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, journal.RunModeWatch)
 	step.Done = true
-	q, err := st.CreateQuest(bg(), domain.Quest{
-		Title: "done-parent", Status: domain.StatusCompleted, Significance: domain.SigCommon,
-		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: []domain.Step{step},
+	q, err := st.CreateQuest(bg(), journal.Quest{
+		Title: "done-parent", Status: journal.StatusCompleted, Significance: journal.SigCommon,
+		CreatedAt: now, UpdatedAt: now, Automated: true, Steps: []journal.Step{step},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := tickAndGet(t, st, q.ID)
-	if got.Steps[0].ProgressTotal != 3 || got.Status != domain.StatusCompleted {
+	if got.Steps[0].ProgressTotal != 3 || got.Status != journal.StatusCompleted {
 		t.Fatalf("completed quest must be left alone, got total=%d status=%s", got.Steps[0].ProgressTotal, got.Status)
 	}
 }
@@ -402,7 +402,7 @@ func TestCheckWatchIgnoresInactiveQuests(t *testing.T) {
 // A closed watch step polls at most once a minute, an open one at its interval.
 func TestCheckWatchClosedStepIsPolledLazily(t *testing.T) {
 	st := openChecksDB(t)
-	q := seedQuest(t, st, []domain.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, domain.RunModeWatch)})
+	q := seedQuest(t, st, []journal.Step{watchStep(`printf '{"progress":3,"total":5}'`, 3, 3, journal.RunModeWatch)})
 	ctx := bg()
 	recent := timeutil.NowUTC().Add(-30 * time.Second) // past 15s, not past 60s
 	if _, err := st.DB.ExecContext(ctx, `UPDATE queststep SET check_last_run_at = ? WHERE quest_id = ?`, timeutil.ToDBUTC(recent), q.ID); err != nil {

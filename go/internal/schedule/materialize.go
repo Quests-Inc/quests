@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
@@ -111,7 +111,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		); err != nil {
 			return nil, err
 		}
-		t.Pinned, t.OverlayHidden = domain.SplitPinState(pinned)
+		t.Pinned, t.OverlayHidden = journal.SplitPinState(pinned)
 		t.Enabled = enabled != 0
 		t.Automated = automated != 0
 		templates = append(templates, t)
@@ -219,10 +219,10 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 				spec = res.Spec
 			}
 		}
-		var steps []domain.Step
+		var steps []journal.Step
 		switch {
 		case poolFailed:
-			steps = []domain.Step{{
+			steps = []journal.Step{{
 				Title:         "Почини команду пула шаблона «" + tmpl.Title + "»",
 				ProgressTotal: 1,
 			}}
@@ -235,11 +235,11 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			}
 		}
 
-		q := domain.Quest{
+		q := journal.Quest{
 			Title:           tmpl.Title,
 			Description:     tmpl.Description,
-			Status:          domain.StatusActive,
-			Significance:    domain.Significance(tmpl.Significance),
+			Status:          journal.StatusActive,
+			Significance:    journal.Significance(tmpl.Significance),
 			Pinned:          tmpl.Pinned,
 			OverlayHidden:   tmpl.OverlayHidden,
 			SortOrder:       tmpl.SortOrder,
@@ -251,14 +251,14 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			Steps:           steps,
 		}
 		if poolFailed {
-			q.Status = domain.StatusFailed
+			q.Status = journal.StatusFailed
 			q.Description = fmt.Sprintf(
 				"`emit_pool_command` провалилась %d раза подряд за этот период. Трейс последней попытки:\n\n```\n%s\n```",
 				emitPoolMaxAttempts, poolFailMsg,
 			)
 		}
 		if tmpl.Significance == "" {
-			q.Significance = domain.SigCommon
+			q.Significance = journal.SigCommon
 		}
 		if tmpl.CategoryID.Valid {
 			v := tmpl.CategoryID.Int64
@@ -512,7 +512,7 @@ func pickScheduledAt(localDay time.Time, windowStart, windowEnd string, rng *ran
 	return start.Add(time.Duration(offset) * time.Second)
 }
 
-func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, rng *rand.Rand) ([]domain.Step, error) {
+func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, rng *rand.Rand) ([]journal.Step, error) {
 	rows, err := st.DB.QueryContext(ctx, `
 		SELECT title, description, sort_order, progress_min, progress_max, check_command, check_interval_seconds,
 			wait_previous, run_mode, run_on
@@ -530,16 +530,16 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 			return nil, err
 		}
 		s.WaitPrevious = waitPrev != 0
-		s.RunMode = domain.RunModePoll
+		s.RunMode = journal.RunModePoll
 		if runMode.Valid {
 			s.RunMode = store.NormalizeRunMode(runMode.String)
 		}
 		src = append(src, s)
 	}
 	if len(src) == 0 {
-		return []domain.Step{{Title: tmpl.Title, ProgressTotal: 1, SortOrder: 0}}, nil
+		return []journal.Step{{Title: tmpl.Title, ProgressTotal: 1, SortOrder: 0}}, nil
 	}
-	out := make([]domain.Step, 0, len(src))
+	out := make([]journal.Step, 0, len(src))
 	for i, s := range src {
 		lo, hi := s.ProgressMin, s.ProgressMax
 		if lo < 1 {
@@ -555,7 +555,7 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 		if hi > lo {
 			total = lo + rng.Intn(hi-lo+1)
 		}
-		st := domain.Step{
+		st := journal.Step{
 			Title: s.Title, Description: s.Description,
 			ProgressCurrent: 0, ProgressTotal: total, SortOrder: s.SortOrder,
 		}
@@ -570,7 +570,7 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 			if s.RunOn.Valid {
 				st.RunOn = store.NormalizeRunOn(&s.RunOn.String)
 			}
-			if st.RunMode == domain.RunModePoll || st.RunMode == domain.RunModeWatch {
+			if st.RunMode == journal.RunModePoll || st.RunMode == journal.RunModeWatch {
 				iv := 15
 				if s.CheckIntervalSeconds.Valid {
 					iv = int(s.CheckIntervalSeconds.Int64)
@@ -585,8 +585,8 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 					st.CheckIntervalSeconds = &iv
 				}
 			}
-			if st.RunMode == domain.RunModeOnce {
-				idle := domain.RunIdle
+			if st.RunMode == journal.RunModeOnce {
+				idle := journal.RunIdle
 				st.RunStatus = &idle
 			}
 		}
@@ -833,7 +833,7 @@ func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRo
 	if err != nil {
 		return templateRow{}, err
 	}
-	t.Pinned, t.OverlayHidden = domain.SplitPinState(pinned)
+	t.Pinned, t.OverlayHidden = journal.SplitPinState(pinned)
 	t.Enabled = enabled != 0
 	t.Automated = automated != 0
 	return t, nil
@@ -890,7 +890,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		poolRollID = res.RollID
 		spec = res.Spec
 	}
-	var steps []domain.Step
+	var steps []journal.Step
 	if spec != nil && len(spec.Steps) > 0 {
 		steps = spec.Steps
 	} else {
@@ -900,11 +900,11 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		}
 	}
 
-	q := domain.Quest{
+	q := journal.Quest{
 		Title:           tmpl.Title,
 		Description:     tmpl.Description,
-		Status:          domain.StatusActive,
-		Significance:    domain.Significance(tmpl.Significance),
+		Status:          journal.StatusActive,
+		Significance:    journal.Significance(tmpl.Significance),
 		Pinned:          tmpl.Pinned,
 		SortOrder:       tmpl.SortOrder,
 		DeadlineAt:      deadline,
@@ -915,7 +915,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		Steps:           steps,
 	}
 	if tmpl.Significance == "" {
-		q.Significance = domain.SigCommon
+		q.Significance = journal.SigCommon
 	}
 	if tmpl.CategoryID.Valid {
 		v := tmpl.CategoryID.Int64
