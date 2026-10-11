@@ -3,7 +3,7 @@
   import Icon from './Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '../js/api.ts'
   import { loadRunners, runnersList } from '../js/runnersList.svelte.ts'
-import type { NoteCheckView } from '../api/http.gen.ts'
+import type { NoteCheckView } from '../api/knowledge_http.gen.ts'
 
   /**
    * A note's freshness check (quest=370): the same kind of command as a step's auto-check, but its answer

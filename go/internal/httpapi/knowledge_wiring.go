@@ -1,0 +1,30 @@
+package httpapi
+
+import (
+	"context"
+
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
+	"github.com/valirum/quests/go/internal/store"
+)
+
+// knowledgeHTTP is the knowledge context's HTTP face, wired to this server (built on first use). What the context
+// needs from the others is supplied here as functions: mentions are resolved against every kind of entity, the
+// change log belongs to the journal, deleting a note removes its attachments.
+func (s *Server) knowledgeHTTP() *knowledgehttp.Handler {
+	s.knowledgeOnce.Do(func() {
+		s.kh = &knowledgehttp.Handler{
+			Store:            s.Store.Knowledge(),
+			Hub:              s.Hub,
+			DataDir:          s.DataDir,
+			ResolveRefs:      s.resolveRefs,
+			PurgeAttachments: s.purgeOwnerAttachments,
+			LogEvent: func(ctx context.Context, e knowledgehttp.ChangeEvent) {
+				_ = s.Store.LogEvent(ctx, store.ChangeEvent{
+					Kind: e.Kind, EntityType: e.EntityType, EntityID: e.EntityID,
+					Title: e.Title, Detail: e.Detail, Coalesce: e.Coalesce,
+				})
+			},
+		}
+	})
+	return s.kh
+}

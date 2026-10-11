@@ -36,7 +36,7 @@
   import NoteIconModal from '../modals/NoteIconModal.svelte'
   import ContextMenu from '../ui/ContextMenu.svelte'
   import QuestlineIcon from '../ui/QuestlineIcon.svelte'
-import type { NotePayload } from '../api/http.gen.ts'
+import type { NotePayload } from '../api/knowledge_http.gen.ts'
 
   let {
     notes = [],

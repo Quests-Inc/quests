@@ -3,6 +3,8 @@ package domain
 import (
 	"strconv"
 	"time"
+
+	"github.com/valirum/quests/go/internal/refs"
 )
 
 // QuestRead is the wire JSON shape matching Python serializers.quest_to_read.
@@ -44,7 +46,7 @@ type QuestRead struct {
 	// Refs is populated only for a single-quest fetch (see Server.getQuest) —
 	// resolving note=N/attachment=N/... mentions for every row in a list
 	// response would be an N+1 query fan-out nobody needs there.
-	Refs []ResolvedRef `json:"refs,omitempty"`
+	Refs []refs.Resolved `json:"refs,omitempty"`
 }
 
 type StepRead struct {
@@ -206,16 +208,4 @@ func timerTone(deadline *time.Time, duration *int, now time.Time) *string {
 		tone = "red"
 	}
 	return &tone
-}
-
-// ResolvedRef is a kind=ID mention in a text with the title it points at (null when the target is gone).
-type ResolvedRef struct {
-	Kind  string  `json:"kind"`
-	ID    int64   `json:"id"`
-	Title *string `json:"title"`
-	// QuestID is set for a step: the quest it belongs to.
-	QuestID *int64 `json:"quest_id,omitempty"`
-	// OwnerType and OwnerID are set for an attachment: what it hangs on.
-	OwnerType string `json:"owner_type,omitempty"`
-	OwnerID   *int64 `json:"owner_id,omitempty"`
 }

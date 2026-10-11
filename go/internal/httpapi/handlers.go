@@ -14,6 +14,8 @@ import (
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/identity"
 	identityhttp "github.com/valirum/quests/go/internal/identity/http"
+	"github.com/valirum/quests/go/internal/kernel"
+	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/clamav"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/health"
@@ -53,6 +55,8 @@ type Server struct {
 	// Lazily initialized on first use — see Server.limiter().
 	loginLimiterOnce sync.Once
 	identityOnce     sync.Once
+	knowledgeOnce    sync.Once
+	kh               *knowledgehttp.Handler
 	idh              *identityhttp.Handler
 	loginLimiter     *ratelimit.Limiter
 	// InternalToken authenticates the server's own loopback calls (LLM assistant).
@@ -137,13 +141,13 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("DELETE /api/quests/{id}/steps/{step_id}", s.deleteStep)
 	s.identityHTTP().Register(mux)
 	s.registerAttachments(mux)
-	s.registerNotes(mux)
+	s.knowledgeHTTP().RegisterNotes(mux)
 	s.registerPDF(mux)
 	s.registerDomainRoutes(mux)
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
-	s.registerNoteCheck(mux)
+	s.knowledgeHTTP().RegisterNoteCheck(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
 	s.registerWorkspaceArchive(mux)
@@ -177,16 +181,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 var writeJSON = httpx.WriteJSON
 
 func writeErr(w http.ResponseWriter, status int, detail string) {
-	// A store refusal is the caller's to fix, wherever it surfaced: not an owner (403), no runner for a command (422).
-	if status >= 500 {
-		switch {
-		case strings.Contains(detail, store.ErrCommandOwner.Error()):
-			status = http.StatusForbidden
-		case strings.Contains(detail, store.ErrNoRunner.Error()):
-			status = http.StatusUnprocessableEntity
-		}
-	}
-	httpx.WriteErr(w, status, detail)
+	httpx.WriteErr(w, kernel.StatusFor(status, detail), detail)
 }
 
 func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {

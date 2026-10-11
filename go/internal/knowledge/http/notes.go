@@ -1,4 +1,4 @@
-package httpapi
+package knowledgehttp
 
 import (
 	"context"
@@ -14,32 +14,32 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/kernel"
 	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/events"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/refs"
-	"github.com/valirum/quests/go/internal/store"
 )
 
-func (s *Server) registerNotes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/notes", s.listNotes)
-	mux.HandleFunc("POST /api/notes", s.createNote)
-	mux.HandleFunc("GET /api/notes/search", s.searchNotes)
-	mux.HandleFunc("GET /api/notes/{id}/search", s.searchInNote)
-	mux.HandleFunc("POST /api/notes/{id}/feedback", s.noteFeedback)
-	mux.HandleFunc("PUT /api/notes/{id}/weight", s.noteWeight)
-	mux.HandleFunc("DELETE /api/notes/{id}/stats", s.resetNoteStats)
-	mux.HandleFunc("GET /api/notes/{id}", s.getNote)
-	mux.HandleFunc("PATCH /api/notes/{id}", s.patchNote)
-	mux.HandleFunc("DELETE /api/notes/{id}", s.deleteNote)
-	mux.HandleFunc("GET /api/notes/{id}/icon", s.getNoteIcon)
-	mux.HandleFunc("POST /api/notes/{id}/icon", s.postNoteIcon)
-	mux.HandleFunc("DELETE /api/notes/{id}/icon", s.deleteNoteIcon)
+func (h *Handler) RegisterNotes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/notes", h.listNotes)
+	mux.HandleFunc("POST /api/notes", h.createNote)
+	mux.HandleFunc("GET /api/notes/search", h.searchNotes)
+	mux.HandleFunc("GET /api/notes/{id}/search", h.searchInNote)
+	mux.HandleFunc("POST /api/notes/{id}/feedback", h.noteFeedback)
+	mux.HandleFunc("PUT /api/notes/{id}/weight", h.noteWeight)
+	mux.HandleFunc("DELETE /api/notes/{id}/stats", h.resetNoteStats)
+	mux.HandleFunc("GET /api/notes/{id}", h.getNote)
+	mux.HandleFunc("PATCH /api/notes/{id}", h.patchNote)
+	mux.HandleFunc("DELETE /api/notes/{id}", h.deleteNote)
+	mux.HandleFunc("GET /api/notes/{id}/icon", h.getNoteIcon)
+	mux.HandleFunc("POST /api/notes/{id}/icon", h.postNoteIcon)
+	mux.HandleFunc("DELETE /api/notes/{id}/icon", h.deleteNoteIcon)
 }
 
-func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 	var f knowledge.NoteFilter
 	if v := r.URL.Query().Get("parent_id"); v != "" {
 		if strings.EqualFold(v, "null") || v == "-" {
@@ -52,12 +52,12 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 		v := p == "1" || strings.EqualFold(p, "true")
 		f.Pinned = &v
 	}
-	rows, err := s.Store.Knowledge().ListNotes(r.Context(), f)
+	rows, err := h.Store.ListNotes(r.Context(), f)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	checks, _ := s.Store.Knowledge().NoteChecks(r.Context())
+	checks, _ := h.Store.NoteChecks(r.Context())
 	out := make([]NoteListItem, 0, len(rows))
 	for _, n := range rows {
 		read := knowledge.NoteToRead(n)
@@ -70,7 +70,7 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 		for _, n := range rows {
 			born[n.ID] = n.CreatedAt
 		}
-		pop, perr := s.Store.Knowledge().Popularity(r.Context(), born)
+		pop, perr := h.Store.Popularity(r.Context(), born)
 		if perr != nil {
 			writeErr(w, 500, perr.Error())
 			return
@@ -90,40 +90,8 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
-// NoteVerdict is the outcome of a note's check, shown on every note.
-type NoteVerdict struct {
-	Outdated       bool   `json:"outdated"`
-	OutdatedReason string `json:"outdated_reason"`
-	HasCheck       bool   `json:"has_check"`
-}
-
 func verdictOf(c knowledge.NoteCheck) NoteVerdict {
 	return NoteVerdict{Outdated: c.Outdated, OutdatedReason: c.Reason, HasCheck: c.Active()}
-}
-
-// NoteListItem is a note in a list: its fields, the verdict of its check, and — in a popularity sort — why it ranks where it does.
-type NoteListItem struct {
-	knowledge.NoteRead `tstype:",extends"`
-	NoteVerdict        `tstype:",extends"`
-	Popularity         *knowledge.NotePopularity `json:"popularity,omitempty"`
-}
-
-// Backlink is something that mentions a note.
-type Backlink struct {
-	Kind  string `json:"kind"`
-	ID    int64  `json:"id"`
-	Title string `json:"title"`
-}
-
-// NotePayload is a note read on its own: the list item plus its surroundings.
-type NotePayload struct {
-	NoteListItem `tstype:",extends"`
-	Children     []knowledge.NoteBriefRead `json:"children"`
-	Refs         []domain.ResolvedRef      `json:"refs"`
-	Backlinks    []Backlink                `json:"backlinks"`
-	Check        NoteCheckView             `json:"check"`
-	// Attachments is set by the context endpoint only.
-	Attachments any `json:"attachments,omitempty"`
 }
 
 // redactPrivateNote replaces description in-place with a placeholder when the
@@ -140,10 +108,10 @@ func redactPrivateNote(r *http.Request, n knowledge.Note, out *knowledge.NoteRea
 	out.Description = "[приватная заметка — содержимое скрыто от MCP; попросите пользователя прочитать её самостоятельно, если это правда нужно]"
 }
 
-func (s *Server) getNote(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getNote(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	n, err := s.Store.Knowledge().GetNote(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
+	n, err := h.Store.GetNote(r.Context(), id)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
@@ -151,14 +119,14 @@ func (s *Server) getNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.countRead(r, n)
-	writeJSON(w, 200, s.notePayloadFiltered(r, n))
+	h.countRead(r, n)
+	writeJSON(w, 200, h.NotePayloadFiltered(r, n))
 }
 
 // countRead feeds the reading signal (quest=353): only the web UI (a person) and MCP (an agent)
 // report reads — the CLI, bots, exports and other background clients do not — and an agent
 // reading a PRIVATE note, which it only sees as a placeholder, is not interest either.
-func (s *Server) countRead(r *http.Request, n knowledge.Note) {
+func (h *Handler) countRead(r *http.Request, n knowledge.Note) {
 	src := requestSource(r)
 	if src == nil || (*src != "web" && *src != "mcp") {
 		return
@@ -167,12 +135,12 @@ func (s *Server) countRead(r *http.Request, n knowledge.Note) {
 	if agent && n.IsPrivate {
 		return
 	}
-	if _, err := s.Store.Knowledge().RecordNoteOpen(r.Context(), n.ID, agent); err != nil {
+	if _, err := h.Store.RecordNoteOpen(r.Context(), n.ID, agent); err != nil {
 		log.Printf("notes: counting a read of note %d: %v", n.ID, err)
 	}
 }
 
-func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 	var body map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "invalid JSON")
@@ -213,38 +181,38 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 	if _, ok := body["parent_id"]; ok {
 		n.ParentID = noteJSONInt64(body["parent_id"])
 	}
-	if err := s.validateNoteParent(r, 0, n.ParentID); err != nil {
+	if err := h.validateNoteParent(r, 0, n.ParentID); err != nil {
 		writeErr(w, 422, err.Error())
 		return
 	}
 	var parent knowledge.Note
 	var hasParent bool
 	if n.ParentID != nil {
-		p, err := s.Store.Knowledge().GetNote(r.Context(), *n.ParentID)
+		p, err := h.Store.GetNote(r.Context(), *n.ParentID)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}
 		parent, hasParent = p, true
 	}
-	created, err := s.Store.Knowledge().CreateNote(r.Context(), n)
+	created, err := h.Store.CreateNote(r.Context(), n)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 	if hasParent && parent.CustomIcon != nil && *parent.CustomIcon != "" {
-		if copied, err := s.Store.Knowledge().CopyNoteCustomIcon(r.Context(), parent.ID, created.ID, s.DataDir); err == nil {
+		if copied, err := h.Store.CopyNoteCustomIcon(r.Context(), parent.ID, created.ID, h.DataDir); err == nil {
 			created = copied
 		}
 	}
-	s.logNote(r.Context(), "note_created", created, "создана", 0)
-	writeJSON(w, 201, s.notePayloadFiltered(r, created))
+	h.logNote(r.Context(), "note_created", created, "создана", 0)
+	writeJSON(w, 201, h.NotePayloadFiltered(r, created))
 }
 
-func (s *Server) patchNote(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) patchNote(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	cur, err := s.Store.Knowledge().GetNote(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
+	cur, err := h.Store.GetNote(r.Context(), id)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	} else if err != nil {
@@ -326,7 +294,7 @@ func (s *Server) patchNote(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := body["parent_id"]; ok {
 		pid := noteJSONInt64(body["parent_id"])
-		if err := s.validateNoteParent(r, id, pid); err != nil {
+		if err := h.validateNoteParent(r, id, pid); err != nil {
 			writeErr(w, 422, err.Error())
 			return
 		}
@@ -336,8 +304,8 @@ func (s *Server) patchNote(w http.ResponseWriter, r *http.Request) {
 			body["parent_id"] = *pid
 		}
 	}
-	updated, err := s.Store.Knowledge().UpdateNote(r.Context(), id, body)
-	if errors.Is(err, store.ErrNotFound) {
+	updated, err := h.Store.UpdateNote(r.Context(), id, body)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
@@ -349,14 +317,14 @@ func (s *Server) patchNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
-	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
+	h.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
+	writeJSON(w, 200, h.NotePayloadFiltered(r, updated))
 }
 
-func (s *Server) deleteNote(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) deleteNote(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	cur, err := s.Store.Knowledge().GetNote(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
+	cur, err := h.Store.GetNote(r.Context(), id)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
@@ -364,26 +332,26 @@ func (s *Server) deleteNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.purgeOwnerAttachments(r.Context(), ownerNote, id)
+	h.PurgeAttachments(r.Context(), ownerNote, id)
 	if cur.CustomIcon != nil && *cur.CustomIcon != "" {
-		_ = os.Remove(filepath.Join(s.DataDir, "note-icons", *cur.CustomIcon))
+		_ = os.Remove(filepath.Join(h.DataDir, "note-icons", *cur.CustomIcon))
 	}
-	if err := s.Store.Knowledge().DeleteNote(r.Context(), id); err != nil {
+	if err := h.Store.DeleteNote(r.Context(), id); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote(r.Context(), "note_deleted", cur, "удалена", 0)
+	h.logNote(r.Context(), "note_deleted", cur, "удалена", 0)
 	w.WriteHeader(204)
 }
 
-func (s *Server) validateNoteParent(r *http.Request, noteID int64, parentID *int64) error {
+func (h *Handler) validateNoteParent(r *http.Request, noteID int64, parentID *int64) error {
 	if parentID == nil {
 		return nil
 	}
 	if noteID != 0 && *parentID == noteID {
 		return knowledge.ErrNoteCycle
 	}
-	ok, err := s.Store.Knowledge().NoteExists(r.Context(), *parentID)
+	ok, err := h.Store.NoteExists(r.Context(), *parentID)
 	if err != nil {
 		return err
 	}
@@ -400,25 +368,25 @@ func noteCustomIcon(n knowledge.Note) string {
 	return ""
 }
 
-func (s *Server) getNoteIcon(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getNoteIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	n, err := s.Store.Knowledge().GetNote(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
+	n, err := h.Store.GetNote(r.Context(), id)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
 	custom := noteCustomIcon(n)
-	if custom == "" || !store.SafeIconName(custom) {
+	if custom == "" || !kernel.SafeIconName(custom) {
 		writeErr(w, 404, "Icon not found")
 		return
 	}
-	path := filepath.Join(s.DataDir, "note-icons", custom)
-	serveIcon(w, r, path)
+	path := filepath.Join(h.DataDir, "note-icons", custom)
+	httpx.ServeIcon(w, r, path)
 }
 
-func (s *Server) postNoteIcon(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) postNoteIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if _, err := s.Store.Knowledge().GetNote(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+	if _, err := h.Store.GetNote(r.Context(), id); errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
@@ -449,26 +417,26 @@ func (s *Server) postNoteIcon(w http.ResponseWriter, r *http.Request) {
 	case strings.Contains(ct, "svg"), strings.HasSuffix(strings.ToLower(hdr.Filename), ".svg"):
 		ext = ".svg"
 	}
-	dir := filepath.Join(s.DataDir, "note-icons")
+	dir := filepath.Join(h.DataDir, "note-icons")
 	_ = os.MkdirAll(dir, 0o755)
 	name := strconv.FormatInt(id, 10) + ext
 	if err := os.WriteFile(filepath.Join(dir, name), raw, 0o644); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	updated, err := s.Store.Knowledge().SetNoteIcon(r.Context(), id, name)
+	updated, err := h.Store.SetNoteIcon(r.Context(), id, name)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
-	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
+	h.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
+	writeJSON(w, 200, h.NotePayloadFiltered(r, updated))
 }
 
-func (s *Server) deleteNoteIcon(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) deleteNoteIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	updated, err := s.Store.Knowledge().ClearNoteIcon(r.Context(), id, s.DataDir)
-	if errors.Is(err, store.ErrNotFound) {
+	updated, err := h.Store.ClearNoteIcon(r.Context(), id, h.DataDir)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
@@ -476,88 +444,36 @@ func (s *Server) deleteNoteIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
-	writeJSON(w, 200, s.notePayloadFiltered(r, updated))
+	h.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
+	writeJSON(w, 200, h.NotePayloadFiltered(r, updated))
 }
 
-// notePayloadFiltered is notePayload with private-note redaction applied —
+// NotePayloadFiltered is notePayload with private-note redaction applied —
 // use this everywhere a note goes back in a response, not the bare notePayload.
-func (s *Server) notePayloadFiltered(r *http.Request, n knowledge.Note) NotePayload {
-	out := s.notePayload(r, n)
+func (h *Handler) NotePayloadFiltered(r *http.Request, n knowledge.Note) NotePayload {
+	out := h.notePayload(r, n)
 	redactPrivateNote(r, n, &out.NoteRead)
 	return out
 }
 
-func (s *Server) notePayload(r *http.Request, n knowledge.Note) NotePayload {
-	children, _ := s.Store.Knowledge().ListNotes(r.Context(), knowledge.NoteFilter{ParentID: &n.ID})
+func (h *Handler) notePayload(r *http.Request, n knowledge.Note) NotePayload {
+	children, _ := h.Store.ListNotes(r.Context(), knowledge.NoteFilter{ParentID: &n.ID})
 	childReads := make([]knowledge.NoteBriefRead, 0, len(children))
 	for _, c := range children {
 		childReads = append(childReads, knowledge.NoteBrief(c))
 	}
-	c, _ := s.Store.Knowledge().GetNoteCheck(r.Context(), n.ID)
+	c, _ := h.Store.GetNoteCheck(r.Context(), n.ID)
 	return NotePayload{
 		NoteListItem: NoteListItem{NoteRead: knowledge.NoteToRead(n), NoteVerdict: verdictOf(c)},
 		Children:     childReads,
-		Refs:         s.resolveRefs(r, refs.Parse(n.Title+"\n"+n.Description)),
-		Backlinks:    s.backlinksTo(r, "note", n.ID),
+		Refs:         h.ResolveRefs(r, refs.Parse(n.Title+"\n"+n.Description)),
+		Backlinks:    h.backlinksTo(r, "note", n.ID),
 		Check:        checkView(c),
 	}
 }
 
-func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []domain.ResolvedRef {
-	out := make([]domain.ResolvedRef, 0, len(list))
-	for _, ref := range list {
-		row := domain.ResolvedRef{Kind: ref.Kind, ID: ref.ID}
-		switch ref.Kind {
-		case "note":
-			n, err := s.Store.Knowledge().GetNote(r.Context(), ref.ID)
-			if err == nil {
-				row.Title = &n.Title
-			}
-		case "quest":
-			q, err := s.Store.GetQuest(r.Context(), ref.ID)
-			if err == nil {
-				row.Title = &q.Title
-			}
-		case "questline":
-			ql, err := s.Store.GetQuestline(r.Context(), ref.ID)
-			if err == nil {
-				row.Title = &ql.Title
-			}
-		case "step":
-			qid, err := s.Store.QuestIDForStep(r.Context(), ref.ID)
-			if err == nil {
-				q, err := s.Store.GetQuest(r.Context(), qid)
-				if err == nil {
-					for _, st := range q.Steps {
-						if st.ID == ref.ID {
-							row.Title = &st.Title
-							row.QuestID = &q.ID
-							break
-						}
-					}
-				}
-			}
-		case "template":
-			t, err := s.Store.GetTemplate(r.Context(), ref.ID)
-			if err == nil {
-				row.Title = &t.Title
-			}
-		case "attachment":
-			a, err := s.Store.Knowledge().GetAttachment(r.Context(), ref.ID)
-			if err == nil {
-				row.Title = &a.Filename
-				row.OwnerType = a.OwnerType
-				row.OwnerID = &a.OwnerID
-			}
-		}
-		out = append(out, row)
-	}
-	return out
-}
-
-func (s *Server) backlinksTo(r *http.Request, kind string, id int64) []Backlink {
-	corpus, err := s.Store.Knowledge().ListLinkCorpus(r.Context())
+func (h *Handler) backlinksTo(r *http.Request, kind string, id int64) []Backlink {
+	corpus, err := h.Store.ListLinkCorpus(r.Context())
 	if err != nil {
 		return []Backlink{}
 	}
@@ -581,31 +497,21 @@ func (s *Server) backlinksTo(r *http.Request, kind string, id int64) []Backlink 
 	return out
 }
 
-func (s *Server) linkedNotesFromText(r *http.Request, texts ...string) []domain.ResolvedRef {
-	var blob strings.Builder
-	for _, t := range texts {
-		blob.WriteString(t)
-		blob.WriteByte('\n')
-	}
-	noteRefs := refs.FilterKind(refs.Parse(blob.String()), "note")
-	return s.resolveRefs(r, noteRefs)
-}
-
 // logNote records the note event in the change log (kind names follow the
 // hub's note_* events) and publishes it live.
-func (s *Server) logNote(ctx context.Context, kind string, n knowledge.Note, detail string, coalesce time.Duration) {
-	_ = s.Store.LogEvent(context.WithoutCancel(ctx), store.ChangeEvent{
+func (h *Handler) logNote(ctx context.Context, kind string, n knowledge.Note, detail string, coalesce time.Duration) {
+	h.LogEvent(context.WithoutCancel(ctx), ChangeEvent{
 		Kind: kind, EntityType: "note", EntityID: n.ID, Title: n.Title, Detail: detail, Coalesce: coalesce,
 	})
-	s.publishNote(ctx, kind, n)
+	h.publishNote(ctx, kind, n)
 }
 
-func (s *Server) publishNote(ctx context.Context, kind string, n knowledge.Note) {
-	if s.Hub == nil {
+func (h *Handler) publishNote(ctx context.Context, kind string, n knowledge.Note) {
+	if h.Hub == nil {
 		return
 	}
 	silent := ""
-	s.Hub.Publish(kind, events.PublishOpts{
+	h.Hub.Publish(kind, events.PublishOpts{
 		Workspace:   wsctx.From(ctx),
 		Title:       n.Title,
 		Description: n.Description,
@@ -614,23 +520,6 @@ func (s *Server) publishNote(ctx context.Context, kind string, n knowledge.Note)
 		Source:      "api",
 		Sound:       &silent,
 		Extra:       map[string]any{"note_id": n.ID},
-	})
-}
-
-// publishSilent wakes journal tabs (they reload on any quests_changed) without
-// a HUD toast or sound. Same contract as note events.
-func (s *Server) publishSilent(ctx context.Context, kind, title string, extra map[string]any) {
-	if s.Hub == nil {
-		return
-	}
-	silent := ""
-	s.Hub.Publish(kind, events.PublishOpts{
-		Workspace: wsctx.From(ctx),
-		Title:     title,
-		Toast:     false,
-		Source:    "api",
-		Sound:     &silent,
-		Extra:     extra,
 	})
 }
 
@@ -669,7 +558,7 @@ func noteJSONInt(v any) (int, bool) {
 // searchNotes ranks notes against a query: stemmed words in Russian and English, prefixes, the
 // other keyboard layout, typos in titles. Each hit says where it matched and carries a fragment
 // with the matches marked (⟪ ⟫). An agent (MCP) is never shown PRIVATE notes.
-func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) searchNotes(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	opts := knowledge.SearchOpts{Limit: limit}
@@ -686,13 +575,13 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 		// Filtering happens after ranking: look at the widest candidate set, then cut to the limit.
 		opts.Limit = 50
 	}
-	hits, err := s.Store.Knowledge().SearchNotes(r.Context(), q.Get("q"), opts)
+	hits, err := h.Store.SearchNotes(r.Context(), q.Get("q"), opts)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if want.active() {
-		hits, err = s.filterHitsByFlags(r, hits, want, limit)
+		hits, err = h.filterHitsByFlags(r, hits, want, limit)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -703,8 +592,8 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 
 // searchInNote finds a query inside one note with the same rules as the notes search; the answer is
 // the matched words (to mark them in the text) and the number of paragraphs that carry them.
-func (s *Server) searchInNote(w http.ResponseWriter, r *http.Request) {
-	_, n, ok := s.noteForStats(w, r)
+func (h *Handler) searchInNote(w http.ResponseWriter, r *http.Request) {
+	_, n, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
@@ -712,7 +601,7 @@ func (s *Server) searchInNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "Note not found")
 		return
 	}
-	res, err := s.Store.Knowledge().SearchInNote(r.Context(), n.Description, r.URL.Query().Get("q"))
+	res, err := h.Store.SearchInNote(r.Context(), n.Description, r.URL.Query().Get("q"))
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -721,8 +610,8 @@ func (s *Server) searchInNote(w http.ResponseWriter, r *http.Request) {
 }
 
 // noteFeedback is the cheap explicit signal: this note was useful (or misleading) for the task at hand.
-func (s *Server) noteFeedback(w http.ResponseWriter, r *http.Request) {
-	id, n, ok := s.noteForStats(w, r)
+func (h *Handler) noteFeedback(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
@@ -733,16 +622,16 @@ func (s *Server) noteFeedback(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, `body: {"useful": true|false}`)
 		return
 	}
-	if err := s.Store.Knowledge().RateNote(r.Context(), id, *body.Useful); err != nil {
+	if err := h.Store.RateNote(r.Context(), id, *body.Useful); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.writePopularity(w, r, n)
+	h.writePopularity(w, r, n)
 }
 
 // noteWeight sets the manual lever: −2 (misleading) … +2 (always worth a look).
-func (s *Server) noteWeight(w http.ResponseWriter, r *http.Request) {
-	id, n, ok := s.noteForStats(w, r)
+func (h *Handler) noteWeight(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
@@ -753,30 +642,30 @@ func (s *Server) noteWeight(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, `body: {"weight": -2..2}`)
 		return
 	}
-	if err := s.Store.Knowledge().SetNoteWeight(r.Context(), id, *body.Weight); err != nil {
+	if err := h.Store.SetNoteWeight(r.Context(), id, *body.Weight); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.writePopularity(w, r, n)
+	h.writePopularity(w, r, n)
 }
 
 // resetNoteStats forgets what was counted for the note (a mistaken streak of opens, a stale favourite).
-func (s *Server) resetNoteStats(w http.ResponseWriter, r *http.Request) {
-	id, n, ok := s.noteForStats(w, r)
+func (h *Handler) resetNoteStats(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
-	if err := s.Store.Knowledge().ResetNoteStats(r.Context(), id); err != nil {
+	if err := h.Store.ResetNoteStats(r.Context(), id); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.writePopularity(w, r, n)
+	h.writePopularity(w, r, n)
 }
 
-func (s *Server) noteForStats(w http.ResponseWriter, r *http.Request) (int64, knowledge.Note, bool) {
+func (h *Handler) noteForStats(w http.ResponseWriter, r *http.Request) (int64, knowledge.Note, bool) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	n, err := s.Store.Knowledge().GetNote(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
+	n, err := h.Store.GetNote(r.Context(), id)
+	if errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, 404, "Note not found")
 		return 0, n, false
 	}
@@ -787,8 +676,8 @@ func (s *Server) noteForStats(w http.ResponseWriter, r *http.Request) (int64, kn
 	return id, n, true
 }
 
-func (s *Server) writePopularity(w http.ResponseWriter, r *http.Request, n knowledge.Note) {
-	pop, err := s.Store.Knowledge().Popularity(r.Context(), map[int64]time.Time{n.ID: n.CreatedAt})
+func (h *Handler) writePopularity(w http.ResponseWriter, r *http.Request, n knowledge.Note) {
+	pop, err := h.Store.Popularity(r.Context(), map[int64]time.Time{n.ID: n.CreatedAt})
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -841,12 +730,12 @@ func parseNoteFlagFilter(raw string) noteFlagFilter {
 	return f
 }
 
-func (s *Server) filterHitsByFlags(r *http.Request, hits []knowledge.SearchHit, f noteFlagFilter, limit int) ([]knowledge.SearchHit, error) {
-	rows, err := s.Store.Knowledge().ListNotes(r.Context(), knowledge.NoteFilter{})
+func (h *Handler) filterHitsByFlags(r *http.Request, hits []knowledge.SearchHit, f noteFlagFilter, limit int) ([]knowledge.SearchHit, error) {
+	rows, err := h.Store.ListNotes(r.Context(), knowledge.NoteFilter{})
 	if err != nil {
 		return nil, err
 	}
-	checks, _ := s.Store.Knowledge().NoteChecks(r.Context())
+	checks, _ := h.Store.NoteChecks(r.Context())
 	byID := make(map[int64]knowledge.Note, len(rows))
 	for _, n := range rows {
 		byID[n.ID] = n

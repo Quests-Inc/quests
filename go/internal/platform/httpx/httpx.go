@@ -87,3 +87,13 @@ func FormatRetryAfter(d time.Duration) string {
 	}
 	return strconv.Itoa(secs)
 }
+
+// ServeIcon serves a user-uploaded icon file. Icons may be SVG, which runs scripts when
+// opened as a page, so the response is sandboxed: it can only ever be drawn as an image.
+func ServeIcon(w http.ResponseWriter, r *http.Request, path string) {
+	hd := w.Header()
+	hd.Set("X-Content-Type-Options", "nosniff")
+	hd.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	hd.Set("Content-Disposition", "inline")
+	http.ServeFile(w, r, path)
+}

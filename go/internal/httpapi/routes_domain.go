@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/valirum/quests/go/internal/domain"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/refs"
 	"github.com/valirum/quests/go/internal/schedule"
@@ -164,15 +165,7 @@ func (s *Server) getQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 	serveIcon(w, r, path)
 }
 
-// serveIcon serves a user-uploaded icon file. Icons may be SVG, which runs scripts when
-// opened as a page, so the response is sandboxed: it can only ever be drawn as an image.
-func serveIcon(w http.ResponseWriter, r *http.Request, path string) {
-	h := w.Header()
-	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-	h.Set("Content-Disposition", "inline")
-	http.ServeFile(w, r, path)
-}
+var serveIcon = httpx.ServeIcon
 
 func (s *Server) postQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -638,7 +631,7 @@ func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64
 		writeErr(w, 500, err.Error())
 		return
 	}
-	payload := s.notePayloadFiltered(r, n)
+	payload := s.knowledgeHTTP().NotePayloadFiltered(r, n)
 	attachments := s.attachmentsForOwner(r.Context(), ownerNote, n.ID, true)
 	payload.Attachments = attachments
 	writeJSON(w, 200, map[string]any{

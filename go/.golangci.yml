@@ -27,7 +27,6 @@ linters:
             - "**/internal/platform/ratelimit/**"
             - "**/internal/pdfdoc/**"
             - "**/internal/refs/**"
-            - "**/internal/domain/**"
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
@@ -172,6 +171,65 @@ linters:
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "db зависит только от wsctx (ADR-0001)"
+        domain:
+          files:
+            - "**/internal/domain/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/valirum/quests/go/internal/httpapi
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/store
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/identity
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/llmassist
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/domain
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/kernel
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/db
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
+            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+              desc: "domain зависит только от refs (общий тип разобранной ссылки)"
         dbx:
           files:
             - "**/internal/platform/dbx/**"

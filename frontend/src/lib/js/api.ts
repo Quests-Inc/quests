@@ -1,15 +1,7 @@
 import type { Category, QuestRead, Tag } from '../api/domain.gen'
-import type {
-  AttachmentRevisions,
-  AttachmentView,
-  GraphDraftView,
-  LLMView,
-  NoteCheckView,
-  NoteListItem,
-  NotePayload,
-  RunnerView,
-} from '../api/http.gen'
+import type { AttachmentRevisions, AttachmentView, GraphDraftView, LLMView, RunnerView } from '../api/http.gen'
 import type { WorkspacesView } from '../api/identity_http.gen'
+import type { NoteCheckView, NoteListItem, NotePayload } from '../api/knowledge_http.gen'
 import type { Graph, QuestlineRead, RunnerJob, TemplateRead } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 

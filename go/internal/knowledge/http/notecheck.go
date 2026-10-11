@@ -1,4 +1,4 @@
-package httpapi
+package knowledgehttp
 
 import (
 	"encoding/json"
@@ -6,30 +6,18 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/valirum/quests/go/internal/kernel"
 	"github.com/valirum/quests/go/internal/knowledge"
+	"github.com/valirum/quests/go/internal/platform/apperr"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/store"
 )
 
 // A note's check (quest=370): set and trigger. The verdict itself comes from the scheduler.
 
-func (s *Server) registerNoteCheck(mux *http.ServeMux) {
-	mux.HandleFunc("PUT /api/notes/{id}/check", s.putNoteCheck)
-	mux.HandleFunc("POST /api/notes/{id}/check/run", s.runNoteCheck)
-	mux.HandleFunc("PUT /api/notes/{id}/outdated", s.putNoteOutdated)
-}
-
-// NoteCheckView is a note's check as the API shows it.
-type NoteCheckView struct {
-	Command         *string `json:"command"`
-	IntervalSeconds *int    `json:"interval_seconds"`
-	RunOn           *string `json:"run_on"`
-	LastRunAt       *string `json:"last_run_at"`
-	Outdated        bool    `json:"outdated"`
-	OutdatedAt      *string `json:"outdated_at"`
-	Reason          string  `json:"reason"`
-	Error           string  `json:"error"`
-	ErrorAt         *string `json:"error_at"`
+func (h *Handler) RegisterNoteCheck(mux *http.ServeMux) {
+	mux.HandleFunc("PUT /api/notes/{id}/check", h.putNoteCheck)
+	mux.HandleFunc("POST /api/notes/{id}/check/run", h.runNoteCheck)
+	mux.HandleFunc("PUT /api/notes/{id}/outdated", h.putNoteOutdated)
 }
 
 func checkView(c knowledge.NoteCheck) NoteCheckView {
@@ -41,8 +29,8 @@ func checkView(c knowledge.NoteCheck) NoteCheckView {
 	}
 }
 
-func (s *Server) putNoteCheck(w http.ResponseWriter, r *http.Request) {
-	id, n, ok := s.noteForStats(w, r)
+func (h *Handler) putNoteCheck(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
@@ -55,16 +43,16 @@ func (s *Server) putNoteCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	c, err := s.Store.Knowledge().SetNoteCheck(r.Context(), id, body.Command, body.IntervalSeconds, body.RunOn)
+	c, err := h.Store.SetNoteCheck(r.Context(), id, body.Command, body.IntervalSeconds, body.RunOn)
 	switch {
 	case err == nil:
-	case store.IsBadInput(err):
+	case apperr.IsBad(err):
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
-	case errors.Is(err, store.ErrCommandOwner):
+	case errors.Is(err, kernel.ErrCommandOwner):
 		writeErr(w, http.StatusForbidden, err.Error())
 		return
-	case errors.Is(err, store.ErrNoRunner):
+	case errors.Is(err, kernel.ErrNoRunner):
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	default:
@@ -75,17 +63,17 @@ func (s *Server) putNoteCheck(w http.ResponseWriter, r *http.Request) {
 	if !c.Active() {
 		detail = "проверка актуальности снята"
 	}
-	s.logNote(r.Context(), "note_updated", n, detail, 0)
+	h.logNote(r.Context(), "note_updated", n, detail, 0)
 	writeJSON(w, http.StatusOK, checkView(c))
 }
 
 // runNoteCheck asks for a run at the next scheduler tick (within seconds).
-func (s *Server) runNoteCheck(w http.ResponseWriter, r *http.Request) {
-	id, _, ok := s.noteForStats(w, r)
+func (h *Handler) runNoteCheck(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
-	if err := s.Store.Knowledge().RequestNoteCheckNow(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+	if err := h.Store.RequestNoteCheckNow(r.Context(), id); errors.Is(err, knowledge.ErrNotFound) {
 		writeErr(w, http.StatusConflict, "у заметки нет проверки")
 		return
 	} else if err != nil {
@@ -96,8 +84,8 @@ func (s *Server) runNoteCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 // putNoteOutdated sets or clears the OUTDATED flag by hand: {"outdated": true|false, "reason": "…"}.
-func (s *Server) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
-	id, n, ok := s.noteForStats(w, r)
+func (h *Handler) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
+	id, n, ok := h.noteForStats(w, r)
 	if !ok {
 		return
 	}
@@ -113,7 +101,7 @@ func (s *Server) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
 	if *body.Outdated && reason == "" {
 		reason = "Отмечена вручную"
 	}
-	if err := s.Store.Knowledge().SetNoteOutdated(r.Context(), id, *body.Outdated, reason, time.Now().UTC()); err != nil {
+	if err := h.Store.SetNoteOutdated(r.Context(), id, *body.Outdated, reason, time.Now().UTC()); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -121,6 +109,6 @@ func (s *Server) putNoteOutdated(w http.ResponseWriter, r *http.Request) {
 	if !*body.Outdated {
 		detail = "пометка «устарела» снята"
 	}
-	s.logNote(r.Context(), "note_updated", n, detail, 0)
+	h.logNote(r.Context(), "note_updated", n, detail, 0)
 	writeJSON(w, http.StatusOK, map[string]any{"outdated": *body.Outdated, "reason": reason})
 }

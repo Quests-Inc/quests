@@ -3,8 +3,11 @@
 packages:
   - path: "github.com/valirum/quests/go/internal/domain"
     output_path: "../frontend/src/lib/api/domain.gen.ts"
+    frontmatter: |
+      import type { Resolved } from "./refs.gen";
     type_mappings:
       time.Time: "string"
+      refs.Resolved: "Resolved"
   - path: "github.com/valirum/quests/go/internal/identity"
     output_path: "../frontend/src/lib/api/identity.gen.ts"
     include_files:
@@ -23,6 +26,25 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       identity.Workspace: "Workspace"
+  - path: "github.com/valirum/quests/go/internal/refs"
+    output_path: "../frontend/src/lib/api/refs.gen.ts"
+    include_files:
+      - "resolved.go"
+    type_mappings:
+      time.Time: "string"
+  - path: "github.com/valirum/quests/go/internal/knowledge/http"
+    output_path: "../frontend/src/lib/api/knowledge_http.gen.ts"
+    include_files:
+      - "views.go"
+    frontmatter: |
+      import type { NoteBriefRead, NotePopularity, NoteRead } from "./knowledge.gen";
+      import type { Resolved } from "./refs.gen";
+    type_mappings:
+      time.Time: "string"
+      knowledge.NoteRead: "NoteRead"
+      knowledge.NoteBriefRead: "NoteBriefRead"
+      knowledge.NotePopularity: "NotePopularity"
+      refs.Resolved: "Resolved"
   - path: "github.com/valirum/quests/go/internal/knowledge"
     output_path: "../frontend/src/lib/api/knowledge.gen.ts"
     exclude_files:
@@ -47,14 +69,11 @@ packages:
     include_files:
       - "runner.go"
       - "llm_settings.go"
-      - "notes.go"
-      - "notecheck.go"
       - "attachments.go"
       - "graphdraft.go"
     frontmatter: |
-      import type { ResolvedRef } from "./domain.gen";
       import type { DraftOp, Runner } from "./store.gen";
-      import type { AttachmentRead, NoteBriefRead, NotePopularity, NoteRead, RevisionRead } from "./knowledge.gen";
+      import type { AttachmentRead, RevisionRead } from "./knowledge.gen";
       import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
@@ -65,10 +84,6 @@ packages:
       knowledge.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
       knowledge.RevisionRead: "RevisionRead"
-      knowledge.NoteRead: "NoteRead"
-      knowledge.NoteBriefRead: "NoteBriefRead"
-      knowledge.NotePopularity: "NotePopularity"
-      domain.ResolvedRef: "ResolvedRef"
   - path: "github.com/valirum/quests/go/internal/llmassist"
     output_path: "../frontend/src/lib/api/llm.gen.ts"
     include_files:
