@@ -105,6 +105,49 @@ test('ссылка на карту с центром рисует карточк
   expect(document.querySelectorAll('.gcard').length).toBeGreaterThanOrEqual(2)
   expect(document.querySelector('.gedges')).not.toBeNull()
   expect(document.body.textContent).toContain('Корневая')
+  expect(document.querySelector('[aria-label="Глубина"]')).not.toBeNull()
+  expect(document.querySelector('[aria-label="Раскладка"]')).not.toBeNull()
+  expect(document.body.textContent).toContain('Квесты:')
+  expect(document.querySelector('[aria-label="Вписать карту в окно"]')).not.toBeNull()
+})
+
+/** Кнопка шапки, не её невидимый двойник для замера ширины. */
+function liveButton(label: string) {
+  return [...document.querySelectorAll(`button[aria-label="${label}"]`)].find(
+    (el) => !el.closest('[aria-hidden="true"]')
+  ) as HTMLElement | undefined
+}
+
+test('окна оболочки открываются с шапки: шаблоны, секреты, теги, настройки, ассистент, квестлайн', async () => {
+  await openAt('')
+  const windows: [string, string, string][] = [
+    ['Шаблоны периодики', 'Шаблоны', 'Шаблоны'],
+    ['Секреты', 'Секреты', 'Секреты'],
+    ['Теги', 'Теги', 'Теги'],
+    ['Настройки', 'Настройки', 'Настройки'],
+    ['Командная строка журнала', 'Командная строка журнала', ''],
+    ['Новый квестлайн', 'Новый квестлайн', 'Новый квестлайн'],
+  ]
+  for (const [label, title, menuLabel] of windows) {
+    const btn = liveButton(label)
+    if (btn) btn.click()
+    else {
+      liveButton('Ещё действия')!.click()
+      await settle(40)
+      const item = [...document.querySelectorAll('[role=menuitem]')].find((el) =>
+        el.textContent?.includes(menuLabel)
+      ) as HTMLElement
+      expect(item, label).toBeTruthy()
+      item.click()
+    }
+    await settle(80)
+    const head = [...document.querySelectorAll('.modal__title')].find((el) => el.textContent?.includes(title))
+    expect(head, title).toBeTruthy()
+    const close = head!.closest('.modal')?.querySelector('button[aria-label="Закрыть"]') as HTMLElement | null
+    expect(close, title).toBeTruthy()
+    close!.click()
+    await settle(40)
+  }
 })
 
 test('ссылка на вложение выбирает его на вкладке вложений', async () => {
