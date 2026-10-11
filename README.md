@@ -2,13 +2,13 @@
 
 Менеджер задач в духе игрового журнала: веб-UI, API и Wayland-оверлей (HUD + тосты) для niri / CachyOS.
 
-Стек: **Go (API + CLI) · PostgreSQL · Svelte (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
+Стек: **Go (API + CLI + раннер) · PostgreSQL · Svelte + TypeScript (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
 
 ## Требования
 
 - Go ≥ 1.26 (сборка API/CLI)
 - Docker (локальный PostgreSQL: `just dev-db`)
-- Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (миграции, MCP, Telegram)
+- Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (MCP, Telegram, STT, оверлей)
 - Bun (фронт)
 - Для оверлея: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
 
@@ -25,7 +25,7 @@ just bootstrap
 
 Нужен [`just`](https://just.systems). Список всех рецептов (сборка, запуск, `just check` = линтеры + тесты) — просто `just`.
 
-Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `bun install` во `frontend/`, создаст `data/` и накатит миграции.
+Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `bun install` во `frontend/` и создаст `data/`; схему БД сервер накатывает сам при старте. Устройство системы — `docs/architecture.md`.
 
 ## Запуск
 

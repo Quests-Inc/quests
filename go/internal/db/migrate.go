@@ -166,7 +166,7 @@ func MigratePostgresOpts(ctx context.Context, url string, opts MigrateOptions) (
 
 	todo, known := pending(pgMigrations, version)
 	if !known {
-		logf("database revision %s is newer than this binary (head %s): nothing to apply", version, expectedAlembic)
+		logf("database revision %s is newer than this binary (head %s): nothing to apply", version, headRevision)
 		return nil, nil
 	}
 	if len(todo) > 0 && version != "" && opts.BeforeApply != nil {
@@ -227,4 +227,4 @@ func CurrentRevision(databaseURL string) (string, error) {
 }
 
 // ExpectedRevision is the schema revision this binary expects (the head of the chain).
-func ExpectedRevision() string { return expectedAlembic }
+func ExpectedRevision() string { return headRevision }

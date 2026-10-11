@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -309,6 +308,14 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"workspace_id": wsID, "username": user.Username, "created": created})
 }
 
+// WorkspacesView is the account's workspaces and what the current one has stored (absent when the usage is unknown).
+type WorkspacesView struct {
+	Current          int64             `json:"current"`
+	Workspaces       []store.Workspace `json:"workspaces"`
+	AttachmentsUsed  *int64            `json:"attachments_used,omitempty"`
+	AttachmentsQuota *int64            `json:"attachments_quota,omitempty"`
+}
+
 func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	cur := wsctx.From(r.Context())
 	if p, ok := PrincipalFrom(r.Context()); cur == 0 && (!ok || p.User.ID == 0) {
@@ -328,7 +335,11 @@ func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Workspace{}
 	}
-	writeJSON(w, http.StatusOK, mergeMaps(map[string]any{"current": cur, "workspaces": list, "enabled": true}, s.attachmentUsage(r.Context())))
+	view := WorkspacesView{Current: cur, Workspaces: list}
+	if used, err := s.Store.AttachmentUsage(r.Context()); err == nil {
+		view.AttachmentsUsed, view.AttachmentsQuota = &used, &s.WorkspaceQuota
+	}
+	writeJSON(w, http.StatusOK, view)
 }
 
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -457,17 +468,3 @@ func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 // attachmentUsage reports how much of the attachment quota the current workspace uses.
-func (s *Server) attachmentUsage(ctx context.Context) map[string]any {
-	used, err := s.Store.AttachmentUsage(ctx)
-	if err != nil {
-		return map[string]any{}
-	}
-	return map[string]any{"attachments_used": used, "attachments_quota": s.WorkspaceQuota}
-}
-
-func mergeMaps(a, b map[string]any) map[string]any {
-	for k, v := range b {
-		a[k] = v
-	}
-	return a
-}

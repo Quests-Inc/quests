@@ -13,7 +13,6 @@ import {
 /** Workspaces of the signed-in account, shared by the settings sections.
  * Switching / creating / deleting reloads the page: every list in the app belongs to one workspace. */
 export const wsx = $state({
-  enabled: false,
   loaded: false,
   list: [],
   current: 0,
@@ -34,19 +33,18 @@ export function currentWorkspaceName() {
 export async function loadWorkspaceState() {
   try {
     const r = await fetchWorkspaces()
-    wsx.enabled = !!r?.enabled
     wsx.list = r?.workspaces ?? []
     wsx.current = r?.current ?? 0
     wsx.attachmentsUsed = r?.attachments_used ?? 0
     wsx.attachmentsQuota = r?.attachments_quota ?? 0
     wsx.loaded = true
-    if (wsx.enabled && wsx.current) {
+    if (wsx.current) {
       const m = await fetchMembers(wsx.current)
       wsx.members = m?.members ?? []
       wsx.myRole = m?.role ?? ''
     }
   } catch {
-    wsx.enabled = false
+    wsx.loaded = false
   }
 }
 

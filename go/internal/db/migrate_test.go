@@ -57,8 +57,8 @@ func TestMigratePostgresFreshThenIdempotent(t *testing.T) {
 	if len(applied) != len(pgMigrations) {
 		t.Fatalf("applied %d, want %d", len(applied), len(pgMigrations))
 	}
-	if got := versionOf(t, dbURL); got != expectedAlembic {
-		t.Fatalf("version %q, want %q", got, expectedAlembic)
+	if got := versionOf(t, dbURL); got != headRevision {
+		t.Fatalf("version %q, want %q", got, headRevision)
 	}
 	again, err := MigratePostgres(context.Background(), dbURL, nil)
 	if err != nil || len(again) != 0 {
@@ -104,7 +104,7 @@ func TestMigratePostgresResumesFromAlembicRevision(t *testing.T) {
 	if len(applied) != len(pgMigrations)-upTo || applied[0] != pgMigrations[upTo].Revision {
 		t.Fatalf("applied %v", applied)
 	}
-	if got := versionOf(t, dbURL); got != expectedAlembic {
+	if got := versionOf(t, dbURL); got != headRevision {
 		t.Fatalf("version %q", got)
 	}
 }
@@ -155,7 +155,7 @@ func TestMigratePostgresRollsBackBrokenMigration(t *testing.T) {
 	}
 	var n int
 	_ = raw.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'half_done'`).Scan(&n)
-	if n != 0 || versionOf(t, dbURL) != expectedAlembic {
+	if n != 0 || versionOf(t, dbURL) != headRevision {
 		t.Fatalf("a failed migration left traces: tables=%d version=%s", n, versionOf(t, dbURL))
 	}
 }

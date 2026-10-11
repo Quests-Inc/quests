@@ -306,7 +306,7 @@ func OpenPostgresOpts(url string, opts PGOptions) (*sql.DB, SchemaStatus, error)
 		_ = sqlDB.Close()
 		return nil, zero, err
 	}
-	st, err := assertMigrated(sqlDB, expectedAlembic)
+	st, err := assertMigrated(sqlDB, headRevision)
 	if err != nil {
 		_ = sqlDB.Close()
 		return nil, zero, err

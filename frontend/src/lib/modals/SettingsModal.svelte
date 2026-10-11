@@ -26,7 +26,7 @@
     { id: 'services', label: 'Сервисы' },
     { id: 'appearance', label: 'Внешний вид' },
     { id: 'hotkeys', label: 'Клавиши' },
-    ...(onLogout && wsx.enabled
+    ...(onLogout && wsx.loaded
       ? [
           { id: 'workspace', label: 'Пространство' },
           { id: 'archive', label: 'Архив' },

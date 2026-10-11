@@ -7,13 +7,13 @@ func TestEmbeddedMigrations(t *testing.T) {
 	if pgMigrations[0].Revision != "1a2b3c4d5e6f" {
 		t.Fatalf("chain must start at the baseline 1a2b3c4d5e6f, got %s", pgMigrations[0].Revision)
 	}
-	if alembicOrder[len(alembicOrder)-1] != expectedAlembic {
-		t.Fatalf("alembicOrder must end with expectedAlembic")
+	if revisionOrder[len(revisionOrder)-1] != headRevision {
+		t.Fatalf("revisionOrder must end with headRevision")
 	}
 	seen := map[string]bool{}
-	for _, r := range alembicOrder {
+	for _, r := range revisionOrder {
 		if seen[r] {
-			t.Errorf("revision %s twice in alembicOrder", r)
+			t.Errorf("revision %s twice in revisionOrder", r)
 		}
 		seen[r] = true
 		if len(r) > 32 {

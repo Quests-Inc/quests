@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestCheckAlembicVersionMatch(t *testing.T) {
-	st, err := checkAlembicVersion(expectedAlembic)
+func TestCheckSchemaVersionMatch(t *testing.T) {
+	st, err := checkSchemaVersion(headRevision)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,9 +15,9 @@ func TestCheckAlembicVersionMatch(t *testing.T) {
 	}
 }
 
-func TestCheckAlembicVersionOlderFails(t *testing.T) {
+func TestCheckSchemaVersionOlderFails(t *testing.T) {
 	// The oldest revision stays older however many migrations are added after it.
-	_, err := checkAlembicVersion(alembicOrder[0])
+	_, err := checkSchemaVersion(revisionOrder[0])
 	if err == nil {
 		t.Fatal("expected error for older alembic")
 	}
@@ -26,8 +26,8 @@ func TestCheckAlembicVersionOlderFails(t *testing.T) {
 	}
 }
 
-func TestCheckAlembicVersionUnknownIsAhead(t *testing.T) {
-	st, err := checkAlembicVersion("ffffdeadbeef")
+func TestCheckSchemaVersionUnknownIsAhead(t *testing.T) {
+	st, err := checkSchemaVersion("ffffdeadbeef")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,9 +39,9 @@ func TestCheckAlembicVersionUnknownIsAhead(t *testing.T) {
 	}
 }
 
-func TestCheckAlembicVersionKnownAhead(t *testing.T) {
+func TestCheckSchemaVersionKnownAhead(t *testing.T) {
 	order := []string{"aaa", "bbb", "ccc"}
-	st, err := checkAlembicVersionAgainst("ccc", "bbb", order)
+	st, err := checkSchemaVersionAgainst("ccc", "bbb", order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,8 +51,8 @@ func TestCheckAlembicVersionKnownAhead(t *testing.T) {
 }
 
 func TestExpectedIsLastInOrder(t *testing.T) {
-	if alembicOrder[len(alembicOrder)-1] != expectedAlembic {
-		t.Fatalf("expectedAlembic %s must be last in alembicOrder (got %s)",
-			expectedAlembic, alembicOrder[len(alembicOrder)-1])
+	if revisionOrder[len(revisionOrder)-1] != headRevision {
+		t.Fatalf("headRevision %s must be last in revisionOrder (got %s)",
+			headRevision, revisionOrder[len(revisionOrder)-1])
 	}
 }

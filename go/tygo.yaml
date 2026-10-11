@@ -24,9 +24,10 @@ packages:
       - "notecheck.go"
       - "attachments.go"
       - "graphdraft.go"
+      - "workspaces.go"
     frontmatter: |
       import type { ResolvedRef } from "./domain.gen";
-      import type { AttachmentRead, DraftOp, NoteBriefRead, NotePopularity, NoteRead, Runner, RevisionRead } from "./store.gen";
+      import type { AttachmentRead, DraftOp, NoteBriefRead, NotePopularity, NoteRead, Runner, RevisionRead, Workspace } from "./store.gen";
       import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
@@ -36,6 +37,7 @@ packages:
       store.Runner: "Runner"
       store.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
+      store.Workspace: "Workspace"
       store.RevisionRead: "RevisionRead"
       store.NoteRead: "NoteRead"
       store.NoteBriefRead: "NoteBriefRead"

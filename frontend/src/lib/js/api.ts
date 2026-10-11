@@ -8,6 +8,7 @@ import type {
   NoteListItem,
   NotePayload,
   RunnerView,
+  WorkspacesView,
 } from '../api/http.gen'
 import type { Graph, QuestlineRead, RunnerJob, TemplateRead } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
@@ -491,7 +492,7 @@ export function logout() {
 // --- workspaces (isolated data spaces of one account) ---
 
 export function fetchWorkspaces() {
-  return request('/api/workspaces')
+  return request<WorkspacesView>('/api/workspaces')
 }
 
 export function createWorkspace(name: string) {

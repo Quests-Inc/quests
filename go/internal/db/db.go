@@ -9,16 +9,16 @@ import (
 )
 
 // The schema chain is embedded (sql/pg, applied by MigratePostgres); its head is
-// expectedAlembic and needs no manual bump. The version table keeps the name and
+// headRevision and needs no manual bump. The version table keeps the name and
 // format of the Alembic era (production was created by Alembic), so existing
 // databases carry on from where they are.
 
-// alembicOrder is oldest→newest. Unknown DB revisions are treated as ahead of this
+// revisionOrder is oldest→newest. Unknown DB revisions are treated as ahead of this
 // binary (deploy race: migrate applied before the new image lands).
-var alembicOrder = buildOrder()
+var revisionOrder = buildOrder()
 
-// expectedAlembic is the schema revision this binary was built against.
-var expectedAlembic = pgMigrations[len(pgMigrations)-1].Revision
+// headRevision is the schema revision this binary was built against.
+var headRevision = pgMigrations[len(pgMigrations)-1].Revision
 
 func buildOrder() []string {
 	order := make([]string, 0, len(pgMigrations))
@@ -46,24 +46,24 @@ func assertMigrated(db *sql.DB, expected string) (SchemaStatus, error) {
 	if err != nil {
 		return SchemaStatus{}, fmt.Errorf("read alembic_version: %w (start the server: it migrates the schema itself)", err)
 	}
-	return checkAlembicVersionAgainst(ver, expected, alembicOrder)
+	return checkSchemaVersionAgainst(ver, expected, revisionOrder)
 }
 
-func checkAlembicVersion(ver string) (SchemaStatus, error) {
-	return checkAlembicVersionAgainst(ver, expectedAlembic, alembicOrder)
+func checkSchemaVersion(ver string) (SchemaStatus, error) {
+	return checkSchemaVersionAgainst(ver, headRevision, revisionOrder)
 }
 
-func checkAlembicVersionAgainst(ver, expected string, order []string) (SchemaStatus, error) {
+func checkSchemaVersionAgainst(ver, expected string, order []string) (SchemaStatus, error) {
 	expIdx := indexOf(order, expected)
 	if expIdx < 0 {
-		return SchemaStatus{}, fmt.Errorf("internal: expectedAlembic %s missing from alembicOrder", expected)
+		return SchemaStatus{}, fmt.Errorf("internal: headRevision %s missing from revisionOrder", expected)
 	}
 	st := SchemaStatus{Version: ver, Expected: expected, State: "ok"}
 	dbIdx := indexOf(order, ver)
 	if dbIdx < 0 {
 		// Unknown id — treat as ahead (new migrate landed before this binary).
 		st.State = "warn"
-		st.Detail = fmt.Sprintf("БД alembic=%s новее API (ожидалось %s) — обнови образ", ver, expected)
+		st.Detail = fmt.Sprintf("Схема БД %s новее API (ожидалось %s) — обнови образ", ver, expected)
 		return st, nil
 	}
 	if dbIdx < expIdx {
@@ -71,10 +71,10 @@ func checkAlembicVersionAgainst(ver, expected string, order []string) (SchemaSta
 	}
 	if dbIdx > expIdx {
 		st.State = "warn"
-		st.Detail = fmt.Sprintf("БД alembic=%s новее API (ожидалось %s) — обнови образ", ver, expected)
+		st.Detail = fmt.Sprintf("Схема БД %s новее API (ожидалось %s) — обнови образ", ver, expected)
 		return st, nil
 	}
-	st.Detail = fmt.Sprintf("alembic=%s", ver)
+	st.Detail = fmt.Sprintf("схема %s", ver)
 	return st, nil
 }
 
