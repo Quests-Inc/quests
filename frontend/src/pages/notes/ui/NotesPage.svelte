@@ -9,6 +9,7 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
+  import { createTreeDnd } from '../model/treeDnd.svelte.ts'
   import { NOTE_SPEC, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { parseQuery, passes, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
@@ -115,14 +116,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let renamingId = $state((null as number | null))
   let renamingValue = $state('')
   let renameInputEl = $state((null as HTMLInputElement | null))
-  /** Drag-n-drop reparenting in the tree — only moves a note between parents,
-   * never touches sort order (that stays children → pinned → sort_order → id,
-   * same as byParent's own sort above). */
-  let dragId = $state((null as number | null))
-  /** String(id) of the row under the cursor, or 'root' for the list's empty
-   * background, or null. */
-  let dragOverKey = $state((null as string | null))
-
   let dirty = $derived(
     title !== saved.title ||
       description !== saved.description ||
@@ -1097,76 +1090,11 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     await reparentNote(id, parent?.parent_id ?? null)
   }
 
-  /** @param targetId — null means "make it a root note" */
-  function canDropOn(targetId: number | null, draggedId = dragId) {
-    if (draggedId == null) return false
-    if (targetId === draggedId) return false
-    // target is a descendant of the dragged note — moving there would cycle it.
-    if (targetId != null && isUnder(notes, targetId, draggedId)) return false
-    return true
-  }
-
-  /** Reparent from a tree drag — saved immediately, like the breadcrumb picker. */
-  function moveNoteTo(id: number, newParentId: number | null) {
-    return reparentNote(id, newParentId)
-  }
-
-  function onRowDragStart(event: { preventDefault: () => void; dataTransfer: { effectAllowed: string; setData: (arg0: string,arg1: string) => void } }, id: number) {
-    if (renamingId != null) {
-      event.preventDefault()
-      return
-    }
-    dragId = id
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', String(id))
-  }
-
-  function onRowDragEnd() {
-    dragId = null
-    dragOverKey = null
-  }
-
-  function onRowDragOver(event: { preventDefault: () => void; stopPropagation: () => void; dataTransfer: { dropEffect: string } }, id: number) {
-    if (!canDropOn(id)) return
-    event.preventDefault()
-    event.stopPropagation()
-    event.dataTransfer.dropEffect = 'move'
-    dragOverKey = String(id)
-  }
-
-  function onRowDragLeave(event: any, id: any) {
-    if (dragOverKey === String(id)) dragOverKey = null
-  }
-
-  function onRowDrop(event: { preventDefault: () => void; stopPropagation: () => void }, id: number) {
-    event.preventDefault()
-    event.stopPropagation()
-    const draggedId = dragId
-    dragId = null
-    dragOverKey = null
-    if (draggedId == null || !canDropOn(id, draggedId)) return
-    moveNoteTo(draggedId, id)
-  }
-
-  function onListDragOver(event: { preventDefault: () => void; dataTransfer: { dropEffect: string } }) {
-    if (!canDropOn(null)) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-    dragOverKey = 'root'
-  }
-
-  function onListDragLeave(event: any) {
-    if (dragOverKey === 'root') dragOverKey = null
-  }
-
-  function onListDrop(event: { preventDefault: () => void }) {
-    event.preventDefault()
-    const draggedId = dragId
-    dragId = null
-    dragOverKey = null
-    if (draggedId == null || !canDropOn(null, draggedId)) return
-    moveNoteTo(draggedId, null)
-  }
+  const dnd = createTreeDnd({
+    notes: () => notes,
+    renaming: () => renamingId != null,
+    move: (id, newParentId) => reparentNote(id, newParentId),
+  })
 
   function requestDelete(id: number) {
     if (id == null) return
@@ -1262,7 +1190,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     {notes}
     {roots}
     {selectedId}
-    {dragOverKey}
+    dragOverKey={dnd.dragOverKey}
     {renamingId}
     bind:renamingValue
     bind:renameInputEl
@@ -1280,14 +1208,14 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     {rowDirty}
     {onRenameKeydown}
     onCommitRename={commitRename}
-    {onListDragOver}
-    {onListDragLeave}
-    {onListDrop}
-    {onRowDragStart}
-    {onRowDragEnd}
-    {onRowDragOver}
-    {onRowDragLeave}
-    {onRowDrop}
+    onListDragOver={dnd.onListDragOver}
+    onListDragLeave={dnd.onListDragLeave}
+    onListDrop={dnd.onListDrop}
+    onRowDragStart={dnd.onRowDragStart}
+    onRowDragEnd={dnd.onRowDragEnd}
+    onRowDragOver={dnd.onRowDragOver}
+    onRowDragLeave={dnd.onRowDragLeave}
+    onRowDrop={dnd.onRowDrop}
   />
 
   <section class="notes__page" bind:this={pageEl}>

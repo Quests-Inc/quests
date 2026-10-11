@@ -73,7 +73,7 @@
     onRenameKeydown(e: KeyboardEvent): void
     onCommitRename: () => void
     onListDragOver(e: DragEvent): void
-    onListDragLeave(e: DragEvent): void
+    onListDragLeave(): void
     onListDrop(e: DragEvent): void
     onRowDragStart(e: DragEvent, id: number): void
     onRowDragEnd: () => void
