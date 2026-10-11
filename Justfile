@@ -277,7 +277,7 @@ test-go:
         just pg-test >/dev/null
         export QUESTS_TEST_PG_URL="postgresql://quests:test@127.0.0.1:55432/quests?sslmode=disable"
     fi
-    cd go && go build ./... && go test ./...
+    cd go && go build ./... && go test -coverpkg=./internal/... -coverprofile=cover.out ./... && python3 ../tools/coverage_gate.py cover.out
 
 # Throwaway PostgreSQL for the Go tests (idempotent); stop with `docker stop quests-pg-test`.
 pg-test:

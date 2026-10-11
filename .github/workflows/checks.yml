@@ -78,7 +78,8 @@ jobs:
           QUESTS_TEST_PG_URL: postgresql://quests:test@127.0.0.1:5432/quests?sslmode=disable
         run: |
           go build ./...
-          go test ./...
+          go test -coverpkg=./internal/... -coverprofile=cover.out ./...
+          python3 ../tools/coverage_gate.py cover.out
 
       - name: TypeScript types are up to date
         working-directory: go

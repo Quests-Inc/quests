@@ -54,3 +54,20 @@ PostgreSQL 17 — единственная БД (`docs/postgres.md`). Изоля
 Бот, MCP, STT и оверлей — отдельные процессы со своим жизненным циклом и тяжёлыми зависимостями (aiogram, whisper, GTK).
 Переписывать их ради единого языка не планируется: границей служит HTTP API, и они не влияют ни на схему данных, ни на
 образ API. Python в API-образе нет совсем.
+
+## Гейты против регрессий
+
+Все гейты гоняются локально (`just test`, `cd frontend && bun run verify`) и теми же командами в CI.
+
+| Гейт | Что держит |
+|---|---|
+| `golangci-lint` + depguard (`go/.golangci.yml`) | направление зависимостей пакетов Go (контексты, `platform`, корень) |
+| `internal/archtest` | нетестовый Go-файл ≤ 600 строк |
+| `tools/coverage_gate.py` (+ `go/.coverage-baseline.json`) | покрытие Go по пакетам не падает; новый пакет — не меньше 50 %; интеграционные тесты засчитываются обработчикам (`-coverpkg`) |
+| `go tool tygo generate` без diff | типы фронта совпадают с Go-структурами |
+| `check:fsd` | слои FSD, импорты только через `index.ts`, кросс-импорты сущностей только через `@x` |
+| `check:arch` (+ `frontend/.arch-baseline.json`) | файл не растёт сверх планки, новый — ≤ 800 строк; `model/` и `lib/` не знают про компоненты, контроллеры `.svelte.ts` — только в них; сеть — только в `shared/api`; **каждый файл `model/` и `shared/lib/` подключён тестом** |
+| `check` (svelte-check) и `check:any` | число ошибок типов и явных `any` не растёт |
+| `tests/unit`, `tests/components`, `tests/security` | чистая логика; компоненты и контроллеры на happy-dom; санитайзер markdown на jsdom |
+
+Новые планки ставятся командами `--update` (`check:any`, `check:arch`, `coverage_gate.py`) и только вниз: долг можно гасить, наращивать — нет.

@@ -76,3 +76,4 @@ go/bin/
 # Local manual backups (`just pull-prod-data`, ad-hoc tar snapshots)
 /backups/
 
+go/cover.out
