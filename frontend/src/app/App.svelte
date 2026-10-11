@@ -3,6 +3,7 @@
   import { HistoryPage } from '@/pages/history'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
+  import { createQuestActions } from '@/app/model/questActions.svelte.ts'
   import { contextMenuItems } from '@/app/model/contextMenu.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
   import {
@@ -217,8 +218,6 @@ import { RunnersPage } from '@/pages/runners'
     deleteAnimResolve?.()
     deleteAnimResolve = null
   }
-  let statusBusy = $state(false)
-  let questPdfBusy = false
   let pinBusyId = $state((null as number | null))
   let stepBusyId = $state((null as number | null))
   let stepEditId = $state((null as number | null))
@@ -496,83 +495,14 @@ import { RunnersPage } from '@/pages/runners'
     }
   }
 
-  async function patchQuestStatus(quest: { id: number }, status: string) {
-    if (!quest || statusBusy) return
-    statusBusy = true
-    error = ''
-    try {
-      const saved = await updateQuest(quest.id, { status })
-      applyQuest(saved)
-      toast(`Статус: ${statusToastLabel(status)}`, { kind: 'success' })
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      statusBusy = false
-    }
-  }
-
-  async function postponeQuest(quest: { id: number }, minutes: number) {
-    if (!quest || statusBusy) return
-    statusBusy = true
-    error = ''
-    try {
-      const secs = Math.max(60, Math.round(Number(minutes) * 60))
-      const deadline = new Date(Date.now() + secs * 1000).toISOString()
-      const saved = await updateQuest(quest.id, {
-        status: 'active',
-        deadline_at: deadline,
-        duration_seconds: secs,
-      })
-      applyQuest(saved)
-      toast(`Отложен на ${minutes} мин`, { kind: 'success' })
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      statusBusy = false
-    }
-  }
-
-  async function patchQuestSignificance(quest: { significance: any; id: number }, significance: string) {
-    if (!quest || statusBusy) return
-    if (significance === (quest.significance || 'common')) return
-    statusBusy = true
-    error = ''
-    try {
-      const saved = await updateQuest(quest.id, { significance })
-      applyQuest(saved)
-      const label = QUEST_SIGNIFICANCES.find((s) => s.id === significance)?.label || significance
-      toast(`Значимость: ${label}`, { kind: 'success' })
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      statusBusy = false
-    }
-  }
-
-  async function exportQuestFromMenu(quest: any, mode: string) {
-    if (!quest || questPdfBusy) return
-    if (mode === 'md') {
-      downloadQuestMarkdown(quest)
-      toast('Markdown сохранён', { kind: 'success' })
-      return
-    }
-    questPdfBusy = true
-    const tid = 'pdf-quest'
-    toastProgress(tid, 'Генерация PDF…')
-    try {
-      if (mode === 'simple') await downloadQuestPdfSimple(quest)
-      else await downloadQuestPdf(quest, { labels: refLabels, tzLabel: localTimeZone() })
-      toastDone(tid, 'PDF сохранён')
-    } catch (e) {
-      console.error(e)
-      toastDone(tid, e?.message || 'Не удалось сохранить PDF', 'error')
-    } finally {
-      questPdfBusy = false
-    }
-  }
+  const questActions = createQuestActions({
+    updateQuest,
+    applyQuest: (quest, opts) => applyQuest(quest, opts),
+    setError: (message) => (error = message),
+    refLabels: () => refLabels,
+  })
+  let statusBusy = $derived(questActions.busy)
+  const { patchStatus: patchQuestStatus, postpone: postponeQuest, patchSignificance: patchQuestSignificance, exportQuest: exportQuestFromMenu } = questActions
 
   function onQuestContextSelect(action: string) {
     if (action === 'copy-id') {
@@ -755,26 +685,7 @@ import { RunnersPage } from '@/pages/runners'
     }
   }
 
-  async function toggleCompleted(quest = selected) {
-    const q = quest || selected
-    if (!q || statusBusy) return
-    statusBusy = true
-    error = ''
-    try {
-      const next = q.status === 'completed' ? 'active' : 'completed'
-      const saved = await updateQuest(q.id, { status: next })
-      applyQuest(saved, { select: false })
-      toast(
-        next === 'completed' ? 'Отмечен выполненным' : 'Снова активен',
-        { kind: 'success' },
-      )
-    } catch (e) {
-      error = e.message || String(e)
-      toast(error, { kind: 'error' })
-    } finally {
-      statusBusy = false
-    }
-  }
+  const toggleCompleted = (quest = selected) => questActions.toggleCompleted(quest || selected)
 
   async function togglePin(quest: { id: number; pinned: any; overlay_hidden: any }, event: { stopPropagation: () => void; preventDefault: () => void }) {
     event?.stopPropagation?.()
