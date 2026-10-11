@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/valirum/quests/go/internal/platform/ratelimit"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -101,16 +103,7 @@ func (s *Server) principal(r *http.Request) (identity.Principal, bool) {
 	return identity.Principal{}, false
 }
 
-func bearerToken(r *http.Request) string {
-	h := strings.TrimSpace(r.Header.Get("Authorization"))
-	if h == "" {
-		return ""
-	}
-	if len(h) > 7 && strings.EqualFold(h[:7], "Bearer ") {
-		return strings.TrimSpace(h[7:])
-	}
-	return ""
-}
+var bearerToken = httpx.BearerToken
 
 func subtleEqual(a, b string) bool {
 	return len(a) == len(b) && tokens.Hash(a) == tokens.Hash(b)
@@ -124,20 +117,7 @@ func formatRetryAfter(d time.Duration) string {
 	return strconv.Itoa(secs)
 }
 
-// requestIsHTTPS reports whether this specific request arrived over TLS,
-// either directly or via a reverse proxy (Caddy on the edge gateway) that
-// sets X-Forwarded-Proto. s.SecureCookies alone can't express "HTTPS via the
-// gateway, plain HTTP on the LAN" — it's all-or-nothing for the whole
-// process, which would either break LAN logins or ship cookies without
-// Secure over the public gateway. Trusting X-Forwarded-Proto here is safe
-// under this deployment: the only route in is direct LAN or Tailscale-only
-// gateway traffic, nothing untrusted can reach this port to spoof the header.
-func requestIsHTTPS(r *http.Request) bool {
-	if r.TLS != nil {
-		return true
-	}
-	return strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https")
-}
+var requestIsHTTPS = httpx.IsHTTPS
 
 // originAllowed accepts requests with no Origin (same-origin navigations and
 // non-browser clients), a same-host Origin, or an explicitly configured one.
@@ -169,8 +149,8 @@ func (s *Server) registerAuth(mux *http.ServeMux) {
 	})
 }
 
-func (s *Server) limiter() *loginLimiter {
-	s.loginLimiterOnce.Do(func() { s.loginLimiter = newLoginLimiter() })
+func (s *Server) limiter() *ratelimit.Limiter {
+	s.loginLimiterOnce.Do(func() { s.loginLimiter = ratelimit.New() })
 	return s.loginLimiter
 }
 
@@ -183,8 +163,8 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "cross-origin request rejected")
 		return
 	}
-	key := loginClientKey(r)
-	if ok, retryIn := s.limiter().allow(key); !ok {
+	key := httpx.ClientKey(r)
+	if ok, retryIn := s.limiter().Allow(key); !ok {
 		w.Header().Set("Retry-After", formatRetryAfter(retryIn))
 		writeErr(w, http.StatusTooManyRequests, "слишком много попыток входа, повторите позже")
 		return
@@ -202,19 +182,19 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
 		return
 	}
-	if d := s.limiter().userPenalty(user); d > 0 {
+	if d := s.limiter().UserPenalty(user); d > 0 {
 		time.Sleep(d)
 	}
-	if !s.limiter().acquire() {
+	if !s.limiter().Acquire() {
 		w.Header().Set("Retry-After", "2")
 		writeErr(w, http.StatusTooManyRequests, "сервер занят проверкой паролей, повторите")
 		return
 	}
 	u, err := s.Auth.Authenticate(body.Username, body.Password)
-	s.limiter().release()
+	s.limiter().Release()
 	if err != nil {
-		s.limiter().recordFailure(key)
-		s.limiter().recordUserFailure(user)
+		s.limiter().RecordFailure(key)
+		s.limiter().RecordUserFailure(user)
 		if errors.Is(err, identity.ErrBadPassword) {
 			writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
 			return
@@ -236,7 +216,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": ticket})
 		return
 	}
-	s.limiter().recordSuccess(key)
+	s.limiter().RecordSuccess(key)
 	if _, err := s.startSession(w, r, u.ID); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

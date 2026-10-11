@@ -216,7 +216,7 @@ func (s *Server) testMyLLM(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !s.limiter().tryLLM(strconv.FormatInt(uid, 10)) {
+	if !s.limiter().TryLLM(strconv.FormatInt(uid, 10)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов к ассистенту, повторите позже")
 		return
 	}

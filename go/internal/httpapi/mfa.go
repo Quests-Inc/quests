@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 	"net/http"
 	"strconv"
 	"strings"
@@ -102,8 +103,8 @@ func (s *Server) postLoginMFA(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "cross-origin request rejected")
 		return
 	}
-	key := loginClientKey(r)
-	if ok, retryIn := s.limiter().allow(key); !ok {
+	key := httpx.ClientKey(r)
+	if ok, retryIn := s.limiter().Allow(key); !ok {
 		w.Header().Set("Retry-After", formatRetryAfter(retryIn))
 		writeErr(w, http.StatusTooManyRequests, "слишком много попыток входа, повторите позже")
 		return
@@ -118,17 +119,17 @@ func (s *Server) postLoginMFA(w http.ResponseWriter, r *http.Request) {
 	}
 	tk, ok := s.mfa.attempt(body.Token)
 	if !ok {
-		s.limiter().recordFailure(key)
+		s.limiter().RecordFailure(key)
 		writeErr(w, http.StatusUnauthorized, "сессия входа истекла или попытки кончились — введите логин и пароль заново")
 		return
 	}
 	user := strings.ToLower(tk.username)
-	if d := s.limiter().userPenalty(user); d > 0 {
+	if d := s.limiter().UserPenalty(user); d > 0 {
 		time.Sleep(d)
 	}
 	if err := s.Auth.VerifySecondFactor(tk.userID, body.Code); err != nil {
-		s.limiter().recordFailure(key)
-		s.limiter().recordUserFailure(user)
+		s.limiter().RecordFailure(key)
+		s.limiter().RecordUserFailure(user)
 		if errors.Is(err, identity.ErrBadCode) {
 			writeErr(w, http.StatusUnauthorized, "Неверный код")
 			return
@@ -137,7 +138,7 @@ func (s *Server) postLoginMFA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mfa.spend(body.Token)
-	s.limiter().recordSuccess(key)
+	s.limiter().RecordSuccess(key)
 	if _, err := s.startSession(w, r, tk.userID); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -173,7 +174,7 @@ func readCode(w http.ResponseWriter, r *http.Request) (string, bool) {
 func (s *Server) mfaFail(w http.ResponseWriter, u identity.User, err error) {
 	switch {
 	case errors.Is(err, identity.ErrBadCode):
-		s.limiter().recordUserFailure("mfa:" + strconv.FormatInt(u.ID, 10))
+		s.limiter().RecordUserFailure("mfa:" + strconv.FormatInt(u.ID, 10))
 		writeErr(w, http.StatusUnprocessableEntity, "Неверный код")
 	case errors.Is(err, identity.ErrMFAUnavailable):
 		writeErr(w, http.StatusConflict, err.Error())
@@ -185,7 +186,7 @@ func (s *Server) mfaFail(w http.ResponseWriter, u identity.User, err error) {
 }
 
 func (s *Server) stallMFA(u identity.User) {
-	if d := s.limiter().userPenalty("mfa:" + strconv.FormatInt(u.ID, 10)); d > 0 {
+	if d := s.limiter().UserPenalty("mfa:" + strconv.FormatInt(u.ID, 10)); d > 0 {
 		time.Sleep(d)
 	}
 }

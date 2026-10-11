@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/valirum/quests/go/internal/platform/ratelimit"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -49,7 +51,7 @@ type Server struct {
 	// loginLimiter throttles repeated failed /api/auth/login attempts.
 	// Lazily initialized on first use — see Server.limiter().
 	loginLimiterOnce sync.Once
-	loginLimiter     *loginLimiter
+	loginLimiter     *ratelimit.Limiter
 	// InternalToken authenticates the server's own loopback calls (LLM assistant).
 	// Generated per process, never persisted.
 	InternalToken string
@@ -174,13 +176,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 	})
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	_ = enc.Encode(v)
-}
+var writeJSON = httpx.WriteJSON
 
 func writeErr(w http.ResponseWriter, status int, detail string) {
 	// A store refusal is the caller's to fix, wherever it surfaced: not an owner (403), no runner for a command (422).
@@ -192,7 +188,7 @@ func writeErr(w http.ResponseWriter, status int, detail string) {
 			status = http.StatusUnprocessableEntity
 		}
 	}
-	writeJSON(w, status, map[string]string{"detail": detail})
+	httpx.WriteErr(w, status, detail)
 }
 
 func (s *Server) getHealth(w http.ResponseWriter, r *http.Request) {
@@ -309,15 +305,7 @@ func (s *Server) getQuest(w http.ResponseWriter, r *http.Request) {
 // scheduler.
 var sourcePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,31}$`)
 
-// requestSource is how the quest being created was made, from the
-// X-Quests-Source header the clients set; "api" when absent or not a plain label.
-func requestSource(r *http.Request) *string {
-	v := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Quests-Source")))
-	if !sourcePattern.MatchString(v) {
-		v = "api"
-	}
-	return &v
-}
+var requestSource = httpx.RequestSource
 
 func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 	var body domain.QuestCreate

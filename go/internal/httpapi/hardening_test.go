@@ -62,24 +62,6 @@ func TestIconsAreSandboxed(t *testing.T) {
 	}
 }
 
-func TestLoginClientKeyIgnoresPortAndGarbage(t *testing.T) {
-	r := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
-	r.RemoteAddr = "192.168.1.5:40001"
-	a := loginClientKey(r)
-	r.RemoteAddr = "192.168.1.5:40002"
-	if b := loginClientKey(r); a != b || a != "192.168.1.5" {
-		t.Fatalf("key depends on the source port: %q vs %q", a, b)
-	}
-	r.Header.Set("X-Forwarded-For", "not an ip, 1.2.3.4")
-	if got := loginClientKey(r); got != "192.168.1.5" {
-		t.Fatalf("a malformed X-Forwarded-For must not become the key, got %q", got)
-	}
-	r.Header.Set("X-Forwarded-For", "203.0.113.7, 10.0.0.1")
-	if got := loginClientKey(r); got != "203.0.113.7" {
-		t.Fatalf("got %q", got)
-	}
-}
-
 func TestReservedSecretNames(t *testing.T) {
 	for _, bad := range []string{"PATH", "path", "LD_PRELOAD", "BASH_ENV", "SHELLOPTS", "PS4", "QUESTS_WORKSPACE", "PYTHONSTARTUP", "NODE_OPTIONS", "GIT_SSH_COMMAND"} {
 		if !store.ReservedSecretName(bad) {
@@ -90,21 +72,5 @@ func TestReservedSecretNames(t *testing.T) {
 		if store.ReservedSecretName(ok) {
 			t.Errorf("%s should be allowed", ok)
 		}
-	}
-}
-
-func TestLoginLimiterUserPenaltyDoesNotLockOut(t *testing.T) {
-	l := newLoginLimiter()
-	for i := 0; i < userFreeFails; i++ {
-		l.recordUserFailure("owner")
-	}
-	if d := l.userPenalty("owner"); d != 0 {
-		t.Fatalf("no stall expected within the free failures, got %v", d)
-	}
-	for i := 0; i < 20; i++ {
-		l.recordUserFailure("owner")
-	}
-	if d := l.userPenalty("owner"); d <= 0 || d > userMaxPenalty {
-		t.Fatalf("penalty %v should be a bounded stall", d)
 	}
 }

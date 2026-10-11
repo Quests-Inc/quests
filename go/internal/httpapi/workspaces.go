@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"github.com/valirum/quests/go/internal/platform/httpx"
 	"net/http"
 	"strconv"
 	"strings"
@@ -212,7 +213,7 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
-	if !s.limiter().tryInvite(loginClientKey(r)) {
+	if !s.limiter().TryInvite(httpx.ClientKey(r)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов")
 		return
 	}
@@ -245,7 +246,7 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "cross-origin request rejected")
 		return
 	}
-	if !s.limiter().tryInvite(loginClientKey(r)) {
+	if !s.limiter().TryInvite(httpx.ClientKey(r)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много попыток, повторите позже")
 		return
 	}

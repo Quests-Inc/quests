@@ -1,22 +1,21 @@
-package httpapi
+// Package ratelimit throttles abuse that is cheap to try and costly to serve: password guessing, invitation
+// probing, paid assistant calls. In-memory only; a restart resets it, which is fine for a single instance.
+package ratelimit
 
 import (
-	"net"
-	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
 
-// loginLimiter throttles repeated failed logins per source IP with
+// Limiter throttles repeated failed logins per source IP with
 // exponential backoff: 5 free attempts, then a lockout that doubles (30s,
 // 1m, 2m, ... capped at 15m) on every further failure while still locked.
 // Process-memory only — resets on restart, which is fine for a personal
 // single-instance server; it only needs to blunt an automated password
 // guesser, not survive a distributed attack.
-type loginLimiter struct {
+type Limiter struct {
 	mu       sync.Mutex
-	attempts map[string]*loginAttempts
+	attempts map[string]*attempts
 	invites  map[string][]time.Time
 	// byUser counts recent failures per login name, from anywhere: the per-IP throttle
 	// does not stop a guesser who rotates addresses (or a header).
@@ -27,20 +26,22 @@ type loginLimiter struct {
 	slots chan struct{}
 }
 
-type loginAttempts struct {
+type attempts struct {
 	fails       int
 	lockedUntil time.Time
 }
 
 const (
-	loginFreeAttempts = 5
-	loginBaseLockout  = 30 * time.Second
-	loginMaxLockout   = 15 * time.Minute
+	// FreeAttempts failed logins are allowed before the lockout starts.
+	FreeAttempts     = 5
+	loginBaseLockout = 30 * time.Second
+	loginMaxLockout  = 15 * time.Minute
 )
 
-func newLoginLimiter() *loginLimiter {
-	return &loginLimiter{
-		attempts: make(map[string]*loginAttempts),
+// New returns an empty limiter.
+func New() *Limiter {
+	return &Limiter{
+		attempts: make(map[string]*attempts),
 		invites:  make(map[string][]time.Time),
 		byUser:   make(map[string][]time.Time),
 		llm:      make(map[string][]time.Time),
@@ -59,8 +60,8 @@ const (
 	llmMax    = 20
 )
 
-// tryLLM counts one assistant request from key and reports whether it is within budget.
-func (l *loginLimiter) tryLLM(key string) bool {
+// TryLLM counts one assistant request from key and reports whether it is within budget.
+func (l *Limiter) TryLLM(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
@@ -78,8 +79,8 @@ func (l *loginLimiter) tryLLM(key string) bool {
 	return true
 }
 
-// acquire takes a hashing slot; false means the server is busy hashing already.
-func (l *loginLimiter) acquire() bool {
+// Acquire takes a hashing slot; false means the server is busy hashing already.
+func (l *Limiter) Acquire() bool {
 	select {
 	case l.slots <- struct{}{}:
 		return true
@@ -88,11 +89,11 @@ func (l *loginLimiter) acquire() bool {
 	}
 }
 
-func (l *loginLimiter) release() { <-l.slots }
+func (l *Limiter) Release() { <-l.slots }
 
-// userPenalty is how long to stall an attempt on this login after many recent
+// UserPenalty is how long to stall an attempt on this login after many recent
 // failures. A stall, not a lockout: whoever guesses cannot lock the owner out.
-func (l *loginLimiter) userPenalty(user string) time.Duration {
+func (l *Limiter) UserPenalty(user string) time.Duration {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
@@ -110,7 +111,7 @@ func (l *loginLimiter) userPenalty(user string) time.Duration {
 	return min(d, userMaxPenalty)
 }
 
-func (l *loginLimiter) recordUserFailure(user string) {
+func (l *Limiter) RecordUserFailure(user string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if len(l.byUser) > 10000 { // names are attacker-chosen: keep the map bounded
@@ -124,10 +125,10 @@ const (
 	inviteMax    = 30
 )
 
-// tryInvite counts one invitation-link request from key and reports whether it
+// TryInvite counts one invitation-link request from key and reports whether it
 // is within budget (inviteMax per inviteWindow). Tokens are 256-bit, so this
 // is hygiene against enumeration noise, not the actual protection.
-func (l *loginLimiter) tryInvite(key string) bool {
+func (l *Limiter) TryInvite(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
@@ -145,9 +146,9 @@ func (l *loginLimiter) tryInvite(key string) bool {
 	return true
 }
 
-// allow reports whether a login attempt from key may proceed, and if not,
+// Allow reports whether a login attempt from key may proceed, and if not,
 // how long until it may retry.
-func (l *loginLimiter) allow(key string) (bool, time.Duration) {
+func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	a, ok := l.attempts[key]
@@ -160,47 +161,27 @@ func (l *loginLimiter) allow(key string) (bool, time.Duration) {
 	return false, time.Until(a.lockedUntil)
 }
 
-func (l *loginLimiter) recordFailure(key string) {
+func (l *Limiter) RecordFailure(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	a, ok := l.attempts[key]
 	if !ok {
-		a = &loginAttempts{}
+		a = &attempts{}
 		l.attempts[key] = a
 	}
 	a.fails++
-	if a.fails <= loginFreeAttempts {
+	if a.fails <= FreeAttempts {
 		return
 	}
-	lockout := loginBaseLockout << uint(a.fails-loginFreeAttempts-1)
+	lockout := loginBaseLockout << uint(a.fails-FreeAttempts-1)
 	if lockout <= 0 || lockout > loginMaxLockout {
 		lockout = loginMaxLockout
 	}
 	a.lockedUntil = time.Now().Add(lockout)
 }
 
-func (l *loginLimiter) recordSuccess(key string) {
+func (l *Limiter) RecordSuccess(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.attempts, key)
-}
-
-// loginClientKey identifies the caller for throttling. X-Forwarded-For is
-// trusted here for the same reason requestIsHTTPS trusts X-Forwarded-Proto:
-// under this deployment the only paths in are the LAN directly or the
-// Tailscale-only edge gateway, nothing untrusted can reach this port to
-// spoof the header. Falls back to RemoteAddr when absent (direct LAN calls).
-func loginClientKey(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		parts := strings.Split(fwd, ",")
-		if ip := net.ParseIP(strings.TrimSpace(parts[0])); ip != nil {
-			return ip.String()
-		}
-	}
-	// RemoteAddr carries the ephemeral port: keyed on it, every new connection
-	// would be a new client and the throttle would never engage.
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
-	}
-	return r.RemoteAddr
 }

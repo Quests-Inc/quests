@@ -3,6 +3,8 @@ package httpapi
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/valirum/quests/go/internal/platform/httpx"
+	"github.com/valirum/quests/go/internal/platform/ratelimit"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -187,7 +189,7 @@ func TestLogin_ThrottlesRepeatedFailures(t *testing.T) {
 	h := s.testHandler()
 
 	wrong := map[string]string{"username": "alice", "password": "wrong"}
-	for i := 0; i < loginFreeAttempts; i++ {
+	for i := 0; i < ratelimit.FreeAttempts; i++ {
 		w := doJSON(t, h, "POST", "/api/auth/login", wrong, nil)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: status = %d, want 401", i, w.Code)
@@ -196,7 +198,7 @@ func TestLogin_ThrottlesRepeatedFailures(t *testing.T) {
 	// The next failure past the free budget should trip the lockout.
 	w := doJSON(t, h, "POST", "/api/auth/login", wrong, nil)
 	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("attempt %d: status = %d, want 401", loginFreeAttempts, w.Code)
+		t.Fatalf("attempt %d: status = %d, want 401", ratelimit.FreeAttempts, w.Code)
 	}
 	// Now even the *correct* password is throttled — the point is to slow
 	// down guessing, not just repeat wrong guesses.
@@ -226,7 +228,7 @@ func TestLogin_SuccessResetsThrottle(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	if ok, _ := s.limiter().allow(loginClientKey(httptest.NewRequest("GET", "/", nil))); !ok {
+	if ok, _ := s.limiter().Allow(httpx.ClientKey(httptest.NewRequest("GET", "/", nil))); !ok {
 		t.Error("successful login should reset the failure count")
 	}
 }

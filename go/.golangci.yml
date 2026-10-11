@@ -22,6 +22,9 @@ linters:
             - "**/internal/platform/hooks/**"
             - "**/internal/platform/events/**"
             - "**/internal/platform/tokens/**"
+            - "**/internal/platform/apperr/**"
+            - "**/internal/platform/httpx/**"
+            - "**/internal/platform/ratelimit/**"
             - "**/internal/pdfdoc/**"
             - "**/internal/refs/**"
             - "**/internal/domain/**"
@@ -70,6 +73,12 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
         platform:
           files:
@@ -141,6 +150,12 @@ linters:
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
               desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+              desc: "db зависит только от wsctx (ADR-0001)"
         pgtest:
           files:
             - "**/internal/platform/pgtest/**"
@@ -188,6 +203,12 @@ linters:
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
               desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+              desc: "pgtest зависит только от db"
         metrics:
           files:
             - "**/internal/platform/metrics/**"
@@ -232,6 +253,12 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
         identity:
           files:
@@ -287,6 +314,10 @@ linters:
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
         schedule:
           files:
             - "**/internal/schedule/**"
@@ -321,6 +352,12 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "schedule не зависит от httpapi, cli, llmassist, identity"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "schedule не зависит от httpapi, cli, llmassist, identity"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "schedule не зависит от httpapi, cli, llmassist, identity"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
         cli:
           files:
@@ -369,6 +406,12 @@ linters:
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
               desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
         llmassist:
           files:
             - "**/internal/llmassist/**"
@@ -415,6 +458,12 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "llmassist → cli исключение, снимается в #23"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "llmassist → cli исключение, снимается в #23"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "llmassist → cli исключение, снимается в #23"
         runner:
           files:
@@ -464,6 +513,12 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
     errcheck:
       # Best-effort cleanup: nothing useful can be done with these errors.
