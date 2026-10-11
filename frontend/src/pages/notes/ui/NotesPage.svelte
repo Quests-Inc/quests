@@ -30,6 +30,7 @@
   import { EntityHistory } from '@/entities/history'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import { NoteIconModal } from '@/features/note-icon'
+  import NotesTree from './NotesTree.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { QuestlineIcon } from '@/entities/questline'
 import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
@@ -1251,132 +1252,41 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 <svelte:window onkeydown={onFindKey} />
 
 <div class="notes" class:notes--sidebar-collapsed={sidebarCollapsed}>
-  <aside class="notes__tree">
-    <div class="notes__tools">
-      <input
-        class="search"
-        type="search"
-        placeholder="Поиск…"
-        title={`Фильтры: ${helpLine(NOTE_SPEC)}; -flag:… — без флага`}
-        bind:value={search}
-      />
-      <button
-        type="button"
-        class="btn btn--accent notes__add"
-        aria-label="Новая заметка"
-        onclick={() => addNote(null)}
-      >
-        +
-      </button>
-    </div>
-    <div class="notes__flaghints"><FlagHints value={search} spec={NOTE_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
-    <div
-      class="notes__list"
-      data-nav-root
-      class:notes__list--dragover={dragOverKey === 'root'}
-      ondragover={onListDragOver}
-      ondragleave={onListDragLeave}
-      ondrop={onListDrop}
-    >
-      {#if searchActive && searchHits}
-        {#if searchHits.length === 0}
-          <p class="empty">Ничего не найдено</p>
-        {:else}
-          <ul class="hits">
-            {#each searchHits as h (h.id)}
-              <li>
-                <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)} oncontextmenu={(e) => openNoteMenu(e, h)}>
-                  <span class="hit__title">{h.title || 'Без названия'}{#if h.outdated}<span class="notes__status-dot notes__status-dot--outdated notes__hit-flag" title={h.outdated_reason || 'Устарела'}><Icon name="clock-alert" size={12} /></span>{/if}</span>
-                  <span class="hit__where">{WHERE_LABEL[h.where] ?? ''}</span>
-                  {#if h.snippet}<span class="hit__snippet">{@html snippetHtml(h.snippet)}</span>{/if}
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      {:else if notes.length === 0}
-        <p class="empty">Пока пусто — это хранилище знания, не список дел.</p>
-      {:else if roots.length === 0 && search}
-        <p class="empty">Ничего не найдено</p>
-      {:else}
-        {#snippet tree(nodes: any[], depth: number)}
-          {#each nodes as n (n.id)}
-            <div class="notes__node" data-nav-node style:--notes-depth="{depth}">
-              {#if hasChildren(n.id)}
-                <button
-                  type="button"
-                  class="notes__fold"
-                  aria-expanded={showChildren(n.id)}
-                  aria-label={showChildren(n.id) ? 'Свернуть' : 'Развернуть'}
-                  onclick={(e) => toggleTree(n.id, e)}
-                >
-                  <Icon
-                    name={showChildren(n.id) ? 'chevron-down' : 'chevron-right'}
-                    size={12}
-                  />
-                </button>
-              {:else}
-                <span class="notes__fold notes__fold--spacer" aria-hidden="true"></span>
-              {/if}
-              <button
-                type="button"
-                data-nav
-                class="notes__row"
-                class:notes__row--on={n.id === selectedId}
-                class:notes__row--pin={n.pinned}
-                class:notes__row--dragover={dragOverKey === String(n.id)}
-                draggable={n.id !== renamingId}
-                onclick={() => onSelect(n.id)}
-                oncontextmenu={(e) => openNoteMenu(e, n)}
-                ondragstart={(e) => onRowDragStart(e, n.id)}
-                ondragend={onRowDragEnd}
-                ondragover={(e) => onRowDragOver(e, n.id)}
-                ondragleave={(e) => onRowDragLeave(e, n.id)}
-                ondrop={(e) => onRowDrop(e, n.id)}
-              >
-                <span class="notes__row-icon" style="--line-color: {n.color || '#9a9a9a'}">
-                  <QuestlineIcon
-                    icon={n.icon || 'document'}
-                    iconUrl={n.icon_url}
-                    size="sm"
-                  />
-                </span>
-                <span class="notes__row-label">
-                  {#if n.id === renamingId}
-                    <input
-                      bind:this={renameInputEl}
-                      class="notes__row-rename"
-                      type="text"
-                      bind:value={renamingValue}
-                      onclick={(e) => e.stopPropagation()}
-                      onkeydown={onRenameKeydown}
-                      onblur={commitRename}
-                    />
-                  {:else}
-                    <RefText class="notes__row-title" source={rowTitle(n)} {labels} {onRef} />{#if rowDirty(n)}<span
-                        class="notes__unsaved"
-                        title="Несохранено">*</span>{/if}
-                  {/if}
-                </span>
-                {#if n.is_readme || n.is_private || n.is_category || n.outdated || readmeBubbleIds.has(n.id)}
-                  <span class="notes__row-status" aria-hidden="true">
-                    {#if n.is_readme}<span class="notes__status-dot notes__status-dot--readme"><Icon name="alert" size={12} /></span>{:else if readmeBubbleIds.has(n.id)}<span class="notes__status-dot notes__status-dot--readme-bubble" title="Ниже есть README"><Icon name="alert" size={12} /></span>{/if}
-                    {#if n.is_private}<span class="notes__status-dot notes__status-dot--private"><Icon name="lock" size={12} /></span>{/if}
-                    {#if n.is_category}<span class="notes__status-dot notes__status-dot--category"><Icon name="folder" size={12} /></span>{/if}
-                    {#if n.outdated}<span class="notes__status-dot notes__status-dot--outdated" title={n.outdated_reason || 'Устарела'}><Icon name="clock-alert" size={12} /></span>{/if}
-                  </span>
-                {/if}
-              </button>
-            </div>
-            {#if showChildren(n.id)}
-              {@render tree(childrenOf(n.id), depth + 1)}
-            {/if}
-          {/each}
-        {/snippet}
-        {@render tree(roots, 0)}
-      {/if}
-    </div>
-  </aside>
+  <NotesTree
+    bind:search
+    {parsedSearch}
+    {searchActive}
+    {searchHits}
+    {notes}
+    {roots}
+    {selectedId}
+    {dragOverKey}
+    {renamingId}
+    bind:renamingValue
+    bind:renameInputEl
+    {readmeBubbleIds}
+    {labels}
+    {onRef}
+    {onSelect}
+    onAdd={() => addNote(null)}
+    onMenu={openNoteMenu}
+    {hasChildren}
+    {showChildren}
+    {childrenOf}
+    onToggleTree={toggleTree}
+    {rowTitle}
+    {rowDirty}
+    {onRenameKeydown}
+    onCommitRename={commitRename}
+    {onListDragOver}
+    {onListDragLeave}
+    {onListDrop}
+    {onRowDragStart}
+    {onRowDragEnd}
+    {onRowDragOver}
+    {onRowDragLeave}
+    {onRowDrop}
+  />
 
   <section class="notes__page" bind:this={pageEl}>
     {#if error}
@@ -1737,142 +1647,12 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     grid-template-columns: 0 1fr;
   }
 
-  .notes--sidebar-collapsed .notes__tree {
+  .notes--sidebar-collapsed :global(.notes__tree) {
     border-right: 0;
-  }
-
-  .notes__tree {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-    border-right: 1px solid var(--color-border, #333);
-    background: var(--color-bg-raised, #1a1a1a);
-  }
-
-  .notes__tools {
-    display: flex;
-    gap: 0.4rem;
-    padding: 0.55rem 0.6rem;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-
-  .notes__flaghints:empty {
-    display: none;
-  }
-
-  .hits {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 2px;
-  }
-  .hit {
-    display: grid;
-    gap: 0.15rem;
-    width: 100%;
-    padding: 0.45rem 0.6rem;
-    text-align: left;
-    color: inherit;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-sm, 6px);
-    cursor: pointer;
-  }
-  .hit:hover,
-  .hit--on {
-    background: var(--color-bg-hover, #2a2a2a);
-  }
-  .hit__title {
-    font-size: var(--text-sm, 0.875rem);
-    color: var(--color-fg);
-  }
-  .hit__where {
-    font-size: 0.68rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-fg-subtle, #6e6e6e);
-  }
-  .hit__snippet {
-    font-size: 0.78rem;
-    line-height: 1.35;
-    color: var(--color-fg-muted, #9a9a9a);
-    overflow-wrap: anywhere;
-  }
-  .hit__snippet :global(mark) {
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 35%, transparent);
-    color: var(--color-fg);
-    border-radius: 2px;
-  }
-
-  .notes__tools .search {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .notes__add {
-    flex: 0 0 auto;
-    min-width: 2rem;
-    padding-inline: 0.55rem;
-    font-size: 1.1rem;
-    line-height: 1;
-  }
-
-  .notes__list {
-    flex: 1 1 auto;
-    overflow: auto;
-    padding: 0.25rem 0;
-  }
-
-  .notes__node {
-    display: flex;
-    align-items: stretch;
-    padding-left: calc(0.35rem + var(--notes-depth, 0) * 0.85rem);
-  }
-
-  .notes__fold {
-    flex: 0 0 1.35rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    padding: 0;
-    margin: 0;
-    background: transparent;
-    color: color-mix(in srgb, var(--color-fg, #e8e8e8) 55%, transparent);
-    cursor: pointer;
-    border-radius: 2px;
-  }
-
-  .notes__fold:hover {
-    color: var(--color-fg, #e8e8e8);
-    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, transparent);
   }
 
   .notes__fold--spacer {
     pointer-events: none;
-  }
-
-  .notes__row {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex: 1 1 auto;
-    min-width: 0;
-    border: 0;
-    border-left: 2px solid transparent;
-    background: transparent;
-    color: inherit;
-    text-align: left;
-    padding: 0.28rem 0.45rem 0.28rem 0.35rem;
-    cursor: pointer;
-    font-family: var(--font-body, Georgia, serif);
-    font-size: var(--text-sm, 0.875rem);
-  }
-
-  .notes__row:hover {
-    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
   }
 
   .notes__row--on {
@@ -1921,7 +1701,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     font: inherit;
   }
 
-  .notes__unsaved {
+  :global(.notes__unsaved) {
     flex-shrink: 0;
     color: var(--color-accent, #c9a227);
     font-weight: 700;
@@ -1946,7 +1726,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   .notes__status-btn--readme.notes__status-btn--on,
-  .notes__status-dot--readme {
+  :global(.notes__status-dot--readme) {
     color: #d14343;
     animation: notes-readme-blink 1.4s steps(1, end) infinite;
   }
@@ -1954,32 +1734,27 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   /* Same alert icon, but on a note whose README is a hidden (collapsed)
    * descendant, not the note itself — yellow keeps it from being mistaken
    * for "this note is the README". */
-  .notes__status-dot--readme-bubble {
+  :global(.notes__status-dot--readme-bubble) {
     color: #d1a33a;
     animation: notes-readme-blink 1.4s steps(1, end) infinite;
   }
 
   .notes__status-btn--private.notes__status-btn--on,
-  .notes__status-dot--private {
+  :global(.notes__status-dot--private) {
     color: #9a9a9a;
   }
 
   .notes__status-btn--category.notes__status-btn--on,
-  .notes__status-dot--category {
+  :global(.notes__status-dot--category) {
     color: #b5651d;
   }
 
   .notes__status-btn--outdated.notes__status-btn--on,
-  .notes__status-dot--outdated {
+  :global(.notes__status-dot--outdated) {
     color: #d14343;
   }
 
-  .notes__hit-flag {
-    margin-left: 0.35rem;
-    vertical-align: middle;
-  }
-
-  .notes__status-dot {
+  :global(.notes__status-dot) {
     display: inline-flex;
   }
 
@@ -2024,7 +1799,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .notes__unsaved {
+    :global(.notes__unsaved) {
       animation: none;
       opacity: 1;
     }
@@ -2040,7 +1815,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   .notes__empty,
-  .empty {
+  :global(.empty) {
     color: var(--color-fg-muted, #9a9a9a);
     padding: 1rem;
   }
@@ -2191,7 +1966,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     outline: none;
   }
 
-  .notes__title-cluster .notes__unsaved {
+  .notes__title-cluster :global(.notes__unsaved) {
     flex-shrink: 0;
     padding: 0.15rem 0;
   }
@@ -2478,7 +2253,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       display: none;
     }
 
-    .notes--sidebar-collapsed .notes__tree {
+    .notes--sidebar-collapsed :global(.notes__tree) {
       display: none;
     }
 
