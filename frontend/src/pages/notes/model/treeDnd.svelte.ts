@@ -1,7 +1,7 @@
 // Перетаскивание заметок в дереве: меняет только родителя, порядок (с детьми → закреплённые → sort_order → id) не трогает.
 import { isUnder } from '@/entities/note'
 
-type Row = { id: number; parent_id: number | null }
+type Row = { id: number; parent_id?: number | null }
 
 export function createTreeDnd(deps: {
   notes: () => Row[]

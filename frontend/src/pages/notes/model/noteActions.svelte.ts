@@ -1,16 +1,14 @@
 // Быстрые действия над заметкой из дерева и меню: перенос, закрепление, флаги, «устарела», подняться на уровень.
 // Каждое сохраняется сразу; если заметка открыта, форма редактора получает значение через `editor.patched`.
 import { isUnder, type NoteForm } from '@/entities/note'
-import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
-
-type Row = { id: number; parent_id?: number | null; pinned?: boolean; outdated?: boolean } & Record<string, unknown>
+import type { NoteListItem, NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 type FlagField = 'is_readme' | 'is_private' | 'is_category'
 const FLAG_FORM = { is_readme: 'isReadme', is_private: 'isPrivate', is_category: 'isCategory' } as const
 
 const messageOf = (e: unknown) => (e as { message?: string })?.message || String(e)
 
 export function createNoteActions(deps: {
-  notes: () => Row[]
+  notes: () => NoteListItem[]
   selectedId: () => number | null
   editor: {
     error: string
@@ -24,7 +22,7 @@ export function createNoteActions(deps: {
     getNote: (id: number) => Promise<NotePayload>
   }
 }) {
-  const byId = (id: number) => deps.notes().find((n) => n.id === id)
+  const byId = (id: number) => deps.notes().find((n) => n.id === id) as NoteListItem | undefined
 
   async function save(id: number, patch: Record<string, unknown>, form: Partial<NoteForm>) {
     deps.editor.error = ''

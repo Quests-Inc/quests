@@ -1,4 +1,4 @@
-// Общий список заметок. Оболочка пишет его целиком после загрузки.
+// Общий список заметок. Оболочка пишет его после загрузки; журнал, карта, заметки и вложения читают отсюда.
 import type { NoteListItem } from '@/shared/api/knowledge_http.gen'
 
 export const noteCatalog = $state({ list: [] as NoteListItem[] })

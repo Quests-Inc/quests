@@ -6,7 +6,9 @@
   import AttachmentPanel from './AttachmentPanel.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
-  import { ATT_SPEC, extOf, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments, thumbSrc } from '@/entities/attachment'
+  import { ATT_SPEC, attachmentCatalog, extOf, flattenAttachmentIndex, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments, thumbSrc } from '@/entities/attachment'
+  import { noteCatalog } from '@/entities/note'
+  import { questCatalog } from '@/entities/quest'
   import { EntityHistory } from '@/entities/history'
   import {
     attachmentDownloadUrl,
@@ -23,24 +25,22 @@
   import { toast } from '@/shared/lib/toasts.svelte.ts'
 
   let {
-    attachments = [],
-    quests = [],
     questlines = [],
-    notes = [],
     selectedId = null,
     onSelect,
     onOpenOwner,
     onChanged,
   }: {
-    attachments?: any[],
-    quests?: any[],
     questlines?: any[],
-    notes?: any[],
     selectedId?: number | null,
     onSelect?: (id: number | null) => void,
     onOpenOwner?: (kind: string, id: number) => void,
     onChanged?: () => void,
   } = $props()
+
+  let attachments = $derived(flattenAttachmentIndex(attachmentCatalog.index))
+  let quests = $derived(questCatalog.list)
+  let notes = $derived(noteCatalog.list)
 
   const KINDS = [
     { id: 'all', label: 'Все' },

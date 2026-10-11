@@ -14,7 +14,9 @@
   import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
   import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
-  import { NOTE_SPEC, moveTargetItems, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { flattenAttachmentIndex, attachmentCatalog } from '@/entities/attachment'
+  import { NOTE_SPEC, moveTargetItems, noteCatalog, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { questCatalog } from '@/entities/quest'
   import { parseQuery, passes } from '@/shared/lib/searchFlags.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import {
@@ -34,30 +36,28 @@
 import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let {
-    notes = [],
     selectedId = null,
     labels = {},
-    quests = [],
     questlines = [],
-    attachments = [],
     sidebarCollapsed = false,
     onSelect,
     onChanged,
     onRef,
     onOpenSecrets,
   }: {
-    notes: any[],
     selectedId: number | null,
     labels?: Record<string, string>,
-    quests?: any[],
     questlines?: any[],
-    attachments?: any[],
     sidebarCollapsed?: boolean,
     onSelect: (id: number | null) => void,
     onChanged: () => void,
     onRef?: (kind: string, id: number) => void,
     onOpenSecrets?: (id: number) => void,
   } = $props()
+
+  let notes = $derived(noteCatalog.list)
+  let quests = $derived(questCatalog.list)
+  let attachments = $derived(flattenAttachmentIndex(attachmentCatalog.index).filter((a) => !a.hidden))
 
   let search = $state('')
   let treeOpen: Record<string, boolean> = $state({})

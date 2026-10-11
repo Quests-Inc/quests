@@ -11,7 +11,7 @@ import {
   putNoteDraft,
 } from '@/entities/note'
 import { getNote, updateNote } from '@/shared/api/client.ts'
-import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
+import type { NoteListItem, NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 const EMPTY: NoteForm = {
@@ -28,7 +28,7 @@ const messageOf = (e: unknown) => (e as { message?: string })?.message || String
 
 export function createNoteEditor(deps: {
   selectedId: () => number | null
-  notes: () => NotePayload[]
+  notes: () => NoteListItem[]
   onChanged: () => void
 }) {
   let detail = $state<NotePayload | null>(null)

@@ -942,10 +942,7 @@ import { RunnersPage } from '@/pages/runners'
   {:else if nav.view === 'notes'}
     <div class="journal__notes">
       <NotesPage
-        {notes}
-        {quests}
         {questlines}
-        {attachments}
         selectedId={nav.selectedNoteId}
         labels={refLabels}
         sidebarCollapsed={sidebarCollapsed.notes}
@@ -974,10 +971,7 @@ import { RunnersPage } from '@/pages/runners'
   {:else if nav.view === 'attachments'}
     <div class="journal__attachments">
       <AttachmentsPage
-        attachments={allAttachments}
-        {quests}
         {questlines}
-        {notes}
         selectedId={nav.selectedAttachmentId}
         onSelect={(id) => selectAttachmentFromUi(id)}
         onOpenOwner={onJournalRef}
@@ -1067,8 +1061,6 @@ import { RunnersPage } from '@/pages/runners'
         rootType={nav.graphRoot.type}
         rootId={nav.graphRoot.id}
         nonce={graphNonce}
-        {quests}
-        {notes}
         {questlines}
         onCenter={onGraphCenter}
         onOpen={onGraphOpen}

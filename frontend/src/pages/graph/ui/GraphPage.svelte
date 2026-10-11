@@ -1,5 +1,7 @@
 <script lang="ts">
   import { computeTiers, RASTER } from '@/entities/graph'
+  import { noteCatalog } from '@/entities/note'
+  import { questCatalog } from '@/entities/quest'
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
   import { FindEntityModal } from '@/features/find-entity'
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
@@ -35,8 +37,6 @@
     rootType = null,
     rootId = null,
     nonce = 0,
-    quests = [],
-    notes = [],
     questlines = [],
     onCenter,
     onOpen,
@@ -45,12 +45,13 @@
     rootType?: 'quest' | 'note' | 'questline' | null
     rootId?: number | null
     nonce?: number
-    quests?: { id: number; status: string; title?: string }[]
-    notes?: { id: number; title?: string }[]
     questlines?: { id: number; title?: string }[]
     onCenter?: (type: string | null, id: number | null) => void
     onOpen?: (kind: string, id: number) => void
   } = $props()
+
+  let quests = $derived(questCatalog.list)
+  let notes = $derived(noteCatalog.list)
 
   const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
   const saved = new Map<string, { x: number; y: number }>()
