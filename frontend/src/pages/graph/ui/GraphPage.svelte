@@ -5,6 +5,9 @@
   import GraphFoot from './GraphFoot.svelte'
   import GraphGroups from './GraphGroups.svelte'
   import GraphCard from './GraphCard.svelte'
+  import GraphMinimap from './GraphMinimap.svelte'
+  import GraphTools from './GraphTools.svelte'
+  import GraphDraftLog from './GraphDraftLog.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
@@ -2033,167 +2036,36 @@
     {/if}
 
     {#if mini}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="gmini"
-        style:width="{mini.w}px"
-        style:height="{mini.h}px"
-        title="Миникарта: клик или перетаскивание — переместить вид"
-        onpointerdown={(e) => {
-          e.stopPropagation()
-          miniDrag = true
-          e.currentTarget.setPointerCapture(e.pointerId)
-          miniGo(e)
-        }}
-        onpointermove={(e) => miniDrag && miniGo(e)}
-        onpointerup={() => (miniDrag = false)}
-        onpointercancel={() => (miniDrag = false)}
-        onwheel={(e) => e.stopPropagation()}
-        oncontextmenu={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-        }}
-      >
-        <svg width={mini.w} height={mini.h} aria-hidden="true">
-          {#each mini.nodes as n (n.key)}
-            <rect
-              x={(n.x - n.w / 2 - mini.x0) * mini.sc}
-              y={(n.y - n.h / 2 - mini.y0) * mini.sc}
-              width={Math.max(2, n.w * mini.sc)}
-              height={Math.max(2, n.h * mini.sc)}
-              rx="1"
-              fill={TYPES[n.type]?.color ?? '#888'}
-              opacity={n.draft ? 1 : 0.7}
-            />
-          {/each}
-          <rect
-            class="gmini__view"
-            x={(mini.view.x - mini.x0) * mini.sc}
-            y={(mini.view.y - mini.y0) * mini.sc}
-            width={mini.view.w * mini.sc}
-            height={mini.view.h * mini.sc}
-          />
-        </svg>
-      </div>
+      <GraphMinimap {mini} onGo={miniGo} />
     {/if}
 
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="gtools"
-      onpointerdown={(e) => e.stopPropagation()}
-      onwheel={(e) => e.stopPropagation()}
-      oncontextmenu={(e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      }}
-    >
-      {#if selectMode && picked.size}
-        <span class="gtools__count">Выделено: {picked.size}</span>
-        <button type="button" class="gtool" title="Убрать выделенное с карты" aria-label="Убрать выделенное с карты" onclick={hidePicked}>
-          <Icon name="eye-off" size={16} />
-        </button>
-        <button type="button" class="gtool" title="Снять выделение" aria-label="Снять выделение" onclick={() => (picked = new Set())}>
-          <Icon name="close" size={16} />
-        </button>
-        <span class="gtools__sep" aria-hidden="true"></span>
-      {/if}
-      <button
-        type="button"
-        class="gtool"
-        class:gtool--on={selectMode}
-        aria-pressed={selectMode}
-        title="Режим выделения (V): рамкой по полю или кликами по карточкам. Выделенные двигаются вместе. Esc — выйти"
-        aria-label="Режим выделения"
-        onclick={toggleSelectMode}
-      >
-        <Icon name="select" size={16} />
-      </button>
-      <button type="button" class="gtool" title="Вписать карту в окно (F)" aria-label="Вписать карту в окно" onclick={fit}>
-        <Icon name="fit" size={16} />
-      </button>
-      <button type="button" class="gtool" title="Распутать: пересчитать раскладку (R)" aria-label="Распутать" onclick={relayout}>
-        <Icon name="arrange" size={16} />
-      </button>
-      <button
-        type="button"
-        class="gtool"
-        class:gtool--on={full}
-        aria-pressed={full}
-        title={full ? 'Выйти из полноэкранного режима (Esc)' : 'Полноэкранный режим'}
-        aria-label="Полноэкранный режим"
-        onclick={toggleFull}
-      >
-        <Icon name={full ? 'fullscreen-exit' : 'fullscreen'} size={16} />
-      </button>
-      <button
-        type="button"
-        class="gtool"
-        disabled={!canClear}
-        title="Очистить карту (Shift+Delete): центр, добавленные центры и скрытое. Журнал изменений остаётся"
-        aria-label="Очистить карту"
-        onclick={clearMap}
-      >
-        <Icon name="clear" size={16} />
-      </button>
-    </div>
+    <GraphTools
+      {selectMode}
+      pickedCount={picked.size}
+      {full}
+      {canClear}
+      onHidePicked={hidePicked}
+      onClearPicked={() => (picked = new Set())}
+      onToggleSelect={toggleSelectMode}
+      onFit={fit}
+      onRelayout={relayout}
+      onToggleFull={toggleFull}
+      onClear={clearMap}
+    />
 
     {#if draft.ops.length}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="gdraft"
-        class:gdraft--strip={!draftOpen}
-        onpointerdown={(e) => e.stopPropagation()}
-        onwheel={(e) => e.stopPropagation()}
-        oncontextmenu={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-        }}
-      >
-        <div class="gdraft__head">
-          <button
-            type="button"
-            class="gdraft__toggle"
-            aria-expanded={draftOpen}
-            title={draftOpen ? 'Свернуть в полоску' : 'Развернуть журнал'}
-            onclick={() => (draftOpen = !draftOpen)}
-          >
-            <Icon name={draftOpen ? 'chevron-down' : 'chevron-right'} size={12} />
-            Журнал ({draft.ops.length})
-          </button>
-          <span class="gdraft__btns">
-            <button
-              type="button"
-              class="graph__btn graph__btn--primary"
-              disabled={committing || ownerless.size > 0}
-              title={ownerless.size ? 'Есть невалидные элементы (красная рамка)' : 'Применить все изменения (Ctrl+S)'}
-              onclick={saveDraft}
-            >
-              {committing ? 'Сохраняю…' : 'Сохранить'}
-            </button>
-            <button type="button" class="graph__btn" onclick={() => (cancelAsk = true)}>Отменить всё</button>
-          </span>
-        </div>
-        {#if draftOpen}
-          <p class="gdraft__hint">
-            {#if ownerless.size}
-              Нужно исправить: {ownerless.size} (красная рамка) — шаг или файл без владельца, квест без шагов. Пока не исправлено, сохранить нельзя.
-            {:else}
-              В базе пока ничего нет — сохраните или отмените.
-            {/if}
-          </p>
-          <ol class="gdraft__list">
-            {#each draft.ops as op (op.id)}
-              <li class:gdraft__row--bad={opProblems[op.id]} class:gdraft__row--flash={flashOp === op.id} data-op={op.id}>
-                <span class="gdraft__text">{describeOp(op, titleOf)}</span>
-                {#if opProblems[op.id]}<span class="gdraft__msg">{opProblems[op.id]}</span>{/if}
-                <button type="button" class="gdraft__x" title="Убрать из черновика" aria-label="Убрать из черновика" onclick={() => askDrop(op)}>
-                  <Icon name="close" size={12} />
-                </button>
-              </li>
-            {/each}
-          </ol>
-        {/if}
-      </div>
+      <GraphDraftLog
+        ops={draft.ops}
+        bind:open={draftOpen}
+        {committing}
+        ownerlessCount={ownerless.size}
+        problems={opProblems}
+        {flashOp}
+        {titleOf}
+        onSave={saveDraft}
+        onCancelAll={() => (cancelAsk = true)}
+        onDrop={askDrop}
+      />
     {/if}
 
     {#if data?.truncated}
@@ -2391,87 +2263,6 @@
     pointer-events: none;
   }
 
-  /* Map tools: flat square icon buttons in the bottom-right corner. */
-  .gmini {
-    position: absolute;
-    z-index: 6;
-    left: 0.6rem;
-    top: 0.6rem;
-    box-shadow: 0 0 0 1px var(--color-border, #333);
-    border-radius: 3px;
-    background: color-mix(in srgb, var(--pill-bg, #0f0f0f) 85%, transparent);
-    cursor: pointer;
-    touch-action: none;
-  }
-
-  .gmini svg {
-    display: block;
-  }
-
-  .gmini__view {
-    fill: rgba(201, 162, 39, 0.05);
-    stroke: var(--color-accent, #c9a227);
-    stroke-width: 1.2;
-  }
-
-  .gtools {
-    position: absolute;
-    z-index: 6;
-    right: 0.6rem;
-    bottom: 0.6rem;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    cursor: default;
-  }
-
-  .gtool {
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    padding: 0;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 8px;
-    background: var(--color-bg-raised, #1a1a1a);
-    color: var(--color-fg-muted, #9a9a9a);
-    cursor: pointer;
-  }
-
-  .gtool:hover:not(:disabled) {
-    color: var(--color-fg, #e8e8e8);
-    border-color: var(--color-fg-subtle, #6e6e6e);
-  }
-
-  .gtool:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .gtool--on {
-    color: #5aa9ff;
-    border-color: #5aa9ff;
-  }
-
-  .gtools__count {
-    margin-right: 0.15rem;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .gtools__sep {
-    width: 1px;
-    height: 1.2rem;
-    margin: 0 0.1rem;
-    background: var(--color-border, #333);
-  }
-
-  /* The folded log is a capsule; its buttons are capsules too. */
-  .gdraft--strip .graph__btn {
-    border-radius: 999px;
-    padding-inline: 0.8rem;
-  }
-
   :global(.graph__btn--on) {
     border-color: #5aa9ff;
     color: #5aa9ff;
@@ -2492,64 +2283,6 @@
     pointer-events: none;
   }
 
-  /* The change log floats over the top-right of the field; folded it is a strip. */
-  .gdraft {
-    position: absolute;
-    z-index: 6;
-    top: 0.6rem;
-    right: 0.6rem;
-    width: min(24rem, calc(100% - 1.2rem));
-    max-height: calc(100% - 1.2rem);
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.5rem 0.6rem;
-    border: 1px solid color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 9%, var(--color-bg-raised, #1a1a1a));
-    box-shadow: 0 4px 18px color-mix(in srgb, #000 45%, transparent);
-    font-size: var(--text-sm, 0.875rem);
-    cursor: default;
-  }
-
-  .gdraft--strip {
-    width: auto;
-    max-width: calc(100% - 1.2rem);
-    padding: 0.3rem 0.5rem;
-    border-radius: 999px;
-  }
-
-  .gdraft__head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .gdraft__btns {
-    display: inline-flex;
-    gap: 0.4rem;
-  }
-
-  .gdraft__toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    border: 0;
-    background: transparent;
-    color: var(--color-fg, #e8e8e8);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .gdraft__hint {
-    margin: 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
   :global(.graph__btn--primary) {
     background: var(--color-accent, #c9a227);
     border-color: var(--color-accent, #c9a227);
@@ -2560,63 +2293,6 @@
   :global(.graph__btn--primary:disabled) {
     opacity: 0.45;
     cursor: not-allowed;
-  }
-
-  .gdraft__list {
-    list-style: none;
-    margin: 0;
-    padding: 0.2rem 0.4rem;
-    min-height: 0;
-    overflow: auto;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 10px;
-    background: color-mix(in srgb, #000 18%, transparent);
-    font-size: var(--text-xs, 0.75rem);
-  }
-
-  .gdraft__list li {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.2rem 0.3rem;
-  }
-
-  .gdraft__text {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .gdraft__msg {
-    color: #e0443e;
-  }
-
-  .gdraft__row--bad {
-    background: color-mix(in srgb, #e0443e 12%, transparent);
-    border-radius: 6px;
-  }
-
-  .gdraft__x {
-    flex: none;
-    display: inline-grid;
-    place-items: center;
-    width: 1.3rem;
-    height: 1.3rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--color-fg-muted, #9a9a9a);
-    cursor: pointer;
-  }
-
-  .gdraft__x:hover {
-    color: var(--color-fg, #e8e8e8);
-  }
-
-  .gdraft__row--flash {
-    background: color-mix(in srgb, #f2c230 28%, transparent);
-    border-radius: 6px;
-    outline: 1px solid #f2c230;
   }
 
   /* Narrow (portrait) screens: the controls form an even grid and the page
