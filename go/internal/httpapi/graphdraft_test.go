@@ -429,10 +429,10 @@ func TestGraphDraftCreateQuestline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if row["title"] != "Новая линия" {
+	if row.Title != "Новая линия" {
 		t.Fatalf("questline = %v", row)
 	}
-	if d, _ := row["description"].(string); !strings.Contains(d, fmt.Sprintf("quest=%d", oldQ)) {
+	if d := row.Description; !strings.Contains(d, fmt.Sprintf("quest=%d", oldQ)) {
 		t.Fatalf("ref not appended to questline: %q", d)
 	}
 }

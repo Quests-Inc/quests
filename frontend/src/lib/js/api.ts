@@ -1,6 +1,6 @@
 import type { Category, QuestRead, Tag } from '../api/domain.gen'
 import type { LLMView, RunnerView } from '../api/http.gen'
-import type { RunnerJob } from '../api/store.gen'
+import type { QuestlineRead, RunnerJob } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
 const BASE = ''
@@ -287,8 +287,7 @@ export function setTemplateTags(templateId, tagIds) {
 }
 
 export function listQuestlines() {
-  // the server sends a free-form map here (store.QuestlineRead), not a struct
-  return request<any[]>('/api/questlines')
+  return request<QuestlineRead[]>('/api/questlines')
 }
 
 export function createQuestline(payload) {

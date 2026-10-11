@@ -379,8 +379,8 @@ func applyResolvedSpec(ctx context.Context, st *store.Store, q *domain.Quest, tm
 		if rs.CategoryID == nil {
 			// a questline brings its own category, as everywhere else
 			if line, err := st.GetQuestline(ctx, *rs.QuestlineID); err == nil {
-				if cid, ok := line["category_id"].(*int64); ok && cid != nil {
-					c := *cid
+				if line.CategoryID != nil {
+					c := *line.CategoryID
 					q.CategoryID = &c
 				}
 			}

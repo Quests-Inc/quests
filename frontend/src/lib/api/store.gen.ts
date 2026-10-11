@@ -388,7 +388,28 @@ export interface Questline {
   CategoryLabel?: string;
   CategoryColor?: string;
 }
-export type QuestlineRead = { [key: string]: any};
+/**
+ * QuestlineRead is a questline as the API sends it.
+ */
+export interface QuestlineRead {
+  id: number /* int64 */;
+  title: string;
+  description: string;
+  category_id?: number /* int64 */;
+  color: string;
+  icon: string;
+  custom_icon?: string;
+  created_at: string;
+  updated_at: string;
+  category_slug?: string;
+  category_label?: string;
+  category_color?: string;
+  icon_url?: string;
+  /**
+   * Refs is filled for a single-questline fetch only: the mentions in the title and description.
+   */
+  refs?: any;
+}
 
 //////////
 // source: runner.go

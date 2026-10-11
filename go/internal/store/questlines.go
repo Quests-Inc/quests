@@ -27,7 +27,24 @@ type Questline struct {
 	CategoryColor *string
 }
 
-type QuestlineRead map[string]any
+// QuestlineRead is a questline as the API sends it.
+type QuestlineRead struct {
+	ID            int64   `json:"id"`
+	Title         string  `json:"title"`
+	Description   string  `json:"description"`
+	CategoryID    *int64  `json:"category_id"`
+	Color         string  `json:"color"`
+	Icon          string  `json:"icon"`
+	CustomIcon    *string `json:"custom_icon"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	CategorySlug  *string `json:"category_slug"`
+	CategoryLabel *string `json:"category_label"`
+	CategoryColor *string `json:"category_color"`
+	IconURL       *string `json:"icon_url"`
+	// Refs is filled for a single-questline fetch only: the mentions in the title and description.
+	Refs any `json:"refs,omitempty"`
+}
 
 func (s *Store) ListQuestlines(ctx context.Context) ([]QuestlineRead, error) {
 	rows, err := s.DB.QueryContext(ctx, `
@@ -60,10 +77,10 @@ func (s *Store) GetQuestline(ctx context.Context, id int64) (QuestlineRead, erro
 		WHERE l.id = ?`, id)
 	ql, err := scanQuestline(row)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return QuestlineRead{}, ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
 	return questlineToRead(ql), nil
 }
@@ -81,7 +98,7 @@ func (s *Store) CreateQuestline(ctx context.Context, title, description string, 
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		title, description, nullI64(categoryID), color, icon, timeutil.ToDBUTC(now), timeutil.ToDBUTC(now))
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
 	id, _ := res.LastInsertId()
 	return s.GetQuestline(ctx, id)
@@ -90,24 +107,9 @@ func (s *Store) CreateQuestline(ctx context.Context, title, description string, 
 func (s *Store) UpdateQuestline(ctx context.Context, id int64, fields map[string]any) (QuestlineRead, error) {
 	cur, err := s.GetQuestline(ctx, id)
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
-	title, _ := cur["title"].(string)
-	desc, _ := cur["description"].(string)
-	color, _ := cur["color"].(string)
-	icon, _ := cur["icon"].(string)
-	// GetQuestline stores the category as *int64; matching only float64/int64
-	// here silently dropped it on every partial update.
-	var catID *int64
-	switch v := cur["category_id"].(type) {
-	case *int64:
-		catID = v
-	case int64:
-		catID = &v
-	case float64:
-		i := int64(v)
-		catID = &i
-	}
+	title, desc, color, icon, catID := cur.Title, cur.Description, cur.Color, cur.Icon, cur.CategoryID
 	if v, ok := fields["title"].(string); ok {
 		title = v
 	}
@@ -136,7 +138,7 @@ func (s *Store) UpdateQuestline(ctx context.Context, id int64, fields map[string
 		UPDATE questline SET title=?, description=?, category_id=?, color=?, icon=?, updated_at=?
 		WHERE id=?`, title, desc, nullI64(catID), color, icon, timeutil.ToDBUTC(now), id)
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
 	if catID != nil {
 		_, _ = s.DB.ExecContext(ctx, `UPDATE quest SET category_id=? WHERE questline_id=?`, *catID, id)
@@ -167,8 +169,8 @@ func (s *Store) DeleteQuestline(ctx context.Context, id int64, dataDir string) e
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	if custom, ok := ql["custom_icon"].(string); ok && custom != "" {
-		_ = os.Remove(filepath.Join(dataDir, "questline-icons", custom))
+	if ql.CustomIcon != nil && *ql.CustomIcon != "" {
+		_ = os.Remove(filepath.Join(dataDir, "questline-icons", *ql.CustomIcon))
 	}
 	return nil
 }
@@ -178,7 +180,7 @@ func (s *Store) SetQuestlineIcon(ctx context.Context, id int64, filename string)
 	_, err := s.DB.ExecContext(ctx, `
 		UPDATE questline SET custom_icon=?, updated_at=? WHERE id=?`, filename, timeutil.ToDBUTC(now), id)
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
 	return s.GetQuestline(ctx, id)
 }
@@ -186,15 +188,15 @@ func (s *Store) SetQuestlineIcon(ctx context.Context, id int64, filename string)
 func (s *Store) ClearQuestlineIcon(ctx context.Context, id int64, dataDir string) (QuestlineRead, error) {
 	ql, err := s.GetQuestline(ctx, id)
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
 	now := timeutil.NowUTC()
 	_, err = s.DB.ExecContext(ctx, `UPDATE questline SET custom_icon=NULL, updated_at=? WHERE id=?`, timeutil.ToDBUTC(now), id)
 	if err != nil {
-		return nil, err
+		return QuestlineRead{}, err
 	}
-	if custom, ok := ql["custom_icon"].(string); ok && custom != "" {
-		_ = os.Remove(filepath.Join(dataDir, "questline-icons", custom))
+	if ql.CustomIcon != nil && *ql.CustomIcon != "" {
+		_ = os.Remove(filepath.Join(dataDir, "questline-icons", *ql.CustomIcon))
 	}
 	return s.GetQuestline(ctx, id)
 }
@@ -248,21 +250,19 @@ func scanQuestline(row rowScanner) (Questline, error) {
 
 func questlineToRead(q Questline) QuestlineRead {
 	out := QuestlineRead{
-		"id": q.ID, "title": q.Title, "description": q.Description,
-		"category_id": q.CategoryID, "color": q.Color, "icon": q.Icon,
-		"custom_icon":   nil,
-		"created_at":    derefISO(&q.CreatedAt),
-		"updated_at":    derefISO(&q.UpdatedAt),
-		"category_slug": q.CategorySlug, "category_label": q.CategoryLabel, "category_color": q.CategoryColor,
-		"icon_url": nil,
+		ID: q.ID, Title: q.Title, Description: q.Description, CategoryID: q.CategoryID,
+		Color: q.Color, Icon: q.Icon,
+		CreatedAt: derefISO(&q.CreatedAt), UpdatedAt: derefISO(&q.UpdatedAt),
+		CategorySlug: q.CategorySlug, CategoryLabel: q.CategoryLabel, CategoryColor: q.CategoryColor,
 	}
 	if q.CustomIcon != nil && *q.CustomIcon != "" {
-		out["custom_icon"] = *q.CustomIcon
+		icon := *q.CustomIcon
+		out.CustomIcon = &icon
 		u := fmt.Sprintf("/api/questlines/%d/icon", q.ID)
 		if iso := timeutil.ToUTCISO(&q.UpdatedAt); iso != nil {
 			u += "?v=" + *iso
 		}
-		out["icon_url"] = u
+		out.IconURL = &u
 	}
 	return out
 }

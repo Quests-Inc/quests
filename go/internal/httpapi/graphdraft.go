@@ -367,8 +367,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 			}
 		case "questline":
 			if ql, err := s.Store.GetQuestline(ctx, id); err == nil {
-				d, _ := ql["description"].(string)
-				has = textHas(d)
+				has = textHas(ql.Description)
 			}
 		}
 	}
@@ -1228,7 +1227,7 @@ func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ st
 		if err != nil {
 			return err
 		}
-		desc, _ = ql["description"].(string)
+		desc = ql.Description
 		path = fmt.Sprintf("/api/questlines/%d", id)
 	case "step":
 		qid, err := s.Store.QuestIDForStep(ctx, id)

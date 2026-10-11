@@ -485,9 +485,7 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []map[string]any 
 		case "questline":
 			ql, err := s.Store.GetQuestline(r.Context(), ref.ID)
 			if err == nil {
-				if t, ok := ql["title"].(string); ok {
-					row["title"] = t
-				}
+				row["title"] = ql.Title
 			}
 		case "step":
 			qid, err := s.Store.QuestIDForStep(r.Context(), ref.ID)

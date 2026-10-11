@@ -64,9 +64,7 @@ func (s *Server) getQuestline(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	title, _ := row["title"].(string)
-	desc, _ := row["description"].(string)
-	row["refs"] = s.resolveRefs(r, refs.Parse(title+"\n"+desc))
+	row.Refs = s.resolveRefs(r, refs.Parse(row.Title+"\n"+row.Description))
 	writeJSON(w, 200, row)
 }
 
@@ -90,7 +88,7 @@ func (s *Server) createQuestline(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.publishSilent(r.Context(), "questline_created", questlineTitle(row), map[string]any{"questline_id": row["id"]})
+	s.publishSilent(r.Context(), "questline_created", questlineTitle(row), map[string]any{"questline_id": row.ID})
 	writeJSON(w, 201, row)
 }
 
@@ -139,19 +137,13 @@ func (s *Server) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
-func questlineTitle(row map[string]any) string {
-	title, _ := row["title"].(string)
-	return title
+func questlineTitle(row store.QuestlineRead) string {
+	return row.Title
 }
 
-func questlineCustomIcon(row map[string]any) string {
-	switch v := row["custom_icon"].(type) {
-	case string:
-		return v
-	case *string:
-		if v != nil {
-			return *v
-		}
+func questlineCustomIcon(row store.QuestlineRead) string {
+	if row.CustomIcon != nil {
+		return *row.CustomIcon
 	}
 	return ""
 }
