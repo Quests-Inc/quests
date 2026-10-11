@@ -9,7 +9,7 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
-  import { NoteCheck, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { NOTE_SPEC, NoteCheck, compareNotes, isUnder, withAncestors, NoteFind, clearNoteDraft, getNoteDraft, noteDrafts, putNoteDraft, type NoteDraft, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { parseQuery, passes, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   type NoteForm = NoteDraft & { isReadme?: boolean; isPrivate?: boolean; isCategory?: boolean }
@@ -130,23 +130,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       isCategory !== saved.isCategory,
   )
 
-  /** Filters typed into the search box: `flag:name` (`-flag:name` = without it). */
-  const NOTE_SPEC = {
-    flag: {
-      label: 'флаг',
-      all: true,
-      values: [
-        { id: 'outdated', label: 'устарела', aliases: ['stale'] },
-        { id: 'readme', label: 'README' },
-        { id: 'private', label: 'PRIVATE' },
-        { id: 'category', label: 'CATEGORY' },
-        { id: 'pinned', label: 'закреплена', aliases: ['pin'] },
-        { id: 'check', label: 'есть проверка актуальности' },
-      ],
-      test: (n: { outdated: any; is_readme: any; is_private: any; is_category: any; pinned: any; has_check: any }, v: string|number) =>
-        ({ outdated: !!n.outdated, readme: !!n.is_readme, private: !!n.is_private, category: !!n.is_category, pinned: !!n.pinned, check: !!n.has_check })[v],
-    },
-  }
   let parsedSearch = $derived(parseQuery(search, NOTE_SPEC))
   let searchText = $derived(parsedSearch.text)
   const flagOk = (n: any) => passes(parsedSearch, NOTE_SPEC, n)
@@ -155,26 +138,10 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const q = searchText.toLowerCase()
     if (!q && !parsedSearch.active) return notes
     return withAncestors(
+      notes,
       notes.filter((n) => flagOk(n) && (!q || `${n.title || ''} ${n.description || ''}`.toLowerCase().includes(q))),
     )
   })
-
-  /** The given notes and the chain of their parents, in the original order. */
-  function withAncestors(list: any[]) {
-    const byId = new Map(notes.map((n) => [n.id, n]))
-    const keep = new Set()
-    for (const n of list) {
-      let cur = n
-      keep.add(cur.id)
-      while (cur.parent_id != null) {
-        const parent = byId.get(cur.parent_id)
-        if (!parent) break
-        keep.add(parent.id)
-        cur = parent
-      }
-    }
-    return notes.filter((n) => keep.has(n.id))
-  }
 
   let searchActive = $derived(search.trim().length > 0)
 
@@ -233,16 +200,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     for (const list of m.values()) list.sort((a, b) => compareNotes(a, b, hasKids))
     return m
   })
-
-  /** Tree order: with children → pinned → sort_order → id. */
-  function compareNotes(a: any, b: any, hasKids: (n: any) => boolean) {
-    return (
-      Number(hasKids(b)) - Number(hasKids(a)) ||
-      Number(b.pinned) - Number(a.pinned) ||
-      (a.sort_order || 0) - (b.sort_order || 0) ||
-      a.id - b.id
-    )
-  }
 
   let roots = $derived(byParent.get('root') || [])
 
@@ -782,19 +739,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     return notes.find((n) => n.id === id) ?? null
   }
 
-  /** candidate is under ancestor (cannot become its parent). */
-  function isUnder(candidateId: number, ancestorId: number) {
-    if (candidateId == null || ancestorId == null) return false
-    let cur = noteById(candidateId)
-    const seen = new Set()
-    while (cur?.parent_id != null && !seen.has(cur.id)) {
-      seen.add(cur.id)
-      if (cur.parent_id === ancestorId) return true
-      cur = noteById(cur.parent_id)
-    }
-    return false
-  }
-
   /** A note is visible in the sidebar when every ancestor up to the root is
    * expanded (or it has no parent). */
   function isNoteVisible(id: any) {
@@ -852,7 +796,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (selectedId == null) return items
     for (const n of notes) {
       if (n.id === selectedId) continue
-      if (isUnder(n.id, selectedId)) continue
+      if (isUnder(notes, n.id, selectedId)) continue
       items.push({ id: String(n.id), label: n.title || `note=${n.id}` })
     }
     return items
@@ -965,7 +909,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
           (n) =>
             (n.parent_id ?? null) === parentOf &&
             n.id !== note?.id &&
-            !(note?.id != null && isUnder(n.id, note.id)),
+            !(note?.id != null && isUnder(notes, n.id, note.id)),
         )
         .sort((a, b) => compareNotes(a, b, hasKids))
     const groups = [
@@ -1057,7 +1001,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (!n) return
     const current = n.parent_id ?? null
     if (current === nextParent) return
-    if (nextParent != null && (nextParent === id || isUnder(nextParent, id))) return
+    if (nextParent != null && (nextParent === id || isUnder(notes, nextParent, id))) return
     error = ''
     try {
       const savedRow = await updateNote(id, { parent_id: nextParent })
@@ -1155,7 +1099,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (draggedId == null) return false
     if (targetId === draggedId) return false
     // target is a descendant of the dragged note — moving there would cycle it.
-    if (targetId != null && isUnder(targetId, draggedId)) return false
+    if (targetId != null && isUnder(notes, targetId, draggedId)) return false
     return true
   }
 

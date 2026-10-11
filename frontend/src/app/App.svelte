@@ -3,6 +3,16 @@
   import { HistoryPage } from '@/pages/history'
 import { RunnersPage } from '@/pages/runners'
   import { GraphPage } from '@/pages/graph'
+  import {
+    attachmentIdFromUrl,
+    dbStatus,
+    noteIdFromUrl,
+    probeStatus,
+    questIdFromUrl,
+    replaceSearch,
+    searchForView as searchForRoute,
+    tabFromUrl,
+  } from '@/app/model/route.ts'
   import { onMount, tick, untrack } from 'svelte'
   import { cubicOut } from 'svelte/easing'
   import { tabSwipe } from '@/shared/lib/tabSwipe.ts'
@@ -1033,93 +1043,8 @@ import { RunnersPage } from '@/pages/runners'
     toast('Квест удалён', { kind: 'success' })
   }
 
-  function questIdFromUrl() {
-    try {
-      const raw = new URL(location.href).searchParams.get('quest')
-      if (!raw) return null
-      const id = Number(raw)
-      return Number.isFinite(id) && id > 0 ? id : null
-    } catch {
-      return null
-    }
-  }
-
-  function noteIdFromUrl() {
-    try {
-      const raw = new URL(location.href).searchParams.get('note')
-      if (!raw) return null
-      const id = Number(raw)
-      return Number.isFinite(id) && id > 0 ? id : null
-    } catch {
-      return null
-    }
-  }
-
-  function attachmentIdFromUrl() {
-    try {
-      const raw = new URL(location.href).searchParams.get('attachment')
-      if (!raw) return null
-      const id = Number(raw)
-      return Number.isFinite(id) && id > 0 ? id : null
-    } catch {
-      return null
-    }
-  }
-
-  function tabFromUrl() {
-    try {
-      const raw = new URL(location.href).searchParams.get('tab')
-      if (
-        raw === 'notes' ||
-        raw === 'attachments' ||
-        raw === 'calendar' ||
-        raw === 'history' ||
-        raw === 'graph' ||
-        raw === 'runners'
-      ) {
-        return raw
-      }
-    } catch {
-      /* ignore */
-    }
-    return null
-  }
-
-  /** Rewrite the query from scratch — tab / quest= / note= / attachment= never share the bar. */
-  function replaceSearch(params: ArrayLike<unknown>|{ [s: string]: unknown }|{ quest: any; note?: undefined; tab?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ quest?: undefined; note?: undefined; tab?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ note: number; quest?: undefined; tab?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ tab: string; quest?: undefined; note?: undefined; gt?: undefined; gid?: undefined; attachment?: undefined }|{ tab: string; gt: "questline"|"quest"|"note"; gid: number; quest?: undefined; note?: undefined; attachment?: undefined }|{ attachment: number; quest?: undefined; note?: undefined; tab?: undefined; gt?: undefined; gid?: undefined }) {
-    try {
-      const qs = new URLSearchParams()
-      for (const [key, value] of Object.entries(params)) {
-        if (value != null && value !== '') qs.set(key, String(value))
-      }
-      const next = `${location.pathname}${qs.toString() ? `?${qs}` : ''}`
-      if (next !== `${location.pathname}${location.search}`) {
-        history.replaceState(null, '', next)
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function searchForView(nextView: string) {
-    if (nextView === 'journal') {
-      return selectedId != null ? { quest: selectedId } : {}
-    }
-    if (nextView === 'notes') {
-      return selectedNoteId != null ? { note: selectedNoteId } : { tab: 'notes' }
-    }
-    if (nextView === 'graph') {
-      return graphRoot.id != null
-        ? { tab: 'graph', gt: graphRoot.type, gid: graphRoot.id }
-        : { tab: 'graph' }
-    }
-    if (nextView === 'attachments') {
-      return selectedAttachmentId != null
-        ? { attachment: selectedAttachmentId }
-        : { tab: 'attachments' }
-    }
-    return { tab: nextView }
-  }
+  const searchForView = (nextView: string) =>
+    searchForRoute(nextView, { quest: selectedId, note: selectedNoteId, attachment: selectedAttachmentId, graph: graphRoot })
 
   // Header tab order; drives which way a tab switch slides.
   const TAB_ORDER = ['journal', 'notes', 'attachments', 'calendar', 'history', 'graph', 'runners']
@@ -1316,18 +1241,6 @@ import { RunnersPage } from '@/pages/runners'
         db: 'unknown',
       }
     }
-  }
-
-  function probeStatus(status: string) {
-    if (status === 'ok') return 'ok'
-    if (status === 'offline') return 'offline'
-    return 'unknown'
-  }
-
-  function dbStatus(status: string) {
-    if (status === 'ok') return 'ok'
-    if (status === 'warn') return 'warn'
-    return 'unknown'
   }
 
   /** Boots data loading and live updates. Only runs once authenticated. */

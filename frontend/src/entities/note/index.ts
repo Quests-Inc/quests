@@ -1,5 +1,6 @@
 export * from './model/noteDrafts.svelte.ts'
 export * from './model/noteExport.ts'
+export * from './model/tree.ts'
 export { default as NoteCheck } from './ui/NoteCheck.svelte'
 export { default as NoteFind } from './ui/NoteFind.svelte'
 export { default as NoteOutline } from './ui/NoteOutline.svelte'

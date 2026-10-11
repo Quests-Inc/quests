@@ -1,0 +1,77 @@
+// Адресная строка приложения: какая вкладка и какой объект открыт, и обратно.
+// Параметры `tab` / `quest=` / `note=` / `attachment=` никогда не живут в строке вместе.
+
+const TABS = ['notes', 'attachments', 'calendar', 'history', 'graph', 'runners'] as const
+export type UrlTab = (typeof TABS)[number]
+
+function param(name: string): string | null {
+  try {
+    return new URL(location.href).searchParams.get(name)
+  } catch {
+    return null
+  }
+}
+
+function idParam(name: string): number | null {
+  const raw = param(name)
+  if (!raw) return null
+  const id = Number(raw)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+export const questIdFromUrl = () => idParam('quest')
+export const noteIdFromUrl = () => idParam('note')
+export const attachmentIdFromUrl = () => idParam('attachment')
+
+export function tabFromUrl(): UrlTab | null {
+  const raw = param('tab')
+  return (TABS as readonly string[]).includes(raw ?? '') ? (raw as UrlTab) : null
+}
+
+/** Rewrite the query from scratch — tab / quest= / note= / attachment= never share the bar. */
+export function replaceSearch(params: Record<string, unknown>) {
+  try {
+    const qs = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value != null && value !== '') qs.set(key, String(value))
+    }
+    const next = `${location.pathname}${qs.toString() ? `?${qs}` : ''}`
+    if (next !== `${location.pathname}${location.search}`) {
+      history.replaceState(null, '', next)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** What the address bar should say for a view, given what is selected in it. */
+export function searchForView(
+  nextView: string,
+  sel: {
+    quest: number | null
+    note: number | null
+    attachment: number | null
+    graph: { type: string | null; id: number | null }
+  }
+): Record<string, unknown> {
+  if (nextView === 'journal') return sel.quest != null ? { quest: sel.quest } : {}
+  if (nextView === 'notes') return sel.note != null ? { note: sel.note } : { tab: 'notes' }
+  if (nextView === 'graph') {
+    return sel.graph.id != null ? { tab: 'graph', gt: sel.graph.type, gid: sel.graph.id } : { tab: 'graph' }
+  }
+  if (nextView === 'attachments')
+    return sel.attachment != null ? { attachment: sel.attachment } : { tab: 'attachments' }
+  return { tab: nextView }
+}
+
+export function probeStatus(status: string) {
+  if (status === 'ok') return 'ok'
+  if (status === 'offline') return 'offline'
+  return 'unknown'
+}
+
+export function dbStatus(status: string) {
+  if (status === 'ok') return 'ok'
+  if (status === 'warn') return 'warn'
+  return 'unknown'
+}
