@@ -3,8 +3,8 @@ package httpapi
 import (
 	"context"
 
+	"github.com/valirum/quests/go/internal/journal"
 	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
-	"github.com/valirum/quests/go/internal/store"
 )
 
 // knowledgeHTTP is the knowledge context's HTTP face, wired to this server (built on first use). What the context
@@ -26,7 +26,7 @@ func (s *Server) knowledgeHTTP() *knowledgehttp.Handler {
 			MaxUploadBytes: s.MaxUploadBytes,
 			Quota:          func() int64 { return s.WorkspaceQuota },
 			LogEvent: func(ctx context.Context, e knowledgehttp.ChangeEvent) {
-				_ = s.Store.LogEvent(ctx, store.ChangeEvent{
+				_ = s.Store.Journal().LogEvent(ctx, journal.ChangeEvent{
 					Kind: e.Kind, EntityType: e.EntityType, EntityID: e.EntityID,
 					Title: e.Title, Detail: e.Detail, Coalesce: e.Coalesce,
 					ParentType: e.ParentType, ParentID: e.ParentID,

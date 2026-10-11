@@ -1,4 +1,4 @@
-package store
+package journal
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 
 func openTagTestDB(t *testing.T) *Store {
 	t.Helper()
-	pool, url := pgtest.NewWithURL(t)
-	return &Store{DB: pool, DatabaseURL: url}
+	pool := pgtest.New(t)
+	return &Store{DB: pool}
 }
 
 func TestNormalizeTagSlug(t *testing.T) {

@@ -164,7 +164,7 @@ func TestMaterializeDueCreatesTheQuestTheCommandPrinted(t *testing.T) {
 	if err != nil || len(ids) != 1 {
 		t.Fatalf("created %v, err %v", ids, err)
 	}
-	q, err := st.GetQuest(bg(), ids[0])
+	q, err := st.Journal().GetQuest(bg(), ids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestMaterializeDueQuestlineCategoryWins(t *testing.T) {
 			if err != nil || len(ids) != 1 {
 				t.Fatalf("created %v, err %v", ids, err)
 			}
-			q, err := st.GetQuest(bg(), ids[0])
+			q, err := st.Journal().GetQuest(bg(), ids[0])
 			if err != nil {
 				t.Fatal(err)
 			}

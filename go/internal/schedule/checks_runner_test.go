@@ -40,7 +40,7 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 	if len(jobs) != 1 || jobs[0].State != store.JobQueued || jobs[0].Command != "echo 3" {
 		t.Fatalf("jobs after the first tick: %+v", jobs)
 	}
-	got, _ := st.GetQuest(ctx, q.ID)
+	got, _ := st.Journal().GetQuest(ctx, q.ID)
 	if got.Steps[0].ProgressCurrent != 0 {
 		t.Fatalf("nothing ran here, progress=%d", got.Steps[0].ProgressCurrent)
 	}
@@ -65,7 +65,7 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.JobFinished(ctx, done)
-	got, _ = st.GetQuest(ctx, q.ID)
+	got, _ = st.Journal().GetQuest(ctx, q.ID)
 	if got.Steps[0].ProgressCurrent != 3 {
 		t.Fatalf("progress=%d want 3", got.Steps[0].ProgressCurrent)
 	}
@@ -82,7 +82,7 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 	r.Tick(ctx)
 	r.Wait()
 
-	got, _ := st.GetQuest(ctx, q.ID)
+	got, _ := st.Journal().GetQuest(ctx, q.ID)
 	if got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != journal.RunRunning {
 		t.Fatalf("run_status=%v, want running (queued for the device)", got.Steps[0].RunStatus)
 	}
@@ -91,7 +91,7 @@ func TestRemoteOnceWaitsThenReleasesWithoutFailingTheQuest(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
-	got, _ = st.GetQuest(ctx, q.ID)
+	got, _ = st.Journal().GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusActive {
 		t.Fatalf("quest status=%s: an unreachable device must not fail it", got.Status)
 	}
@@ -120,7 +120,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
-	got, _ := st.GetQuest(ctx, q.ID)
+	got, _ := st.Journal().GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusActive {
 		t.Fatalf("lost lease alone must not fail the quest, status=%s", got.Status)
 	}
@@ -128,7 +128,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)
-	got, _ = st.GetQuest(ctx, q.ID)
+	got, _ = st.Journal().GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusFailed {
 		t.Fatalf("status=%s want failed (result unknown, not re-run)", got.Status)
 	}
@@ -142,7 +142,7 @@ func TestRemoteStepSurvivesServerRestart(t *testing.T) {
 	step.RunStatus = &running
 	q := seedQuest(t, st, []journal.Step{step})
 	NewCheckRunner(st, events.New()).FailStaleRunning(ctx)
-	got, _ := st.GetQuest(ctx, q.ID)
+	got, _ := st.Journal().GetQuest(ctx, q.ID)
 	if got.Status != journal.StatusActive {
 		t.Fatalf("a job on a device outlives the server restart, status=%s", got.Status)
 	}
@@ -165,7 +165,7 @@ func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
 		t.Fatal("no running job")
 	}
 
-	if err := st.DeleteQuest(ctx, q.ID, q.Title); err != nil {
+	if err := st.Journal().DeleteQuest(ctx, q.ID, q.Title); err != nil {
 		t.Fatal(err)
 	}
 	r.ExpireRunnerJobs(ctx)

@@ -15,6 +15,8 @@ var (
 	boolInt       = dbx.BoolInt
 	nullStr       = dbx.NullStr
 	parseNullTime = dbx.ParseNullTime
+	nullInt       = dbx.NullInt
+	nullI64       = dbx.NullI64
 	trimTo        = dbx.TrimTo
 	errBad        = apperr.Bad
 

@@ -228,7 +228,7 @@ func (s *Server) postHeartbeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.Store.ListCategories(r.Context())
+	rows, err := s.Store.Journal().ListCategories(r.Context())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -240,7 +240,7 @@ func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listQuests(w http.ResponseWriter, r *http.Request) {
-	var f store.ListFilter
+	var f journal.ListFilter
 	if st := r.URL.Query().Get("status"); st != "" {
 		s := journal.QuestStatus(st)
 		if !s.Valid() {
@@ -258,7 +258,7 @@ func (s *Server) listQuests(w http.ResponseWriter, r *http.Request) {
 			f.QuestlineID = &n
 		}
 	}
-	quests, err := s.Store.ListQuests(r.Context(), f)
+	quests, err := s.Store.Journal().ListQuests(r.Context(), f)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -277,7 +277,7 @@ func (s *Server) getQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), id)
+	q, err := s.Store.Journal().GetQuest(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Quest not found")
 		return
@@ -334,14 +334,14 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 		deadline = &t
 	}
 	d, dur := timeutil.NormalizeDeadline(deadline, body.DurationSeconds, body.DurationSeconds != nil, now)
-	catID, err := store.ValidateCategoryID(r.Context(), s.Store, body.CategoryID)
+	catID, err := journal.ValidateCategoryID(r.Context(), s.Store.Journal(), body.CategoryID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	lineID := body.QuestlineID
 	if lineID != nil {
-		ok, err := s.Store.QuestlineExists(r.Context(), *lineID)
+		ok, err := s.Store.Journal().QuestlineExists(r.Context(), *lineID)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -350,7 +350,7 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusUnprocessableEntity, "questline not found")
 			return
 		}
-		if c, err := s.Store.QuestlineCategory(r.Context(), *lineID); err == nil && c != nil {
+		if c, err := s.Store.Journal().QuestlineCategory(r.Context(), *lineID); err == nil && c != nil {
 			catID = c
 		}
 	}
@@ -379,7 +379,7 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 			if sc.SortOrder != nil {
 				ord = *sc.SortOrder
 			}
-			cmd, iv := store.NormalizeCheck(sc.CheckCommand, sc.CheckIntervalSeconds)
+			cmd, iv := journal.NormalizeCheck(sc.CheckCommand, sc.CheckIntervalSeconds)
 			st := journal.Step{
 				Title: sc.Title, Description: sc.Description,
 				ProgressCurrent: sc.ProgressCurrent, ProgressTotal: sc.ProgressTotal,
@@ -394,26 +394,26 @@ func (s *Server) createQuest(w http.ResponseWriter, r *http.Request) {
 				st.WaitPrevious = *sc.WaitPrevious
 			}
 			if sc.RunMode != nil {
-				st.RunMode = store.NormalizeRunMode(*sc.RunMode)
+				st.RunMode = journal.NormalizeRunMode(*sc.RunMode)
 			}
-			store.NormalizeStepCheck(&st)
+			journal.NormalizeStepCheck(&st)
 			if st.ProgressTotal < 1 {
 				st.ProgressTotal = 1
 			}
 			q.Steps = append(q.Steps, st)
 		}
 	}
-	created, err := s.Store.CreateQuest(r.Context(), q)
+	created, err := s.Store.Journal().CreateQuest(r.Context(), q)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if body.TagIDs != nil {
-		if err := s.Store.SetQuestTags(r.Context(), created.ID, body.TagIDs); err != nil {
+		if err := s.Store.Journal().SetQuestTags(r.Context(), created.ID, body.TagIDs); err != nil {
 			writeTagErr(w, err)
 			return
 		}
-		created, err = s.Store.GetQuest(r.Context(), created.ID)
+		created, err = s.Store.Journal().GetQuest(r.Context(), created.ID)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -446,7 +446,7 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, "steps replace removed; use step CRUD")
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), id)
+	q, err := s.Store.Journal().GetQuest(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Quest not found")
 		return
@@ -501,7 +501,7 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 	if v, ok := raw["category_id"]; ok {
 		var cid *int64
 		_ = json.Unmarshal(v, &cid)
-		cid, err = store.ValidateCategoryID(r.Context(), s.Store, cid)
+		cid, err = journal.ValidateCategoryID(r.Context(), s.Store.Journal(), cid)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -517,7 +517,7 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 	// assigned — ignore a manually supplied category_id in that case, so the
 	// two can never drift apart (regardless of which field this request touched).
 	if q.QuestlineID != nil {
-		if c, err := s.Store.QuestlineCategory(r.Context(), *q.QuestlineID); err == nil && c != nil {
+		if c, err := s.Store.Journal().QuestlineCategory(r.Context(), *q.QuestlineID); err == nil && c != nil {
 			q.CategoryID = c
 		}
 	}
@@ -578,7 +578,7 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 			kind, detail, toast = "status_changed", string(beforeStatus)+" → "+string(q.Status), true
 		}
 	}
-	updated, err := s.Store.UpdateQuest(r.Context(), q, kind, detail)
+	updated, err := s.Store.Journal().UpdateQuest(r.Context(), q, kind, detail)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -589,11 +589,11 @@ func (s *Server) patchQuest(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "invalid tag_ids")
 			return
 		}
-		if err := s.Store.SetQuestTags(r.Context(), updated.ID, ids); err != nil {
+		if err := s.Store.Journal().SetQuestTags(r.Context(), updated.ID, ids); err != nil {
 			writeTagErr(w, err)
 			return
 		}
-		updated, err = s.Store.GetQuest(r.Context(), updated.ID)
+		updated, err = s.Store.Journal().GetQuest(r.Context(), updated.ID)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -617,7 +617,7 @@ func (s *Server) deleteQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), id)
+	q, err := s.Store.Journal().GetQuest(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Quest not found")
 		return
@@ -627,7 +627,7 @@ func (s *Server) deleteQuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.knowledgeHTTP().PurgeOwnerAttachments(r.Context(), ownerQuest, id)
-	if err := s.Store.DeleteQuest(r.Context(), id, q.Title); err != nil {
+	if err := s.Store.Journal().DeleteQuest(r.Context(), id, q.Title); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -652,7 +652,7 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), qid)
+	q, err := s.Store.Journal().GetQuest(r.Context(), qid)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Quest not found")
 		return
@@ -671,7 +671,7 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	cmd, iv := store.NormalizeCheck(body.CheckCommand, body.CheckIntervalSeconds)
+	cmd, iv := journal.NormalizeCheck(body.CheckCommand, body.CheckIntervalSeconds)
 	st := journal.Step{
 		QuestID: qid, Title: strings.TrimSpace(body.Title), Description: body.Description,
 		ProgressCurrent: body.ProgressCurrent, ProgressTotal: body.ProgressTotal,
@@ -686,9 +686,9 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 		st.WaitPrevious = *body.WaitPrevious
 	}
 	if body.RunMode != nil {
-		st.RunMode = store.NormalizeRunMode(*body.RunMode)
+		st.RunMode = journal.NormalizeRunMode(*body.RunMode)
 	}
-	store.NormalizeStepCheck(&st)
+	journal.NormalizeStepCheck(&st)
 	if st.Title == "" {
 		writeErr(w, http.StatusUnprocessableEntity, "title required")
 		return
@@ -700,7 +700,7 @@ func (s *Server) addStep(w http.ResponseWriter, r *http.Request) {
 	now := timeutil.NowUTC()
 	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
-	updated, err := s.Store.AddStep(r.Context(), qid, st, q)
+	updated, err := s.Store.Journal().AddStep(r.Context(), qid, st, q)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -725,7 +725,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), qid)
+	q, err := s.Store.Journal().GetQuest(r.Context(), qid)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Quest not found")
 		return
@@ -770,13 +770,13 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		if body.CheckIntervalSeconds != nil {
 			iv = body.CheckIntervalSeconds
 		}
-		st.CheckCommand, st.CheckIntervalSeconds = store.NormalizeCheck(cmd, iv)
+		st.CheckCommand, st.CheckIntervalSeconds = journal.NormalizeCheck(cmd, iv)
 	}
 	if body.WaitPrevious != nil {
 		st.WaitPrevious = *body.WaitPrevious
 	}
 	if body.RunMode != nil {
-		st.RunMode = store.NormalizeRunMode(*body.RunMode)
+		st.RunMode = journal.NormalizeRunMode(*body.RunMode)
 	}
 	if body.RunOn != nil {
 		st.RunOn = store.NormalizeRunOn(body.RunOn) // "" clears
@@ -785,7 +785,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	store.NormalizeStepCheck(st)
+	journal.NormalizeStepCheck(st)
 	journal.ClampStep(st)
 	now := timeutil.NowUTC()
 	journal.SyncStatusFromSteps(&q, now)
@@ -799,7 +799,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 		kind = "step_reopened"
 		detail = st.Title
 	}
-	updated, err := s.Store.UpdateStep(r.Context(), *st, q, kind, detail)
+	updated, err := s.Store.Journal().UpdateStep(r.Context(), *st, q, kind, detail)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -819,7 +819,7 @@ func (s *Server) patchStep(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
 	qid, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	sid, _ := strconv.ParseInt(r.PathValue("step_id"), 10, 64)
-	q, err := s.Store.GetQuest(r.Context(), qid)
+	q, err := s.Store.Journal().GetQuest(r.Context(), qid)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Quest not found")
 		return
@@ -849,7 +849,7 @@ func (s *Server) deleteStep(w http.ResponseWriter, r *http.Request) {
 	now := timeutil.NowUTC()
 	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
-	updated, err := s.Store.DeleteStep(r.Context(), qid, sid, q)
+	updated, err := s.Store.Journal().DeleteStep(r.Context(), qid, sid, q)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "Step not found")
 		return

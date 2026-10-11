@@ -93,7 +93,7 @@ func TestGraphDraftCommitFlow(t *testing.T) {
 	noteID := int64(created[tn].(float64))
 	questID := int64(created[tq].(float64))
 
-	q, err := s.Store.GetQuest(t.Context(), questID)
+	q, err := s.Store.Journal().GetQuest(t.Context(), questID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestMoveExistingStep(t *testing.T) {
 	}
 	a := mk("A", "a1", "a2")
 	b := mk("B", "b1")
-	qa, _ := s.Store.GetQuest(t.Context(), a)
+	qa, _ := s.Store.Journal().GetQuest(t.Context(), a)
 	moveID := qa.Steps[0].ID
 
 	// Through the endpoint.
@@ -229,8 +229,8 @@ func TestMoveExistingStep(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("move = %d %v", code, out)
 	}
-	qa, _ = s.Store.GetQuest(t.Context(), a)
-	qb, _ := s.Store.GetQuest(t.Context(), b)
+	qa, _ = s.Store.Journal().GetQuest(t.Context(), a)
+	qb, _ := s.Store.Journal().GetQuest(t.Context(), b)
 	if len(qa.Steps) != 1 || len(qb.Steps) != 2 || qb.Steps[1].ID != moveID {
 		t.Fatalf("after move: A=%d steps, B=%d steps (%+v)", len(qa.Steps), len(qb.Steps), qb.Steps)
 	}
@@ -247,14 +247,14 @@ func TestMoveExistingStep(t *testing.T) {
 	if code, out := draftReq(t, h, "POST", "/api/graph-draft/commit", nil); code != 200 {
 		t.Fatalf("commit = %d %v", code, out)
 	}
-	qa, _ = s.Store.GetQuest(t.Context(), a)
+	qa, _ = s.Store.Journal().GetQuest(t.Context(), a)
 	if len(qa.Steps) != 2 {
 		t.Fatalf("step did not come back: %d", len(qa.Steps))
 	}
 	_ = op
 	// Taking a quest's last step is fine in the draft, but saving is refused
 	// while the quest would be left with none ...
-	qb, _ = s.Store.GetQuest(t.Context(), b)
+	qb, _ = s.Store.Journal().GetQuest(t.Context(), b)
 	b1 := qb.Steps[0].ID
 	take := addOp(t, h, "attach", map[string]any{"item": fmt.Sprintf("step:%d", b1), "owner": fmt.Sprintf("quest:%d", a)})
 	code, out = draftReq(t, h, "POST", "/api/graph-draft/commit", nil)
@@ -268,11 +268,11 @@ func TestMoveExistingStep(t *testing.T) {
 		t.Fatalf("commit with a replacement step = %d %v", code, out)
 	}
 	_ = take
-	qb, _ = s.Store.GetQuest(t.Context(), b)
+	qb, _ = s.Store.Journal().GetQuest(t.Context(), b)
 	if len(qb.Steps) != 1 || qb.Steps[0].Title != "замена" {
 		t.Fatalf("B should hold only the replacement: %+v", qb.Steps)
 	}
-	qa, _ = s.Store.GetQuest(t.Context(), a)
+	qa, _ = s.Store.Journal().GetQuest(t.Context(), a)
 	if len(qa.Steps) != 3 {
 		t.Fatalf("A should have gained b1: %d steps", len(qa.Steps))
 	}
@@ -343,7 +343,7 @@ func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
 	var att map[string]any
 	_ = json.Unmarshal(up.Body.Bytes(), &att)
 	attID := int64(att["id"].(float64))
-	qs, _ := s.Store.GetQuest(t.Context(), qid)
+	qs, _ := s.Store.Journal().GetQuest(t.Context(), qid)
 	stepID := qs.Steps[0].ID
 
 	// Edit a quest and a step; copy the quest, the step and the file.
@@ -360,7 +360,7 @@ func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("commit = %d %v", code, out)
 	}
-	orig, _ := s.Store.GetQuest(t.Context(), qid)
+	orig, _ := s.Store.Journal().GetQuest(t.Context(), qid)
 	if orig.Title != "Переименован" || orig.Steps[0].Title != "первый (правка)" {
 		t.Fatalf("edits not applied: %q / %q", orig.Title, orig.Steps[0].Title)
 	}
@@ -372,7 +372,7 @@ func TestDraftCopyEditAndNoteForQuestline(t *testing.T) {
 	}
 	created := out["created"].(map[string]any)
 	copyID := int64(created[fmt.Sprintf("quest:t%d", cq)].(float64))
-	cp, _ := s.Store.GetQuest(t.Context(), copyID)
+	cp, _ := s.Store.Journal().GetQuest(t.Context(), copyID)
 	if cp.Title != "Переименован"+copySuffix && cp.Title != "Исходный"+copySuffix {
 		t.Fatalf("quest copy title = %q", cp.Title)
 	}
@@ -425,7 +425,7 @@ func TestGraphDraftCreateQuestline(t *testing.T) {
 		t.Fatalf("commit = %d %v", code, out)
 	}
 	id := int64(out["created"].(map[string]any)[tql].(float64))
-	row, err := s.Store.GetQuestline(t.Context(), id)
+	row, err := s.Store.Journal().GetQuestline(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}

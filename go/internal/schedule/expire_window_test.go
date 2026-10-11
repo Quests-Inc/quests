@@ -79,7 +79,7 @@ func countStarted(hub *events.Hub) int {
 
 func seedWindowQuest(t *testing.T, st *store.Store, deadline time.Time, duration int, updatedAt time.Time) journal.Quest {
 	t.Helper()
-	q, err := st.CreateQuest(bg(), journal.Quest{
+	q, err := st.Journal().CreateQuest(bg(), journal.Quest{
 		Title:           "window",
 		Status:          journal.StatusActive,
 		Significance:    journal.SigCommon,
@@ -99,7 +99,7 @@ func seedWindowQuest(t *testing.T, st *store.Store, deadline time.Time, duration
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := st.GetQuest(bg(), q.ID)
+	got, err := st.Journal().GetQuest(bg(), q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

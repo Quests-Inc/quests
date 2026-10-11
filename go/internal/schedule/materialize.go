@@ -280,7 +280,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		q.Source = &source
 
 		// Create without auto quest_created — we emit quest_appeared.
-		createdQ, err := st.CreateQuestAppeared(ctx, q)
+		createdQ, err := st.Journal().CreateQuestAppeared(ctx, q)
 		if err != nil {
 			return created, err
 		}
@@ -532,7 +532,7 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 		s.WaitPrevious = waitPrev != 0
 		s.RunMode = journal.RunModePoll
 		if runMode.Valid {
-			s.RunMode = store.NormalizeRunMode(runMode.String)
+			s.RunMode = journal.NormalizeRunMode(runMode.String)
 		}
 		src = append(src, s)
 	}
@@ -936,7 +936,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 	source := fmt.Sprintf("template:%d", tmpl.ID)
 	q.Source = &source
 
-	createdQ, err := st.CreateQuestAppeared(ctx, q)
+	createdQ, err := st.Journal().CreateQuestAppeared(ctx, q)
 	if err != nil {
 		return 0, err
 	}

@@ -269,7 +269,7 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 				v := 15
 				step.CheckIntervalSeconds = &v
 			}
-			step.RunMode = store.NormalizeRunMode(ss.RunMode)
+			step.RunMode = journal.NormalizeRunMode(ss.RunMode)
 			if ss.WaitPrevious != nil {
 				step.WaitPrevious = *ss.WaitPrevious
 			}
@@ -278,7 +278,7 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 				return nil, fmt.Errorf("steps[%d]: run_on: %v", i, store.ErrBadRunnerLabel)
 			}
 		}
-		store.NormalizeStepCheck(&step)
+		journal.NormalizeStepCheck(&step)
 		journal.ClampStep(&step)
 		rs.Steps = append(rs.Steps, step)
 	}
@@ -306,7 +306,7 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 				return nil, fmt.Errorf("tags: expected slugs or ids, got %v", r)
 			}
 		}
-		ids, err := st.ResolveTagIDs(ctx, strs)
+		ids, err := st.Journal().ResolveTagIDs(ctx, strs)
 		if err != nil {
 			return nil, fmt.Errorf("tags: %v", err)
 		}
@@ -378,7 +378,7 @@ func applyResolvedSpec(ctx context.Context, st *store.Store, q *journal.Quest, t
 		q.QuestlineID = rs.QuestlineID
 		if rs.CategoryID == nil {
 			// a questline brings its own category, as everywhere else
-			if line, err := st.GetQuestline(ctx, *rs.QuestlineID); err == nil {
+			if line, err := st.Journal().GetQuestline(ctx, *rs.QuestlineID); err == nil {
 				if line.CategoryID != nil {
 					c := *line.CategoryID
 					q.CategoryID = &c
@@ -395,9 +395,9 @@ func applyResolvedSpec(ctx context.Context, st *store.Store, q *journal.Quest, t
 // template's own when it printed none.
 func attachTags(ctx context.Context, st *store.Store, tmpl templateRow, questID int64, rs *resolvedSpec) error {
 	if rs != nil && rs.TagsSet {
-		return st.SetQuestTags(ctx, questID, rs.TagIDs)
+		return st.Journal().SetQuestTags(ctx, questID, rs.TagIDs)
 	}
-	return st.CopyTemplateTagsToQuest(ctx, tmpl.ID, questID)
+	return st.Journal().CopyTemplateTagsToQuest(ctx, tmpl.ID, questID)
 }
 
 // followQuestlineCategory enforces the same rule as the REST API: a quest in a
@@ -407,7 +407,7 @@ func followQuestlineCategory(ctx context.Context, st *store.Store, q *journal.Qu
 	if q.QuestlineID == nil {
 		return
 	}
-	if c, err := st.QuestlineCategory(ctx, *q.QuestlineID); err == nil && c != nil {
+	if c, err := st.Journal().QuestlineCategory(ctx, *q.QuestlineID); err == nil && c != nil {
 		q.CategoryID = c
 	}
 }

@@ -50,3 +50,27 @@ func TrimTo(s string, n int) string {
 	}
 	return s
 }
+
+// NullTime turns a nil time pointer into SQL NULL (and formats the rest the way the schema stores them).
+func NullTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return timeutil.ToDBUTC(*t)
+}
+
+// NullInt turns a nil int pointer into SQL NULL.
+func NullInt(v *int) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
+// NullI64 turns a nil int64 pointer into SQL NULL.
+func NullI64(v *int64) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}

@@ -155,11 +155,11 @@ func (s *Server) copyEntity(ctx context.Context, mux http.Handler, op store.Draf
 		if !ok {
 			return 0, errors.New("copied step has no quest")
 		}
-		fromQ, err := s.Store.QuestIDForStep(ctx, sid)
+		fromQ, err := s.Store.Journal().QuestIDForStep(ctx, sid)
 		if err != nil {
 			return 0, err
 		}
-		q, err := s.Store.GetQuest(ctx, fromQ)
+		q, err := s.Store.Journal().GetQuest(ctx, fromQ)
 		if err != nil {
 			return 0, err
 		}

@@ -47,7 +47,7 @@ func (s *Server) registerDomainRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) listQuestlines(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.Store.ListQuestlines(r.Context())
+	rows, err := s.Store.Journal().ListQuestlines(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -57,7 +57,7 @@ func (s *Server) listQuestlines(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getQuestline(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.GetQuestline(r.Context(), id)
+	row, err := s.Store.Journal().GetQuestline(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Questline not found")
 		return
@@ -85,7 +85,7 @@ func (s *Server) createQuestline(w http.ResponseWriter, r *http.Request) {
 		i := int64(v)
 		cat = &i
 	}
-	row, err := s.Store.CreateQuestline(r.Context(), strings.TrimSpace(title), desc, cat, color, icon)
+	row, err := s.Store.Journal().CreateQuestline(r.Context(), strings.TrimSpace(title), desc, cat, color, icon)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -101,7 +101,7 @@ func (s *Server) patchQuestline(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	row, err := s.Store.UpdateQuestline(r.Context(), id, body)
+	row, err := s.Store.Journal().UpdateQuestline(r.Context(), id, body)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Questline not found")
 		return
@@ -116,7 +116,7 @@ func (s *Server) patchQuestline(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.GetQuestline(r.Context(), id)
+	row, err := s.Store.Journal().GetQuestline(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Questline not found")
 		return
@@ -127,7 +127,7 @@ func (s *Server) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 	}
 	title := questlineTitle(row)
 	s.knowledgeHTTP().PurgeOwnerAttachments(r.Context(), ownerQuestline, id)
-	if err := s.Store.DeleteQuestline(r.Context(), id, s.DataDir); err != nil {
+	if err := s.Store.Journal().DeleteQuestline(r.Context(), id, s.DataDir); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Questline not found")
 			return
@@ -139,11 +139,11 @@ func (s *Server) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
-func questlineTitle(row store.QuestlineRead) string {
+func questlineTitle(row journal.QuestlineRead) string {
 	return row.Title
 }
 
-func questlineCustomIcon(row store.QuestlineRead) string {
+func questlineCustomIcon(row journal.QuestlineRead) string {
 	if row.CustomIcon != nil {
 		return *row.CustomIcon
 	}
@@ -152,7 +152,7 @@ func questlineCustomIcon(row store.QuestlineRead) string {
 
 func (s *Server) getQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.GetQuestline(r.Context(), id)
+	row, err := s.Store.Journal().GetQuestline(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Questline not found")
 		return
@@ -170,7 +170,7 @@ var serveIcon = httpx.ServeIcon
 
 func (s *Server) postQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if _, err := s.Store.GetQuestline(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+	if _, err := s.Store.Journal().GetQuestline(r.Context(), id); errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Questline not found")
 		return
 	}
@@ -208,7 +208,7 @@ func (s *Server) postQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	row, err := s.Store.SetQuestlineIcon(r.Context(), id, name)
+	row, err := s.Store.Journal().SetQuestlineIcon(r.Context(), id, name)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -219,7 +219,7 @@ func (s *Server) postQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteQuestlineIcon(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.ClearQuestlineIcon(r.Context(), id, s.DataDir)
+	row, err := s.Store.Journal().ClearQuestlineIcon(r.Context(), id, s.DataDir)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Questline not found")
 		return
@@ -341,7 +341,7 @@ func (s *Server) emitTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), qid)
+	q, err := s.Store.Journal().GetQuest(r.Context(), qid)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -461,7 +461,7 @@ func (s *Server) getQuestLog(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	rows, err := s.Store.ListChangeLog(r.Context(), store.ChangeLogFilter{
+	rows, err := s.Store.Journal().ListChangeLog(r.Context(), journal.ChangeLogFilter{
 		Limit:       limit,
 		QuestID:     i64("quest_id"),
 		EntityTypes: list("entity_type"),
@@ -528,7 +528,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 	case "questline":
 		lineID = &focusID
 	case "quest":
-		qq, err := s.Store.GetQuest(r.Context(), focusID)
+		qq, err := s.Store.Journal().GetQuest(r.Context(), focusID)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Quest not found")
 			return
@@ -542,7 +542,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 			quests = []journal.Quest{qq}
 		}
 	case "step":
-		qid, err := s.Store.QuestIDForStep(r.Context(), focusID)
+		qid, err := s.Store.Journal().QuestIDForStep(r.Context(), focusID)
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Step not found")
 			return
@@ -551,7 +551,7 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		qq, err := s.Store.GetQuest(r.Context(), qid)
+		qq, err := s.Store.Journal().GetQuest(r.Context(), qid)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
@@ -563,13 +563,13 @@ func (s *Server) getContext(w http.ResponseWriter, r *http.Request) {
 	}
 	var line any
 	if lineID != nil {
-		lr, err := s.Store.GetQuestline(r.Context(), *lineID)
+		lr, err := s.Store.Journal().GetQuestline(r.Context(), *lineID)
 		if err != nil {
 			writeErr(w, 404, "Questline not found")
 			return
 		}
 		line = lr
-		qs, err := s.Store.ListQuests(r.Context(), store.ListFilter{
+		qs, err := s.Store.Journal().ListQuests(r.Context(), journal.ListFilter{
 			QuestlineID: lineID,
 			NewestFirst: true,
 		})

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/valirum/quests/go/internal/identity"
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/kernel"
 	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
@@ -87,3 +88,8 @@ func (s *Store) guardExec(_ context.Context, command, runOn *string) error {
 // Knowledge gives access to notes, attachments and search (the knowledge context) over the same database.
 // Transitional, like Identity: until the composition root injects each context's service (ADR-0001).
 func (s *Store) Knowledge() *knowledge.Store { return &knowledge.Store{DB: s.DB} }
+
+// Journal gives access to quests, steps, questlines, categories, tags and the change log (the journal context)
+// over the same database. Transitional, like Identity and Knowledge: until the composition root injects each
+// context's service (ADR-0001).
+func (s *Store) Journal() *journal.Store { return &journal.Store{DB: s.DB} }

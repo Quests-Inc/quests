@@ -138,7 +138,7 @@ func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRea
 	for i := range out {
 		ids[i] = out[i].ID
 	}
-	tagMap, err := s.loadTagsForTemplates(ctx, ids)
+	tagMap, err := s.Journal().TagsForTemplates(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 			tr.EmitPoolLastOutcome = &outcome
 		}
 	}
-	tagMap, err := s.loadTagsForTemplates(ctx, []int64{id})
+	tagMap, err := s.Journal().TagsForTemplates(ctx, []int64{id})
 	if err != nil {
 		return TemplateRead{}, err
 	}
@@ -419,7 +419,7 @@ func (s *Store) applyTemplateTagIDs(ctx context.Context, templateID int64, body 
 	if !ok {
 		return nil
 	}
-	return s.SetTemplateTags(ctx, templateID, ids)
+	return s.Journal().SetTemplateTags(ctx, templateID, ids)
 }
 
 func parseTagIDsFromBody(body map[string]any) ([]int64, bool, error) {
@@ -553,7 +553,7 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tid, title, asStringDef(m["description"], ""), ord, pmin, pmax,
 			nullStr(asStringPtr(m["check_command"])), nullInt(asIntPtr(m["check_interval_seconds"])),
-			boolInt(asBool(m["wait_previous"], false)), nullRunMode(asStringDef(m["run_mode"], journal.RunModePoll)),
+			boolInt(asBool(m["wait_previous"], false)), journal.NullRunMode(asStringDef(m["run_mode"], journal.RunModePoll)),
 			nullStr(NormalizeRunOn(asStringPtr(m["run_on"]))),
 		)
 		if err != nil {
@@ -596,7 +596,7 @@ func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]Templat
 			m.CheckIntervalSeconds = &v
 		}
 		if runMode.Valid && strings.TrimSpace(runMode.String) != "" {
-			m.RunMode = NormalizeRunMode(runMode.String)
+			m.RunMode = journal.NormalizeRunMode(runMode.String)
 		}
 		out = append(out, m)
 	}

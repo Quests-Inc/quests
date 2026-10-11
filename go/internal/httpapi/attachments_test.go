@@ -160,7 +160,7 @@ func newAttachmentServer(t *testing.T, davURL, clamAddr string, maxUpload int64)
 func seedQuest(t *testing.T, s *Server) int64 {
 	t.Helper()
 	now := timeutil.NowUTC()
-	q, err := s.Store.CreateQuest(t.Context(), journal.Quest{
+	q, err := s.Store.Journal().CreateQuest(t.Context(), journal.Quest{
 		Title:        "with files",
 		Status:       journal.StatusActive,
 		Significance: journal.SigCommon,
@@ -700,7 +700,7 @@ func TestAttachmentEventsLandInChangeLog(t *testing.T) {
 	if up.Code != 201 {
 		t.Fatalf("upload = %d %s", up.Code, up.Body.String())
 	}
-	rows, err := s.Store.ListChangeLog(context.Background(), store.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
+	rows, err := s.Store.Journal().ListChangeLog(context.Background(), journal.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -721,13 +721,13 @@ func TestAttachmentEventsLandInChangeLog(t *testing.T) {
 func TestLogEventCoalesces(t *testing.T) {
 	s := newAttachmentServer(t, "", "", 0)
 	ctx := context.Background()
-	ev := store.ChangeEvent{Kind: "note_updated", EntityType: "note", EntityID: 7, Title: "n", Detail: "изменена", Coalesce: 10 * time.Minute}
+	ev := journal.ChangeEvent{Kind: "note_updated", EntityType: "note", EntityID: 7, Title: "n", Detail: "изменена", Coalesce: 10 * time.Minute}
 	for i := 0; i < 3; i++ {
-		if err := s.Store.LogEvent(ctx, ev); err != nil {
+		if err := s.Store.Journal().LogEvent(ctx, ev); err != nil {
 			t.Fatal(err)
 		}
 	}
-	rows, _ := s.Store.ListChangeLog(ctx, store.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
+	rows, _ := s.Store.Journal().ListChangeLog(ctx, journal.ChangeLogFilter{Limit: 10, EntityTypes: []string{"all"}})
 	if len(rows) != 1 {
 		t.Fatalf("want 1 coalesced entry, got %d: %v", len(rows), rows)
 	}
@@ -736,46 +736,46 @@ func TestLogEventCoalesces(t *testing.T) {
 func TestChangeLogFilters(t *testing.T) {
 	s := newAttachmentServer(t, "", "", 0)
 	ctx := context.Background()
-	for i, e := range []store.ChangeEvent{
+	for i, e := range []journal.ChangeEvent{
 		{Kind: "note_created", EntityType: "note", EntityID: 1, Title: "Рецепт Борща", Detail: "создана"},
 		{Kind: "note_deleted", EntityType: "note", EntityID: 2, Title: "Другое", Detail: "удалена"},
 		{Kind: "attachment_added", EntityType: "attachment", EntityID: 3, ParentType: "note", ParentID: 1, Title: "борщ.pdf", Detail: "загружено"},
 	} {
-		if err := s.Store.LogEvent(ctx, e); err != nil {
+		if err := s.Store.Journal().LogEvent(ctx, e); err != nil {
 			t.Fatal(i, err)
 		}
 	}
-	count := func(f store.ChangeLogFilter) int {
-		rows, err := s.Store.ListChangeLog(ctx, f)
+	count := func(f journal.ChangeLogFilter) int {
+		rows, err := s.Store.Journal().ListChangeLog(ctx, f)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return len(rows)
 	}
 	all := []string{"all"}
-	if n := count(store.ChangeLogFilter{}); n != 0 {
+	if n := count(journal.ChangeLogFilter{}); n != 0 {
 		t.Fatalf("default must be quest-only, got %d", n)
 	}
-	if n := count(store.ChangeLogFilter{EntityTypes: all}); n != 3 {
+	if n := count(journal.ChangeLogFilter{EntityTypes: all}); n != 3 {
 		t.Fatalf("all = %d", n)
 	}
-	if n := count(store.ChangeLogFilter{EntityTypes: []string{"note"}}); n != 2 {
+	if n := count(journal.ChangeLogFilter{EntityTypes: []string{"note"}}); n != 2 {
 		t.Fatalf("note = %d", n)
 	}
-	if n := count(store.ChangeLogFilter{EntityTypes: all, Kinds: []string{"note_deleted"}}); n != 1 {
+	if n := count(journal.ChangeLogFilter{EntityTypes: all, Kinds: []string{"note_deleted"}}); n != 1 {
 		t.Fatalf("kind = %d", n)
 	}
-	if n := count(store.ChangeLogFilter{EntityTypes: all, Query: "БОРЩ"}); n != 2 {
+	if n := count(journal.ChangeLogFilter{EntityTypes: all, Query: "БОРЩ"}); n != 2 {
 		t.Fatalf("cyrillic query = %d", n)
 	}
 	id := int64(1)
-	if n := count(store.ChangeLogFilter{EntityTypes: []string{"note"}, EntityID: &id}); n != 1 {
+	if n := count(journal.ChangeLogFilter{EntityTypes: []string{"note"}, EntityID: &id}); n != 1 {
 		t.Fatalf("entity id = %d", n)
 	}
-	first, _ := s.Store.ListChangeLog(ctx, store.ChangeLogFilter{EntityTypes: all, Limit: 1})
+	first, _ := s.Store.Journal().ListChangeLog(ctx, journal.ChangeLogFilter{EntityTypes: all, Limit: 1})
 	bid := first[0]["id"].(int64)
 	bat, _ := timeutil.ParseFlexible(first[0]["at"].(string))
-	if n := count(store.ChangeLogFilter{EntityTypes: all, BeforeID: &bid, BeforeAt: &bat}); n != 2 {
+	if n := count(journal.ChangeLogFilter{EntityTypes: all, BeforeID: &bid, BeforeAt: &bat}); n != 2 {
 		t.Fatalf("after cursor = %d", n)
 	}
 }

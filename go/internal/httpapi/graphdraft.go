@@ -174,16 +174,16 @@ func (s *Server) draftRefExists(ctx context.Context, ref draftRef, ops []store.D
 	id, _ := strconv.ParseInt(ref.ID, 10, 64)
 	switch ref.Type {
 	case "quest":
-		_, err := s.Store.GetQuest(ctx, id)
+		_, err := s.Store.Journal().GetQuest(ctx, id)
 		return err == nil
 	case "note":
 		ok, err := s.Store.Knowledge().NoteExists(ctx, id)
 		return err == nil && ok
 	case "questline":
-		_, err := s.Store.GetQuestline(ctx, id)
+		_, err := s.Store.Journal().GetQuestline(ctx, id)
 		return err == nil
 	case "step":
-		_, err := s.Store.QuestIDForStep(ctx, id)
+		_, err := s.Store.Journal().QuestIDForStep(ctx, id)
 		return err == nil
 	case "attachment":
 		_, err := s.Store.Knowledge().GetAttachment(ctx, id)
@@ -356,7 +356,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 		id, _ := strconv.ParseInt(f.ID, 10, 64)
 		switch f.Type {
 		case "quest":
-			if q, err := s.Store.GetQuest(ctx, id); err == nil {
+			if q, err := s.Store.Journal().GetQuest(ctx, id); err == nil {
 				has = textHas(q.Description)
 			}
 		case "note":
@@ -364,8 +364,8 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 				has = textHas(n.Description)
 			}
 		case "step":
-			if qid, err := s.Store.QuestIDForStep(ctx, id); err == nil {
-				if q, err := s.Store.GetQuest(ctx, qid); err == nil {
+			if qid, err := s.Store.Journal().QuestIDForStep(ctx, id); err == nil {
+				if q, err := s.Store.Journal().GetQuest(ctx, qid); err == nil {
 					for _, st := range q.Steps {
 						if st.ID == id {
 							has = textHas(st.Description)
@@ -374,7 +374,7 @@ func (s *Server) draftHasRef(ctx context.Context, from, to string, ops []store.D
 				}
 			}
 		case "questline":
-			if ql, err := s.Store.GetQuestline(ctx, id); err == nil {
+			if ql, err := s.Store.Journal().GetQuestline(ctx, id); err == nil {
 				has = textHas(ql.Description)
 			}
 		}
@@ -767,7 +767,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 422, "шаг уже в этом квесте")
 		return
 	}
-	from, err := s.Store.GetQuest(r.Context(), fromID)
+	from, err := s.Store.Journal().GetQuest(r.Context(), fromID)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Quest not found")
 		return
@@ -776,7 +776,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	to, err := s.Store.GetQuest(r.Context(), in.QuestID)
+	to, err := s.Store.Journal().GetQuest(r.Context(), in.QuestID)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Target quest not found")
 		return
@@ -815,7 +815,7 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 	journal.SyncStatusFromSteps(&from, now)
 	journal.SyncStatusFromSteps(&to, now)
 	from.UpdatedAt, to.UpdatedAt = now, now
-	if err := s.Store.MoveStep(r.Context(), stepID, from, to, order); err != nil {
+	if err := s.Store.Journal().MoveStep(r.Context(), stepID, from, to, order); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Step not found")
 			return
@@ -830,8 +830,8 @@ func (s *Server) postStepMove(w http.ResponseWriter, r *http.Request) {
 			QuestID:   &id, Title: q.Title, Detail: "перенос шага", Source: "web", Significance: string(q.Significance),
 		})
 	}
-	nf, _ := s.Store.GetQuest(r.Context(), fromID)
-	nt, _ := s.Store.GetQuest(r.Context(), in.QuestID)
+	nf, _ := s.Store.Journal().GetQuest(r.Context(), fromID)
+	nt, _ := s.Store.Journal().GetQuest(r.Context(), in.QuestID)
 	writeJSON(w, 200, map[string]any{
 		"from": journal.ToQuestRead(nf, timeutil.NowUTC()),
 		"to":   journal.ToQuestRead(nt, timeutil.NowUTC()),
@@ -1012,7 +1012,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 				path = fmt.Sprintf("/api/notes/%d", id)
 			}
 			if op.Kind == "edit_step" {
-				qid, qerr := s.Store.QuestIDForStep(ctx, id)
+				qid, qerr := s.Store.Journal().QuestIDForStep(ctx, id)
 				if qerr != nil {
 					fail(op, qerr)
 					return
@@ -1060,7 +1060,7 @@ func (s *Server) commitGraphDraft(w http.ResponseWriter, r *http.Request) {
 			}
 			aid, _ := strconv.ParseInt(item.ID, 10, 64)
 			if item.Type == "step" {
-				fromQ, qerr := s.Store.QuestIDForStep(ctx, aid)
+				fromQ, qerr := s.Store.Journal().QuestIDForStep(ctx, aid)
 				if qerr != nil {
 					fail(op, qerr)
 					return
@@ -1131,7 +1131,7 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		sid, _ := strconv.ParseInt(src.ID, 10, 64)
 		switch src.Type {
 		case "step":
-			if qid, err := s.Store.QuestIDForStep(ctx, sid); err == nil {
+			if qid, err := s.Store.Journal().QuestIDForStep(ctx, sid); err == nil {
 				owners["step:"+store.TmpID(op.ID)] = fmt.Sprintf("quest:%d", qid)
 			}
 		case "attachment":
@@ -1169,13 +1169,13 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		sid, _ := strconv.ParseInt(item.ID, 10, 64)
 		oid, _ := strconv.ParseInt(owner.ID, 10, 64)
 		finalOwner[sid] = oid
-		if origin, err := s.Store.QuestIDForStep(ctx, sid); err == nil {
+		if origin, err := s.Store.Journal().QuestIDForStep(ctx, sid); err == nil {
 			lastMoveOp[origin] = op.ID
 		}
 	}
 	delta := map[int64]int{}
 	for sid, dest := range finalOwner {
-		origin, err := s.Store.QuestIDForStep(ctx, sid)
+		origin, err := s.Store.Journal().QuestIDForStep(ctx, sid)
 		if err != nil || origin == dest {
 			continue
 		}
@@ -1194,7 +1194,7 @@ func (s *Server) planDraft(ctx context.Context, ops []store.DraftOp) (map[string
 		if d >= 0 {
 			continue
 		}
-		q, err := s.Store.GetQuest(ctx, qid)
+		q, err := s.Store.Journal().GetQuest(ctx, qid)
 		if err == nil && len(q.Steps)+d < 1 {
 			problems = append(problems, draftProblem{lastMoveOp[qid], "квест «" + q.Title + "» останется без шагов"})
 		}
@@ -1219,7 +1219,7 @@ func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ st
 	var desc, path string
 	switch typ {
 	case "quest":
-		q, err := s.Store.GetQuest(ctx, id)
+		q, err := s.Store.Journal().GetQuest(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -1231,18 +1231,18 @@ func (s *Server) editRef(ctx context.Context, mux http.Handler, add bool, typ st
 		}
 		desc, path = n.Description, fmt.Sprintf("/api/notes/%d", id)
 	case "questline":
-		ql, err := s.Store.GetQuestline(ctx, id)
+		ql, err := s.Store.Journal().GetQuestline(ctx, id)
 		if err != nil {
 			return err
 		}
 		desc = ql.Description
 		path = fmt.Sprintf("/api/questlines/%d", id)
 	case "step":
-		qid, err := s.Store.QuestIDForStep(ctx, id)
+		qid, err := s.Store.Journal().QuestIDForStep(ctx, id)
 		if err != nil {
 			return err
 		}
-		q, err := s.Store.GetQuest(ctx, qid)
+		q, err := s.Store.Journal().GetQuest(ctx, qid)
 		if err != nil {
 			return err
 		}

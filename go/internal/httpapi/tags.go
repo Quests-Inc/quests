@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
@@ -23,7 +24,7 @@ func (s *Server) registerTags(mux *http.ServeMux) {
 }
 
 func (s *Server) listTags(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.Store.ListTags(r.Context(), r.URL.Query().Get("q"))
+	rows, err := s.Store.Journal().ListTags(r.Context(), r.URL.Query().Get("q"))
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -37,7 +38,7 @@ func (s *Server) getTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	t, err := s.Store.GetTag(r.Context(), id)
+	t, err := s.Store.Journal().GetTag(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Tag not found")
 		return
@@ -59,12 +60,12 @@ func (s *Server) createTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	t, err := s.Store.CreateTag(r.Context(), store.TagCreate{
+	t, err := s.Store.Journal().CreateTag(r.Context(), journal.TagCreate{
 		Slug:  body.Slug,
 		Label: body.Label,
 		Color: body.Color,
 	})
-	if errors.Is(err, store.ErrBadSlug) {
+	if errors.Is(err, journal.ErrBadSlug) {
 		writeErr(w, 422, "slug or label required")
 		return
 	}
@@ -95,7 +96,7 @@ func (s *Server) patchTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	t, err := s.Store.UpdateTag(r.Context(), id, body.Label, body.Color)
+	t, err := s.Store.Journal().UpdateTag(r.Context(), id, body.Label, body.Color)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Tag not found")
 		return
@@ -115,7 +116,7 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	t, err := s.Store.GetTag(r.Context(), id)
+	t, err := s.Store.Journal().GetTag(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Tag not found")
 		return
@@ -124,7 +125,7 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if err := s.Store.DeleteTag(r.Context(), id); err != nil {
+	if err := s.Store.Journal().DeleteTag(r.Context(), id); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Tag not found")
 			return
@@ -142,7 +143,7 @@ func (s *Server) putQuestTags(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	q, err := s.Store.GetQuest(r.Context(), id)
+	q, err := s.Store.Journal().GetQuest(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Quest not found")
 		return
@@ -155,11 +156,11 @@ func (s *Server) putQuestTags(w http.ResponseWriter, r *http.Request) {
 		writeTagErr(w, err)
 		return
 	}
-	if err := s.Store.SetQuestTags(r.Context(), id, ids); err != nil {
+	if err := s.Store.Journal().SetQuestTags(r.Context(), id, ids); err != nil {
 		writeTagErr(w, err)
 		return
 	}
-	q, err = s.Store.GetQuest(r.Context(), id)
+	q, err = s.Store.Journal().GetQuest(r.Context(), id)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -198,7 +199,7 @@ func (s *Server) putTemplateTags(w http.ResponseWriter, r *http.Request) {
 		writeTagErr(w, err)
 		return
 	}
-	if err := s.Store.SetTemplateTags(r.Context(), id, ids); err != nil {
+	if err := s.Store.Journal().SetTemplateTags(r.Context(), id, ids); err != nil {
 		writeTagErr(w, err)
 		return
 	}
@@ -223,13 +224,13 @@ func (s *Server) decodeTagIDs(r *http.Request) ([]int64, error) {
 		return body.TagIDs, nil
 	}
 	if body.Tags != nil {
-		return s.Store.ResolveTagIDs(r.Context(), body.Tags)
+		return s.Store.Journal().ResolveTagIDs(r.Context(), body.Tags)
 	}
 	return []int64{}, nil
 }
 
 func writeTagErr(w http.ResponseWriter, err error) {
-	if errors.Is(err, store.ErrTooManyTags) {
+	if errors.Is(err, journal.ErrTooManyTags) {
 		writeErr(w, 422, err.Error())
 		return
 	}
@@ -237,7 +238,7 @@ func writeTagErr(w http.ResponseWriter, err error) {
 		writeErr(w, 404, "Tag not found")
 		return
 	}
-	if errors.Is(err, store.ErrBadSlug) {
+	if errors.Is(err, journal.ErrBadSlug) {
 		writeErr(w, 422, err.Error())
 		return
 	}

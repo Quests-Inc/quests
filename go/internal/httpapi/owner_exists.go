@@ -18,12 +18,12 @@ const (
 // contexts, so it lives in the root and the knowledge handler receives it as a function.
 func (s *Server) ownerExists(ctx context.Context, ownerType string, id int64) (bool, error) {
 	if ownerType == ownerQuestline {
-		return s.Store.QuestlineExists(ctx, id)
+		return s.Store.Journal().QuestlineExists(ctx, id)
 	}
 	if ownerType == ownerNote {
 		return s.Store.Knowledge().NoteExists(ctx, id)
 	}
-	_, err := s.Store.GetQuest(ctx, id)
+	_, err := s.Store.Journal().GetQuest(ctx, id)
 	if errors.Is(err, store.ErrNotFound) {
 		return false, nil
 	}

@@ -63,7 +63,7 @@ func (r *CheckRunner) Wait() {
 // FailStaleRunning marks in-progress one-shots as failed after a server restart.
 func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 	active := journal.StatusActive
-	quests, err := r.Store.ListQuests(ctx, store.ListFilter{Status: &active})
+	quests, err := r.Store.Journal().ListQuests(ctx, journal.ListFilter{Status: &active})
 	if err != nil {
 		log.Printf("checks: list stale: %v", err)
 		return
@@ -87,7 +87,7 @@ func (r *CheckRunner) FailStaleRunning(ctx context.Context) {
 			qq.UpdatedAt = now
 			qq.CompletedAt = nil
 			comment := "автошаг «" + st.Title + "»: прервано перезапуском сервера"
-			updated, err := r.Store.UpdateStepComment(ctx, st, qq, "quest_failed", "провалено", comment)
+			updated, err := r.Store.Journal().UpdateStepComment(ctx, st, qq, "quest_failed", "провалено", comment)
 			if err != nil {
 				log.Printf("checks: stale fail step %d: %v", st.ID, err)
 				continue
@@ -111,7 +111,7 @@ const watchDoneInterval = 60
 func (r *CheckRunner) Tick(ctx context.Context) {
 	defer r.TickNotes(ctx) // note checks follow the step checks
 	active := journal.StatusActive
-	quests, err := r.Store.ListQuests(ctx, store.ListFilter{Status: &active})
+	quests, err := r.Store.Journal().ListQuests(ctx, journal.ListFilter{Status: &active})
 	if err != nil {
 		log.Printf("checks: list: %v", err)
 		return
@@ -177,7 +177,7 @@ func (r *CheckRunner) spawn(ctx context.Context, q journal.Quest, st journal.Ste
 		run := journal.RunRunning
 		st.RunStatus = &run
 	}
-	if _, err := r.Store.UpdateStep(ctx, st, q, "step_progress", st.Title); err != nil {
+	if _, err := r.Store.Journal().UpdateStep(ctx, st, q, "step_progress", st.Title); err != nil {
 		r.unlock(st.ID)
 		log.Printf("checks: mark start step %d: %v", st.ID, err)
 		return
@@ -189,7 +189,7 @@ func (r *CheckRunner) spawn(ctx context.Context, q journal.Quest, st journal.Ste
 }
 
 func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once bool, exit int, stdout, stderr string, timedOut bool) {
-	q, err := r.Store.GetQuest(ctx, questID)
+	q, err := r.Store.Journal().GetQuest(ctx, questID)
 	if err != nil {
 		log.Printf("checks: reload quest %d: %v", questID, err)
 		return
@@ -212,7 +212,7 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		return
 	}
 	if exit != 0 {
-		_, _ = r.Store.UpdateStep(ctx, *st, q, "step_progress", st.Title)
+		_, _ = r.Store.Journal().UpdateStep(ctx, *st, q, "step_progress", st.Title)
 		return
 	}
 	parsed := ParseCheckOutput(stdout)
@@ -224,7 +224,7 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		st.ProgressTotal = parsed.Total
 	}
 	if !parsed.ProgressOK && !totalChanged {
-		_, _ = r.Store.UpdateStep(ctx, *st, q, "step_progress", st.Title)
+		_, _ = r.Store.Journal().UpdateStep(ctx, *st, q, "step_progress", st.Title)
 		return
 	}
 	n := st.ProgressCurrent // a total-only reading keeps the progress it had
@@ -240,7 +240,7 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 	progressSame := n == st.ProgressCurrent
 	descTouched := parsed.Description != nil
 	if progressSame && !descTouched && !totalChanged {
-		_, _ = r.Store.UpdateStep(ctx, *st, q, "step_progress", st.Title)
+		_, _ = r.Store.Journal().UpdateStep(ctx, *st, q, "step_progress", st.Title)
 		return
 	}
 	st.ProgressCurrent = n
@@ -259,7 +259,7 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		detail = "завершено"
 		toast = true
 	}
-	updated, err := r.Store.UpdateStep(ctx, *st, q, kind, detail)
+	updated, err := r.Store.Journal().UpdateStep(ctx, *st, q, kind, detail)
 	if err != nil {
 		log.Printf("checks: poll save step %d: %v", st.ID, err)
 		return
@@ -290,7 +290,7 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q journal.Quest, st *journa
 			kind = "quest_completed"
 			detail = "завершено"
 		}
-		updated, err := r.Store.UpdateStep(ctx, *st, q, kind, detail)
+		updated, err := r.Store.Journal().UpdateStep(ctx, *st, q, kind, detail)
 		if err != nil {
 			log.Printf("checks: once ok step %d: %v", st.ID, err)
 			return
@@ -319,7 +319,7 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q journal.Quest, st *journa
 	if blob := trimCheckOut(stderr, stdout); blob != "" {
 		comment += "\n" + blob
 	}
-	updated, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_failed", "провалено", comment)
+	updated, err := r.Store.Journal().UpdateStepComment(ctx, *st, q, "quest_failed", "провалено", comment)
 	if err != nil {
 		log.Printf("checks: once fail step %d: %v", st.ID, err)
 		return
@@ -492,7 +492,7 @@ func (r *CheckRunner) JobFinished(ctx context.Context, j store.RunnerJob) {
 }
 
 func (r *CheckRunner) stepOf(ctx context.Context, j store.RunnerJob) (journal.Quest, *journal.Step, bool) {
-	q, err := r.Store.GetQuest(ctx, *j.QuestID)
+	q, err := r.Store.Journal().GetQuest(ctx, *j.QuestID)
 	if err != nil {
 		return q, nil, false
 	}
@@ -512,7 +512,7 @@ func (r *CheckRunner) releaseOnce(ctx context.Context, j store.RunnerJob, why st
 	}
 	idle := journal.RunIdle
 	st.RunStatus = &idle
-	if _, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_updated", "устройство недоступно", "автошаг «"+st.Title+"»: "+why); err != nil {
+	if _, err := r.Store.Journal().UpdateStepComment(ctx, *st, q, "quest_updated", "устройство недоступно", "автошаг «"+st.Title+"»: "+why); err != nil {
 		log.Printf("checks: release step %d: %v", st.ID, err)
 	}
 }
@@ -525,7 +525,7 @@ func (r *CheckRunner) stopOnce(ctx context.Context, j store.RunnerJob, why strin
 	}
 	fail := journal.RunFail
 	st.RunStatus = &fail
-	if _, err := r.Store.UpdateStepComment(ctx, *st, q, "quest_updated", "автошаг остановлен", "автошаг «"+st.Title+"»: "+why); err != nil {
+	if _, err := r.Store.Journal().UpdateStepComment(ctx, *st, q, "quest_updated", "автошаг остановлен", "автошаг «"+st.Title+"»: "+why); err != nil {
 		log.Printf("checks: stop step %d: %v", st.ID, err)
 	}
 }

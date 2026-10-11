@@ -2,6 +2,49 @@
 import type { Resolved } from "./refs.gen";
 
 //////////
+// source: changelog.go
+
+/**
+ * ChangeLogFilter narrows ListChangeLog. Zero value = everything of entity
+ * type quest (what the HUD expects); set EntityTypes to widen.
+ */
+export interface ChangeLogFilter {
+  Limit: number /* int */;
+  QuestID?: number /* int64 */; // the quest itself, or an attachment owned by it
+  EntityTypes: string[]; // quest | note | attachment; empty = quest only, "all" = any
+  EntityID?: number /* int64 */; // with exactly one EntityType: one entity's history
+  OwnerType: string; // with OwnerID: the entity itself plus everything attached to it
+  OwnerID?: number /* int64 */;
+  Kinds: string[];
+  QuestlineID?: number /* int64 */; // quests of the line, their attachments, and its own attachments
+  CategoryID?: number /* int64 */;
+  TagID?: number /* int64 */;
+  From?: string; // [From, To)
+  To?: string; // [From, To)
+  Query: string; // case-insensitive substring of title/detail
+  BeforeID?: number /* int64 */;
+  BeforeAt?: string; // with BeforeID: keyset cursor on (at, id)
+}
+/**
+ * ChangeEvent is a log entry about a non-quest entity (note, attachment).
+ * Quest events are staged inside the quest transaction instead.
+ */
+export interface ChangeEvent {
+  Kind: string;
+  EntityType: string; // note | attachment
+  EntityID: number /* int64 */;
+  ParentType: string; // owner of an attachment; empty otherwise
+  ParentID: number /* int64 */;
+  Title: string;
+  Detail: string;
+  /**
+   * Coalesce folds the entry into the previous identical (kind, entity) one
+   * when that is newer than this window, so autosave bursts stay one line.
+   */
+  Coalesce: any /* time.Duration */;
+}
+
+//////////
 // source: domain.go
 
 export type QuestStatus = string;
@@ -140,6 +183,56 @@ export interface QuestCreate {
 }
 
 //////////
+// source: questlines.go
+
+export interface Questline {
+  ID: number /* int64 */;
+  Title: string;
+  Description: string;
+  CategoryID?: number /* int64 */;
+  Color: string;
+  Icon: string;
+  CustomIcon?: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+  CategorySlug?: string;
+  CategoryLabel?: string;
+  CategoryColor?: string;
+}
+/**
+ * QuestlineRead is a questline as the API sends it.
+ */
+export interface QuestlineRead {
+  id: number /* int64 */;
+  title: string;
+  description: string;
+  category_id?: number /* int64 */;
+  color: string;
+  icon: string;
+  custom_icon?: string;
+  created_at: string;
+  updated_at: string;
+  category_slug?: string;
+  category_label?: string;
+  category_color?: string;
+  icon_url?: string;
+  /**
+   * Refs is filled for a single-questline fetch only: the mentions in the title and description.
+   */
+  refs?: any;
+}
+
+//////////
+// source: quests.go
+
+export interface ListFilter {
+  Status?: QuestStatus;
+  Pinned?: boolean;
+  QuestlineID?: number /* int64 */;
+  NewestFirst: boolean;
+}
+
+//////////
 // source: read.go
 
 /**
@@ -203,4 +296,24 @@ export interface StepRead {
   run_status?: string;
   run_on?: string;
   done: boolean;
+}
+
+//////////
+// source: store.go
+
+/**
+ * Store is the context's data access: the PostgreSQL database behind the row-level-security driver.
+ */
+export interface Store {
+  DB?: any /* sql.DB */;
+}
+
+//////////
+// source: tags.go
+
+export const MaxTagsPerOwner = 5;
+export interface TagCreate {
+  Slug: string;
+  Label: string;
+  Color: string;
 }

@@ -22,19 +22,19 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 				row.Title = &n.Title
 			}
 		case "quest":
-			q, err := s.Store.GetQuest(r.Context(), ref.ID)
+			q, err := s.Store.Journal().GetQuest(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &q.Title
 			}
 		case "questline":
-			ql, err := s.Store.GetQuestline(r.Context(), ref.ID)
+			ql, err := s.Store.Journal().GetQuestline(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &ql.Title
 			}
 		case "step":
-			qid, err := s.Store.QuestIDForStep(r.Context(), ref.ID)
+			qid, err := s.Store.Journal().QuestIDForStep(r.Context(), ref.ID)
 			if err == nil {
-				q, err := s.Store.GetQuest(r.Context(), qid)
+				q, err := s.Store.Journal().GetQuest(r.Context(), qid)
 				if err == nil {
 					for _, st := range q.Steps {
 						if st.ID == ref.ID {

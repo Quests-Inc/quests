@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
@@ -188,7 +189,7 @@ func (r *CheckRunner) noteError(ctx context.Context, id int64, title, msg string
 }
 
 func (r *CheckRunner) noteChanged(ctx context.Context, id int64, title, detail string) {
-	_ = r.Store.LogEvent(context.WithoutCancel(ctx), store.ChangeEvent{
+	_ = r.Store.Journal().LogEvent(context.WithoutCancel(ctx), journal.ChangeEvent{
 		Kind: "note_updated", EntityType: "note", EntityID: id, Title: title, Detail: detail,
 	})
 	if r.Hub == nil {
