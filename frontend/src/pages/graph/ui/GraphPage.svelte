@@ -27,7 +27,7 @@
     uploadGraphDraftFile,
   } from '@/shared/api/client.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { applyDraft, describeOp, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown } from '@/entities/graph'
+  import { applyDraft, clampK, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -1030,77 +1030,6 @@
     cam = { k, x: r.width / 2 - ((x0 + x1) / 2) * k, y: r.height / 2 - ((y0 + y1) / 2) * k }
   }
 
-  /** Straight run at the end of an edge, so the arrowhead sits on the line. */
-  const STUB = 16
-
-  /** Which sides of a and b an edge uses: facing sides, horizontal if far apart in x. */
-  function sidesOf(a: { x: any; w: any; y: any; h?: number }, b: { x: any; w: any; y: any; h?: number }) {
-    const dx = b.x - a.x
-    if (Math.abs(dx) > (a.w + b.w) / 2 * 0.7) {
-      const dir = dx > 0 ? 1 : -1
-      return { vertical: false, dir, sa: dir > 0 ? 'R' : 'L', sb: dir > 0 ? 'L' : 'R' }
-    }
-    const dir = b.y > a.y ? 1 : -1
-    return { vertical: true, dir, sa: dir > 0 ? 'B' : 'T', sb: dir > 0 ? 'T' : 'B' }
-  }
-
-  /**
-   * Edge between the facing sides of two cards. `oa` / `ob` are the offsets,
-   * along the side, of where it leaves a and where it arrives at b, so edges
-   * sharing a side get their own points. Returns the path and the start point.
-   */
-  function edgePath(a: { x: number; w: number; y: number; h: number }, b: { x: number; w: number; y: number; h: number }, oa = 0, ob = 0) {
-    const { vertical, dir } = sidesOf(a, b)
-    if (!vertical) {
-      const x1 = a.x + (dir * a.w) / 2
-      const y1 = a.y + oa
-      const x2 = b.x - (dir * b.w) / 2
-      const y2 = b.y + ob
-      const ex = x2 - dir * STUB
-      const off = Math.max(30, Math.abs(ex - x1) / 2)
-      return { d: `M${x1} ${y1} C${x1 + dir * off} ${y1} ${ex - dir * off} ${y2} ${ex} ${y2} L${x2} ${y2}`, sx: x1, sy: y1 }
-    }
-    const x1 = a.x + oa
-    const y1 = a.y + (dir * a.h) / 2
-    const x2 = b.x + ob
-    const y2 = b.y - (dir * b.h) / 2
-    const ey = y2 - dir * STUB
-    const off = Math.max(30, Math.abs(ey - y1) / 2)
-    return { d: `M${x1} ${y1} C${x1} ${y1 + dir * off} ${x2} ${ey - dir * off} ${x2} ${ey} L${x2} ${y2}`, sx: x1, sy: y1 }
-  }
-
-  /**
-   * Gives every edge end its own point on the card side: outgoing edges share
-   * the upper/left half, incoming the lower/right half, each ordered by where
-   * the other end is, so lines do not cross needlessly.
-   */
-  function spreadEnds(items: { e: any, a: any, b: any }[]) {
-    const groups: Map<string, { item: any, end: 'a' | 'b', other: number }[]> = new Map()
-    const push = (key: string, item: { e: any; a: any; b: any }, end: 'a' | 'b', other: any) => {
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push({ item, end, other })
-    }
-    for (const item of items) {
-      const { vertical, sa, sb } = sidesOf(item.a, item.b)
-      push(`${item.a.key}|${sa}|out`, item, 'a', vertical ? item.b.x : item.b.y)
-      push(`${item.b.key}|${sb}|in`, item, 'b', vertical ? item.a.x : item.a.y)
-    }
-    for (const [key, list] of groups) {
-      list.sort((p, q) => p.other - q.other)
-      const isOut = key.endsWith('|out')
-      const node = list[0].end === 'a' ? list[0].item.a : list[0].item.b
-      const side = key.split('|')[1]
-      const len = side === 'L' || side === 'R' ? node.h : node.w
-      const lo = isOut ? -0.4 * len : 0.04 * len
-      const hi = isOut ? -0.04 * len : 0.4 * len
-      list.forEach((x, i) => {
-        const off = lo + ((hi - lo) * (i + 0.5)) / list.length
-        if (x.end === 'a') x.item.oa = off
-        else x.item.ob = off
-      })
-    }
-  }
-
   let nodeMap = $derived(new Map((view?.nodes ?? []).map((n) => [n.key, n])))
   /** Balls follow their members while those are dragged. */
   let groups = $derived(
@@ -1152,11 +1081,6 @@
   // Pan / zoom / card drag. Dragging a card works from anywhere except its
   // scrollable text and links, so reading and scrolling are not hijacked.
   let drag: { moved?: any; kind: any; n?: any; nx?: any; ny?: any; items?: any; members?: any; k?: any; d?: any; wx?: any; wy?: any; x?: any; y?: any; cx?: any; cy?: any; additive?: any; key?: any } = null
-  const MIN_K = 0.2
-  const MAX_K = 2.5
-  /** Limits a zoom step that starts at `from`. Fit can go below MIN_K on a big
-   * map; from there zooming in must not jump straight to MIN_K. */
-  const clampK = (k: number, from: number) => Math.max(Math.min(MIN_K, from), Math.min(Math.max(MAX_K, from), k))
   /** Zooms to `k` keeping the stage point (px, py) on the same world point. */
   function zoomAt(k: number, px: number, py: number) {
     k = clampK(k, cam.k)
