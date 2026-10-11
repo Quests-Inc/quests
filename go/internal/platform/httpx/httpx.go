@@ -27,6 +27,9 @@ func WriteErr(w http.ResponseWriter, status int, detail string) {
 
 var sourcePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,31}$`)
 
+// SourceLabelOK reports whether v is a plain client label (see RequestSource).
+func SourceLabelOK(v string) bool { return sourcePattern.MatchString(v) }
+
 // RequestSource is how a thing was made, from the X-Quests-Source header the clients set
 // ("web", "cli", "mcp", "telegram"…); "api" when absent or not a plain label.
 func RequestSource(r *http.Request) *string {

@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -99,18 +98,4 @@ func (s *Server) wsEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-func (s *Server) publishOpts(r *http.Request) (quiet bool, source string) {
-	quiet = events.QuietFromQuery(r.URL.Query().Get("quiet"))
-	source = r.URL.Query().Get("source")
-	if source == "" {
-		// Clients label themselves in X-Quests-Source (web, mcp, cli…); the web
-		// UI tells its own edits apart from everyone else's by it.
-		if h := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Quests-Source"))); sourcePattern.MatchString(h) {
-			source = h
-		}
-	}
-	source = events.SourceLabel(quiet, source)
-	return quiet, source
 }
