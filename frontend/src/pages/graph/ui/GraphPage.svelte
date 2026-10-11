@@ -27,7 +27,7 @@
     uploadGraphDraftFile,
   } from '@/shared/api/client.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { applyDraft, clampK, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
+  import { CARD, EDGES, LAYOUTS, RASTER, SQUARE, TYPES, applyDraft, clampK, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -56,39 +56,7 @@
     onOpen?: (kind: string, id: number) => void,
   } = $props()
 
-  const TYPES: Record<string, any> = {
-    quest: { label: 'Квест', glyph: '◆', color: '#c9a227' },
-    step: { label: 'Шаг', glyph: '•', color: '#8c97a8' },
-    note: { label: 'Заметка', glyph: '¶', color: '#b48ad6' },
-    attachment: { label: 'Вложение', glyph: '⎘', color: '#4f9fc7' },
-    questline: { label: 'Квестлайн', glyph: '☰', color: '#4fa56b' },
-    template: { label: 'Шаблон', glyph: '⟳', color: '#d9894a' },
-    cluster: { label: 'Вложения', glyph: '⎘', color: '#4f9fc7' },
-  }
-  const EDGES: Record<string, any> = {
-    structure: { label: 'Принадлежность', color: '#6e6e6e', dash: '' },
-    reference: { label: 'Ссылка', color: '#c9a227', dash: '6 4' },
-    dependency: { label: 'Зависимость', color: '#d0699b', dash: '' },
-  }
-  /** Attachments of one owner collapse into a cluster beyond this many. */
-  const CLUSTER_MIN = 6
-  /** Card width / max height (px) by kind; text beyond the height scrolls. */
-  const CARD: Record<string, any> = {
-    quest: { w: 300, max: 260 },
-    note: { w: 320, max: 300 },
-    stepBody: { w: 240, max: 120 },
-  }
-  const SQUARE = 96
-  const RASTER = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
-
   let depth = $state(2)
-  const LAYOUTS = {
-    tree: 'Дерево',
-    down: 'Дерево сверху вниз',
-    radial: 'Радиальная',
-    layers: 'Слоями по типам',
-    free: 'Свободно',
-  }
   const LAYOUT_KEY = 'quests.graph.layout'
   let layoutMode = $state(
     (
@@ -359,44 +327,6 @@
     if (!active && untrack(() => full)) toggleFull()
   })
 
-  /** Collapses bulky attachment lists into one cluster node. */
-  function prepare(g: { root?: any; nodes?: any; edges?: any }, open_: Set<string>) {
-    const nodes = g.nodes.map((n: any) => ({ ...n, x: 0, y: 0, w: 0, h: 0 }))
-    const edges = g.edges.map((e: any) => ({ ...e }))
-    const byKey = new Map<string, any>(nodes.map((n: { key: any }): [string, any] => [n.key, n]))
-    const owners = new Map<string, any[]>()
-    for (const e of edges) {
-      const to = byKey.get(e.to)
-      if (e.kind === 'structure' && to?.type === 'attachment' && to.links === 0 && !to.draft && !e.draft) {
-        if (!owners.has(e.from)) owners.set(e.from, [])
-        owners.get(e.from).push(to.key)
-      }
-    }
-    const drop = new Set()
-    for (const [owner, keys] of owners) {
-      const ck = `cluster:${owner}`
-      if (keys.length < CLUSTER_MIN || open_.has(ck) || loose.has(owner)) continue
-      for (const k of keys) drop.add(k)
-      nodes.push({
-        key: ck,
-        type: 'cluster',
-        id: 0,
-        title: `${keys.length} вложений`,
-        depth: (byKey.get(owner)?.depth ?? 0) + 1,
-        links: 0,
-        x: 0,
-        y: 0,
-        w: 0,
-        h: 0,
-      })
-      edges.push({ from: owner, to: ck, kind: 'structure' })
-    }
-    return {
-      nodes: nodes.filter((n: { key: unknown }) => !drop.has(n.key)),
-      edges: edges.filter((e: { from: unknown; to: unknown }) => !drop.has(e.from) && !drop.has(e.to)),
-    }
-  }
-
   /** Positions the user has set by hand (dragged cards), kept across rebuilds.
    * A key like `cluster:<owner>` also remembers where a folded attachment
    * group sat, so an expanded block lands there and folds back to the same spot. */
@@ -414,7 +344,7 @@
   async function rebuild(g: { root: any }, open_: Set<string>) {
     const mine = ++buildSeq
     ready = false
-    view = prepare(g, open_)
+    view = prepare(g, open_, loose)
     await tick()
     await tick()
     if (mine !== buildSeq || !stageEl || !view) return
