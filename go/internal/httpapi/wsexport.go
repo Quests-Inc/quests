@@ -63,7 +63,7 @@ func fileKey(webdavPath string) string {
 
 // exportWorkspace streams the workspace as a zip (owners only; secrets only with ?secrets=1).
 func (s *Server) exportWorkspace(w http.ResponseWriter, r *http.Request) {
-	id, role, _, ok := s.memberOf(w, r)
+	id, role, _, ok := s.identityHTTP().MemberOf(w, r)
 	if !ok {
 		return
 	}

@@ -6,7 +6,9 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // WriteJSON answers with v as JSON (no HTML escaping: the web client renders text, not markup).
@@ -75,4 +77,13 @@ func ClientKey(r *http.Request) string {
 		return host
 	}
 	return r.RemoteAddr
+}
+
+// FormatRetryAfter renders d for a Retry-After header (whole seconds, at least 1).
+func FormatRetryAfter(d time.Duration) string {
+	secs := int(d.Round(time.Second) / time.Second)
+	if secs < 1 {
+		secs = 1
+	}
+	return strconv.Itoa(secs)
 }

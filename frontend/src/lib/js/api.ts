@@ -8,8 +8,8 @@ import type {
   NoteListItem,
   NotePayload,
   RunnerView,
-  WorkspacesView,
 } from '../api/http.gen'
+import type { WorkspacesView } from '../api/identity_http.gen'
 import type { Graph, QuestlineRead, RunnerJob, TemplateRead } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 

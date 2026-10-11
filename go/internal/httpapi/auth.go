@@ -1,13 +1,9 @@
 package httpapi
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/httpx"
@@ -16,7 +12,7 @@ import (
 )
 
 // SessionCookie holds the opaque session secret for the SPA.
-const SessionCookie = "quests_session"
+const SessionCookie = identity.SessionCookie
 
 // publicPaths never require authentication: the login endpoint itself, the
 // auth-state probe the SPA uses to decide whether to show the login screen,
@@ -98,16 +94,6 @@ func subtleEqual(a, b string) bool {
 	return len(a) == len(b) && tokens.Hash(a) == tokens.Hash(b)
 }
 
-func formatRetryAfter(d time.Duration) string {
-	secs := int(d.Round(time.Second) / time.Second)
-	if secs < 1 {
-		secs = 1
-	}
-	return strconv.Itoa(secs)
-}
-
-var requestIsHTTPS = httpx.IsHTTPS
-
 // originAllowed accepts requests with no Origin (same-origin navigations and
 // non-browser clients), a same-host Origin, or an explicitly configured one.
 func (s *Server) originAllowed(r *http.Request) bool {
@@ -127,148 +113,7 @@ func (s *Server) originAllowed(r *http.Request) bool {
 	return u.Host == r.Host
 }
 
-// --- endpoints ---
-
-func (s *Server) registerAuth(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/auth/login", s.postLogin)
-	mux.HandleFunc("POST /api/auth/logout", s.postLogout)
-	mux.HandleFunc("GET /api/auth/state", s.getAuthState)
-	mux.HandleFunc("GET /api/ping", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
-}
-
 func (s *Server) limiter() *ratelimit.Limiter {
 	s.loginLimiterOnce.Do(func() { s.loginLimiter = ratelimit.New() })
 	return s.loginLimiter
-}
-
-func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
-	if !s.AuthRequired {
-		writeErr(w, http.StatusBadRequest, "authentication is disabled on this instance")
-		return
-	}
-	if !s.originAllowed(r) {
-		writeErr(w, http.StatusForbidden, "cross-origin request rejected")
-		return
-	}
-	key := httpx.ClientKey(r)
-	if ok, retryIn := s.limiter().Allow(key); !ok {
-		w.Header().Set("Retry-After", formatRetryAfter(retryIn))
-		writeErr(w, http.StatusTooManyRequests, "слишком много попыток входа, повторите позже")
-		return
-	}
-	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid JSON")
-		return
-	}
-	user := strings.ToLower(strings.TrimSpace(body.Username))
-	if len(user) > 64 || len(body.Password) > 1024 {
-		writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
-		return
-	}
-	if d := s.limiter().UserPenalty(user); d > 0 {
-		time.Sleep(d)
-	}
-	if !s.limiter().Acquire() {
-		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusTooManyRequests, "сервер занят проверкой паролей, повторите")
-		return
-	}
-	u, err := s.Auth.Authenticate(body.Username, body.Password)
-	s.limiter().Release()
-	if err != nil {
-		s.limiter().RecordFailure(key)
-		s.limiter().RecordUserFailure(user)
-		if errors.Is(err, identity.ErrBadPassword) {
-			writeErr(w, http.StatusUnauthorized, "Неверный логин или пароль")
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if on, merr := s.Auth.HasMFA(u.ID); merr != nil {
-		writeErr(w, http.StatusInternalServerError, merr.Error())
-		return
-	} else if on {
-		// Password right, second factor still owed: a ticket, not a session. The failure counters
-		// stay until the code is accepted, so a guesser gains nothing by stopping here.
-		ticket, terr := s.mfa.issue(u.ID, u.Username)
-		if terr != nil {
-			writeErr(w, http.StatusInternalServerError, terr.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": ticket})
-		return
-	}
-	s.limiter().RecordSuccess(key)
-	if _, err := s.startSession(w, r, u.ID); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"authenticated": true,
-		"username":      u.Username,
-	})
-}
-
-// startSession logs userID in: creates the session row and sets the cookie. Returns the secret.
-func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) (string, error) {
-	secret, expires, err := s.Auth.CreateSession(userID, r.Header.Get("User-Agent"))
-	if err != nil {
-		return "", err
-	}
-	go func() { _ = s.Auth.PurgeExpiredSessions() }()
-	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookie,
-		Value:    secret,
-		Path:     "/",
-		Expires:  expires,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   s.SecureCookies || requestIsHTTPS(r),
-	})
-	return secret, nil
-}
-
-func (s *Server) postLogout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(SessionCookie); err == nil && c.Value != "" {
-		_ = s.Auth.DeleteSession(c.Value)
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookie,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   s.SecureCookies || requestIsHTTPS(r),
-	})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// getAuthState tells the SPA whether to render the login screen. It is public
-// by design and reveals only whether auth is on and who (if anyone) is logged in.
-func (s *Server) getAuthState(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]any{
-		"auth_required": s.AuthRequired,
-		"authenticated": false,
-		"username":      nil,
-	}
-	if !s.AuthRequired {
-		resp["authenticated"] = true
-		writeJSON(w, http.StatusOK, resp)
-		return
-	}
-	if p, ok := s.principal(r); ok {
-		resp["authenticated"] = true
-		resp["username"] = p.User.Username
-		// 0 = signed in but in no workspace (the SPA offers to create one).
-		resp["workspace_id"] = p.User.WorkspaceID
-	}
-	writeJSON(w, http.StatusOK, resp)
 }

@@ -89,7 +89,7 @@ func (s *Server) listSecrets(segment string) http.HandlerFunc {
 func (s *Server) putSecret(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Secrets feed the environment of the owner's commands: only owners write them.
-		if !s.requireOwner(w, r, "set secrets") {
+		if !s.identityHTTP().RequireOwner(w, r, "set secrets") {
 			return
 		}
 		key := r.PathValue("key")
@@ -126,7 +126,7 @@ func (s *Server) putSecret(segment string) http.HandlerFunc {
 
 func (s *Server) deleteSecret(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !s.requireOwner(w, r, "remove secrets") {
+		if !s.identityHTTP().RequireOwner(w, r, "remove secrets") {
 			return
 		}
 		o, ok := s.secretOwner(w, r, segment)

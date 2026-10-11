@@ -14,3 +14,6 @@ func PrincipalFrom(ctx context.Context) (Principal, bool) {
 	p, ok := ctx.Value(principalCtxKey{}).(Principal)
 	return p, ok
 }
+
+// SessionCookie holds the opaque session secret for the SPA.
+const SessionCookie = "quests_session"

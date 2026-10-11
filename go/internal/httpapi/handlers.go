@@ -13,6 +13,7 @@ import (
 
 	"github.com/valirum/quests/go/internal/domain"
 	"github.com/valirum/quests/go/internal/identity"
+	identityhttp "github.com/valirum/quests/go/internal/identity/http"
 	"github.com/valirum/quests/go/internal/platform/clamav"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/health"
@@ -51,6 +52,8 @@ type Server struct {
 	// loginLimiter throttles repeated failed /api/auth/login attempts.
 	// Lazily initialized on first use — see Server.limiter().
 	loginLimiterOnce sync.Once
+	identityOnce     sync.Once
+	idh              *identityhttp.Handler
 	loginLimiter     *ratelimit.Limiter
 	// InternalToken authenticates the server's own loopback calls (LLM assistant).
 	// Generated per process, never persisted.
@@ -73,8 +76,6 @@ type Server struct {
 	WorkspaceQuota int64
 	// Secrets seals what is stored for an account (its LLM key). Nil = nothing can be stored.
 	Secrets *secretbox.Box
-
-	mfa mfaTickets
 }
 
 func (s *Server) Handler() http.Handler {
@@ -134,7 +135,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/quests/{id}/steps", s.addStep)
 	mux.HandleFunc("PATCH /api/quests/{id}/steps/{step_id}", s.patchStep)
 	mux.HandleFunc("DELETE /api/quests/{id}/steps/{step_id}", s.deleteStep)
-	s.registerAuth(mux)
+	s.identityHTTP().Register(mux)
 	s.registerAttachments(mux)
 	s.registerNotes(mux)
 	s.registerPDF(mux)
@@ -142,13 +143,10 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerTags(mux)
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
-	s.registerMFA(mux)
 	s.registerNoteCheck(mux)
 	s.registerGraphDraft(mux)
 	s.registerRunner(mux)
-	s.registerWorkspaces(mux)
 	s.registerWorkspaceArchive(mux)
-	s.registerTokens(mux)
 	s.mountSPA(mux)
 	return mux
 }

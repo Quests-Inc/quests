@@ -33,7 +33,7 @@ func (s *Server) testHandler() http.Handler {
 	mux.HandleFunc("GET /api/protected", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"ok": "yes"})
 	})
-	s.registerAuth(mux)
+	s.identityHTTP().RegisterAuth(mux)
 	return s.requireAuth(mux)
 }
 
@@ -434,8 +434,8 @@ func TestSelfServiceTokens(t *testing.T) {
 		}
 	}
 	mux := http.NewServeMux()
-	s.registerAuth(mux)
-	s.registerTokens(mux)
+	s.identityHTTP().RegisterAuth(mux)
+	s.identityHTTP().RegisterTokens(mux)
 	h := s.requireAuth(mux)
 
 	login := func(user string) *http.Cookie {
