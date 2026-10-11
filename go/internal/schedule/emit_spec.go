@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/store"
@@ -201,7 +202,7 @@ func runeLen(s string) int { return utf8.RuneCountInString(s) }
 // resolveEmitSpec validates spec against the template's limits and resolves
 // questline/category/tags given by name. Any problem is an error: the run is
 // treated like a failed attempt (logged, retried, then a failed quest).
-func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim store.EmitLimits) (*resolvedSpec, error) {
+func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim automation.EmitLimits) (*resolvedSpec, error) {
 	rs := &resolvedSpec{Pinned: spec.Pinned, Automated: spec.Automated, Ignored: spec.Ignored}
 	if spec.Title != nil {
 		t := strings.TrimSpace(*spec.Title)
@@ -284,10 +285,10 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim s
 	}
 
 	var err error
-	if rs.QuestlineID, err = resolveRefField(ctx, spec.Questline, "questline", st.ResolveQuestlineRef); err != nil {
+	if rs.QuestlineID, err = resolveRefField(ctx, spec.Questline, "questline", st.Automation().ResolveQuestlineRef); err != nil {
 		return nil, err
 	}
-	if rs.CategoryID, err = resolveRefField(ctx, spec.Category, "category", st.ResolveCategoryRef); err != nil {
+	if rs.CategoryID, err = resolveRefField(ctx, spec.Category, "category", st.Automation().ResolveCategoryRef); err != nil {
 		return nil, err
 	}
 	if len(spec.Tags) > 0 {

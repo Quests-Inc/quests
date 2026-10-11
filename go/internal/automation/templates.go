@@ -1,4 +1,4 @@
-package store
+package automation
 
 import (
 	"context"

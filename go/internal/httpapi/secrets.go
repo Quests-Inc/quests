@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/valirum/quests/go/internal/automation"
 )
 
 // secretKeyPattern matches a valid env var name — secrets are injected into a
@@ -17,32 +17,32 @@ var secretKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // secretOwnerKinds maps the URL segment to the owner kind:
 // /api/{questlines|templates|quests|steps}/{id}/secrets[/{key}].
 var secretOwnerKinds = map[string]string{
-	"questlines": store.SecretOwnerQuestline,
-	"templates":  store.SecretOwnerTemplate,
-	"quests":     store.SecretOwnerQuest,
-	"steps":      store.SecretOwnerStep,
-	"notes":      store.SecretOwnerNote,
+	"questlines": automation.SecretOwnerQuestline,
+	"templates":  automation.SecretOwnerTemplate,
+	"quests":     automation.SecretOwnerQuest,
+	"steps":      automation.SecretOwnerStep,
+	"notes":      automation.SecretOwnerNote,
 }
 
 var secretOwnerLabels = map[string]string{
-	store.SecretOwnerQuestline: "Questline",
-	store.SecretOwnerTemplate:  "Template",
-	store.SecretOwnerQuest:     "Quest",
-	store.SecretOwnerStep:      "Step",
-	store.SecretOwnerNote:      "Note",
+	automation.SecretOwnerQuestline: "Questline",
+	automation.SecretOwnerTemplate:  "Template",
+	automation.SecretOwnerQuest:     "Quest",
+	automation.SecretOwnerStep:      "Step",
+	automation.SecretOwnerNote:      "Note",
 }
 
 // secretOwner resolves {id} for the route's owner kind and 404s when the
 // owning row does not exist.
-func (s *Server) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (store.SecretOwner, bool) {
+func (s *Server) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (automation.SecretOwner, bool) {
 	kind := secretOwnerKinds[segment]
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id < 1 {
 		writeErr(w, http.StatusBadRequest, "invalid id")
-		return store.SecretOwner{}, false
+		return automation.SecretOwner{}, false
 	}
-	o := store.SecretOwner{Kind: kind, ID: id}
-	ok, err := s.Store.SecretOwnerExists(r.Context(), o)
+	o := automation.SecretOwner{Kind: kind, ID: id}
+	ok, err := s.Store.Automation().SecretOwnerExists(r.Context(), o)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return o, false
@@ -63,12 +63,12 @@ func (s *Server) listSecrets(segment string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		own, err := s.Store.ListSecretKeys(r.Context(), o)
+		own, err := s.Store.Automation().ListSecretKeys(r.Context(), o)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		eff, err := s.Store.ListEffectiveSecretKeys(r.Context(), o)
+		eff, err := s.Store.Automation().ListEffectiveSecretKeys(r.Context(), o)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -97,7 +97,7 @@ func (s *Server) putSecret(segment string) http.HandlerFunc {
 			writeErr(w, 422, "key must look like an env var name: [A-Za-z_][A-Za-z0-9_]*")
 			return
 		}
-		if store.ReservedSecretName(key) {
+		if automation.ReservedSecretName(key) {
 			writeErr(w, 422, "this name is reserved: it would change how commands start, not carry a credential")
 			return
 		}
@@ -116,7 +116,7 @@ func (s *Server) putSecret(segment string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if err := s.Store.SetSecret(r.Context(), o, key, body.Value); err != nil {
+		if err := s.Store.Automation().SetSecret(r.Context(), o, key, body.Value); err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}
@@ -133,7 +133,7 @@ func (s *Server) deleteSecret(segment string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if err := s.Store.DeleteSecret(r.Context(), o, r.PathValue("key")); err != nil {
+		if err := s.Store.Automation().DeleteSecret(r.Context(), o, r.PathValue("key")); err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}

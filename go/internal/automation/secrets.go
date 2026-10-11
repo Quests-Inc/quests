@@ -1,4 +1,4 @@
-package store
+package automation
 
 import (
 	"context"
@@ -87,7 +87,7 @@ func (s *Store) SecretOwnerExists(ctx context.Context, o SecretOwner) (bool, err
 // sealedPrefix marks a value sealed by secretbox. Rows from before sealing hold the bare value.
 const sealedPrefix = "v1:"
 
-func (s *Store) sealSecret(v string) (string, error) {
+func (s *Store) SealSecret(v string) (string, error) {
 	if s.Box == nil {
 		return v, nil
 	}
@@ -96,7 +96,7 @@ func (s *Store) sealSecret(v string) (string, error) {
 
 // openSecret returns the plain value of a stored one; ok=false means it cannot be opened
 // (sealed under another key), and the secret is left out rather than handed over as ciphertext.
-func (s *Store) openSecret(stored string) (string, bool) {
+func (s *Store) OpenSecret(stored string) (string, bool) {
 	if s.Box == nil || !strings.HasPrefix(stored, sealedPrefix) {
 		return stored, true // not sealed: a legacy plain row (sealed at the next start)
 	}
@@ -160,7 +160,7 @@ func (s *Store) SealLegacySecrets(ctx context.Context) (int, error) {
 
 // SetSecret upserts one secret value for an owner.
 func (s *Store) SetSecret(ctx context.Context, o SecretOwner, key, value string) error {
-	value, err := s.sealSecret(value)
+	value, err := s.SealSecret(value)
 	if err != nil {
 		return err
 	}
@@ -276,7 +276,7 @@ func (s *Store) secretValues(ctx context.Context, o SecretOwner) (map[string]str
 		if err := rows.Scan(&k, &v); err != nil {
 			return nil, err
 		}
-		if plain, ok := s.openSecret(v); ok {
+		if plain, ok := s.OpenSecret(v); ok {
 			out[k] = plain
 		}
 	}

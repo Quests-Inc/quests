@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/httpapi"
 	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/platform/config"
@@ -157,7 +158,7 @@ func runAdmin(args []string) bool {
 			fmt.Printf("%d\t%s\t%s\n", u.ID, u.Username, state)
 		}
 	case "secrets-check":
-		counts, err := wst.SealedHealth(context.Background())
+		counts, err := wst.Automation().SealedHealth(context.Background())
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -388,14 +389,14 @@ func runRunnerCmd(st *store.Store, args []string) {
 		if len(args) < 2 {
 			fatal("usage: quests-server runner add <label>")
 		}
-		token, err := st.CreateRunner(ctx, args[1])
+		token, err := st.Automation().CreateRunner(ctx, args[1])
 		if err != nil {
 			fatal("%v", err)
 		}
-		fmt.Printf("runner %q created. One-time registration token (valid %d h):\n\n  %s\n\n", args[1], int(store.RegistrationTTL.Hours()), token)
+		fmt.Printf("runner %q created. One-time registration token (valid %d h):\n\n  %s\n\n", args[1], int(automation.RegistrationTTL.Hours()), token)
 		fmt.Println("On the device:  quests-runner register --server https://… --token <the token above>")
 	case "ls":
-		runners, err := st.ListRunners(ctx)
+		runners, err := st.Automation().ListRunners(ctx)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -411,7 +412,7 @@ func runRunnerCmd(st *store.Store, args []string) {
 				state = "revoked"
 			case !r.Registered:
 				state = "not registered yet"
-			case !store.RunnerOnline(r, now):
+			case !automation.RunnerOnline(r, now):
 				state = "offline"
 			}
 			seen := "never"
@@ -424,7 +425,7 @@ func runRunnerCmd(st *store.Store, args []string) {
 		if len(args) < 2 {
 			fatal("usage: quests-server runner rm <label>")
 		}
-		if err := st.RevokeRunner(ctx, args[1]); err != nil {
+		if err := st.Automation().RevokeRunner(ctx, args[1]); err != nil {
 			fatal("%v", err)
 		}
 		fmt.Printf("runner %q revoked\n", args[1])

@@ -1,4 +1,4 @@
-package store
+package automation
 
 import (
 	"context"
@@ -618,4 +618,27 @@ func (s *Store) PurgeRunnerJobs(ctx context.Context, before time.Time) (int64, e
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// RunnerWorkspaceByToken resolves the workspace of a runner's permanent token
+// (the runner has not been placed in a workspace yet, so this goes through a
+// SECURITY DEFINER function that bypasses row-level security).
+func (s *Store) RunnerWorkspaceByToken(ctx context.Context, token string) (int64, error) {
+	if token == "" {
+		return 0, ErrRunnerAuth
+	}
+	var id sql.NullInt64
+	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_token(?)`, tokens.Hash(token)).Scan(&id); err != nil || !id.Valid {
+		return 0, ErrRunnerAuth
+	}
+	return id.Int64, nil
+}
+
+// RunnerWorkspaceByReg is the same for a one-time registration token.
+func (s *Store) RunnerWorkspaceByReg(ctx context.Context, token string) (int64, error) {
+	var id sql.NullInt64
+	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_reg(?)`, tokens.Hash(token)).Scan(&id); err != nil || !id.Valid {
+		return 0, ErrRunnerToken
+	}
+	return id.Int64, nil
 }

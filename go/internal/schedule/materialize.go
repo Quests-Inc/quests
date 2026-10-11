@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
@@ -658,14 +659,14 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 		info.Status = "error"
 		execErr = store.ErrNoRunner
 	}
-	rec := store.EmitAttempt{
+	rec := automation.EmitAttempt{
 		TemplateID: tmpl.ID, PeriodKey: periodKey, At: now, Attempt: attemptNo,
 		Status: info.Status, DurationMS: info.Duration.Milliseconds(),
 		Message: info.Stderr,
 	}
 	// Logging never fails the roll: it's diagnostics, not state.
 	record := func() {
-		if rerr := st.RecordEmitAttempt(ctx, rec); rerr != nil {
+		if rerr := st.Automation().RecordEmitAttempt(ctx, rec); rerr != nil {
 			log.Printf("emit attempt log (template %d): %v", tmpl.ID, rerr)
 		}
 	}
@@ -675,9 +676,9 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 	if execErr == nil {
 		spec := out.Spec
 		if spec != nil {
-			lim, lerr := store.ParseEmitLimits(tmpl.EmitLimits.String)
+			lim, lerr := automation.ParseEmitLimits(tmpl.EmitLimits.String)
 			if lerr != nil {
-				lim = store.DefaultEmitLimits()
+				lim = automation.DefaultEmitLimits()
 				log.Printf("emit limits (template %d): %v; using defaults", tmpl.ID, lerr)
 			}
 			var rerr error

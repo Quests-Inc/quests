@@ -2,14 +2,12 @@ package store
 
 import (
 	"context"
-	"database/sql"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/identity"
 	"github.com/valirum/quests/go/internal/journal"
-	"github.com/valirum/quests/go/internal/kernel"
 	"github.com/valirum/quests/go/internal/knowledge"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/platform/tokens"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 )
 
@@ -52,39 +50,6 @@ func (s *Store) CopyCategories(ctx context.Context, from, to int64) error {
 	return nil
 }
 
-// RunnerWorkspaceByToken resolves the workspace of a runner's permanent token
-// (the runner has not been placed in a workspace yet, so this goes through a
-// SECURITY DEFINER function that bypasses row-level security).
-func (s *Store) RunnerWorkspaceByToken(ctx context.Context, token string) (int64, error) {
-	if token == "" {
-		return 0, ErrRunnerAuth
-	}
-	var id sql.NullInt64
-	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_token(?)`, tokens.Hash(token)).Scan(&id); err != nil || !id.Valid {
-		return 0, ErrRunnerAuth
-	}
-	return id.Int64, nil
-}
-
-// RunnerWorkspaceByReg is the same for a one-time registration token.
-func (s *Store) RunnerWorkspaceByReg(ctx context.Context, token string) (int64, error) {
-	var id sql.NullInt64
-	if err := s.DB.QueryRowContext(ctx, `SELECT runner_workspace_by_reg(?)`, tokens.Hash(token)).Scan(&id); err != nil || !id.Valid {
-		return 0, ErrRunnerToken
-	}
-	return id.Int64, nil
-}
-
-// guardAuthor refuses a command written by someone who is not an owner of the workspace (kernel.CommandAuthor).
-func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
-	return kernel.CommandAuthor(ctx, s.Identity(), command, old)
-}
-
-// guardExec refuses a command that has no runner (kernel.CommandExec).
-func (s *Store) guardExec(_ context.Context, command, runOn *string) error {
-	return kernel.CommandExec(command, runOn)
-}
-
 // Knowledge gives access to notes, attachments and search (the knowledge context) over the same database.
 // Transitional, like Identity: until the composition root injects each context's service (ADR-0001).
 func (s *Store) Knowledge() *knowledge.Store { return &knowledge.Store{DB: s.DB} }
@@ -93,3 +58,7 @@ func (s *Store) Knowledge() *knowledge.Store { return &knowledge.Store{DB: s.DB}
 // over the same database. Transitional, like Identity and Knowledge: until the composition root injects each
 // context's service (ADR-0001).
 func (s *Store) Journal() *journal.Store { return &journal.Store{DB: s.DB} }
+
+// Automation gives access to templates, runners, jobs and secrets (the automation context) over the same database.
+// Transitional, like Identity, Knowledge and Journal: until the composition root injects each context's service.
+func (s *Store) Automation() *automation.Store { return &automation.Store{DB: s.DB, Box: s.Box} }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/identity"
 	identityhttp "github.com/valirum/quests/go/internal/identity/http"
 	journalhttp "github.com/valirum/quests/go/internal/journal/http"
@@ -63,7 +64,7 @@ type Server struct {
 	SelfBase string
 	// RunnerDone is called once for every runner job that reaches a final state
 	// (result delivered, lease lost, never picked up): the scheduler applies it to the step.
-	RunnerDone func(ctx context.Context, j store.RunnerJob)
+	RunnerDone func(ctx context.Context, j automation.RunnerJob)
 	// WebDAV stores attachment bytes. Nil/unconfigured disables uploads.
 	WebDAV *webdav.Client
 	// ClamAV scans uploads. Unconfigured refuses uploads rather than storing

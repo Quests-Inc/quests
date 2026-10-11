@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/valirum/quests/go/internal/store"
+	"github.com/valirum/quests/go/internal/automation"
 )
 
 func TestSecureHeadersAndBodyCap(t *testing.T) {
@@ -64,12 +64,12 @@ func TestIconsAreSandboxed(t *testing.T) {
 
 func TestReservedSecretNames(t *testing.T) {
 	for _, bad := range []string{"PATH", "path", "LD_PRELOAD", "BASH_ENV", "SHELLOPTS", "PS4", "QUESTS_WORKSPACE", "PYTHONSTARTUP", "NODE_OPTIONS", "GIT_SSH_COMMAND"} {
-		if !store.ReservedSecretName(bad) {
+		if !automation.ReservedSecretName(bad) {
 			t.Errorf("%s should be reserved", bad)
 		}
 	}
 	for _, ok := range []string{"API_KEY", "GROQ_TOKEN", "DB_PASSWORD", "REFCOOL_URL"} {
-		if store.ReservedSecretName(ok) {
+		if automation.ReservedSecretName(ok) {
 			t.Errorf("%s should be allowed", ok)
 		}
 	}

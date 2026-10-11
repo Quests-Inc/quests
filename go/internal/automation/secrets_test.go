@@ -1,4 +1,4 @@
-package store
+package automation
 
 import (
 	"context"
@@ -21,9 +21,9 @@ INSERT INTO queststep (id, quest_id, title, description, progress_current, progr
 
 func openSecretsDB(t *testing.T) *Store {
 	t.Helper()
-	pool, url := pgtest.NewWithURL(t)
+	pool := pgtest.New(t)
 	pgtest.Seed(t, pool, secretsTestSeed)
-	return &Store{DB: pool, DatabaseURL: url}
+	return &Store{DB: pool}
 }
 
 var (

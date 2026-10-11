@@ -56,6 +56,18 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
+  - path: "github.com/valirum/quests/go/internal/automation"
+    output_path: "../frontend/src/lib/api/automation.gen.ts"
+    exclude_files:
+      - "store.go"
+      - "durations.go"
+    type_mappings:
+      time.Time: "string"
+      time.Duration: "number"
+      json.RawMessage: "unknown"
+      journal.Tag: "Tag"
+    frontmatter: |
+      import type { Tag } from "./journal.gen";
   - path: "github.com/valirum/quests/go/internal/store"
     output_path: "../frontend/src/lib/api/store.gen.ts"
     exclude_files:
@@ -73,14 +85,15 @@ packages:
       - "llm_settings.go"
       - "graphdraft.go"
     frontmatter: |
-      import type { DraftOp, Runner } from "./store.gen";
+      import type { DraftOp } from "./store.gen";
+      import type { Runner } from "./automation.gen";
             import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
       llmassist.Provider: "Provider"
-      store.Runner: "Runner"
+      automation.Runner: "Runner"
       knowledge.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
       knowledge.RevisionRead: "RevisionRead"

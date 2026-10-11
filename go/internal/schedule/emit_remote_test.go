@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/store"
 )
 
@@ -32,8 +33,8 @@ echo '{"title":"Вернуться на пакет"}'`, "home")
 	if first.Spec != nil || first.FailMsg != "" {
 		t.Fatalf("first tick must only queue: %+v", first)
 	}
-	jobs, _ := st.ListRunnerJobs(ctx, store.JobFilter{Label: "home"})
-	if len(jobs) != 1 || jobs[0].Kind != store.JobKindEmitPool || jobs[0].TemplateID == nil || *jobs[0].TemplateID != 7 || !strings.HasPrefix(jobs[0].Command, "#!/bin/sh") {
+	jobs, _ := st.Automation().ListRunnerJobs(ctx, automation.JobFilter{Label: "home"})
+	if len(jobs) != 1 || jobs[0].Kind != automation.JobKindEmitPool || jobs[0].TemplateID == nil || *jobs[0].TemplateID != 7 || !strings.HasPrefix(jobs[0].Command, "#!/bin/sh") {
 		t.Fatalf("queued jobs: %+v", jobs)
 	}
 	// Ticks while the device is away neither queue again nor fail the template.
@@ -42,16 +43,16 @@ echo '{"title":"Вернуться на пакет"}'`, "home")
 			t.Fatalf("waiting tick %d: %+v", i, r)
 		}
 	}
-	if jobs, _ = st.ListRunnerJobs(ctx, store.JobFilter{Label: "home"}); len(jobs) != 1 {
+	if jobs, _ = st.Automation().ListRunnerJobs(ctx, automation.JobFilter{Label: "home"}); len(jobs) != 1 {
 		t.Fatalf("jobs piled up: %d", len(jobs))
 	}
 
 	// The runner runs it and delivers.
-	job, _ := st.ClaimJob(ctx, "home", time.Minute)
+	job, _ := st.Automation().ClaimJob(ctx, "home", time.Minute)
 	if job == nil {
 		t.Fatal("no job to claim")
 	}
-	if _, _, err := st.CompleteJob(ctx, job.ID, job.LeaseID, store.JobResult{Exit: 0, Stdout: `{"title":"Вернуться на пакет"}`}); err != nil {
+	if _, _, err := st.Automation().CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: 0, Stdout: `{"title":"Вернуться на пакет"}`}); err != nil {
 		t.Fatal(err)
 	}
 	got := emitTick(t, st, tmpl, "2026-10-06", time.Now())
@@ -59,7 +60,7 @@ echo '{"title":"Вернуться на пакет"}'`, "home")
 		t.Fatalf("result not collected: %+v", got)
 	}
 	// Handed out once: the finished job is gone.
-	if jobs, _ = st.ListRunnerJobs(ctx, store.JobFilter{Label: "home"}); len(jobs) != 0 {
+	if jobs, _ = st.Automation().ListRunnerJobs(ctx, automation.JobFilter{Label: "home"}); len(jobs) != 0 {
 		t.Fatalf("job kept after collecting: %+v", jobs)
 	}
 }
@@ -69,8 +70,8 @@ func TestEmitRemoteFailureRetriesLikeALocalOne(t *testing.T) {
 	ctx := bg()
 	tmpl := remoteTemplate(`exit 3`, "home")
 	emitTick(t, st, tmpl, "p", time.Now())
-	job, _ := st.ClaimJob(ctx, "home", time.Minute)
-	_, _, _ = st.CompleteJob(ctx, job.ID, job.LeaseID, store.JobResult{Exit: 3, Stderr: "no pacman"})
+	job, _ := st.Automation().ClaimJob(ctx, "home", time.Minute)
+	_, _, _ = st.Automation().CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: 3, Stderr: "no pacman"})
 	res := emitTick(t, st, tmpl, "p", time.Now())
 	var outcome string
 	var attempts int
@@ -96,7 +97,7 @@ func TestEmitRemoteOfflineDeviceDoesNotFailTheTemplate(t *testing.T) {
 	if _, err := st.DB.Exec(`UPDATE runner_job SET valid_until = '2000-01-01 00:00:00.000000'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.ExpireJobs(ctx); err != nil {
+	if _, err := st.Automation().ExpireJobs(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 3; i++ {
@@ -104,8 +105,8 @@ func TestEmitRemoteOfflineDeviceDoesNotFailTheTemplate(t *testing.T) {
 			t.Fatalf("tick %d after skip: %+v", i, r)
 		}
 	}
-	jobs, _ := st.ListRunnerJobs(ctx, store.JobFilter{Label: "laptop"})
-	if len(jobs) != 1 || jobs[0].State != store.JobSkipped {
+	jobs, _ := st.Automation().ListRunnerJobs(ctx, automation.JobFilter{Label: "laptop"})
+	if len(jobs) != 1 || jobs[0].State != automation.JobSkipped {
 		t.Fatalf("jobs: %+v", jobs)
 	}
 	var n int

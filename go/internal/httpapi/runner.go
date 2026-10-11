@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
 	"github.com/valirum/quests/go/internal/platform/wsctx"
 	"github.com/valirum/quests/go/internal/store"
@@ -46,11 +47,11 @@ func (s *Server) registerRunner(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/runner-jobs/{id}/cancel", s.cancelRunnerJob)
 }
 
-func (s *Server) runnerFrom(w http.ResponseWriter, r *http.Request) (store.Runner, bool) {
-	run, err := s.Store.AuthRunner(r.Context(), bearerToken(r))
+func (s *Server) runnerFrom(w http.ResponseWriter, r *http.Request) (automation.Runner, bool) {
+	run, err := s.Store.Automation().AuthRunner(r.Context(), bearerToken(r))
 	if err != nil {
 		writeErr(w, http.StatusUnauthorized, "invalid runner token")
-		return store.Runner{}, false
+		return automation.Runner{}, false
 	}
 	return run, true
 }
@@ -66,15 +67,15 @@ func (s *Server) runnerRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	ws, werr := s.Store.RunnerWorkspaceByReg(ctx, strings.TrimSpace(in.Token))
+	ws, werr := s.Store.Automation().RunnerWorkspaceByReg(ctx, strings.TrimSpace(in.Token))
 	if werr != nil {
 		writeErr(w, http.StatusUnauthorized, werr.Error())
 		return
 	}
 	ctx = wsctx.With(ctx, ws)
 
-	token, run, err := s.Store.RegisterRunner(ctx, strings.TrimSpace(in.Token), in.Hostname, in.Version)
-	if errors.Is(err, store.ErrRunnerToken) {
+	token, run, err := s.Store.Automation().RegisterRunner(ctx, strings.TrimSpace(in.Token), in.Hostname, in.Version)
+	if errors.Is(err, automation.ErrRunnerToken) {
 		writeErr(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -103,19 +104,19 @@ type jobPayload struct {
 }
 
 // jobSecrets resolves the secrets of what the job belongs to (step, else template).
-func (s *Server) jobSecrets(ctx context.Context, j store.RunnerJob) map[string]string {
-	var owner store.SecretOwner
+func (s *Server) jobSecrets(ctx context.Context, j automation.RunnerJob) map[string]string {
+	var owner automation.SecretOwner
 	switch {
 	case j.StepID != nil:
-		owner = store.SecretOwner{Kind: store.SecretOwnerStep, ID: *j.StepID}
+		owner = automation.SecretOwner{Kind: automation.SecretOwnerStep, ID: *j.StepID}
 	case j.TemplateID != nil:
-		owner = store.SecretOwner{Kind: store.SecretOwnerTemplate, ID: *j.TemplateID}
+		owner = automation.SecretOwner{Kind: automation.SecretOwnerTemplate, ID: *j.TemplateID}
 	case j.NoteID != nil:
-		owner = store.SecretOwner{Kind: store.SecretOwnerNote, ID: *j.NoteID}
+		owner = automation.SecretOwner{Kind: automation.SecretOwnerNote, ID: *j.NoteID}
 	default:
 		return map[string]string{}
 	}
-	m, err := s.Store.ResolveSecrets(ctx, owner)
+	m, err := s.Store.Automation().ResolveSecrets(ctx, owner)
 	if err != nil || m == nil {
 		return map[string]string{}
 	}
@@ -136,7 +137,7 @@ func (s *Server) runnerPoll(w http.ResponseWriter, r *http.Request) {
 	}
 	deadline := time.Now().Add(wait)
 	for {
-		job, err := s.Store.ClaimJob(r.Context(), run.Label, runnerLease)
+		job, err := s.Store.Automation().ClaimJob(r.Context(), run.Label, runnerLease)
 		if err != nil {
 			writeErr(w, 500, err.Error())
 			return
@@ -159,7 +160,7 @@ func (s *Server) runnerPoll(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-time.After(runnerPollStep):
 			// Count the wait as a sign of life too.
-			if _, err := s.Store.AuthRunner(r.Context(), bearerToken(r)); err != nil {
+			if _, err := s.Store.Automation().AuthRunner(r.Context(), bearerToken(r)); err != nil {
 				writeErr(w, http.StatusUnauthorized, "invalid runner token")
 				return
 			}
@@ -186,13 +187,13 @@ func (s *Server) runnerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if in.ProgressCurrent != nil && in.ProgressTotal != nil && *in.ProgressTotal >= 1 {
 		prog = &[2]int{*in.ProgressCurrent, *in.ProgressTotal}
 	}
-	job, gerr := s.Store.GetRunnerJob(r.Context(), id)
+	job, gerr := s.Store.Automation().GetRunnerJob(r.Context(), id)
 	tail := in.LogTail
 	if gerr == nil {
-		tail = store.MaskSecrets(tail, s.jobSecrets(r.Context(), job))
+		tail = automation.MaskSecrets(tail, s.jobSecrets(r.Context(), job))
 	}
-	cancel, err := s.Store.JobHeartbeat(r.Context(), id, in.LeaseID, prog, tail, runnerLease)
-	if errors.Is(err, store.ErrLeaseLost) {
+	cancel, err := s.Store.Automation().JobHeartbeat(r.Context(), id, in.LeaseID, prog, tail, runnerLease)
+	if errors.Is(err, automation.ErrLeaseLost) {
 		writeErr(w, http.StatusConflict, "lease lost")
 		return
 	}
@@ -219,19 +220,19 @@ func (s *Server) runnerComplete(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	cur, err := s.Store.GetRunnerJob(r.Context(), id)
+	cur, err := s.Store.Automation().GetRunnerJob(r.Context(), id)
 	if err != nil {
 		writeErr(w, 404, "job not found")
 		return
 	}
 	secrets := s.jobSecrets(r.Context(), cur)
-	job, done, err := s.Store.CompleteJob(r.Context(), id, in.LeaseID, store.JobResult{
+	job, done, err := s.Store.Automation().CompleteJob(r.Context(), id, in.LeaseID, automation.JobResult{
 		Exit:     in.Exit,
-		Stdout:   store.MaskSecrets(in.Stdout, secrets),
-		Stderr:   store.MaskSecrets(in.Stderr, secrets),
+		Stdout:   automation.MaskSecrets(in.Stdout, secrets),
+		Stderr:   automation.MaskSecrets(in.Stderr, secrets),
 		TimedOut: in.TimedOut,
 	})
-	if errors.Is(err, store.ErrLeaseLost) {
+	if errors.Is(err, automation.ErrLeaseLost) {
 		writeErr(w, http.StatusConflict, "lease lost")
 		return
 	}
@@ -248,29 +249,29 @@ func (s *Server) runnerComplete(w http.ResponseWriter, r *http.Request) {
 // --- user-facing management ---
 
 type RunnerView struct {
-	store.Runner `tstype:",extends"`
-	Online       bool `json:"online"`
+	automation.Runner `tstype:",extends"`
+	Online            bool `json:"online"`
 	// Queued / Running count the runner's unfinished jobs.
 	Queued  int `json:"queued"`
 	Running int `json:"running"`
 }
 
 func (s *Server) listRunners(w http.ResponseWriter, r *http.Request) {
-	runners, err := s.Store.ListRunners(r.Context())
+	runners, err := s.Store.Automation().ListRunners(r.Context())
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	jobs, _ := s.Store.ListRunnerJobs(r.Context(), store.JobFilter{States: []string{store.JobQueued, store.JobAssigned, store.JobRunning}, Limit: 500})
+	jobs, _ := s.Store.Automation().ListRunnerJobs(r.Context(), automation.JobFilter{States: []string{automation.JobQueued, automation.JobAssigned, automation.JobRunning}, Limit: 500})
 	now := timeutil.NowUTC()
 	out := make([]RunnerView, 0, len(runners))
 	for _, run := range runners {
-		v := RunnerView{Runner: run, Online: store.RunnerOnline(run, now)}
+		v := RunnerView{Runner: run, Online: automation.RunnerOnline(run, now)}
 		for _, j := range jobs {
 			if j.RunnerLabel != run.Label {
 				continue
 			}
-			if j.State == store.JobQueued {
+			if j.State == automation.JobQueued {
 				v.Queued++
 			} else {
 				v.Running++
@@ -293,16 +294,16 @@ func (s *Server) createRunner(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	token, err := s.Store.CreateRunner(r.Context(), in.Label)
+	token, err := s.Store.Automation().CreateRunner(r.Context(), in.Label)
 	switch {
 	case errors.Is(err, store.ErrBadRunnerLabel):
 		writeErr(w, 422, err.Error())
-	case errors.Is(err, store.ErrRunnerExists):
+	case errors.Is(err, automation.ErrRunnerExists):
 		writeErr(w, 409, err.Error())
 	case err != nil:
 		writeErr(w, 500, err.Error())
 	default:
-		writeJSON(w, 201, map[string]any{"label": strings.TrimSpace(in.Label), "registration_token": token, "valid_hours": int(store.RegistrationTTL / time.Hour)})
+		writeJSON(w, 201, map[string]any{"label": strings.TrimSpace(in.Label), "registration_token": token, "valid_hours": int(automation.RegistrationTTL / time.Hour)})
 	}
 }
 
@@ -310,7 +311,7 @@ func (s *Server) deleteRunner(w http.ResponseWriter, r *http.Request) {
 	if !s.identityHTTP().RequireOwner(w, r, "remove a runner") {
 		return
 	}
-	err := s.Store.RevokeRunner(r.Context(), r.PathValue("label"))
+	err := s.Store.Automation().RevokeRunner(r.Context(), r.PathValue("label"))
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "runner not found")
 		return
@@ -324,7 +325,7 @@ func (s *Server) deleteRunner(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listRunnerJobs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := store.JobFilter{Label: q.Get("label")}
+	f := automation.JobFilter{Label: q.Get("label")}
 	if v := q.Get("state"); v != "" {
 		f.States = strings.Split(v, ",")
 	}
@@ -334,7 +335,7 @@ func (s *Server) listRunnerJobs(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.ParseInt(q.Get("step_id"), 10, 64); err == nil {
 		f.StepID = v
 	}
-	jobs, err := s.Store.ListRunnerJobs(r.Context(), f)
+	jobs, err := s.Store.Automation().ListRunnerJobs(r.Context(), f)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -344,7 +345,7 @@ func (s *Server) listRunnerJobs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) cancelRunnerJob(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	err := s.Store.CancelRunnerJob(r.Context(), id)
+	err := s.Store.Automation().CancelRunnerJob(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "no such unfinished job")
 		return

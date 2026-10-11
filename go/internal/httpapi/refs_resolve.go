@@ -46,7 +46,7 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 				}
 			}
 		case "template":
-			t, err := s.Store.GetTemplate(r.Context(), ref.ID)
+			t, err := s.Store.Automation().GetTemplate(r.Context(), ref.ID)
 			if err == nil {
 				row.Title = &t.Title
 			}

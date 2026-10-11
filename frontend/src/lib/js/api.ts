@@ -1,3 +1,4 @@
+import type { RunnerJob, TemplateRead } from '../api/automation.gen'
 import type { GraphDraftView, LLMView, RunnerView } from '../api/http.gen'
 import type { WorkspacesView } from '../api/identity_http.gen'
 import type { Category, QuestRead, QuestlineRead, Tag } from '../api/journal.gen'
@@ -8,7 +9,7 @@ import type {
   NoteListItem,
   NotePayload,
 } from '../api/knowledge_http.gen'
-import type { Graph, RunnerJob, TemplateRead } from '../api/store.gen'
+import type { Graph } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
 const BASE = ''

@@ -42,7 +42,7 @@ func (s *Server) listTemplates(w http.ResponseWriter, r *http.Request) {
 		b := v == "1" || strings.EqualFold(v, "true")
 		en = &b
 	}
-	rows, err := s.Store.ListTemplates(r.Context(), en)
+	rows, err := s.Store.Automation().ListTemplates(r.Context(), en)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -52,7 +52,7 @@ func (s *Server) listTemplates(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getTemplate(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.GetTemplate(r.Context(), id)
+	row, err := s.Store.Automation().GetTemplate(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Template not found")
 		return
@@ -70,7 +70,7 @@ func (s *Server) createTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	row, err := s.Store.CreateTemplate(r.Context(), body)
+	row, err := s.Store.Automation().CreateTemplate(r.Context(), body)
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -88,7 +88,7 @@ func (s *Server) patchTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid JSON")
 		return
 	}
-	row, err := s.Store.UpdateTemplate(r.Context(), id, body)
+	row, err := s.Store.Automation().UpdateTemplate(r.Context(), id, body)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Template not found")
 		return
@@ -105,7 +105,7 @@ func (s *Server) patchTemplate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err := s.Store.DeleteTemplate(r.Context(), id); err != nil {
+	if err := s.Store.Automation().DeleteTemplate(r.Context(), id); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, 404, "Template not found")
 			return
@@ -118,7 +118,7 @@ func (s *Server) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) copyTemplate(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.CopyTemplate(r.Context(), id)
+	row, err := s.Store.Automation().CopyTemplate(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Template not found")
 		return
@@ -161,7 +161,7 @@ func (s *Server) getTemplateStreak(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "bad template id")
 		return
 	}
-	row, err := s.Store.TemplateStreak(r.Context(), id, timeutil.NowUTC())
+	row, err := s.Store.Automation().TemplateStreak(r.Context(), id, timeutil.NowUTC())
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, 404, "Template not found")
 		return

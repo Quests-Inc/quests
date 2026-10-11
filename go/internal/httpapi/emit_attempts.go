@@ -20,7 +20,7 @@ func (s *Server) listEmitAttempts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	rows, err := s.Store.ListEmitAttempts(r.Context(), id, limit)
+	rows, err := s.Store.Automation().ListEmitAttempts(r.Context(), id, limit)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

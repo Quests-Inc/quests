@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/valirum/quests/go/internal/automation"
 	"github.com/valirum/quests/go/internal/journal"
 	"github.com/valirum/quests/go/internal/platform/events"
 	"github.com/valirum/quests/go/internal/platform/pgtest"
@@ -72,7 +73,7 @@ INSERT INTO tag (id, slug, label, created_at) VALUES (1, 'infra', 'infra', now()
 	return &store.Store{DB: pool, DatabaseURL: url}
 }
 
-func resolveJSON(t *testing.T, st *store.Store, js string, lim store.EmitLimits) (*resolvedSpec, error) {
+func resolveJSON(t *testing.T, st *store.Store, js string, lim automation.EmitLimits) (*resolvedSpec, error) {
 	t.Helper()
 	out, err := parseEmitOutput([]byte(js))
 	if err != nil || out.Spec == nil {
@@ -83,7 +84,7 @@ func resolveJSON(t *testing.T, st *store.Store, js string, lim store.EmitLimits)
 
 func TestResolveEmitSpecNamesAndTags(t *testing.T) {
 	st := openEmitSpecDB(t)
-	lim := store.DefaultEmitLimits()
+	lim := automation.DefaultEmitLimits()
 	rs, err := resolveJSON(t, st, `{"questline":"рефкул","category":"home","tags":["infra",2]}`, lim)
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ func TestResolveEmitSpecNamesAndTags(t *testing.T) {
 
 func TestResolveEmitSpecLimits(t *testing.T) {
 	st := openEmitSpecDB(t)
-	lim := store.EmitLimits{MaxSteps: 2, MaxTitle: 5, MaxDescription: 10, MaxCommand: 8}
+	lim := automation.EmitLimits{MaxSteps: 2, MaxTitle: 5, MaxDescription: 10, MaxCommand: 8}
 	for js, want := range map[string]string{
 		`{"steps":[{"title":"a"},{"title":"b"},{"title":"c"}]}`:  "3 steps, limit 2",
 		`{"title":"toolongtitle"}`:                               "title is 12 characters, limit 5",
@@ -117,12 +118,12 @@ func TestResolveEmitSpecLimits(t *testing.T) {
 		}
 	}
 	// the limits JSON of a template overrides the defaults key by key, typos fail
-	got, err := store.ParseEmitLimits(`{"max_steps": 3}`)
+	got, err := automation.ParseEmitLimits(`{"max_steps": 3}`)
 	if err != nil || got.MaxSteps != 3 || got.MaxTitle != 200 {
 		t.Fatalf("ParseEmitLimits = %+v, %v", got, err)
 	}
 	for _, bad := range []string{`{"max_step": 3}`, `{"max_steps": 0}`, `{"max_steps": "x"}`, `[1]`} {
-		if _, err := store.ParseEmitLimits(bad); err == nil {
+		if _, err := automation.ParseEmitLimits(bad); err == nil {
 			t.Errorf("%s: want an error", bad)
 		}
 	}
