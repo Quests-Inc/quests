@@ -57,6 +57,8 @@ linters:
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/wsctx
@@ -126,6 +128,8 @@ linters:
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
         db:
           files:
             - "**/internal/platform/db/**"
@@ -158,6 +162,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "db зависит только от wsctx (ADR-0001)"
@@ -218,6 +224,8 @@ linters:
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
         dbx:
           files:
             - "**/internal/platform/dbx/**"
@@ -250,6 +258,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "dbx зависит только от timeutil"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "dbx зависит только от timeutil"
@@ -318,6 +328,8 @@ linters:
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/platform/wsctx
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/platform/webdav
@@ -385,6 +397,8 @@ linters:
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/platform/wsctx
@@ -448,6 +462,8 @@ linters:
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
         store:
           files:
             - "**/internal/store/**"
@@ -468,6 +484,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/webdav
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
@@ -515,6 +533,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "schedule не зависит от httpapi, cli, llmassist, identity"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
@@ -567,6 +587,8 @@ linters:
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
         automation:
           files:
             - "**/internal/automation/**"
@@ -587,6 +609,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
         kernel:
           files:
@@ -617,6 +641,8 @@ linters:
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
         wsarchive:
           files:
             - "**/internal/wsarchive/**"
@@ -639,6 +665,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
@@ -691,6 +719,8 @@ linters:
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/valirum/quests/go/internal/platform/secretbox
@@ -715,6 +745,61 @@ linters:
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/valirum/quests/go/internal/platform/apiclient
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
+        assistant:
+          files:
+            - "**/internal/assistant/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/valirum/quests/go/internal/httpapi
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/schedule
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/knowledge
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/automation
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/refs
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/journal
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/wsarchive
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/assistant
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/db
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/health
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/events
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/config
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
         cli:
           files:
             - "**/internal/cli/**"
@@ -747,6 +832,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
@@ -812,6 +899,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "llmassist ходит в API только через platform/apiclient"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "llmassist ходит в API только через platform/apiclient"
@@ -879,6 +968,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/wsarchive
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/graphdraft
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/assistant
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/platform/db
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"

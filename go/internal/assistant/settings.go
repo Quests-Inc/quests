@@ -1,4 +1,4 @@
-package httpapi
+package assistant
 
 import (
 	"context"
@@ -12,23 +12,38 @@ import (
 	"unicode"
 
 	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/kernel"
 	"github.com/quests-inc/quests/go/internal/llmassist"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
+	"github.com/quests-inc/quests/go/internal/platform/secretbox"
 	"github.com/quests-inc/quests/go/internal/store"
 )
+
+// Handler serves the assistant endpoints: the account's own LLM settings and the free-text action batches.
+type Handler struct {
+	Store *store.Store
+	// Secrets seals the account's key at rest; nil = nothing can be stored.
+	Secrets *secretbox.Box
+	// TryLLM spends one request of the caller's assistant budget (false = over the limit).
+	TryLLM func(user string) bool
+	// SelfBase and InternalToken let the executor call this same server over loopback.
+	SelfBase      string
+	InternalToken string
+}
+
+var writeJSON = httpx.WriteJSON
+
+func writeErr(w http.ResponseWriter, status int, detail string) {
+	httpx.WriteErr(w, kernel.StatusFor(status, detail), detail)
+}
 
 // maxAssistantText bounds one request to the assistant: it is sent to a third party and paid per token.
 const maxAssistantText = 8000
 
-func (s *Server) registerLLMSettings(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/me/llm", s.getMyLLM)
-	mux.HandleFunc("PUT /api/me/llm", s.putMyLLM)
-	mux.HandleFunc("DELETE /api/me/llm", s.deleteMyLLM)
-	mux.HandleFunc("POST /api/me/llm/test", s.testMyLLM)
-}
-
 // sharedKeyAllowed: may accounts without their own key use the server's key? Only if the host
 // opted in (QUESTS_LLM_SHARED=1).
-func (s *Server) sharedKeyAllowed(*http.Request) bool {
+func (h *Handler) sharedKeyAllowed(*http.Request) bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("QUESTS_LLM_SHARED"))) {
 	case "1", "true", "yes", "on":
 		return true
@@ -40,46 +55,33 @@ var errNoLLM = errors.New("ассистент не настроен: задай�
 
 // llmSettingsFor picks the settings for this request: the account's own provider and key
 // when it has them, else the server's key if this caller may use it. source is "own" or "server".
-func (s *Server) llmSettingsFor(ctx context.Context, r *http.Request) (llmassist.Settings, string, error) {
+func (h *Handler) llmSettingsFor(ctx context.Context, r *http.Request) (llmassist.Settings, string, error) {
 	base := llmassist.LoadSettings()
-	if p, ok := identity.PrincipalFrom(ctx); ok && p.User.ID != 0 && s.Secrets != nil {
-		row, err := s.Store.GetUserLLM(ctx, p.User.ID)
+	if p, ok := identity.PrincipalFrom(ctx); ok && p.User.ID != 0 && h.Secrets != nil {
+		row, err := h.Store.GetUserLLM(ctx, p.User.ID)
 		switch {
 		case err == nil && row.KeySealed != "":
-			key, oerr := s.Secrets.Open(row.KeySealed)
+			key, oerr := h.Secrets.Open(row.KeySealed)
 			if oerr != nil {
 				return base, "", oerr
 			}
 			return base.WithUser(row.Provider, row.BaseURL, row.Model, key), "own", nil
-		case err != nil && !errors.Is(err, store.ErrNotFound):
+		case err != nil && !errors.Is(err, apperr.ErrNotFound):
 			return base, "", err
 		}
 	}
-	if s.sharedKeyAllowed(r) && base.APIKey != "" {
+	if h.sharedKeyAllowed(r) && base.APIKey != "" {
 		return base, "server", nil
 	}
 	return base, "", errNoLLM
 }
 
-type LLMView struct {
-	Providers      []llmassist.Provider `json:"providers"`
-	Provider       string               `json:"provider"`
-	BaseURL        string               `json:"base_url"`
-	Model          string               `json:"model"`
-	HasKey         bool                 `json:"has_key"`
-	KeyHint        string               `json:"key_hint"`
-	Source         string               `json:"source"` // own | server | none
-	ServerFallback bool                 `json:"server_fallback"`
-	Storage        bool                 `json:"storage"` // can this instance keep a personal key at all
-	TextLimit      int                  `json:"text_limit"`
-}
-
-func (s *Server) LLMView(r *http.Request) (LLMView, error) {
+func (h *Handler) LLMView(r *http.Request) (LLMView, error) {
 	v := LLMView{Providers: llmassist.Providers, Provider: "groq", TextLimit: maxAssistantText}
-	if p, ok := identity.PrincipalFrom(r.Context()); ok && p.User.ID != 0 && s.Secrets != nil {
+	if p, ok := identity.PrincipalFrom(r.Context()); ok && p.User.ID != 0 && h.Secrets != nil {
 		v.Storage = true
-		row, err := s.Store.GetUserLLM(r.Context(), p.User.ID)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		row, err := h.Store.GetUserLLM(r.Context(), p.User.ID)
+		if err != nil && !errors.Is(err, apperr.ErrNotFound) {
 			return v, err
 		}
 		if err == nil {
@@ -87,7 +89,7 @@ func (s *Server) LLMView(r *http.Request) (LLMView, error) {
 			v.HasKey, v.KeyHint = row.KeySealed != "", row.KeyHint
 		}
 	}
-	v.ServerFallback = s.sharedKeyAllowed(r) && llmassist.LoadSettings().APIKey != ""
+	v.ServerFallback = h.sharedKeyAllowed(r) && llmassist.LoadSettings().APIKey != ""
 	switch {
 	case v.HasKey:
 		v.Source = "own"
@@ -99,8 +101,9 @@ func (s *Server) LLMView(r *http.Request) (LLMView, error) {
 	return v, nil
 }
 
-func (s *Server) getMyLLM(w http.ResponseWriter, r *http.Request) {
-	v, err := s.LLMView(r)
+// GetMy reports the caller's assistant settings.
+func (h *Handler) GetMy(w http.ResponseWriter, r *http.Request) {
+	v, err := h.LLMView(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -109,13 +112,13 @@ func (s *Server) getMyLLM(w http.ResponseWriter, r *http.Request) {
 }
 
 // sessionUser returns the account behind a browser session; keys are not set from tokens.
-func (s *Server) llmSessionUser(w http.ResponseWriter, r *http.Request) (int64, bool) {
+func (h *Handler) llmSessionUser(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	p, ok := identity.PrincipalFrom(r.Context())
 	if !ok || p.User.ID == 0 || p.Via != "session" {
 		writeErr(w, http.StatusForbidden, "the assistant key is managed from the web interface, not with a token")
 		return 0, false
 	}
-	if s.Secrets == nil {
+	if h.Secrets == nil {
 		writeErr(w, http.StatusConflict, "личный ключ хранится только при PostgreSQL; на этом сервере ассистент берёт ключ из окружения")
 		return 0, false
 	}
@@ -157,8 +160,9 @@ func (in *llmInput) clean() (string, error) {
 	return llmassist.CheckBaseURL(in.BaseURL)
 }
 
-func (s *Server) putMyLLM(w http.ResponseWriter, r *http.Request) {
-	uid, ok := s.llmSessionUser(w, r)
+// PutMy stores the caller's own provider and key.
+func (h *Handler) PutMy(w http.ResponseWriter, r *http.Request) {
+	uid, ok := h.llmSessionUser(w, r)
 	if !ok {
 		return
 	}
@@ -174,22 +178,22 @@ func (s *Server) putMyLLM(w http.ResponseWriter, r *http.Request) {
 	}
 	row := store.UserLLM{Provider: in.Provider, BaseURL: base, Model: in.Model}
 	if in.APIKey != "" {
-		sealed, err := s.Secrets.Seal(in.APIKey)
+		sealed, err := h.Secrets.Seal(in.APIKey)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		row.KeySealed = sealed
 		row.KeyHint = hintOf(in.APIKey)
-	} else if cur, err := s.Store.GetUserLLM(r.Context(), uid); err != nil || cur.KeySealed == "" {
+	} else if cur, err := h.Store.GetUserLLM(r.Context(), uid); err != nil || cur.KeySealed == "" {
 		writeErr(w, http.StatusUnprocessableEntity, "введите ключ")
 		return
 	}
-	if err := s.Store.SetUserLLM(r.Context(), uid, row); err != nil {
+	if err := h.Store.SetUserLLM(r.Context(), uid, row); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.getMyLLM(w, r)
+	h.GetMy(w, r)
 }
 
 func hintOf(key string) string {
@@ -199,25 +203,27 @@ func hintOf(key string) string {
 	return "…" + key[len(key)-4:]
 }
 
-func (s *Server) deleteMyLLM(w http.ResponseWriter, r *http.Request) {
-	uid, ok := s.llmSessionUser(w, r)
+// DeleteMy removes the caller's own key.
+func (h *Handler) DeleteMy(w http.ResponseWriter, r *http.Request) {
+	uid, ok := h.llmSessionUser(w, r)
 	if !ok {
 		return
 	}
-	if err := s.Store.DeleteUserLLM(r.Context(), uid); err != nil {
+	if err := h.Store.DeleteUserLLM(r.Context(), uid); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.getMyLLM(w, r)
+	h.GetMy(w, r)
 }
 
 // testMyLLM checks a provider/key pair, the typed one (before saving) or the stored one.
-func (s *Server) testMyLLM(w http.ResponseWriter, r *http.Request) {
-	uid, ok := s.llmSessionUser(w, r)
+// TestMy checks a provider and key without storing them.
+func (h *Handler) TestMy(w http.ResponseWriter, r *http.Request) {
+	uid, ok := h.llmSessionUser(w, r)
 	if !ok {
 		return
 	}
-	if !s.limiter().TryLLM(strconv.FormatInt(uid, 10)) {
+	if !h.TryLLM(strconv.FormatInt(uid, 10)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов к ассистенту, повторите позже")
 		return
 	}
@@ -233,12 +239,12 @@ func (s *Server) testMyLLM(w http.ResponseWriter, r *http.Request) {
 	}
 	key := in.APIKey
 	if key == "" {
-		cur, gerr := s.Store.GetUserLLM(r.Context(), uid)
+		cur, gerr := h.Store.GetUserLLM(r.Context(), uid)
 		if gerr != nil || cur.KeySealed == "" {
 			writeErr(w, http.StatusUnprocessableEntity, "введите ключ")
 			return
 		}
-		if key, err = s.Secrets.Open(cur.KeySealed); err != nil {
+		if key, err = h.Secrets.Open(cur.KeySealed); err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}

@@ -2,8 +2,11 @@
 import type { Provider } from "./llm.gen";
 
 //////////
-// source: llm_settings.go
+// source: views.go
 
+/**
+ * LLMView is the account's assistant settings as the settings page shows them.
+ */
 export interface LLMView {
   providers: Provider[];
   provider: string;

@@ -81,10 +81,10 @@ packages:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
-  - path: "github.com/quests-inc/quests/go/internal/httpapi"
-    output_path: "../frontend/src/shared/api/http.gen.ts"
+  - path: "github.com/quests-inc/quests/go/internal/assistant"
+    output_path: "../frontend/src/shared/api/assistant.gen.ts"
     include_files:
-      - "llm_settings.go"
+      - "views.go"
     frontmatter: |
       import type { Provider } from "./llm.gen";
     type_mappings:

@@ -1,4 +1,4 @@
-import type { LLMView } from './http.gen'
+import type { LLMView } from './assistant.gen'
 import { request } from './http.ts'
 
 /** Free text → LLM action batch → dry-run preview (no writes). */

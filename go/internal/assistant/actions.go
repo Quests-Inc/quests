@@ -1,4 +1,4 @@
-package httpapi
+package assistant
 
 import (
 	"context"
@@ -13,18 +13,8 @@ import (
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
-// registerLLMActions wires the web-form path for the LLM action-batch
-// feature: free text -> Groq -> dry-run preview -> (user confirms) -> apply.
-// Runs in-process (llmassist package), calling this same server over
-// loopback (SelfBase) for the actual quest CRUD — same code path the
-// frontend/CLI use, just one hop shorter than going through a separate
-// service/container.
-func (s *Server) registerLLMActions(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/llm/actions/preview", s.postLLMActionsPreview)
-	mux.HandleFunc("POST /api/llm/actions/apply", s.postLLMActionsApply)
-}
-
-func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
+// Preview turns free text into a dry-run batch of actions.
+func (h *Handler) Preview(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Text      string `json:"text"`
 		NoClarify bool   `json:"no_clarify"`
@@ -42,12 +32,12 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusRequestEntityTooLarge, "текст длиннее "+strconv.Itoa(maxAssistantText)+" символов")
 		return
 	}
-	settings, _, serr := s.llmSettingsFor(r.Context(), r)
+	settings, _, serr := h.llmSettingsFor(r.Context(), r)
 	if serr != nil {
 		writeErr(w, http.StatusConflict, serr.Error())
 		return
 	}
-	if p, ok := identity.PrincipalFrom(r.Context()); ok && !s.limiter().TryLLM(strconv.FormatInt(p.User.ID, 10)) {
+	if p, ok := identity.PrincipalFrom(r.Context()); ok && !h.TryLLM(strconv.FormatInt(p.User.ID, 10)) {
 		writeErr(w, http.StatusTooManyRequests, "слишком много запросов к ассистенту, повторите позже")
 		return
 	}
@@ -55,7 +45,7 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
 	defer cancel()
 
-	cats, err := s.Store.Journal.ListCategories(r.Context())
+	cats, err := h.Store.Journal.ListCategories(r.Context())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -87,7 +77,7 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	executor := llmassist.NewExecutor(s.SelfBase, s.InternalToken, wsctx.From(r.Context()))
+	executor := llmassist.NewExecutor(h.SelfBase, h.InternalToken, wsctx.From(r.Context()))
 	preview, err := executor.Run(batch, true)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
@@ -98,7 +88,8 @@ func (s *Server) postLLMActionsPreview(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) postLLMActionsApply(w http.ResponseWriter, r *http.Request) {
+// Apply runs a confirmed batch.
+func (h *Handler) Apply(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Batch llmassist.ActionBatch `json:"batch"`
 	}
@@ -111,7 +102,7 @@ func (s *Server) postLLMActionsApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	executor := llmassist.NewExecutor(s.SelfBase, s.InternalToken, wsctx.From(r.Context()))
+	executor := llmassist.NewExecutor(h.SelfBase, h.InternalToken, wsctx.From(r.Context()))
 	results, err := executor.Run(body.Batch, false)
 	if err != nil {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "detail": err.Error(), "results": results})
