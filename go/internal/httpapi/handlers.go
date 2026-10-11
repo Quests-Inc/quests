@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/valirum/quests/go/internal/automation"
+	automationhttp "github.com/valirum/quests/go/internal/automation/http"
 	"github.com/valirum/quests/go/internal/identity"
 	identityhttp "github.com/valirum/quests/go/internal/identity/http"
 	journalhttp "github.com/valirum/quests/go/internal/journal/http"
@@ -52,6 +53,8 @@ type Server struct {
 	knowledgeOnce    sync.Once
 	journalOnce      sync.Once
 	jh               *journalhttp.Handler
+	automationOnce   sync.Once
+	ah               *automationhttp.Handler
 	kh               *knowledgehttp.Handler
 	idh              *identityhttp.Handler
 	loginLimiter     *ratelimit.Limiter
@@ -134,7 +137,6 @@ func (s *Server) routes() *http.ServeMux {
 	s.registerLLMActions(mux)
 	s.registerLLMSettings(mux)
 	s.registerGraphDraft(mux)
-	s.registerRunner(mux)
 	s.registerWorkspaceArchive(mux)
 	s.mountSPA(mux)
 	return mux

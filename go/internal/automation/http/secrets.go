@@ -1,4 +1,4 @@
-package httpapi
+package automationhttp
 
 import (
 	"encoding/json"
@@ -34,7 +34,7 @@ var secretOwnerLabels = map[string]string{
 
 // secretOwner resolves {id} for the route's owner kind and 404s when the
 // owning row does not exist.
-func (s *Server) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (automation.SecretOwner, bool) {
+func (h *Handler) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (automation.SecretOwner, bool) {
 	kind := secretOwnerKinds[segment]
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id < 1 {
@@ -42,7 +42,7 @@ func (s *Server) secretOwner(w http.ResponseWriter, r *http.Request, segment str
 		return automation.SecretOwner{}, false
 	}
 	o := automation.SecretOwner{Kind: kind, ID: id}
-	ok, err := s.Store.Automation().SecretOwnerExists(r.Context(), o)
+	ok, err := h.Store.SecretOwnerExists(r.Context(), o)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return o, false
@@ -57,18 +57,18 @@ func (s *Server) secretOwner(w http.ResponseWriter, r *http.Request, segment str
 // listSecrets returns only names: the owner's own (`keys`, the original
 // response shape) and what it inherits (`inherited`, each with its source).
 // Values never come back from a read endpoint or MCP tool.
-func (s *Server) listSecrets(segment string) http.HandlerFunc {
+func (h *Handler) listSecrets(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		o, ok := s.secretOwner(w, r, segment)
+		o, ok := h.secretOwner(w, r, segment)
 		if !ok {
 			return
 		}
-		own, err := s.Store.Automation().ListSecretKeys(r.Context(), o)
+		own, err := h.Store.ListSecretKeys(r.Context(), o)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		eff, err := s.Store.Automation().ListEffectiveSecretKeys(r.Context(), o)
+		eff, err := h.Store.ListEffectiveSecretKeys(r.Context(), o)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -86,10 +86,10 @@ func (s *Server) listSecrets(segment string) http.HandlerFunc {
 
 // putSecret writes one secret value — write-only: the request body is never
 // echoed back and no GET returns it.
-func (s *Server) putSecret(segment string) http.HandlerFunc {
+func (h *Handler) putSecret(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Secrets feed the environment of the owner's commands: only owners write them.
-		if !s.identityHTTP().RequireOwner(w, r, "set secrets") {
+		if !h.RequireOwner(w, r, "set secrets") {
 			return
 		}
 		key := r.PathValue("key")
@@ -112,11 +112,11 @@ func (s *Server) putSecret(segment string) http.HandlerFunc {
 			writeErr(w, 422, "value required (use DELETE to remove a secret)")
 			return
 		}
-		o, ok := s.secretOwner(w, r, segment)
+		o, ok := h.secretOwner(w, r, segment)
 		if !ok {
 			return
 		}
-		if err := s.Store.Automation().SetSecret(r.Context(), o, key, body.Value); err != nil {
+		if err := h.Store.SetSecret(r.Context(), o, key, body.Value); err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}
@@ -124,16 +124,16 @@ func (s *Server) putSecret(segment string) http.HandlerFunc {
 	}
 }
 
-func (s *Server) deleteSecret(segment string) http.HandlerFunc {
+func (h *Handler) deleteSecret(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !s.identityHTTP().RequireOwner(w, r, "remove secrets") {
+		if !h.RequireOwner(w, r, "remove secrets") {
 			return
 		}
-		o, ok := s.secretOwner(w, r, segment)
+		o, ok := h.secretOwner(w, r, segment)
 		if !ok {
 			return
 		}
-		if err := s.Store.Automation().DeleteSecret(r.Context(), o, r.PathValue("key")); err != nil {
+		if err := h.Store.DeleteSecret(r.Context(), o, r.PathValue("key")); err != nil {
 			writeErr(w, 500, err.Error())
 			return
 		}
@@ -141,10 +141,10 @@ func (s *Server) deleteSecret(segment string) http.HandlerFunc {
 	}
 }
 
-func (s *Server) registerSecretRoutes(mux *http.ServeMux) {
+func (h *Handler) registerSecretRoutes(mux *http.ServeMux) {
 	for segment := range secretOwnerKinds {
-		mux.HandleFunc("GET /api/"+segment+"/{id}/secrets", s.listSecrets(segment))
-		mux.HandleFunc("PUT /api/"+segment+"/{id}/secrets/{key}", s.putSecret(segment))
-		mux.HandleFunc("DELETE /api/"+segment+"/{id}/secrets/{key}", s.deleteSecret(segment))
+		mux.HandleFunc("GET /api/"+segment+"/{id}/secrets", h.listSecrets(segment))
+		mux.HandleFunc("PUT /api/"+segment+"/{id}/secrets/{key}", h.putSecret(segment))
+		mux.HandleFunc("DELETE /api/"+segment+"/{id}/secrets/{key}", h.deleteSecret(segment))
 	}
 }

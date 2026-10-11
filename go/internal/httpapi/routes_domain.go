@@ -1,177 +1,26 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/valirum/quests/go/internal/journal"
 	knowledgehttp "github.com/valirum/quests/go/internal/knowledge/http"
 	"github.com/valirum/quests/go/internal/platform/httpx"
 	"github.com/valirum/quests/go/internal/platform/timeutil"
-	"github.com/valirum/quests/go/internal/refs"
-	"github.com/valirum/quests/go/internal/schedule"
 	"github.com/valirum/quests/go/internal/store"
 )
 
 func (s *Server) registerDomainRoutes(mux *http.ServeMux) {
 
-	mux.HandleFunc("GET /api/templates", s.listTemplates)
-	mux.HandleFunc("POST /api/templates", s.createTemplate)
-	mux.HandleFunc("GET /api/templates/{id}", s.getTemplate)
-	mux.HandleFunc("PATCH /api/templates/{id}", s.patchTemplate)
-	mux.HandleFunc("DELETE /api/templates/{id}", s.deleteTemplate)
-	mux.HandleFunc("POST /api/templates/{id}/copy", s.copyTemplate)
-	mux.HandleFunc("POST /api/templates/{id}/emit", s.emitTemplate)
-	mux.HandleFunc("GET /api/templates/{id}/emit-attempts", s.listEmitAttempts)
-	s.registerSecretRoutes(mux)
-
-	mux.HandleFunc("GET /api/templates/{id}/streak", s.getTemplateStreak)
+	s.automationHTTP().Register(mux)
 	mux.HandleFunc("GET /api/graph", s.getGraph)
 	mux.HandleFunc("GET /api/context", s.getContext)
 }
 
 var serveIcon = httpx.ServeIcon
-
-func (s *Server) listTemplates(w http.ResponseWriter, r *http.Request) {
-	var en *bool
-	if v := r.URL.Query().Get("enabled"); v != "" {
-		b := v == "1" || strings.EqualFold(v, "true")
-		en = &b
-	}
-	rows, err := s.Store.Automation().ListTemplates(r.Context(), en)
-	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 200, rows)
-}
-
-func (s *Server) getTemplate(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.Automation().GetTemplate(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeErr(w, 404, "Template not found")
-		return
-	}
-	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 200, row)
-}
-
-func (s *Server) createTemplate(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeErr(w, 400, "invalid JSON")
-		return
-	}
-	row, err := s.Store.Automation().CreateTemplate(r.Context(), body)
-	if err != nil {
-		writeErr(w, 400, err.Error())
-		return
-	}
-	if row.Enabled {
-		_, _ = schedule.MaterializeDue(r.Context(), s.Store, s.Hub, time.Time{}, nil)
-	}
-	writeJSON(w, 201, row)
-}
-
-func (s *Server) patchTemplate(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	var body map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeErr(w, 400, "invalid JSON")
-		return
-	}
-	row, err := s.Store.Automation().UpdateTemplate(r.Context(), id, body)
-	if errors.Is(err, store.ErrNotFound) {
-		writeErr(w, 404, "Template not found")
-		return
-	}
-	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	if row.Enabled {
-		_, _ = schedule.MaterializeDue(r.Context(), s.Store, s.Hub, time.Time{}, nil)
-	}
-	writeJSON(w, 200, row)
-}
-
-func (s *Server) deleteTemplate(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err := s.Store.Automation().DeleteTemplate(r.Context(), id); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			writeErr(w, 404, "Template not found")
-			return
-		}
-		writeErr(w, 500, err.Error())
-		return
-	}
-	w.WriteHeader(204)
-}
-
-func (s *Server) copyTemplate(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	row, err := s.Store.Automation().CopyTemplate(r.Context(), id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeErr(w, 404, "Template not found")
-		return
-	}
-	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 201, row)
-}
-
-func (s *Server) emitTemplate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id < 1 {
-		writeErr(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-	qid, err := schedule.MaterializeTemplateManual(r.Context(), s.Store, s.Hub, id, timeutil.NowUTC(), nil)
-	if errors.Is(err, schedule.ErrTemplateNotFound) {
-		writeErr(w, http.StatusNotFound, "Template not found")
-		return
-	}
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	q, err := s.Store.Journal().GetQuest(r.Context(), qid)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	out := journal.ToQuestRead(q, timeutil.NowUTC())
-	out.Refs = s.resolveRefs(r, refs.Parse(q.Title+"\n"+q.Description))
-	writeJSON(w, http.StatusCreated, out)
-}
-
-func (s *Server) getTemplateStreak(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeErr(w, 400, "bad template id")
-		return
-	}
-	row, err := s.Store.Automation().TemplateStreak(r.Context(), id, timeutil.NowUTC())
-	if errors.Is(err, store.ErrNotFound) {
-		writeErr(w, 404, "Template not found")
-		return
-	}
-	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 200, row)
-}
 
 // getGraph maps the neighbourhood of one entity: ?quest=N | note=N | questline=N,
 // optional &depth=1..4 (default 2).

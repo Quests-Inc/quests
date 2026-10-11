@@ -81,22 +81,30 @@ packages:
   - path: "github.com/valirum/quests/go/internal/httpapi"
     output_path: "../frontend/src/lib/api/http.gen.ts"
     include_files:
-      - "runner.go"
       - "llm_settings.go"
       - "graphdraft.go"
     frontmatter: |
       import type { DraftOp } from "./store.gen";
-      import type { Runner } from "./automation.gen";
-            import type { Provider } from "./llm.gen";
+      import type { Provider } from "./llm.gen";
     type_mappings:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
       llmassist.Provider: "Provider"
-      automation.Runner: "Runner"
       knowledge.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
       knowledge.RevisionRead: "RevisionRead"
+  - path: "github.com/valirum/quests/go/internal/automation/http"
+    output_path: "../frontend/src/lib/api/automation_http.gen.ts"
+    include_files:
+      - "views.go"
+    frontmatter: |
+      import type { Runner } from "./automation.gen";
+    type_mappings:
+      time.Time: "string"
+      time.Duration: "number"
+      json.RawMessage: "unknown"
+      automation.Runner: "Runner"
   - path: "github.com/valirum/quests/go/internal/llmassist"
     output_path: "../frontend/src/lib/api/llm.gen.ts"
     include_files:

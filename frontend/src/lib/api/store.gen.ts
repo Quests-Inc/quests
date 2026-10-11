@@ -136,10 +136,6 @@ export interface DraftOp {
 }
 
 //////////
-// source: shared.go
-
-
-//////////
 // source: stats.go
 
 /**
