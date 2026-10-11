@@ -113,12 +113,62 @@ test('ссылка на вложение выбирает его на вклад
   expect(document.body.textContent).toContain('attachment=5')
 })
 
-test('обход вкладок не породил шторма запросов (зацикленный эффект)', () => {
+test('создание квеста: кнопка «Новый квест» → форма → POST и новый квест в списке', async () => {
+  await openAt('')
+  const open = [...document.querySelectorAll('button')].find(
+    (b) => b.textContent?.trim() === 'Новый квест'
+  ) as HTMLElement
+  open.click()
+  await settle(80)
+  const input = document.querySelector('.modal__form input[type=text]') as HTMLInputElement
+  expect(input).toBeTruthy()
+  input.value = 'Квест из теста'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  ;(document.querySelector('.modal__form') as HTMLFormElement).dispatchEvent(
+    new Event('submit', { bubbles: true, cancelable: true })
+  )
+  await settle(250)
+  expect(fake.bodies['POST /api/quests']?.[0]).toMatchObject({ title: 'Квест из теста', status: 'active' })
+  expect(document.body.textContent).toContain('Квест из теста')
+})
+
+test('шаг: кнопка +1 шлёт PATCH с новым прогрессом', async () => {
+  await openAt('?quest=1')
+  ;(document.querySelector('.step__btn[aria-label="Увеличить прогресс"]') as HTMLElement).click()
+  await settle(150)
+  expect(fake.bodies['PATCH /api/quests/1/steps/11']?.[0]).toEqual({ progress_current: 2 })
+})
+
+test('заметка: переименование в дереве шлёт PATCH и обновляет строку', async () => {
+  await openAt('?note=1')
+  const row = document.querySelector('.notes__row') as HTMLElement
+  row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }))
+  await settle(50)
+  const item = [...document.querySelectorAll('[role=menuitem], [role=menu] button')].find((b) =>
+    b.textContent?.trim().startsWith('Переименовать')
+  ) as HTMLElement
+  item.click()
+  await settle(80)
+  const input = document.querySelector('.notes__row-rename') as HTMLInputElement
+  input.value = 'Новое имя'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new FocusEvent('blur'))
+  await settle(150)
+  expect(fake.bodies['PATCH /api/notes/1']?.[0]).toEqual({ title: 'Новое имя' })
+  expect(document.querySelector('.notes__row')?.textContent).toContain('Новое имя')
+})
+
+test('обход всех вкладок не порождает шторма запросов (зацикленный эффект)', async () => {
+  await openAt('')
+  fake.log.length = 0
+  for (const tab of ['notes', 'attachments', 'calendar', 'history', 'graph', 'runners', 'journal']) {
+    window.questsNav!.setTab(tab)
+    await settle(150)
+  }
   const perUrl = new Map<string, number>()
   for (const l of fake.log) perUrl.set(l, (perUrl.get(l) ?? 0) + 1)
-  const noisy = [...perUrl].filter(([, n]) => n > 8)
-  expect(noisy).toEqual([])
-  expect(fake.log.length).toBeLessThan(120)
+  expect([...perUrl].filter(([, n]) => n > 6)).toEqual([])
+  expect(fake.log.length).toBeLessThan(80)
 })
 
 test('за время обхода в консоль не попало ошибок', () => {

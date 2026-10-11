@@ -31,11 +31,20 @@ for (const g of groups) {
     : [null]
   for (const target of targets) {
     const args = g.perFile ? [...g.args, target] : g.args
-    const p = Bun.spawnSync(['bun', 'test', ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+    const p = Bun.spawnSync(['bun', 'test', ...args], {
+      cwd: root,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 120_000,
+      killSignal: 'SIGKILL',
+    })
     const out = p.stdout.toString() + p.stderr.toString()
     if (p.exitCode !== 0) {
       failed++
-      console.error(`\n✗ ${g.name}${target ? ` · ${target}` : ''}\n${out}`)
+      const hung = p.exitCode === null || p.signalCode === 'SIGKILL'
+      console.error(
+        `\n✗ ${g.name}${target ? ` · ${target}` : ''}${hung ? ' — ЗАВИС (больше 120 с: похоже на зацикленный эффект)' : ''}\n${out}`
+      )
     } else {
       const m = /(\d+) pass/.exec(out)
       console.log(`✓ ${g.name}${target ? ` · ${target.split('/').pop()}` : ''} — ${m ? m[1] : '?'} pass`)

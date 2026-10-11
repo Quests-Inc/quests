@@ -100,6 +100,7 @@ export type Fake = ReturnType<typeof installFakeApi>
 /** Ставит перехват fetch и заглушку WebSocket; возвращает журнал запросов и снятие перехвата. */
 export function installFakeApi(data = fixtureData(), opts: { authRequired?: boolean } = {}) {
   const log: string[] = []
+  const bodies: Record<string, unknown[]> = {}
   const realFetch = globalThis.fetch
   const realWS = (globalThis as any).WebSocket
   const json = (body: unknown, status = 200) =>
@@ -108,7 +109,33 @@ export function installFakeApi(data = fixtureData(), opts: { authRequired?: bool
     const url = new URL(String(input), 'http://localhost')
     const method = (init.method || 'GET').toUpperCase()
     log.push(`${method} ${url.pathname}${url.search}`)
+    if (init.body) (bodies[`${method} ${url.pathname}`] ??= []).push(JSON.parse(init.body))
     const p = url.pathname
+    const body = init.body && typeof init.body === 'string' ? JSON.parse(init.body) : null
+    if (method === 'POST' && p === '/api/quests') {
+      const q = { ...data.quests[0], id: data.quests.length + 1, steps: [], ...body }
+      data.quests.push(q)
+      return json(q, 201)
+    }
+    const stepPatch = /^\/api\/quests\/(\d+)\/steps\/(\d+)$/.exec(p)
+    if (method === 'PATCH' && stepPatch) {
+      const q = data.quests.find((x) => x.id === Number(stepPatch[1]))!
+      const s = q.steps.find((x) => x.id === Number(stepPatch[2]))!
+      Object.assign(s, body)
+      return json(q)
+    }
+    const questPatch = /^\/api\/quests\/(\d+)$/.exec(p)
+    if (method === 'PATCH' && questPatch) {
+      const q = data.quests.find((x) => x.id === Number(questPatch[1]))!
+      Object.assign(q, body)
+      return json(q)
+    }
+    const notePatch = /^\/api\/notes\/(\d+)$/.exec(p)
+    if (method === 'PATCH' && notePatch) {
+      const n = data.notes.find((x) => x.id === Number(notePatch[1]))!
+      Object.assign(n, body)
+      return json({ ...n, refs: [], backlinks: [] })
+    }
     if (p === '/api/auth/state')
       return json({ auth_required: !!opts.authRequired, authenticated: true, username: 'alice', workspace_id: 1 })
     if (p === '/api/health')
@@ -156,6 +183,8 @@ export function installFakeApi(data = fixtureData(), opts: { authRequired?: bool
   ;(globalThis as any).WebSocket = QuietSocket
   return {
     log,
+    bodies,
+    data,
     restore() {
       globalThis.fetch = realFetch
       ;(globalThis as any).WebSocket = realWS
