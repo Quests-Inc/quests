@@ -3,6 +3,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"github.com/valirum/quests/go/internal/platform/apiclient"
 	"strconv"
 	"strings"
 )
@@ -36,7 +37,7 @@ func cmdNoteList(c *Client, args []string) (int, error) {
 	}
 	q := map[string]string{}
 	if *parent != "" {
-		if isNone(*parent) {
+		if apiclient.IsNone(*parent) {
 			q["parent_id"] = "null"
 		} else {
 			id, err := strconv.ParseInt(*parent, 10, 64)
@@ -103,7 +104,7 @@ func cmdNoteAdd(c *Client, args []string) (int, error) {
 		return 1, fmt.Errorf("нужен TITLE")
 	}
 	body := map[string]any{"title": strings.Join(pos, " "), "description": *desc, "pinned": *pin}
-	if *parent != "" && !isNone(*parent) {
+	if *parent != "" && !apiclient.IsNone(*parent) {
 		pid, err := strconv.ParseInt(*parent, 10, 64)
 		if err != nil {
 			return 1, fmt.Errorf("некорректный parent")
@@ -150,7 +151,7 @@ func cmdNoteSet(c *Client, args []string) (int, error) {
 		body["description"] = *desc
 	}
 	if set["parent"] {
-		if isNone(*parent) {
+		if apiclient.IsNone(*parent) {
 			body["parent_id"] = nil
 		} else {
 			pid, err := strconv.ParseInt(*parent, 10, 64)

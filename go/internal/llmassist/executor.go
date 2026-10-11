@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/valirum/quests/go/internal/cli"
+	"github.com/valirum/quests/go/internal/platform/apiclient"
 )
 
 // ActionExecError carries the offending action's index alongside the message.
@@ -34,16 +34,16 @@ func placeholderID(index int) int64 { return -(int64(index) + 1) }
 
 // Executor applies an ActionBatch against the same HTTP API the frontend and
 // CLI use — via loopback (127.0.0.1), not a separate process. Reuses
-// cli.Client for requests and its ResolveCategoryID/ResolveQuestlineID for
+// apiclient.Client for requests and its ResolveCategoryID/ResolveQuestlineID for
 // the identical name/substring resolution the Go CLI already has.
 type Executor struct {
-	Client *cli.Client
+	Client *apiclient.Client
 }
 
 // NewExecutor acts in workspace ws (the caller's): the loopback token is not a
 // user, so without an explicit workspace it would land in the default one.
 func NewExecutor(apiBase, token string, ws int64) *Executor {
-	c := cli.NewClient(apiBase, true)
+	c := apiclient.NewClient(apiBase, true)
 	// Loopback calls to our own API must carry credentials once accounts are on.
 	c.Token = token
 	c.Source = "assistant"
@@ -80,7 +80,7 @@ func (e *Executor) resolvedID(literal *int64, ref *int, results []ActionResult, 
 	if src == nil {
 		src = results[idx].After
 	}
-	id, ok := cli.AsInt64(src["id"])
+	id, ok := apiclient.AsInt64(src["id"])
 	if !ok {
 		return nil, fmt.Errorf("%s_ref target has no id", label)
 	}
@@ -102,7 +102,7 @@ func (e *Executor) resolveQuestlineByName(raw *string) (*int64, error) {
 }
 
 func toMap(raw json.RawMessage) (map[string]any, error) {
-	return cli.DecodeMap(raw)
+	return apiclient.DecodeMap(raw)
 }
 
 func (e *Executor) getQuest(id int64) (map[string]any, error) {

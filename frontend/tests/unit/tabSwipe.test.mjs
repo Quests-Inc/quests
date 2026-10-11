@@ -1,7 +1,7 @@
 import { test } from 'bun:test'
 import assert from 'node:assert/strict'
 
-import { scrollRoom, swipeDir } from '../src/shared/lib/tabSwipe.ts'
+import { scrollRoom, swipeDir } from '../../src/shared/lib/tabSwipe.ts'
 
 test('swipeDir: clear horizontal swipes only', () => {
   assert.equal(swipeDir(-120, 10), 1)

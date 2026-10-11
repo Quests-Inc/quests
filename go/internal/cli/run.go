@@ -3,6 +3,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"github.com/valirum/quests/go/internal/platform/apiclient"
 	"os"
 	"strconv"
 	"strings"
@@ -74,7 +75,7 @@ func Run(argv []string) int {
 }
 
 func peelGlobals(argv []string) (asJSON bool, api string, rest []string) {
-	api = defaultAPI()
+	api = apiclient.DefaultAPI()
 	rest = make([]string, 0, len(argv))
 	for i := 0; i < len(argv); i++ {
 		tok := argv[i]

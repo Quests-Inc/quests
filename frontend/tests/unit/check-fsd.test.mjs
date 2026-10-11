@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 
-import { checkFsd } from '../scripts/check-fsd.mjs'
+import { checkFsd } from '../../scripts/check-fsd.mjs'
 
-const fixture = (name) => new URL(`./fixtures/${name}`, import.meta.url).pathname
+const fixture = (name) => new URL(`../fixtures/${name}`, import.meta.url).pathname
 
 test('корректная раскладка проходит', () => {
   expect(checkFsd(fixture('fsd-good'))).toEqual([])

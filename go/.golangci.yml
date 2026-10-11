@@ -87,6 +87,8 @@ linters:
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
         platform:
           files:
             - "**/internal/platform/**"
@@ -177,6 +179,8 @@ linters:
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+              desc: "db зависит только от wsctx (ADR-0001)"
         journal:
           files:
             - "**/internal/journal/**"
@@ -259,6 +263,8 @@ linters:
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "dbx зависит только от timeutil"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+              desc: "dbx зависит только от timeutil"
         pgtest:
           files:
             - "**/internal/platform/pgtest/**"
@@ -320,6 +326,8 @@ linters:
               desc: "pgtest зависит только от db"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
               desc: "pgtest зависит только от db"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+              desc: "pgtest зависит только от db"
         metrics:
           files:
             - "**/internal/platform/metrics/**"
@@ -378,6 +386,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
         identity:
           files:
@@ -443,6 +453,8 @@ linters:
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
             - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+              desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
         schedule:
           files:
             - "**/internal/schedule/**"
@@ -487,6 +499,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
+              desc: "schedule не зависит от httpapi, cli, llmassist, identity"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
         knowledge:
           files:
@@ -557,122 +571,124 @@ linters:
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/store
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/identity
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/knowledge
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/automation
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/cli
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/refs
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/journal
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/kernel
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/db
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/wsctx
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/webdav
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/clamav
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/secretbox
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/timeutil
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/metrics
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/health
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/events
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/config
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/pgtest
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/apperr
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/httpx
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
-              desc: "cli это клиент HTTP API: только hooks, никаких store и db"
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
         llmassist:
           files:
             - "**/internal/llmassist/**"
             - "!**/*_test.go"
           deny:
             - pkg: github.com/valirum/quests/go/internal/httpapi
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/store
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/schedule
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/identity
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/knowledge
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/automation
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
+            - pkg: github.com/valirum/quests/go/internal/cli
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/llmassist
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/pdfdoc
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/refs
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/journal
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/kernel
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/db
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/wsctx
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/webdav
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/clamav
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/secretbox
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/timeutil
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/metrics
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/health
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/events
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/config
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/pgtest
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/hooks
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/tokens
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/apperr
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/httpx
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
-              desc: "llmassist → cli исключение, снимается в #23"
+              desc: "llmassist ходит в API только через platform/apiclient"
         runner:
           files:
             - "**/cmd/quests-runner/**"
@@ -735,6 +751,8 @@ linters:
             - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/valirum/quests/go/internal/platform/dbx
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
     errcheck:
       # Best-effort cleanup: nothing useful can be done with these errors.

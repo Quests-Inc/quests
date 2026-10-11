@@ -164,6 +164,10 @@ export interface JobFilter {
   StepID: number /* int64 */;
   Limit: number /* int */;
 }
+
+//////////
+// source: runner_jobs.go
+
 /**
  * JobResult is what a runner reports when the command ends.
  */

@@ -1,4 +1,4 @@
-package cli
+package apiclient
 
 import (
 	"fmt"
@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-func isNone(raw string) bool {
+func IsNone(raw string) bool {
 	s := strings.ToLower(strings.TrimSpace(raw))
 	return s == "" || s == "none" || s == "-" || s == "нет" || s == "null"
 }
 
 func (c *Client) ResolveCategoryID(raw string) (*int64, error) {
-	if isNone(raw) {
+	if IsNone(raw) {
 		return nil, nil
 	}
 	raw = strings.TrimSpace(raw)
@@ -47,7 +47,7 @@ func (c *Client) ResolveCategoryID(raw string) (*int64, error) {
 }
 
 func (c *Client) ResolveQuestlineID(raw string) (*int64, error) {
-	if isNone(raw) {
+	if IsNone(raw) {
 		return nil, nil
 	}
 	raw = strings.TrimSpace(raw)
