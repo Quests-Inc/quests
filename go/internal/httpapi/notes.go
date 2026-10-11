@@ -540,9 +540,7 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []domain.Resolved
 		case "template":
 			t, err := s.Store.GetTemplate(r.Context(), ref.ID)
 			if err == nil {
-				if title, ok := t["title"].(string); ok {
-					row.Title = &title
-				}
+				row.Title = &t.Title
 			}
 		case "attachment":
 			a, err := s.Store.GetAttachment(r.Context(), ref.ID)

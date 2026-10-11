@@ -787,7 +787,66 @@ export interface TagCreate {
 //////////
 // source: templates.go
 
-export type TemplateRead = { [key: string]: any};
+/**
+ * TemplateRead is a quest template as the API sends it.
+ */
+export interface TemplateRead {
+  id: number /* int64 */;
+  title: string;
+  description: string;
+  pinned: boolean;
+  overlay_hidden: boolean;
+  sort_order: number /* int */;
+  freq: string;
+  weekdays: string;
+  enabled: boolean;
+  timezone: string;
+  significance: string;
+  emit_mode: string;
+  emit_chance: number /* float64 */;
+  emit_limits: { [key: string]: any};
+  duration_seconds?: number /* int */;
+  deadline_time?: string;
+  emit_window_start?: string;
+  emit_window_end?: string;
+  emit_pool_command?: string;
+  emit_run_on?: string;
+  category_id?: number /* int64 */;
+  questline_id?: number /* int64 */;
+  category_slug?: string;
+  category_label?: string;
+  category_color?: string;
+  questline_title?: string;
+  questline_color?: string;
+  questline_icon?: string;
+  questline_icon_url?: string;
+  automated: boolean;
+  /**
+   * EmitPoolLastOutcome is the outcome of the latest emit_pool roll, once there was one.
+   */
+  emit_pool_last_outcome?: string;
+  created_at?: string;
+  updated_at?: string;
+  steps: TemplateStepRead[];
+  tags: any /* domain.Tag */[];
+}
+/**
+ * TemplateStepRead is one step of a template.
+ */
+export interface TemplateStepRead {
+  id: number /* int64 */;
+  template_id: number /* int64 */;
+  title: string;
+  description: string;
+  sort_order: number /* int */;
+  progress_min: number /* int */;
+  progress_max: number /* int */;
+  check_command?: string;
+  check_interval_seconds?: number /* int */;
+  wait_previous: boolean;
+  run_mode: string;
+  run_on?: string;
+}
 
 //////////
 // source: userllm.go

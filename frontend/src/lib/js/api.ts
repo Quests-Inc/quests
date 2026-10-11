@@ -8,7 +8,7 @@ import type {
   NotePayload,
   RunnerView,
 } from '../api/http.gen'
-import type { QuestlineRead, RunnerJob } from '../api/store.gen'
+import type { QuestlineRead, RunnerJob, TemplateRead } from '../api/store.gen'
 import { toast } from './toasts.svelte.ts'
 
 const BASE = ''
@@ -129,18 +129,18 @@ export function listTemplates(params: { enabled?: boolean | null } = {}) {
   const q = new URLSearchParams()
   if (params.enabled != null) q.set('enabled', String(params.enabled))
   const qs = q.toString()
-  return request(`/api/templates${qs ? `?${qs}` : ''}`)
+  return request<TemplateRead[]>(`/api/templates${qs ? `?${qs}` : ''}`)
 }
 
-export function createTemplate(payload) {
-  return request('/api/templates', {
+export function createTemplate(payload: object) {
+  return request<TemplateRead>('/api/templates', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
-export function updateTemplate(id, payload) {
-  return request(`/api/templates/${id}`, {
+export function updateTemplate(id: number, payload: object) {
+  return request<TemplateRead>(`/api/templates/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
@@ -150,8 +150,8 @@ export function deleteTemplate(id) {
   return request(`/api/templates/${id}`, { method: 'DELETE' })
 }
 
-export function copyTemplate(id) {
-  return request(`/api/templates/${id}/copy`, { method: 'POST' })
+export function copyTemplate(id: number) {
+  return request<TemplateRead>(`/api/templates/${id}/copy`, { method: 'POST' })
 }
 
 /** Force-materialize one quest from a template (manual emit for testing). */

@@ -277,7 +277,7 @@ func (s *Server) createTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err.Error())
 		return
 	}
-	if asBool(row["enabled"], true) {
+	if row.Enabled {
 		_, _ = schedule.MaterializeDue(r.Context(), s.Store, s.Hub, time.Time{}, nil)
 	}
 	writeJSON(w, 201, row)
@@ -299,7 +299,7 @@ func (s *Server) patchTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if asBool(row["enabled"], false) {
+	if row.Enabled {
 		_, _ = schedule.MaterializeDue(r.Context(), s.Store, s.Hub, time.Time{}, nil)
 	}
 	writeJSON(w, 200, row)
@@ -648,13 +648,4 @@ func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64
 		"quests":      []any{},
 		"attachments": map[string]any{"note": attachments},
 	})
-}
-
-func asBool(v any, def bool) bool {
-	switch t := v.(type) {
-	case bool:
-		return t
-	default:
-		return def
-	}
 }

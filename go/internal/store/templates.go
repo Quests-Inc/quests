@@ -13,7 +13,70 @@ import (
 	"github.com/valirum/quests/go/internal/timeutil"
 )
 
-type TemplateRead map[string]any
+// TemplateRead is a quest template as the API sends it.
+type TemplateRead struct {
+	ID               int64          `json:"id"`
+	Title            string         `json:"title"`
+	Description      string         `json:"description"`
+	Pinned           bool           `json:"pinned"`
+	OverlayHidden    bool           `json:"overlay_hidden"`
+	SortOrder        int            `json:"sort_order"`
+	Freq             string         `json:"freq"`
+	Weekdays         string         `json:"weekdays"`
+	Enabled          bool           `json:"enabled"`
+	Timezone         string         `json:"timezone"`
+	Significance     string         `json:"significance"`
+	EmitMode         string         `json:"emit_mode"`
+	EmitChance       float64        `json:"emit_chance"`
+	EmitLimits       map[string]any `json:"emit_limits"`
+	DurationSecs     *int           `json:"duration_seconds"`
+	DeadlineTime     *string        `json:"deadline_time"`
+	EmitWindowFrom   *string        `json:"emit_window_start"`
+	EmitWindowTo     *string        `json:"emit_window_end"`
+	EmitPoolCmd      *string        `json:"emit_pool_command"`
+	EmitRunOn        *string        `json:"emit_run_on"`
+	CategoryID       *int64         `json:"category_id"`
+	QuestlineID      *int64         `json:"questline_id"`
+	CategorySlug     *string        `json:"category_slug"`
+	CategoryLabel    *string        `json:"category_label"`
+	CategoryColor    *string        `json:"category_color"`
+	QuestlineTitle   *string        `json:"questline_title"`
+	QuestlineColor   *string        `json:"questline_color"`
+	QuestlineIcon    *string        `json:"questline_icon"`
+	QuestlineIconURL *string        `json:"questline_icon_url"`
+	Automated        bool           `json:"automated"`
+	// EmitPoolLastOutcome is the outcome of the latest emit_pool roll, once there was one.
+	EmitPoolLastOutcome *string            `json:"emit_pool_last_outcome"`
+	CreatedAt           *string            `json:"created_at"`
+	UpdatedAt           *string            `json:"updated_at"`
+	Steps               []TemplateStepRead `json:"steps"`
+	Tags                []domain.Tag       `json:"tags"`
+}
+
+// TemplateStepRead is one step of a template.
+type TemplateStepRead struct {
+	ID                   int64   `json:"id"`
+	TemplateID           int64   `json:"template_id"`
+	Title                string  `json:"title"`
+	Description          string  `json:"description"`
+	SortOrder            int     `json:"sort_order"`
+	ProgressMin          int     `json:"progress_min"`
+	ProgressMax          int     `json:"progress_max"`
+	CheckCommand         *string `json:"check_command"`
+	CheckIntervalSeconds *int    `json:"check_interval_seconds"`
+	WaitPrevious         bool    `json:"wait_previous"`
+	RunMode              string  `json:"run_mode"`
+	RunOn                *string `json:"run_on"`
+}
+
+// body is the template in the shape a create/update request has, so that a read can be merged with
+// a patch or copied.
+func (t TemplateRead) body() map[string]any {
+	raw, _ := json.Marshal(t)
+	var m map[string]any
+	_ = json.Unmarshal(raw, &m)
+	return m
+}
 
 func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRead, error) {
 	q := `
@@ -56,36 +119,36 @@ func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRea
 	}
 	_ = rows.Close()
 	for i := range out {
-		id := int64(out[i]["id"].(int64))
+		id := out[i].ID
 		steps, err := s.loadTemplateStepsRead(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		out[i]["steps"] = steps
-		if out[i]["emit_pool_command"] != nil {
+		out[i].Steps = steps
+		if out[i].EmitPoolCmd != nil {
 			outcome, err := s.latestEmitRollOutcome(ctx, id)
 			if err != nil {
 				return nil, err
 			}
 			if outcome != "" {
-				out[i]["emit_pool_last_outcome"] = outcome
+				out[i].EmitPoolLastOutcome = &outcome
 			}
 		}
 	}
 	ids := make([]int64, len(out))
 	for i := range out {
-		ids[i] = out[i]["id"].(int64)
+		ids[i] = out[i].ID
 	}
 	tagMap, err := s.loadTagsForTemplates(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 	for i := range out {
-		tags := tagMap[out[i]["id"].(int64)]
+		tags := tagMap[out[i].ID]
 		if tags == nil {
 			tags = []domain.Tag{}
 		}
-		out[i]["tags"] = tags
+		out[i].Tags = tags
 	}
 	return out, nil
 }
@@ -122,34 +185,34 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 		WHERE t.id = ?`, id)
 	tr, err := scanTemplate(row)
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return TemplateRead{}, ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	steps, err := s.loadTemplateStepsRead(ctx, id)
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
-	tr["steps"] = steps
-	if tr["emit_pool_command"] != nil {
+	tr.Steps = steps
+	if tr.EmitPoolCmd != nil {
 		outcome, err := s.latestEmitRollOutcome(ctx, id)
 		if err != nil {
-			return nil, err
+			return TemplateRead{}, err
 		}
 		if outcome != "" {
-			tr["emit_pool_last_outcome"] = outcome
+			tr.EmitPoolLastOutcome = &outcome
 		}
 	}
 	tagMap, err := s.loadTagsForTemplates(ctx, []int64{id})
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	tags := tagMap[id]
 	if tags == nil {
 		tags = []domain.Tag{}
 	}
-	tr["tags"] = tags
+	tr.Tags = tags
 	return tr, nil
 }
 
@@ -158,7 +221,7 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 	title, _ := body["title"].(string)
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return nil, errBad("title required")
+		return TemplateRead{}, errBad("title required")
 	}
 	desc, _ := asString(body["description"])
 	pinned := domain.PinState(asBool(body["pinned"], false), asBool(body["overlay_hidden"], false))
@@ -169,31 +232,31 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 	tz := asStringDef(body["timezone"], "Europe/Moscow")
 	sig := asStringDef(body["significance"], "common")
 	if !domain.Significance(sig).Valid() {
-		return nil, errBad(domain.InvalidSignificanceMsg(sig))
+		return TemplateRead{}, errBad(domain.InvalidSignificanceMsg(sig))
 	}
 	emitMode := asStringDef(body["emit_mode"], "fixed")
 	emitChance := asFloat(body["emit_chance"], 1.0)
 	emitLimits, err := emitLimitsColumn(body["emit_limits"])
 	if err != nil {
-		return nil, errBad(err.Error())
+		return TemplateRead{}, errBad(err.Error())
 	}
 	colorCat := nullI64(asI64Ptr(body["category_id"]))
 	lineID := nullI64(asI64Ptr(body["questline_id"]))
 	emitRunOn := NormalizeRunOn(asStringPtr(body["emit_run_on"]))
 	if !ValidRunOn(emitRunOn) {
-		return nil, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
 	}
 
 	if err := s.guardAuthor(ctx, asStringPtr(body["emit_pool_command"]), nil); err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	if err := s.guardExec(ctx, asStringPtr(body["emit_pool_command"]), emitRunOn); err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	if raw, ok := body["steps"]; ok {
 		if steps, ok := raw.([]any); ok {
 			if err := s.guardTemplateSteps(ctx, 0, steps); err != nil {
-				return nil, err
+				return TemplateRead{}, err
 			}
 		}
 	}
@@ -212,14 +275,14 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 		timeutil.ToDBUTC(now), timeutil.ToDBUTC(now), boolInt(asBool(body["automated"], false)),
 	)
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	tid, _ := res.LastInsertId()
 	if err := s.replaceTemplateSteps(ctx, tid, body["steps"]); err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	if err := s.applyTemplateTagIDs(ctx, tid, body); err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	return s.GetTemplate(ctx, tid)
 }
@@ -227,17 +290,14 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]any) (TemplateRead, error) {
 	if v, ok := body["significance"]; ok {
 		if sg, _ := v.(string); !domain.Significance(sg).Valid() {
-			return nil, errBad(domain.InvalidSignificanceMsg(sg))
+			return TemplateRead{}, errBad(domain.InvalidSignificanceMsg(sg))
 		}
 	}
 	cur, err := s.GetTemplate(ctx, id)
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
-	merged := map[string]any{}
-	for k, v := range cur {
-		merged[k] = v
-	}
+	merged := cur.body()
 	for k, v := range body {
 		merged[k] = v
 	}
@@ -250,17 +310,17 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	now := timeutil.NowUTC()
 	emitLimits, lerr := emitLimitsColumn(merged["emit_limits"])
 	if lerr != nil {
-		return nil, errBad(lerr.Error())
+		return TemplateRead{}, errBad(lerr.Error())
 	}
 	emitRunOn := NormalizeRunOn(asStringPtr(merged["emit_run_on"]))
 	if !ValidRunOn(emitRunOn) {
-		return nil, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
 	}
-	if err := s.guardAuthor(ctx, asStringPtr(merged["emit_pool_command"]), asStringPtr(cur["emit_pool_command"])); err != nil {
-		return nil, err
+	if err := s.guardAuthor(ctx, asStringPtr(merged["emit_pool_command"]), cur.EmitPoolCmd); err != nil {
+		return TemplateRead{}, err
 	}
 	if err := s.guardExec(ctx, asStringPtr(merged["emit_pool_command"]), emitRunOn); err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	_, err = s.DB.ExecContext(ctx, `
 		UPDATE questtemplate SET
@@ -282,20 +342,20 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 		timeutil.ToDBUTC(now), boolInt(asBool(merged["automated"], false)), id,
 	)
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	if _, ok := body["steps"]; ok {
 		if err := s.replaceTemplateSteps(ctx, id, body["steps"]); err != nil {
-			return nil, err
+			return TemplateRead{}, err
 		}
 	}
 	if _, ok := body["tag_ids"]; ok {
 		if err := s.applyTemplateTagIDs(ctx, id, body); err != nil {
-			return nil, err
+			return TemplateRead{}, err
 		}
 	} else if _, ok := body["tags"]; ok {
 		if err := s.applyTemplateTagIDs(ctx, id, body); err != nil {
-			return nil, err
+			return TemplateRead{}, err
 		}
 	}
 	return s.GetTemplate(ctx, id)
@@ -340,15 +400,16 @@ func (s *Store) DeleteTemplate(ctx context.Context, id int64) error {
 func (s *Store) CopyTemplate(ctx context.Context, id int64) (TemplateRead, error) {
 	src, err := s.GetTemplate(ctx, id)
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
-	src["title"] = asStringDef(src["title"], "") + " (копия)"
-	src["enabled"] = false
-	delete(src, "id")
-	delete(src, "created_at")
-	delete(src, "updated_at")
+	body := src.body()
+	body["title"] = src.Title + " (копия)"
+	body["enabled"] = false
+	delete(body, "id")
+	delete(body, "created_at")
+	delete(body, "updated_at")
 	// Keep tags so CreateTemplate can re-link via applyTemplateTagIDs.
-	return s.CreateTemplate(ctx, src)
+	return s.CreateTemplate(ctx, body)
 }
 
 func (s *Store) applyTemplateTagIDs(ctx context.Context, templateID int64, body map[string]any) error {
@@ -503,7 +564,7 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 	return nil
 }
 
-func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]map[string]any, error) {
+func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]TemplateStepRead, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, template_id, title, description, sort_order, progress_min, progress_max,
 			check_command, check_interval_seconds, wait_previous, run_mode, run_on
@@ -512,35 +573,31 @@ func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]map[str
 		return nil, err
 	}
 	defer rows.Close()
-	out := make([]map[string]any, 0)
+	out := make([]TemplateStepRead, 0)
 	for rows.Next() {
-		var id, tmplID int64
-		var title, desc string
-		var sortOrder, pmin, pmax int
+		var m TemplateStepRead
 		var cmd sql.NullString
 		var iv sql.NullInt64
 		var waitPrev int
 		var runMode, runOn sql.NullString
-		if err := rows.Scan(&id, &tmplID, &title, &desc, &sortOrder, &pmin, &pmax, &cmd, &iv, &waitPrev, &runMode, &runOn); err != nil {
+		if err := rows.Scan(&m.ID, &m.TemplateID, &m.Title, &m.Description, &m.SortOrder, &m.ProgressMin, &m.ProgressMax, &cmd, &iv, &waitPrev, &runMode, &runOn); err != nil {
 			return nil, err
 		}
-		m := map[string]any{
-			"id": id, "template_id": tmplID, "title": title, "description": desc,
-			"sort_order": sortOrder, "progress_min": pmin, "progress_max": pmax,
-			"check_command": nil, "check_interval_seconds": nil,
-			"wait_previous": waitPrev != 0, "run_mode": domain.RunModePoll, "run_on": nil,
-		}
+		m.WaitPrevious = waitPrev != 0
+		m.RunMode = domain.RunModePoll
 		if runOn.Valid && strings.TrimSpace(runOn.String) != "" {
-			m["run_on"] = strings.TrimSpace(runOn.String)
+			v := strings.TrimSpace(runOn.String)
+			m.RunOn = &v
 		}
 		if cmd.Valid {
-			m["check_command"] = cmd.String
+			m.CheckCommand = &cmd.String
 		}
 		if iv.Valid {
-			m["check_interval_seconds"] = int(iv.Int64)
+			v := int(iv.Int64)
+			m.CheckIntervalSeconds = &v
 		}
 		if runMode.Valid && strings.TrimSpace(runMode.String) != "" {
-			m["run_mode"] = NormalizeRunMode(runMode.String)
+			m.RunMode = NormalizeRunMode(runMode.String)
 		}
 		out = append(out, m)
 	}
@@ -568,78 +625,72 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 		&cSlug, &cLabel, &cColor, &lTitle, &lColor, &lIcon, &lCustom, &lUpdated, &lID,
 	)
 	if err != nil {
-		return nil, err
+		return TemplateRead{}, err
 	}
 	tr := TemplateRead{
-		"id": id, "title": title, "description": desc, "pinned": pinned > 0, "overlay_hidden": pinned < 0, "sort_order": sortOrder,
-		"freq": freq, "weekdays": weekdays, "enabled": enabled != 0, "timezone": tz,
-		"significance": sig, "emit_mode": emitMode, "emit_chance": emitChance,
-		"emit_limits":      nil,
-		"duration_seconds": nil, "deadline_time": nil, "emit_window_start": nil, "emit_window_end": nil,
-		"emit_pool_command": nil, "emit_run_on": nil,
-		"category_id": nil, "questline_id": nil,
-		"category_slug": nil, "category_label": nil, "category_color": nil,
-		"questline_title": nil, "questline_color": nil, "questline_icon": nil, "questline_icon_url": nil,
-		"automated":              automated != 0,
-		"emit_pool_last_outcome": nil,
+		ID: id, Title: title, Description: desc, Pinned: pinned > 0, OverlayHidden: pinned < 0, SortOrder: sortOrder,
+		Freq: freq, Weekdays: weekdays, Enabled: enabled != 0, Timezone: tz,
+		Significance: sig, EmitMode: emitMode, EmitChance: emitChance, Automated: automated != 0,
 	}
 	if emitLimits.Valid && strings.TrimSpace(emitLimits.String) != "" {
 		var lim map[string]any
 		if json.Unmarshal([]byte(emitLimits.String), &lim) == nil {
-			tr["emit_limits"] = lim
+			tr.EmitLimits = lim
 		}
 	}
 	if dur.Valid {
-		tr["duration_seconds"] = int(dur.Int64)
+		v := int(dur.Int64)
+		tr.DurationSecs = &v
 	}
 	if deadline.Valid {
-		tr["deadline_time"] = deadline.String
+		tr.DeadlineTime = &deadline.String
 	}
 	if ewStart.Valid {
-		tr["emit_window_start"] = ewStart.String
+		tr.EmitWindowFrom = &ewStart.String
 	}
 	if ewEnd.Valid {
-		tr["emit_window_end"] = ewEnd.String
+		tr.EmitWindowTo = &ewEnd.String
 	}
 	if emitPoolCommand.Valid {
-		tr["emit_pool_command"] = emitPoolCommand.String
+		tr.EmitPoolCmd = &emitPoolCommand.String
 	}
 	if emitRunOn.Valid && strings.TrimSpace(emitRunOn.String) != "" {
-		tr["emit_run_on"] = strings.TrimSpace(emitRunOn.String)
+		v := strings.TrimSpace(emitRunOn.String)
+		tr.EmitRunOn = &v
 	}
 	if catID.Valid {
-		tr["category_id"] = catID.Int64
+		tr.CategoryID = &catID.Int64
 	}
 	if lineID.Valid {
-		tr["questline_id"] = lineID.Int64
+		tr.QuestlineID = &lineID.Int64
 	}
 	if created.Valid {
 		if t, e := timeutil.ParseFlexible(created.String); e == nil {
-			tr["created_at"] = derefISO(&t)
+			tr.CreatedAt = timeutil.ToUTCISO(&t)
 		}
 	}
 	if updated.Valid {
 		if t, e := timeutil.ParseFlexible(updated.String); e == nil {
-			tr["updated_at"] = derefISO(&t)
+			tr.UpdatedAt = timeutil.ToUTCISO(&t)
 		}
 	}
 	if cSlug.Valid {
-		tr["category_slug"] = cSlug.String
+		tr.CategorySlug = &cSlug.String
 	}
 	if cLabel.Valid {
-		tr["category_label"] = cLabel.String
+		tr.CategoryLabel = &cLabel.String
 	}
 	if cColor.Valid {
-		tr["category_color"] = cColor.String
+		tr.CategoryColor = &cColor.String
 	}
 	if lTitle.Valid {
-		tr["questline_title"] = lTitle.String
+		tr.QuestlineTitle = &lTitle.String
 	}
 	if lColor.Valid {
-		tr["questline_color"] = lColor.String
+		tr.QuestlineColor = &lColor.String
 	}
 	if lIcon.Valid {
-		tr["questline_icon"] = lIcon.String
+		tr.QuestlineIcon = &lIcon.String
 	}
 	if lCustom.Valid && lCustom.String != "" && lID.Valid {
 		u := "/api/questlines/" + itoa64(lID.Int64) + "/icon"
@@ -650,7 +701,7 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 				}
 			}
 		}
-		tr["questline_icon_url"] = u
+		tr.QuestlineIconURL = &u
 	}
 	return tr, nil
 }

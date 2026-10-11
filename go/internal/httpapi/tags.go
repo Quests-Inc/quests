@@ -207,9 +207,8 @@ func (s *Server) putTemplateTags(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	title, _ := row["title"].(string)
-	s.publishSilent(r.Context(), "template_updated", title, map[string]any{"template_id": id})
-	writeJSON(w, 200, row["tags"])
+	s.publishSilent(r.Context(), "template_updated", row.Title, map[string]any{"template_id": id})
+	writeJSON(w, 200, row.Tags)
 }
 
 func (s *Server) decodeTagIDs(r *http.Request) ([]int64, error) {
