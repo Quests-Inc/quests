@@ -34,6 +34,7 @@
     putGraphDraftRoots,
     uploadGraphDraftFile,
   } from '@/shared/api/client.ts'
+  import { createGraphDraft } from '../model/draft.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { CARD, EDGES, ENTITY_LABELS, ENTITY_TYPES, LAYOUTS, RASTER, SQUARE, TYPES, applyDraft, clampK, prepareGraph as prepare, describeOp, edgePath, layoutGraph, layoutLayers, layoutRadial, layoutTree, layoutTreeDown, spreadEnds } from '@/entities/graph'
 
@@ -89,119 +90,18 @@
   let loose = $state((new Set() as Set<string>))
   let seq = 0
 
-  // --- Draft: edits made here stay in a server-side log until saved. ---
-  let draft = $state({ ops: ([] as any[]), roots: ([] as { type: string, id: number }[]) })
-  let draftOpen = $state(true)
-  let committing = $state(false)
-  /** op id → message, from a refused or failed save */
-  let opProblems = $state(({} as Record<number, string>))
-  let cancelAsk = $state(false)
-  let dropAsk = $state((null as { id: number, ids: number[] } | null))
-  let reloadTick = $state(0)
-
-  async function loadDraft() {
-    try {
-      const d = await getGraphDraft()
-      const next = { ops: d.ops ?? [], roots: Array.isArray(d.roots) ? d.roots : [] }
-      // Unchanged: keep the object, so nothing is rebuilt.
-      if (JSON.stringify(next) !== JSON.stringify(draft)) draft = next
-    } catch {
-      /* the page still works read-only */
-    }
-  }
-
-  /** Adds an operation; resolves to the op, or null when the server refused it. */
-  async function addOp(kind: string, payload: { id?: any; parent?: any; was?: any; item?: string; owner?: any; from?: any; to?: any; source?: any; pos?: { x: number; y: number }|{ x: number; y: number }|{ x: number; y: number }; fields?: any; quest?: any }) {
-    try {
-      const op = await addGraphDraftOp(kind, payload)
-      await loadDraft()
-      return op
-    } catch {
-      return null
-    }
-  }
-
-  async function saveDraft() {
-    if (committing || !draft.ops.length) return
-    committing = true
-    opProblems = {}
-    try {
-      const r = await commitGraphDraft()
-      toast(`Сохранено: ${r.applied} ${r.applied === 1 ? 'изменение' : 'изменений'}`, { kind: 'success' })
-      // An empty map has nothing to show the saved things on: centre on the first one.
-      const made = !center.id ? Object.entries(r.created ?? {}).find(([k]) => k.startsWith('quest:') || k.startsWith('note:') || k.startsWith('questline:')) : null
-      // Saving must not rearrange the map: every card stays where it is, and
-      // the things that were only in the draft keep their spot under their new ids.
-      for (const n of view?.nodes ?? []) {
-        if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) continue
-        const real = r.created?.[n.key]
-        const key = real != null ? `${n.key.split(':')[0]}:${real}` : n.key
-        if (n.type !== 'cluster') saved.set(key, { x: n.x, y: n.y })
-      }
-      if (made) {
-        center = { type: made[0].split(':')[0], id: Number(made[1]) }
-        onCenter?.(center.type, center.id)
-      }
-      // Things made on the map with no link to anything on it have nothing to
-      // hang from once saved: keep them as extra centres so they stay put.
-      const kept = [...draft.roots]
-      for (const n of view?.nodes ?? []) {
-        if (!n.draft || n.depth >= 0 || !['quest', 'note', 'questline'].includes(n.type)) continue
-        const id = Number(r.created?.[n.key])
-        if (!id || (center.type === n.type && center.id === id)) continue
-        if (!kept.some((x) => x.type === n.type && x.id === id)) kept.push({ type: n.type, id })
-      }
-      if (kept.length !== draft.roots.length) await putGraphDraftRoots(kept)
-      await loadDraft()
-      reloadTick += 1
-    } catch (e) {
-      const problems: Record<number, string> = {}
-      // @ts-ignore
-      for (const p of e.problems ?? []) problems[p.op] = p.message
-      // @ts-ignore
-      if (e.failedOp != null) problems[e.failedOp] = e.message
-      opProblems = problems
-      draftOpen = true
-      toast(e.message || 'Не удалось сохранить', { kind: 'error' })
-      await loadDraft()
-      reloadTick += 1
-    } finally {
-      committing = false
-    }
-  }
-
-  async function discardDraft() {
-    cancelAsk = false
-    try {
-      await cancelGraphDraft()
-      opProblems = {}
-      resetPositions()
-      await loadDraft()
-    } catch {
-      /* toast already shown */
-    }
-  }
-
-  /** Ask which ops would go with this one, then drop them. */
-  async function askDrop(op: { id: any }) {
-    try {
-      const r = await deleteGraphDraftOp(op.id, true)
-      const ids = r?.would_remove ?? [op.id]
-      if (ids.length > 1) dropAsk = { id: op.id, ids }
-      else await doDrop(op.id)
-    } catch {
-      /* toast already shown */
-    }
-  }
-  async function doDrop(id: number) {
-    dropAsk = null
-    try {
-      await deleteGraphDraftOp(id)
-      await loadDraft()
-    } catch {
-      /* toast already shown */
-    }
-  }
+  // --- Draft: edits made here stay in a server-side log until saved (see model/draft.svelte.ts). ---
+  const gd = createGraphDraft({
+    getCenter: () => center,
+    setCenter: (c) => {
+      center = c
+      onCenter?.(c.type, c.id)
+    },
+    getNodes: () => view?.nodes ?? [],
+    getSaved: () => saved,
+    resetPositions,
+  })
+  let draft = $derived(gd.draft)
 
   // Camera: pan (x, y) and zoom (k) of the world.
   let cam = $state({ x: 0, y: 0, k: 1 })
@@ -228,7 +128,7 @@
   })
 
   $effect(() => {
-    if (active) void loadDraft()
+    if (active) void gd.load()
   })
 
   $effect(() => {
@@ -248,7 +148,7 @@
       return { type: ref.split(':')[0], id: Number(ref.split(':')[1]), only }
     })
     void nonce
-    void reloadTick
+    void gd.reloadTick
     const mine = ++seq
     loading = true
     error = ''
@@ -286,14 +186,14 @@
     const mod = e.ctrlKey || e.metaKey
     if (mod && e.code === 'KeyS') {
       e.preventDefault()
-      if (!ownerless.size && !document.querySelector('.backdrop [role="dialog"]')) void saveDraft()
+      if (!ownerless.size && !document.querySelector('.backdrop [role="dialog"]')) void gd.save()
       return
     }
     if (typing(e)) return
     if (mod && e.code === 'KeyZ' && !e.shiftKey) {
       e.preventDefault()
       const last = draft.ops[draft.ops.length - 1]
-      if (last) void askDrop(last)
+      if (last) void gd.askDrop(last)
       return
     }
     if (mod) return
@@ -641,7 +541,7 @@
     if (rootsChanged) {
       try {
         await putGraphDraftRoots(roots)
-        await loadDraft()
+        await gd.load()
       } catch {
         /* toast already shown */
       }
@@ -661,7 +561,7 @@
   function showChanges(key: string) {
     const ops = touched.get(key)
     if (!ops?.length) return
-    draftOpen = true
+    gd.open = true
     flashOp = ops[ops.length - 1]
     clearTimeout(flashTimer)
     flashTimer = window.setTimeout((): void => {
@@ -1406,10 +1306,10 @@
         return
       }
       if (nodeMap.get(l.anchor)?.type === 'note') {
-        await addOp('set_parent', { id: l.anchor, parent: target.key, was: parentNote(nodeMap.get(l.anchor)) ?? '' })
+        await gd.addOp('set_parent', { id: l.anchor, parent: target.key, was: parentNote(nodeMap.get(l.anchor)) ?? '' })
         return
       }
-      await addOp('attach', { item: l.anchor, owner: target.key })
+      await gd.addOp('attach', { item: l.anchor, owner: target.key })
       return
     }
     const from = l.mode === 'to' ? l.anchor : target.key
@@ -1418,7 +1318,7 @@
       toast('Такая ссылка уже есть', { kind: 'info' })
       return
     }
-    await addOp('add_ref', { from, to })
+    await gd.addOp('add_ref', { from, to })
   }
 
   /** Links written in this card's own text, as targets still visible on the map. */
@@ -1434,10 +1334,10 @@
     )
     // A link made earlier in this draft is undone by dropping that step of the log.
     if (e?.draft === 'add' && e.op) {
-      await askDrop({ id: e.op })
+      await gd.askDrop({ id: e.op })
       return
     }
-    await addOp('remove_ref', { from: n.key, to: targetKey })
+    await gd.addOp('remove_ref', { from: n.key, to: targetKey })
   }
 
   // Right-click menus: on the empty field (create / upload / add to map) and on a card.
@@ -1630,7 +1530,7 @@
     else if (id === 'add-step' && n) entityModal = { open: true, kind: 'step', at, ...plain, owner: n.key }
     else if (id === 'add-note' && n) await createNoteHere(at, n.key)
     else if (id === 'edit' && n) await startEdit(n)
-    else if (id === 'copy' && n) await addOp('copy', { source: n.key, pos: at })
+    else if (id === 'copy' && n) await gd.addOp('copy', { source: n.key, pos: at })
     else if (id === 'upload' || id === 'add-file') {
       fileAt = at
       fileOwner = id === 'add-file' && n ? n.key : ''
@@ -1643,21 +1543,21 @@
     else if (id === 'cl-fold' && ctx.cluster?.key) collapse(ctx.cluster.key)
     else if (id === 'cl-disband' && ctx.cluster) disband(ctx.cluster.owner)
     else if (id === 'edge-unref' && ctx.edge) await unlinkRef({ key: ctx.edge.from }, ctx.edge.to)
-    else if (id === 'edge-nowait' && ctx.edge) await addOp('edit_step', { id: ctx.edge.to, fields: { wait_previous: false } })
-    else if (id === 'edge-unline' && ctx.edge) await addOp('edit_quest', { id: ctx.edge.to, fields: { questline_id: null } })
-    else if (id === 'edge-unparent' && ctx.edge) await addOp('set_parent', { id: ctx.edge.to, parent: '', was: ctx.edge.from })
+    else if (id === 'edge-nowait' && ctx.edge) await gd.addOp('edit_step', { id: ctx.edge.to, fields: { wait_previous: false } })
+    else if (id === 'edge-unline' && ctx.edge) await gd.addOp('edit_quest', { id: ctx.edge.to, fields: { questline_id: null } })
+    else if (id === 'edge-unparent' && ctx.edge) await gd.addOp('set_parent', { id: ctx.edge.to, parent: '', was: ctx.edge.from })
     else if (id === 'expand' && n) setExpand([...expandKeys.filter((k) => !k.startsWith(`${n.key}>`)), n.key])
     else if (id === 'collapse' && n) setExpand(expandKeys.filter((k) => k !== n.key && !k.startsWith(`${n.key}>`)))
     else if (id === 'drop-steps' && n) await hideKeys(childKeys(n, 'step'))
     else if (id === 'drop-quests' && n) await hideKeys(childKeys(n, 'quest'))
-    else if (id === 'detach-note' && n) await addOp('set_parent', { id: n.key, parent: '', was: parentNote(n) ?? '' })
+    else if (id === 'detach-note' && n) await gd.addOp('set_parent', { id: n.key, parent: '', was: parentNote(n) ?? '' })
     else if (id.startsWith('unlink:') && n) await unlinkRef(n, id.slice('unlink:'.length))
-    else if (id === 'drop' && n?.op) await askDrop({ id: n.op })
+    else if (id === 'drop' && n?.op) await gd.askDrop({ id: n.op })
     else if (id === 'hide' && n) await hideKeys([n.key])
     else if (id === 'unroot' && n) {
       const roots = draft.roots.filter((r) => `${r.type}:${r.id}` !== n.key)
       await putGraphDraftRoots(roots)
-      await loadDraft()
+      await gd.load()
     } else if (id === 'open' && n) {
       const t = openTarget(n)
       if (t) onOpen?.(t[0], t[1])
@@ -1675,7 +1575,7 @@
         /* toast already shown */
       }
     }
-    await loadDraft()
+    await gd.load()
   }
 
   // --- Editing. A saved quest / step opens its usual form (the change goes to
@@ -1744,7 +1644,7 @@
       toast('Ничего не изменилось', { kind: 'info' })
       return
     }
-    await addOp('edit_quest', { id: `quest:${orig.id}`, fields })
+    await gd.addOp('edit_quest', { id: `quest:${orig.id}`, fields })
   }
 
   async function draftEditStep(payload: Record<string,any>) {
@@ -1755,7 +1655,7 @@
       toast('Ничего не изменилось', { kind: 'info' })
       return
     }
-    await addOp('edit_step', { id: `step:${orig.id}`, fields })
+    await gd.addOp('edit_step', { id: `step:${orig.id}`, fields })
   }
 
   /** Submit of the small title + description form (new note / step, or an in-place edit). */
@@ -1764,22 +1664,22 @@
     if (m.edit) {
       try {
         await putGraphDraftOp(m.edit.opId, { ...m.edit.payload, fields: { ...(m.edit.payload.fields ?? {}), ...fields } })
-        await loadDraft()
+        await gd.load()
       } catch {
         /* toast already shown */
       }
       return
     }
     if (m.kind === 'step') {
-      await addOp('create_step', { fields, ...(m.owner ? { quest: m.owner } : {}), pos: m.at })
+      await gd.addOp('create_step', { fields, ...(m.owner ? { quest: m.owner } : {}), pos: m.at })
       return
     }
     if (m.kind === 'questline') {
-      await addOp('create_questline', { fields, pos: m.at })
+      await gd.addOp('create_questline', { fields, pos: m.at })
       return
     }
-    const op = await addOp('create_note', { fields, pos: m.at })
-    if (op && m.linkFrom) await addOp('add_ref', { from: m.linkFrom, to: `note:t${op.id}` })
+    const op = await gd.addOp('create_note', { fields, pos: m.at })
+    if (op && m.linkFrom) await gd.addOp('add_ref', { from: m.linkFrom, to: `note:t${op.id}` })
   }
 
   const NEW_NOTE = 'Новая заметка'
@@ -1800,9 +1700,9 @@
   /** A new note appears at the cursor with its title selected, ready to type over. */
   async function createNoteHere(at: { x: number; y: number }, linkFrom: string) {
     const title = freshNoteTitle()
-    const op = await addOp('create_note', { fields: { title, description: '' }, pos: at })
+    const op = await gd.addOp('create_note', { fields: { title, description: '' }, pos: at })
     if (!op) return
-    if (linkFrom) await addOp('add_ref', { from: linkFrom, to: `note:t${op.id}` })
+    if (linkFrom) await gd.addOp('add_ref', { from: linkFrom, to: `note:t${op.id}` })
     await startEditNote({ key: `note:t${op.id}`, draft: true, op: op.id, title }, true)
   }
 
@@ -1853,13 +1753,13 @@
     if (e.opId != null) {
       try {
         await putGraphDraftOp(e.opId, { ...e.payload, fields: { ...(e.payload.fields ?? {}), ...changed } })
-        await loadDraft()
+        await gd.load()
       } catch {
         /* toast already shown */
       }
       return
     }
-    await addOp('edit_note', { id: e.key, fields: changed })
+    await gd.addOp('edit_note', { id: e.key, fields: changed })
   }
 
   const autofocus = (node: { focus: () => void }) => {
@@ -1881,7 +1781,7 @@
     saveHidden(new Set())
     try {
       await putGraphDraftRoots([])
-      await loadDraft()
+      await gd.load()
     } catch {
       /* toast already shown */
     }
@@ -1908,7 +1808,7 @@
       return
     }
     await putGraphDraftRoots([...draft.roots, { type, id }])
-    await loadDraft()
+    await gd.load()
   }
 
   function onLayoutChange() {
@@ -2056,15 +1956,15 @@
     {#if draft.ops.length}
       <GraphDraftLog
         ops={draft.ops}
-        bind:open={draftOpen}
-        {committing}
+        bind:open={gd.open}
+        committing={gd.committing}
         ownerlessCount={ownerless.size}
-        problems={opProblems}
+        problems={gd.problems}
         {flashOp}
         {titleOf}
-        onSave={saveDraft}
-        onCancelAll={() => (cancelAsk = true)}
-        onDrop={askDrop}
+        onSave={gd.save}
+        onCancelAll={() => (gd.cancelAsk = true)}
+        onDrop={gd.askDrop}
       />
     {/if}
 
@@ -2093,7 +1993,7 @@
   attachments={[]}
   onClose={() => (questModal = { ...questModal, open: false })}
   onSaved={() => {}}
-  onDraft={(payload) => addOp('create_quest', { fields: payload, pos: questModal.at })}
+  onDraft={(payload) => gd.addOp('create_quest', { fields: payload, pos: questModal.at })}
 />
 
 <DraftEntityModal
@@ -2144,21 +2044,21 @@
 />
 
 <ConfirmModal
-  open={cancelAsk}
+  open={gd.cancelAsk}
   title="Отменить все изменения?"
   message={`Черновик (${draft.ops.length}) будет сброшен, загруженные в него файлы удалены. В базе ничего не изменится.`}
   confirmLabel="Отменить всё"
-  onCancel={() => (cancelAsk = false)}
-  onConfirm={discardDraft}
+  onCancel={() => (gd.cancelAsk = false)}
+  onConfirm={gd.discard}
 />
 
 <ConfirmModal
-  open={dropAsk != null}
+  open={gd.dropAsk != null}
   title="Убрать из черновика?"
-  message={`Вместе с этим уберётся то, что на него опирается: всего операций ${dropAsk?.ids.length ?? 0}.`}
+  message={`Вместе с этим уберётся то, что на него опирается: всего операций ${gd.dropAsk?.ids.length ?? 0}.`}
   confirmLabel="Убрать"
-  onCancel={() => (dropAsk = null)}
-  onConfirm={() => dropAsk && doDrop(dropAsk.id)}
+  onCancel={() => (gd.dropAsk = null)}
+  onConfirm={() => gd.dropAsk && gd.doDrop(gd.dropAsk.id)}
 />
 
 <ContextMenu
