@@ -17,7 +17,7 @@
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '@/shared/lib/duration.ts'
   import { templateStepDraft, templateStepsPayload, StepsEditor } from '@/entities/quest'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { MentionTextarea } from '@/entities/template'
+  import { MentionTextarea, WORKDAYS, daysLabel, parseClock, parseLimits, parseWeekdays } from '@/entities/template'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import Picker from '@/shared/ui/Picker.svelte'
   import FormSection from '@/shared/ui/FormSection.svelte'
@@ -44,7 +44,6 @@
   let { open = false, quests = [], notes = [], attachments = [], focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, quests?: any[], notes?: any[], attachments?: any[], focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
 
   const LOCAL_TZ = localTimeZone() || 'Europe/Moscow'
-  const WORKDAYS = [0, 1, 2, 3, 4]
 
   let templates = $state(([] as any[]))
   let loading = $state(false)
@@ -131,15 +130,6 @@
     }
   })
 
-  function parseLimits(text: string) {
-    try {
-      const v = JSON.parse(text)
-      if (v && typeof v === 'object' && !Array.isArray(v)) return v
-    } catch {
-      /* falls through to the error below */
-    }
-    throw new Error('Лимиты: нужен JSON-объект, например {"max_steps": 50}')
-  }
   let weekdayIds = $derived(new Set([...weekdays].map(String)))
 
   let lineOptions = $derived(
@@ -151,14 +141,6 @@
   let lineCategory = $derived(
     categoryId === '' ? null : categories.find((c) => String(c.id) === categoryId) ?? null,
   )
-
-  function daysLabel(set: Set<number>) {
-    const ids = [...set].sort((a, b) => a - b)
-    if (ids.length === 7) return 'каждый день'
-    if (ids.join() === WORKDAYS.join()) return 'по будням'
-    if (ids.join() === '5,6') return 'по выходным'
-    return ids.map((i) => WEEKDAY_LABELS.find((d) => d.id === i)?.label.toLowerCase()).join(', ')
-  }
 
   let scheduleSummary = $derived.by(() => {
     const days = freq === 'weekly' ? daysLabel(weekdays) : 'каждый день'
@@ -204,27 +186,6 @@
     const line = questlines.find((l) => String(l.id) === idStr)
     if (!line) return
     categoryId = line.category_id != null ? String(line.category_id) : ''
-  }
-
-  function parseClock(raw: any, fallbackH: string, fallbackM: string) {
-    const text = String(raw || '').trim()
-    if (text && text.includes(':')) {
-      const [hh = fallbackH, mm = fallbackM] = text.split(':')
-      return {
-        hour: String(Math.min(23, Math.max(0, Number(hh) || 0))).padStart(2, '0'),
-        minute: String(Math.min(59, Math.max(0, Number(mm) || 0))).padStart(2, '0'),
-      }
-    }
-    return { hour: fallbackH, minute: fallbackM }
-  }
-
-  function parseWeekdays(raw: any) {
-    const set = new Set<number>()
-    for (const part of String(raw || '').split(',')) {
-      const n = Number(part.trim())
-      if (Number.isInteger(n) && n >= 0 && n <= 6) set.add(n)
-    }
-    return set.size ? set : new Set(WORKDAYS)
   }
 
   function resetForm(t: any = null) {
