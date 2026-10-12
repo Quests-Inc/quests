@@ -39,7 +39,7 @@ the endpoint off), `GRAFANA_ADMIN_PASSWORD`; optional `GRAFANA_PORT` (3002), `PR
   (`respond /metrics 404` in the edge Caddyfile).
 - Prometheus scrapes `api:8765/metrics`, `node-exporter` (host: CPU, RAM, disk), `postgres-exporter` (size, connections)
   and itself every 15 s; no ports are published for any of them.
-- Grafana (`http://<server>:3002`, or behind the gateway at `https://grafana.<base domain>` with `GRAFANA_ROOT_URL` in `.env`; needs port 3002 in the Tailscale ACL grant, user `admin`, password from `.env`) comes with the Prometheus data source and the
+- Grafana (`http://<server>:3002`, or behind the gateway at `https://grafana.<base domain>` with `GRAFANA_ROOT_URL` in `config.env` of the deploy repository; needs port 3002 in the Tailscale ACL grant, user `admin`, password from `.env`) comes with the Prometheus data source and the
   «Quests — обзор» dashboard provisioned from `monitoring/grafana/` of the deploy repository. Edit the JSON in the repo, not in the UI
   (provisioned dashboards are read-only there).
 

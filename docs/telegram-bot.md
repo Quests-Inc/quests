@@ -20,8 +20,8 @@ voice notes (through the optional STT sidecar, `faster-whisper`, a ~1.5 GB image
    If `api.telegram.org` is blocked where it runs, set `QUESTS_TG_PROXY`. Voice needs the STT sidecar
    (`just run-stt`, then `QUESTS_STT=http://127.0.0.1:8766`).
 
-## On the operator's server
+## On the host admin's server
 
-The compose services `bot` and `stt` are in the `bot` profile. With `COMPOSE_PROFILES=bot` in `.env` (set on the prod host)
-they start as before; without it a plain `docker compose up -d --remove-orphans` stops and removes them — leave the variable in place
-for as long as you want the bot.
+The compose services `bot` and `stt` are in the `bot` profile. On prod the profile is switched on in `.doco-cd.yml` of the deploy
+repository (`Quests-Inc/quests-deploy`, `profiles: [bot]`); remove it there and the next rollout stops the bot and the speech-to-text
+service — keep it for as long as you want the bot.

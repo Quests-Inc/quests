@@ -20,7 +20,7 @@ Python wrapper, no list to update — the head is derived from the files). Sever
 advisory lock. A database newer than the binary (a rollback) is left alone with a warning; `quests-server schema` prints the
 revision. Roll back only to a release whose schema the data still fits: add columns first, drop them a release later.
 
-The table is still called `alembic_version` (and files `0001`–`0011` carry Alembic ids) because the production
+The table is still called `alembic_version` (and files `0001`–`0011` (`0012` onward are plain numbers) carry Alembic ids) because the production
 database was created by Alembic; the Alembic chain itself has been removed from the repository (see git history).
 
 Baseline conventions:
@@ -89,8 +89,7 @@ even through a query that forgot a filter.
   exact name typed). A deleted workspace disappears at once — its tokens, runners and sessions stop (a token
   never falls back to another workspace; a session moves to the user's next one) — and is purged after 7 days
   (files on WebDAV first, then the rows; cascades over every table). `quests-server workspace restore <id>`
-  undoes it before that; `workspace ls` lists pending purges. Trusted workspaces cannot be deleted until
-  `workspace untrust <id>`.
+  undoes it before that; `workspace ls` lists pending purges. The main workspace (id 1) cannot be deleted.
 - **Export / import (quest=349):** Settings → Пространства → Архив. Export (owners) streams a zip:
   `manifest.json`, `tables/<table>.jsonl` (quests, steps, questlines, notes, templates, tags, categories,
   attachments, change log, emit state; secrets only with `?secrets=1`), `files/` (attachment bytes from WebDAV)
@@ -98,8 +97,7 @@ even through a query that forgot a filter.
   workspace owned by the importer and renumbers everything: foreign keys go through old→new id maps and the
   `kind=ID` references in text are rewritten with the same maps. A reference to something that is not in the
   archive becomes `kind#ID` (otherwise it could start pointing at an unrelated entity that carries that id in the
-  new workspace). Commands that would run on the server are dropped (the new workspace is untrusted), runner
-  commands are kept. The import is one transaction: a bad archive (unknown column, wrong version, infected file)
+  new workspace). Commands are kept only if they name a runner (`run_on` / `emit_run_on`); the server runs none itself. The import is one transaction: a bad archive (unknown column, wrong version, infected file)
   leaves nothing behind, neither rows nor files.
 - Category slugs, tag slugs and runner labels are unique per workspace.
 
