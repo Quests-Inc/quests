@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createNoteScroll } from '../model/noteScroll.ts'
   import { createTitleEdit } from '../model/noteTitleEdit.svelte.ts'
   import { tick } from 'svelte'
   import {
@@ -291,6 +292,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top
     if (window.scrollY !== winTop) window.scrollTo({ top: winTop })
   }
+
+  const scroll = createNoteScroll({ shownId: () => ed.loadedId, selectedId: () => selectedId, page: () => pageEl })
+  $effect(() => scroll.sync())
 
   $effect(() => {
     // Re-measure whenever the text or the mode changes (mode switch remounts
@@ -635,7 +639,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onRowDrop={dnd.onRowDrop}
   />
 
-  <section class="notes__page" bind:this={pageEl}>
+  <section class="notes__page" bind:this={pageEl} onscroll={scroll.onScroll}>
     <NoteCanvas
       {ed}
       {selectedId}
