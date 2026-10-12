@@ -52,7 +52,7 @@ func (h *Handler) addStep(w http.ResponseWriter, r *http.Request) {
 		RunOn: kernel.NormalizeRunOn(body.RunOn),
 	}
 	if !kernel.ValidRunOn(st.RunOn) {
-		writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunnerLabel.Error())
+		writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunOn.Error())
 		return
 	}
 	if body.WaitPrevious != nil {
@@ -154,7 +154,7 @@ func (h *Handler) patchStep(w http.ResponseWriter, r *http.Request) {
 	if body.RunOn != nil {
 		st.RunOn = kernel.NormalizeRunOn(body.RunOn) // "" clears
 		if !kernel.ValidRunOn(st.RunOn) {
-			writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunnerLabel.Error())
+			writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunOn.Error())
 			return
 		}
 	}

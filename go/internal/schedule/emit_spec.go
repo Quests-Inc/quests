@@ -276,7 +276,7 @@ func resolveEmitSpec(ctx context.Context, st *store.Store, spec *emitSpec, lim a
 			}
 			step.RunOn = store.NormalizeRunOn(ss.RunOn)
 			if !store.ValidRunOn(step.RunOn) {
-				return nil, fmt.Errorf("steps[%d]: run_on: %v", i, store.ErrBadRunnerLabel)
+				return nil, fmt.Errorf("steps[%d]: run_on: %v", i, store.ErrBadRunOn)
 			}
 		}
 		journal.NormalizeStepCheck(&step)

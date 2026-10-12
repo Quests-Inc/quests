@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import HelpTip from '@/shared/ui/HelpTip.svelte'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import { mirrorQuestId as findMirrorQuest } from '../model/steps.ts'
@@ -33,7 +34,6 @@
       void loadRunners()
     }
   })
-  let missing = $derived(runOn && !runnersList.items.some((r) => r.label === runOn) ? runOn : '')
 
   /** First quest=N in the step's title/description, offered while no command is set. */
   let mirrorQuestId = $derived(hasCommand ? null : findMirrorQuest(text))
@@ -80,15 +80,7 @@
         <input type="checkbox" bind:checked={waitPrevious} />
         ждать предыдущий
       </label>
-      <select class="autocheck__runon" title="Где запускать проверку" aria-label="Устройство" bind:value={runOn}>
-        <option value="" disabled>выберите устройство</option>
-        {#each runnersList.items as r (r.label)}
-          <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
-        {/each}
-        {#if missing}
-          <option value={missing}>{missing} (нет такого раннера)</option>
-        {/if}
-      </select>
+      <span class="autocheck__runon"><RunnerPicker bind:value={runOn} runners={runnersList.items} /></span>
       {#if !runnersList.items.length}
         <span class="autocheck__note">Команды запускаются на раннерах: подключите раннер во вкладке «Раннеры».</span>
       {/if}
@@ -98,7 +90,7 @@
         <p><b>Наблюдение</b> — как опрос, но продолжается и после закрытия шага (не чаще раза в минуту): если число растёт, шаг открывается снова. Работает только пока квест активен.</p>
         <p><b>Разово</b> — один запуск: код 0 закрывает шаг, иначе квест проваливается.</p>
         <p><b>Ждать предыдущий</b> — шаг стартует только после предыдущего: линейный пайплайн.</p>
-        <p><b>Устройство</b> — раннер (<code>quests-runner</code>), на котором запустится команда; команды выполняются только на раннерах. Раннеры добавляются во вкладке «Раннеры». Если устройство офлайн, разовая проверка ждёт его до суток и не проваливает квест.</p>
+        <p><b>Устройство</b> — раннер (<code>quests-runner</code>), на котором запустится команда; команды выполняются только на раннерах. Можно выбрать несколько: команда уйдёт на первое доступное сверху и перейдёт к следующему, если оно не отвечает (подходит, когда команде всё равно, на каком устройстве идти). Раннеры добавляются во вкладке «Раннеры». Если устройство офлайн, разовая проверка ждёт его до суток и не проваливает квест.</p>
       </HelpTip>
     </div>
   {/if}
@@ -136,7 +128,7 @@
   }
 
   .autocheck__opts .autocheck__runon {
-    flex: 0 1 11rem;
+    flex: 1 1 11rem;
     min-width: 0;
     font-size: var(--text-xs, 0.75rem);
   }

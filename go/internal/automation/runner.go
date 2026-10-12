@@ -291,7 +291,8 @@ func (s *Store) scanJob(sc interface{ Scan(...any) error }) (RunnerJob, error) {
 // EnqueueJob queues a job. With a DedupeKey that already has an unfinished job,
 // that job is returned instead and created is false.
 func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, created bool, err error) {
-	if sp.RunnerLabel == "" || strings.TrimSpace(sp.Command) == "" {
+	labels := kernel.SplitRunOn(sp.RunnerLabel)
+	if len(labels) == 0 || strings.TrimSpace(sp.Command) == "" {
 		return RunnerJob{}, false, errors.New("runner label and command required")
 	}
 	if sp.TimeoutSeconds <= 0 {
@@ -305,10 +306,16 @@ func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, crea
 	if sp.DedupeKey != "" {
 		dk = sp.DedupeKey
 	}
+	// Several runners: the first one that is online gets the job, the rest stay as the fallback.
+	var all any
+	if len(labels) > 1 {
+		all = strings.Join(labels, ",")
+	}
+	label := s.firstOnline(ctx, labels, now)
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO runner_job
-		(runner_label, kind, quest_id, step_id, template_id, title, dedupe_key, command, state, attempt_no, timeout_seconds, valid_until, created_at, note_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
-		sp.RunnerLabel, sp.Kind, sp.QuestID, sp.StepID, sp.TemplateID, trimTo(sp.Title, 200), dk, sp.Command,
+		(runner_label, runner_labels, kind, quest_id, step_id, template_id, title, dedupe_key, command, state, attempt_no, timeout_seconds, valid_until, created_at, note_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
+		label, all, sp.Kind, sp.QuestID, sp.StepID, sp.TemplateID, trimTo(sp.Title, 200), dk, sp.Command,
 		s.nextAttempt(ctx, sp.DedupeKey), sp.TimeoutSeconds, timeutil.ToDBUTC(now.Add(sp.ValidFor)), timeutil.ToDBUTC(now), sp.NoteID)
 	if err != nil {
 		if sp.DedupeKey != "" && db.IsUniqueViolation(err) {
@@ -320,6 +327,64 @@ func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, crea
 	id, _ := res.LastInsertId()
 	j, err := s.GetRunnerJob(ctx, id)
 	return j, true, err
+}
+
+// firstOnline is the first label of the list whose runner polls right now; none online — the first one,
+// the job waits for it (or is rerouted by RerouteQueued when another one shows up).
+func (s *Store) firstOnline(ctx context.Context, labels []string, now time.Time) string {
+	if len(labels) > 1 {
+		for _, l := range labels {
+			r, err := scanRunner(s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+` FROM runner WHERE label = ?`, l))
+			if err == nil && RunnerOnline(r, now) {
+				return l
+			}
+		}
+	}
+	return labels[0]
+}
+
+// RerouteQueued moves a waiting job to the next runner of its list when the one it waits for is away
+// and another one is online. Jobs on a single runner are left alone.
+func (s *Store) RerouteQueued(ctx context.Context) error {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, runner_label, runner_labels FROM runner_job
+		WHERE state = 'queued' AND runner_labels IS NOT NULL`)
+	if err != nil {
+		return err
+	}
+	type waiting struct {
+		id      int64
+		current string
+		all     []string
+	}
+	var jobs []waiting
+	for rows.Next() {
+		var w waiting
+		var all string
+		if err := rows.Scan(&w.id, &w.current, &all); err != nil {
+			rows.Close()
+			return err
+		}
+		w.all = kernel.SplitRunOn(all)
+		jobs = append(jobs, w)
+	}
+	rows.Close()
+	now := timeutil.NowUTC()
+	for _, w := range jobs {
+		if r, err := scanRunner(s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+` FROM runner WHERE label = ?`, w.current)); err == nil && RunnerOnline(r, now) {
+			continue
+		}
+		next := s.firstOnline(ctx, w.all, now)
+		if next == w.current {
+			continue
+		}
+		if r, err := scanRunner(s.DB.QueryRowContext(ctx, `SELECT `+runnerCols+` FROM runner WHERE label = ?`, next)); err != nil || !RunnerOnline(r, now) {
+			continue // nobody online: stay where we are
+		}
+		if _, err := s.DB.ExecContext(ctx, `UPDATE runner_job SET runner_label = ? WHERE id = ? AND state = 'queued'`, next, w.id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // nextAttempt numbers attempts of the same thing (same dedupe key).

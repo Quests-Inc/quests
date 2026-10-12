@@ -241,7 +241,7 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 	lineID := nullI64(asI64Ptr(body["questline_id"]))
 	emitRunOn := NormalizeRunOn(asStringPtr(body["emit_run_on"]))
 	if !ValidRunOn(emitRunOn) {
-		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunOn.Error())
 	}
 
 	if err := s.guardAuthor(ctx, asStringPtr(body["emit_pool_command"]), nil); err != nil {
@@ -311,7 +311,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	}
 	emitRunOn := NormalizeRunOn(asStringPtr(merged["emit_run_on"]))
 	if !ValidRunOn(emitRunOn) {
-		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunnerLabel.Error())
+		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunOn.Error())
 	}
 	if err := s.guardAuthor(ctx, asStringPtr(merged["emit_pool_command"]), cur.EmitPoolCmd); err != nil {
 		return TemplateRead{}, err

@@ -170,7 +170,7 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 				RunOn: kernel.NormalizeRunOn(sc.RunOn),
 			}
 			if !kernel.ValidRunOn(st.RunOn) {
-				writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunnerLabel.Error())
+				writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunOn.Error())
 				return
 			}
 			if sc.WaitPrevious != nil {

@@ -127,6 +127,9 @@ func (s *Store) CompleteJob(ctx context.Context, id int64, leaseID string, res J
 // waited past valid_until for its runner → skipped, a lost job whose result
 // never came before valid_until → abandoned. Returns what reached a final state.
 func (s *Store) ExpireJobs(ctx context.Context) ([]RunnerJob, error) {
+	if err := s.RerouteQueued(ctx); err != nil {
+		return nil, err
+	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
 	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM runner_job WHERE
 		(state IN ('assigned','running') AND lease_until < ?) OR (state IN ('queued','lost') AND valid_until < ?)`, now, now)

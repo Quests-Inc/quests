@@ -33,6 +33,11 @@ Like a step's check: on a runner (the command needs a runner label). The interva
 minimum as for steps. Environment: `QUESTS_NOTE_ID`, `QUESTS_API`, `QUESTS_API_TOKEN` and, in a non-default
 workspace, `QUESTS_WORKSPACE`.
 
+`run_on` may list several runners, comma-separated (`main-pc,laptop-n95`; at most 8). The job goes to the first one that is
+online; a job still waiting when its runner goes away moves to the next online one in the list. Use it only for a command that
+does not depend on one particular device (a check against a git remote, an HTTP probe) — that is the author's responsibility.
+The same list works for a step's `run_on` and a template's `emit_run_on`.
+
 ## Rights and secrets
 
 - Only workspace owners set or change the command (same as steps).
