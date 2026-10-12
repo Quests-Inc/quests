@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import {
     WEEKDAY_LABELS,
     QUEST_SIGNIFICANCES,
@@ -688,23 +689,15 @@
           ></textarea>
         </div>
         {#if hasPool}
-          <label class="field">
+          <div class="field">
             <span class="label">
               Устройство
               <HelpTip label="Устройство">
-                <p>Метка раннера (<code>quests-runner</code>), на котором выполнить команду (обязательно). Устройство офлайн — команда ждёт его до суток, шаблон при этом не считается сломанным: период просто пропускается.</p>
+                <p>Метка раннера (<code>quests-runner</code>), на котором выполнить команду (обязательно). Можно выбрать несколько: команда идёт на первое доступное сверху, остальные запасные (команде должно быть всё равно, где идти). Устройство офлайн — команда ждёт его до суток, шаблон при этом не считается сломанным: период просто пропускается.</p>
               </HelpTip>
             </span>
-            <select bind:value={emitRunOn} aria-label="Устройство">
-              <option value="" disabled>выберите устройство</option>
-              {#each runnersList.items as r (r.label)}
-                <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
-              {/each}
-              {#if emitRunOn && !runnersList.items.some((r) => r.label === emitRunOn)}
-                <option value={emitRunOn}>{emitRunOn} (нет такого раннера)</option>
-              {/if}
-            </select>
-          </label>
+            <RunnerPicker bind:value={emitRunOn} runners={runnersList.items} />
+          </div>
           <label class="field">
             <span class="label">
               Лимиты ответа (JSON, необязательно)

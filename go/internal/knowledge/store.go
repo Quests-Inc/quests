@@ -22,6 +22,7 @@ var (
 	ErrNotFound       = apperr.ErrNotFound
 	ErrConflict       = apperr.ErrConflict
 	ErrBadRunnerLabel = kernel.ErrBadRunnerLabel
+	ErrBadRunOn       = kernel.ErrBadRunOn
 	NormalizeRunOn    = kernel.NormalizeRunOn
 	ValidRunOn        = kernel.ValidRunOn
 	SafeIconName      = kernel.SafeIconName

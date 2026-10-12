@@ -105,7 +105,7 @@ server = MCPServer(
         "duration_seconds before deadline_at, automated=true to demote create/start "
         "overlay toasts, category/questline by id or by name — e.g. "
         "category='health', questline='Сайт Рефкул'). "
-        "Steps may include check_command (one line, several lines, or a script starting with #!/usr/bin/env …; it runs on a runner, so run_on=<runner label> is required with it), run_mode=poll|once|watch, wait_previous. "
+        "Steps may include check_command (one line, several lines, or a script starting with #!/usr/bin/env …; it runs on a runner, so run_on=<runner label> is required with it; several labels separated by commas = try them in order, the first one that is online runs it — only when the command does not depend on one particular device), run_mode=poll|once|watch, wait_previous. "
         "To create a new questline (project/theme container) use create_questline. "
         "Tags (work-surface labels like frontend/api/mcp): list_tags first; "
         "create_tag only if nothing suitable exists; set_quest_tags / tag_ids on "
@@ -714,7 +714,7 @@ def get_graph(entity: str, entity_id: int, depth: int = 2) -> dict[str, Any]:
 @server.tool(
     description=(
         "Runners: devices that execute step checks / template commands (run_on / "
-        "emit_run_on = the runner's label). Returns label, online (seen within ~70s), "
+        "emit_run_on = the runner's label; a comma-separated list is tried in order). Returns label, online (seen within ~70s), "
         "last_seen_at, hostname, version, registered/revoked and queued/running job "
         "counts. Registering a runner (one-time token) is done by the user: "
         "`quests-server runner add <label>` or the Runners tab."
@@ -1569,7 +1569,7 @@ def _filter_note_flags(rows: list[dict[str, Any]], flags: str) -> list[dict[str,
 @server.tool(
     description=(
         "Give a note a freshness check, or remove it (empty command). The command runs like a step's "
-        "check: on a runner (run_on = runner label, required), with the "
+        "check: on a runner (run_on = runner label, required; a,b = first online, then the next), with the "
         "note's own secrets in its environment, every interval_seconds (default 3600, minimum 15). It may be "
         "several lines, or a script with its own interpreter (starts with #!/usr/bin/env python3 …). It must "
         "print 0 or 1 on its last line (1 = the note is out of date) or JSON {\"outdated\": 0|1, "
@@ -1859,7 +1859,7 @@ def delete_note(note_id: int) -> dict[str, Any]:
         "another quest: put quest=N in its title/description, run_mode=watch (poll that "
         "also keeps going after the step is closed, active quests only) and check_command "
         "`quests progress N` (prints that quest's closed/total steps). wait_previous "
-        "gates the auto-step on the previous step. run_on=<runner label> makes the "
+        "gates the auto-step on the previous step. run_on=<runner label> (or a,b — first online) makes the "
         "check run on another device (a quests-runner registered under that label) "
         "instead of the server; empty = the server. automated=true demotes "
         "created/appeared/started overlay toasts. deadline_at is the moment the quest is due (ISO datetime, UTC — "

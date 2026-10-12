@@ -40,6 +40,7 @@ var (
 	ErrNotFound       = apperr.ErrNotFound
 	ErrConflict       = apperr.ErrConflict
 	ErrBadRunnerLabel = kernel.ErrBadRunnerLabel
+	ErrBadRunOn       = kernel.ErrBadRunOn
 	ErrCommandOwner   = kernel.ErrCommandOwner
 	ErrNoRunner       = kernel.ErrNoRunner
 	ValidRunOn        = kernel.ValidRunOn

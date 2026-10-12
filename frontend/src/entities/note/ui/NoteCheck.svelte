@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import HelpTip from '@/shared/ui/HelpTip.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import { getNote, setNoteCheck, runNoteCheck } from '@/shared/api/client.ts'
@@ -56,7 +57,6 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
   })
 
   const active = $derived(Boolean(check?.command))
-  const missing = $derived(runOn && !runnersList.items.some((r) => r.label === runOn) ? runOn : '')
 
   async function run(fn: { (): Promise<void>; (): Promise<void>; (): Promise<void>; (): any }) {
     busy = true
@@ -135,13 +135,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
           bind:value={interval}
           oninput={() => (dirty = true)}
         />
-        <select class="nc__runon" aria-label="Устройство" bind:value={runOn} onchange={() => (dirty = true)}>
-          <option value="" disabled>выберите устройство</option>
-          {#each runnersList.items as r (r.label)}
-            <option value={r.label}>{r.label}{r.online ? '' : r.registered ? ' (офлайн)' : ' (не подключён)'}</option>
-          {/each}
-          {#if missing}<option value={missing}>{missing} (нет такого раннера)</option>{/if}
-        </select>
+        <span class="nc__runon"><RunnerPicker bind:value={runOn} runners={runnersList.items} onchange={() => (dirty = true)} /></span>
         <HelpTip label="Как работает проверка актуальности">
           <p>Команда работает как автопроверка шага: на раннере (<code>quests-runner</code>), с <b>секретами этой заметки</b> в окружении, раз в N секунд. Ставить команду может только владелец пространства.</p>
           <p>Ответ: последняя строка <code>0</code> / <code>1</code> (1 — устарела) или JSON <code>{`{"outdated": 1, "reason": "что разошлось"}`}</code>. Любой другой исход (код ≠ 0, таймаут, непонятный вывод) — это ошибка проверки: вердикт не меняется.</p>
@@ -216,8 +210,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     gap: 0.5rem;
   }
   .nc__cmd,
-  .nc__interval,
-  .nc__runon {
+  .nc__interval {
     box-sizing: border-box;
     padding: 0.4rem 0.55rem;
     border: 1px solid var(--color-border, #333);
@@ -225,6 +218,10 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     background: var(--color-bg, #121212);
     color: var(--color-fg, #e8e8e8);
     font-size: var(--text-sm, 0.875rem);
+  }
+  .nc__runon {
+    display: inline-block;
+    min-width: 12rem;
   }
   .nc__cmd {
     width: 100%;

@@ -106,7 +106,7 @@ func (s *Store) SetNoteCheck(ctx context.Context, id int64, command *string, int
 	}
 	runOn = NormalizeRunOn(runOn)
 	if !ValidRunOn(runOn) {
-		return NoteCheck{}, errBad("run_on: " + ErrBadRunnerLabel.Error())
+		return NoteCheck{}, errBad("run_on: " + ErrBadRunOn.Error())
 	}
 	if command == nil || strings.TrimSpace(*command) == "" {
 		_, err = s.DB.ExecContext(ctx, `UPDATE note SET check_command = NULL, check_interval_seconds = NULL, check_last_run_at = NULL, run_on = NULL,
