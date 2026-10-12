@@ -1,29 +1,29 @@
-# Глоссарий
+# Glossary
 
-Русский термин (как в интерфейсе и документации) — имя в коде — смысл. Контекст — где живёт по [ADR-0001](adr/0001-architecture.md).
+The Russian term (as in the interface) — the name in code — the meaning. The context is where it lives per [ADR-0001](adr/0001-architecture.md).
 
-| Термин | В коде | Контекст | Смысл |
+| Term (UI) | In code | Context | Meaning |
 |---|---|---|---|
-| Журнал | journal | journal | Главный экран: список квестов с деталью |
-| Квест | quest | journal | Задача со статусом, значимостью, сроком и шагами |
-| Шаг | step | journal | Часть квеста с прогрессом; может иметь команду проверки |
-| Квестлайн | questline | journal | Группа связанных квестов с общим цветом и значком |
-| Раздел | category | journal | Категория квестов |
-| Тег | tag | journal | Сквозная метка квеста или шаблона |
-| История | changelog | journal | Журнал изменений сущностей |
-| Заметка | note | knowledge | Документ в дереве; флаги README, PRIVATE, CATEGORY, OUTDATED |
-| Вложение | attachment | knowledge | Файл квеста, квестлайна или заметки; версии, проверка ClamAV, хранение в WebDAV |
-| Ссылка | ref | knowledge | Упоминание сущности в тексте: `quest=N`, `note=N`, `attachment=N`… |
-| Секрет | secret | knowledge | Значение окружения для команды; наследуется шаг > квест > шаблон > квестлайн |
-| Шаблон | template | automation | Правило периодического квеста (расписание, режим, пул) |
-| Эмит | emit | automation | Создание квеста по шаблону; при `emit_pool_command` квест печатает команда |
-| Проверка | check | automation | Команда шага или заметки, определяющая прогресс или актуальность |
-| Раннер | runner | automation | Процесс на устройстве владельца, исполняющий команды; сервер команд не запускает |
-| Задание | job | automation | Единица работы раннера |
-| Пространство | workspace | identity | Изолированный набор данных; у аккаунта их несколько |
-| Роль | role | identity | Владелец или участник пространства |
-| Токен | token | identity | Bearer-токен для клиентов без сессии (CLI, HUD, бот, MCP) |
-| Карта | graph | кросс-срез | Карта связей между сущностями |
-| Черновик карты | graph draft | кросс-срез | Правки на карте, не применённые до сохранения |
-| Хук | hook | platform | Команда администратора на событие (`data/hooks.json`) |
-| HUD / оверлей | overlay | вне ядра | Wayland-панель с закреплёнными квестами и тостами |
+| Журнал (Journal) | journal | journal | The main screen: the list of quests with a detail view |
+| Квест (Quest) | quest | journal | A task with a status, significance, deadline and steps |
+| Шаг (Step) | step | journal | A part of a quest with progress; may have a check command |
+| Квестлайн (Questline) | questline | journal | A group of related quests with a shared colour and icon |
+| Раздел (Category) | category | journal | A category of quests |
+| Тег (Tag) | tag | journal | A cross-cutting label of a quest or template |
+| История (History) | changelog | journal | The change log of entities |
+| Заметка (Note) | note | knowledge | A document in a tree; flags README, PRIVATE, CATEGORY, OUTDATED |
+| Вложение (Attachment) | attachment | knowledge | A file of a quest, questline or note; versions, ClamAV scan, stored on WebDAV |
+| Ссылка (Reference) | ref | knowledge | A mention of an entity in text: `quest=N`, `note=N`, `attachment=N`… |
+| Секрет (Secret) | secret | knowledge | An environment value for a command; inherited step > quest > template > questline |
+| Шаблон (Template) | template | automation | The rule of a periodic quest (schedule, mode, pool) |
+| Эмит (Emit) | emit | automation | Creating a quest from a template; with `emit_pool_command` a command prints the quest |
+| Проверка (Check) | check | automation | A step's or note's command that determines progress or freshness |
+| Раннер (Runner) | runner | automation | A process on the owner's device that executes commands; the server runs none |
+| Задание (Job) | job | automation | A unit of runner work |
+| Пространство (Workspace) | workspace | identity | An isolated set of data; an account has several |
+| Роль (Role) | role | identity | Owner or member of a workspace |
+| Токен (Token) | token | identity | A bearer token for clients without a session (CLI, HUD, bot, MCP) |
+| Карта (Map) | graph | cross-cutting | The map of relations between entities |
+| Черновик карты (Map draft) | graph draft | cross-cutting | Edits on the map not applied until saved |
+| Хук (Hook) | hook | platform | An administrator's command on an event (`data/hooks.json`) |
+| HUD / оверлей (Overlay) | overlay | outside the core | A Wayland panel with pinned quests and toasts |

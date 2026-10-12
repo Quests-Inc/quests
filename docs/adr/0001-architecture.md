@@ -1,113 +1,117 @@
-# ADR-0001. Архитектура: модульный монолит по контекстам (бэкенд) и FSD (фронтенд)
+# ADR-0001. Architecture: a modular monolith by contexts (backend) and FSD (frontend)
 
-- Статус: принято
-- Дата: 2026-10-11
-- Связано: #9 (разбиение больших файлов и пакетов), #10 (типы API), #11 (фронтенд), #16 (оверлей на Rust)
+- Status: accepted
+- Date: 2026-10-11
+- Related: #9 (splitting big files and packages), #10 (API types), #11 (frontend), #16 (the overlay in Rust)
 
-## Контекст
+## Context
 
-Код вырос по техническим слоям, а не по предметной области (замеры на дату решения):
+The code had grown by technical layers rather than by subject area (measurements at the date of the decision):
 
-**Бэкенд (Go, ≈24 тыс. строк без тестов).**
-- `store` — 8,3 тыс. строк и **195 методов** на одном `*Store`: данные, инварианты (`guardAuthor`, `guardExec`, `guardTemplateSteps`) и SQL вместе.
-- `httpapi` — 8,4 тыс. строк в одном пакете (41 файл, до 1345 строк), 309 обращений к `s.Store.*`.
-- `domain` — 520 строк (квест и шаг); заметки, шаблоны, questline и вложения живут структурами внутри `store`.
-- Лишние связи: `store → auth`, `llmassist → cli`, `metrics → store`, `events → hooks`; `schedule` содержит 16 прямых SQL-запросов в обход `store`.
-- Одна сущность размазана по слоям: «шаблон» — в 12 файлах `store`, 7 `httpapi`, 3 `schedule`, 2 `domain`.
+**Backend (Go, ≈24k lines without tests).**
+- `store` — 8.3k lines and **195 methods** on a single `*Store`: data, invariants (`guardAuthor`, `guardExec`, `guardTemplateSteps`) and SQL together.
+- `httpapi` — 8.4k lines in one package (41 files, up to 1345 lines), 309 calls to `s.Store.*`.
+- `domain` — 520 lines (quest and step); notes, templates, questlines and attachments live as structs inside `store`.
+- Needless links: `store → auth`, `llmassist → cli`, `metrics → store`, `events → hooks`; `schedule` contains 16 direct SQL queries bypassing `store`.
+- One entity is smeared across layers: “template” is in 12 files of `store`, 7 of `httpapi`, 3 of `schedule`, 2 of `domain`.
 
-**Фронтенд (Svelte + TypeScript, ≈27 тыс. строк).**
-- Раскладка по виду файла: `blocks`, `modals`, `ui`, `js`; страницы-гиганты (`GraphPage` 3643 строки, `NotesPage` 2555, `App` 2042, 85 функций).
-- Один `api.ts` на 909 строк; 30 компонентов импортируют его напрямую; границ между сущностями нет.
+**Frontend (Svelte + TypeScript, ≈27k lines).**
+- Laid out by kind of file: `blocks`, `modals`, `ui`, `js`; giant pages (`GraphPage` 3643 lines, `NotesPage` 2555, `App` 2042, 85 functions).
+- A single `api.ts` of 909 lines; 30 components import it directly; there are no boundaries between entities.
 
-## Решение
+## Decision
 
-### 1. Бэкенд: модульный монолит по ограниченным контекстам
+### 1. Backend: a modular monolith by bounded contexts
 
-Один процесс и одна БД, но код делится на контексты со своим языком, данными и публичным интерфейсом. Берём **стратегическую** часть DDD (контексты, единый язык, правила зависимостей) и **минимум тактической**: доменные типы с инвариантами там, где они есть (статусы квеста, цепочка `wait_previous`, правила эмита, права на команды, изоляция воркспейсов). Агрегаты, репозиторий «на каждую сущность» и доменные события ради церемонии не вводим: домен в основном CRUD, планировщик и граф.
+One process and one database, but the code is divided into contexts with their own language, data and public interface. We take the **strategic** part of DDD (contexts, a ubiquitous language, dependency rules) and a **minimum of the tactical** part: domain types with invariants where they exist (quest statuses, the `wait_previous` chain, emit rules, command permissions, workspace isolation). Aggregates, a repository per entity and domain events for the sake of ceremony are not introduced: the domain is mostly CRUD, a scheduler and a graph.
 
-| Контекст | Что внутри |
+| Context | What is inside |
 |---|---|
-| `journal` | квесты, шаги, questline, разделы, теги, история изменений |
-| `knowledge` | заметки, вложения, поиск, ссылки (`kind=ID`), проверка актуальности заметок |
-| `automation` | шаблоны и эмит, проверки шагов, раннеры и их задания, планировщик, секреты команд |
-| `identity` | аккаунты, сессии, токены, MFA, воркспейсы, роли, инвайты |
-| `platform` | БД и RLS (`wsctx`), WebDAV, ClamAV, `secretbox`, `timeutil`, метрики, события, health, конфиг |
+| `journal` | quests, steps, questlines, categories, tags, the change history |
+| `knowledge` | notes, attachments, search, references (`kind=ID`), note freshness checks |
+| `automation` | templates and emit, step checks, runners and their jobs, the scheduler, command secrets |
+| `identity` | accounts, sessions, tokens, MFA, workspaces, roles, invitations |
+| `platform` | the database and RLS (`wsctx`), WebDAV, ClamAV, `secretbox`, `timeutil`, metrics, events, health, config |
 
-Целевая раскладка (создаётся по мере переноса, пустых слоёв «про запас» не заводим):
+The target layout (created as code is moved; no empty layers “in reserve”):
 
 ```
 go/internal/
-  platform/…            инфраструктура и общие примитивы
+  platform/…            infrastructure and shared primitives
   identity/  journal/  knowledge/  automation/
-      <ctx>.go …        корневой пакет: доменные типы, сервис (сценарии), интерфейсы-порты
-      pg/               реализация портов на PostgreSQL (то, что сейчас в store)
-      http/             обработчики контекста; регистрируют маршруты в общем mux
-  httpapi/              корень композиции HTTP: сервер, middleware (auth, воркспейс, CORS, заголовки), SPA, health/metrics
-go/cmd/*                сборка зависимостей (composition root)
+      <ctx>.go …        root package: domain types, the service (scenarios), port interfaces
+      pg/               the ports implemented on PostgreSQL (what is `store` now)
+      http/             the context's handlers; they register routes in the shared mux
+  httpapi/              the HTTP composition root: server, middleware (auth, workspace, CORS, headers), SPA, health/metrics
+go/cmd/*                wiring the dependencies (composition root)
 ```
 
-**Общее ядро.** Несколько контекстов обязаны применять одни и те же маленькие правила: метка раннера, имя файла значка, «кто вправе писать команду». Они лежат в `internal/kernel` (зависит только от `identity` и `platform`); контексты `journal`, `knowledge` и `automation` его импортируют. Туда же по смыслу относится листовой `internal/refs` (разбор ссылок `kind=ID`).
+**The shared kernel.** Several contexts must apply the same small rules: a runner label, an icon file name, “who may write a command”. They live in `internal/kernel` (which depends only on `identity` and `platform`); the contexts `journal`, `knowledge` and `automation` import it. By meaning the leaf `internal/refs` (parsing `kind=ID` references) belongs there too.
 
-**Поправка (#20): секреты — в `automation`.** Секрет существует только как окружение команды, которую исполняет раннер, наследуется по цепочке шаг → квест → шаблон → questline и читает таблицы этих сущностей напрямую, поэтому принадлежит `automation`, а не `knowledge`, как значилось в первой редакции.
+**Amendment (#20): secrets belong to `automation`.** A secret exists only as the environment of a command a runner executes, is inherited along the chain step → quest → template → questline and reads those entities' tables directly, so it belongs to `automation`, not to `knowledge` as the first edition had it.
 
-**Правила зависимостей** (проверяются в CI, см. «Проверка границ»):
+**Dependency rules** (checked in CI, see “Checking the boundaries”):
 
-1. `platform` не импортирует ничего из контекстов и `httpapi`.
-2. Контекст импортирует `platform` и **корневые пакеты** других контекстов из белого списка; пакеты `pg` и `http` чужих контекстов — никогда.
-3. Разрешённые связи между контекстами: `journal → identity`, `knowledge → identity`, `automation → identity, journal, knowledge`. Обратные запрещены; `identity` ни от кого не зависит.
-4. `<ctx>/http` не импортирует `<ctx>/pg`: связываются портами в `cmd/*`.
-5. Всё, что пересекает контексты (поиск по всему, разрешение ссылок `kind=ID`, граф), живёт отдельным «читающим» слоем поверх узких интерфейсов контекстов, а не в чужих `store`.
-6. Изоляция воркспейсов (RLS, `wsctx`) остаётся сквозной и принадлежит `platform`.
+1. `platform` imports nothing from the contexts or from `httpapi`.
+2. A context imports `platform` and the **root packages** of other contexts from a whitelist; the `pg` and `http` packages of other contexts — never.
+3. Allowed links between contexts: `journal → identity`, `knowledge → identity`, `automation → identity, journal, knowledge`. The reverse is forbidden; `identity` depends on nothing.
+4. `<ctx>/http` does not import `<ctx>/pg`: they are tied together by ports in `cmd/*`.
+5. Everything that crosses contexts (search over everything, resolving `kind=ID` references, the graph) lives in a separate “reading” layer over the contexts' narrow interfaces, not inside another context's `store`.
+6. Workspace isolation (RLS, `wsctx`) stays cross-cutting and belongs to `platform`.
 
-**Поправка (#21): планировщик — координирующий пакет.** `internal/schedule` (материализация шаблонов, просрочка, обслуживание, очистка) не принадлежит одному контексту: он решает, *когда* что делать, и вызывает контексты (`journal`, `automation`, `knowledge`). Поэтому он остаётся верхнеуровневым пакетом с правом зависеть от них, но **не ходит в БД напрямую** — только через хранилища контекстов (`automation.Store.EmitRollFor/InsertEmitRoll/ListEnabledTemplateRows…`, `journal.Store.QuestIDForPeriod/ActiveQuestIDsPastDeadline`). Правила шаблонов (что такое «пора») лежат в `schedule`, данные — в `automation`.
+**Amendment (#21): the scheduler is a coordinating package.** `internal/schedule` (template materialization, expiry, maintenance, purging) belongs to no single context: it decides *when* to do what and calls the contexts (`journal`, `automation`, `knowledge`). So it stays a top-level package allowed to depend on them, but it **does not touch the database directly** — only through the contexts' stores (`automation.Store.EmitRollFor/InsertEmitRoll/ListEnabledTemplateRows…`, `journal.Store.QuestIDForPeriod/ActiveQuestIDsPastDeadline`). The templates' rules (what “it is time” means) live in `schedule`, the data in `automation`.
 
-Рабочие компоненты вне Go-ядра (бот, MCP, STT, оверлей, раннер) в эту схему не входят: они общаются с API только по HTTP (`docs/architecture.md`).
+Working components outside the Go core (the bot, MCP, STT, the overlay, the runner) are not part of this scheme: they talk to the API only over HTTP (`docs/architecture.md`).
 
-### 2. Фронтенд: Feature-Sliced Design
+### 2. Frontend: Feature-Sliced Design
 
-Слои `app → pages → widgets → features → entities → shared`, импорт только вниз, у каждого слайса публичный API в `index.ts`.
+Layers `app → pages → widgets → features → entities → shared`, imports only downwards, every slice with a public API in `index.ts`.
 
-| Слой | Для Quests |
+| Layer | For Quests |
 |---|---|
-| `app` | оболочка, вкладки и состояние маршрута, тема, сессия, глобальные стили |
-| `pages` | журнал, заметки, вложения, календарь, история, карта, раннеры |
-| `widgets` | шапка, сайдбар квестов, календарь активности, холст карты |
+| `app` | the shell, tabs and route state, the theme, the session, global styles |
+| `pages` | journal, notes, attachments, calendar, history, map, runners |
+| `widgets` | the header, the quest sidebar, the activity calendar, the map canvas |
 | `features` | edit-quest, upload-attachment, run-template, search, assistant… |
-| `entities` | quest, questline, note, attachment, template, tag, runner, workspace (модель + запросы + атомарный UI) |
-| `shared` | `api` (клиент и сгенерированные типы), `ui`, `lib`, `styles`, `config` |
+| `entities` | quest, questline, note, attachment, template, tag, runner, workspace (model + queries + atomic UI) |
+| `shared` | `api` (the client and generated types), `ui`, `lib`, `styles`, `config` |
 
-Сущности FSD совпадают по именам с контекстами и сущностями бэкенда; сгенерированные из Go типы (`tygo`) лежат в `shared/api`, а их использование — в `entities/<x>/api`.
+FSD entities match the backend's contexts and entities by name; the types generated from Go (`tygo`) live in `shared/api`, and their use lives in `entities/<x>/api`.
 
-### 3. Единый язык
+### 3. A ubiquitous language
 
-Имена пакетов, слайсов и типов в коде — английские (как сейчас); русские термины остаются в интерфейсе, документации и в [глоссарии](../glossary.md), на который ссылаются оба слоя.
+Names of packages, slices and types in code are English (as now); Russian terms stay in the interface, the documentation and the [glossary](../glossary.md), which both layers refer to.
 
-### 4. Проверка границ
+### 4. Checking the boundaries
 
-- Go: правила импортов — `depguard` в `go/.golangci.yml` (раздел `linters.settings.depguard`), гоняются в CI вместе с остальным `golangci-lint`; тестовые файлы из правил исключены. Нарушения, существующие на дату решения, перечисляются исключениями и удаляются подзадачами; новых нарушений правила не допускают. Исключений не осталось: `metrics → store` и `events → hooks` сняты в #18, `store → auth` — в #19, `llmassist → cli` — в #23 (общий клиент API вынесен в `platform/apiclient`), прямой SQL из `schedule` — в #21.
-- Фронтенд (итог спайка, #25): собственная проверка `frontend/scripts/check-fsd.mjs` (`bun run check:fsd`, входит в `verify`). Она разбирает `.ts` и скрипты `.svelte` через компилятор TypeScript и проверяет: импорт только вниз по слоям, слайсы одного слоя друг друга не знают (кросс-импорт сущностей — через `@x`), в слайс заходят только через `index.ts`. Проверено на фикстурах (`tests/check-fsd.test.mjs`), пока каталогов слоёв нет — проходит вхолостую.
-  - `steiger` (как в `grafana/oncall`) читает скрипты `.svelte`, но **не видит импортов, у которых целью служит сам `.svelte`-файл** (обход публичного API и импорт вышележащего компонента остаются незамеченными) и шумит структурными правилами; его можно подключить позже ради структурных проверок.
-  - `dependency-cruiser` 18 с Svelte 5 и `lang="ts"` не извлекает зависимости из компонентов (0 импортов), поэтому не подходит.
+- Go: the import rules are `depguard` in `go/.golangci.yml` (section `linters.settings.depguard`), run in CI together with the rest of `golangci-lint`; test files are excluded from the rules. Violations that existed at the date of the decision were listed as exceptions and removed by sub-tasks; the rules admit no new ones. No exceptions are left: `metrics → store` and `events → hooks` were removed in #18, `store → auth` in #19, `llmassist → cli` in #23 (the shared API client moved to `platform/apiclient`), direct SQL from `schedule` in #21.
+- Frontend (the result of a spike, #25): its own check, `frontend/scripts/check-fsd.mjs` (`bun run check:fsd`, part of `verify`). It parses `.ts` and the scripts of `.svelte` through the TypeScript compiler and checks: imports only downwards across layers, slices of one layer do not know each other (cross-imports of entities go through `@x`), a slice is entered only through `index.ts`. It is tested on fixtures (`tests/unit/check-fsd.test.mjs`) and now guards the real layers.
+  - `steiger` (as in `grafana/oncall`) reads the scripts of `.svelte` but **does not see imports whose target is a `.svelte` file itself** (bypassing a public API and importing a higher component go unnoticed) and is noisy with its structural rules; it may be added later for the structural checks.
+  - `dependency-cruiser` 18 does not extract dependencies from components with Svelte 5 and `lang="ts"` (0 imports), so it does not fit.
 
-## Порядок внедрения
+## Rollout order
 
-Без большого взрыва; каждый шаг — отдельный PR, зелёный CI, форма JSON не меняется (`Test*JSONShape`).
+No big bang; each step is a separate PR with green CI and an unchanged JSON shape (`Test*JSONShape`).
 
-1. Правила границ и инструмент проверки (Go и фронтенд), глоссарий.
-2. Бэкенд по контекстам, от наиболее изолированного: `platform` → `identity` → `knowledge` → `automation` → `journal`; затем `httpapi` сжимается до корня композиции, большие файлы режутся по пути.
-3. Фронтенд: каркас слоёв и `shared` → `entities` → `features`/`widgets` → `pages`; перед разрезанием `GraphPage`, `NotesPage` и `App` — компонентные тесты на критичные сценарии (#11).
+1. Boundary rules and the checking tool (Go and frontend), the glossary.
+2. The backend by contexts, from the most isolated: `platform` → `identity` → `knowledge` → `automation` → `journal`; then `httpapi` shrinks to a composition root, big files are cut along the way.
+3. The frontend: the layer skeleton and `shared` → `entities` → `features`/`widgets` → `pages`; before cutting `GraphPage`, `NotesPage` and `App`, component tests of the critical scenarios (#11).
 
-Подзадачи заведены как sub-issue к #9.
+The sub-tasks were created as sub-issues of #9.
 
-## Последствия
+## Outcome (2026-10-12)
 
-**Плюсы.** Изменение сущности затрагивает один контекст и один слайс; границы проверяются машиной, а не ревью; `Store` перестаёт быть точкой, через которую проходит всё; модули можно тестировать узкими интерфейсами.
+The migration is done and the gates are in CI (`docs/architecture.md`, “Gates against regressions”). One thing differs from the target layout: a context's SQL store was **not** split into a separate `pg/` package. Each context keeps its domain types and its PostgreSQL store together in the root package (`journal`, `knowledge`, `automation`, `identity`) next to `http/`; the ports between contexts are the root packages' public methods, and rule 4 holds trivially. The shared parts that fit no single context are the cross-cutting slices `assistant`, `graphdraft` and `wsarchive`, the remainder `store` (cross-context reads and the backup log) and `schedule`.
 
-**Минусы и риски.** Крупный механический перенос с риском регрессий (страховка — тесты, формы JSON, ручной прогон в браузере); на время миграции в коде сосуществуют две раскладки; планировщик и граф пересекают контексты, и для них придётся аккуратно подобрать интерфейсы; FSD для Svelte требует собственной проверки границ.
+## Consequences
 
-## Рассмотренные альтернативы
+**Pros.** A change to an entity touches one context and one slice; the boundaries are checked by a machine, not by review; `Store` stops being the point everything passes through; modules can be tested through narrow interfaces.
 
-- **Разнести `httpapi` и `Store` по пакетам без контекстной модели.** Дёшево, но оставляет сущности размазанными и не даёт правил зависимостей; через время всё склеится обратно.
-- **Полный тактический DDD** (агрегаты, репозитории, доменные события, фабрики). Дорогая церемония при CRUD-домене с небольшим числом настоящих инвариантов.
-- **Раздельные сервисы.** Нет ни нагрузки, ни команд, которые это оправдали бы; цена — сеть, транзакции и деплой.
-- **Оставить как есть.** Файлы и пакеты продолжат расти, а граница «где правило X» останется на ревью.
+**Cons and risks.** A large mechanical move with a risk of regressions (insurance: tests, JSON shapes, a manual run in the browser); during the migration two layouts coexist in the code; the scheduler and the graph cross contexts, and interfaces have to be chosen carefully for them; FSD for Svelte needs its own boundary check.
+
+## Alternatives considered
+
+- **Split `httpapi` and `Store` into packages without a context model.** Cheap, but it leaves entities smeared and gives no dependency rules; after a while everything glues back together.
+- **Full tactical DDD** (aggregates, repositories, domain events, factories). An expensive ceremony for a CRUD domain with few real invariants.
+- **Separate services.** There is neither the load nor the teams that would justify it; the price is the network, transactions and deployment.
+- **Leave it as it is.** Files and packages keep growing, and the question “where does rule X live” stays with review.

@@ -1,30 +1,30 @@
-# Рабочая станция: HUD на удалённый API
+# Workstation: the HUD against a remote API
 
-Оверлей (GTK4 + layer-shell) живёт **на ПК с Wayland/niri**. API может быть
-локальным или на сервере (systemd / Docker / tailnet). Ниже — типичный кейс:
-API уже крутится где-то в сети, HUD поднимаем локально через user systemd.
+The overlay (GTK4 + layer-shell) lives **on a PC with Wayland/niri**. The API can be local
+or on a server (systemd / Docker / tailnet). Below is the typical case: the API is already running somewhere on the network and the HUD
+is brought up locally through user systemd.
 
-## Почему «просто логин» не хватает
+## Why “just a login” is not enough
 
-| Клиент | Как ходит в API |
+| Client | How it reaches the API |
 |--------|-----------------|
-| Браузер (SPA) | сессия по куке после `POST /api/auth/login` |
-| HUD / CLI / бот / MCP | `Authorization: Bearer …` из `QUESTS_API_TOKEN` |
+| Browser (SPA) | a session cookie after `POST /api/auth/login` |
+| HUD / CLI / bot / MCP | `Authorization: Bearer …` from `QUESTS_API_TOKEN` |
 
-Логин/пароль аккаунта **не** подставляются в оверлей. Токен минтится на
-машине с БД и показывается **один раз** (в БД только хеш). Подробности:
+An account's login and password are **not** put into the overlay. A token is minted in the web interface or on the
+machine with the database and is shown **once** (only a hash is stored). Details:
 [`auth.md`](auth.md).
 
-Проверка, что auth включён:
+Check that auth is on:
 
 ```bash
 curl -sS http://SERVER:8765/api/auth/state
-# {"auth_required":true,...}  →  нужен токен для HUD
+# {"auth_required":true,...}  →  the HUD needs a token
 ```
 
-## 1. Bearer-токен
+## 1. A bearer token
 
-**Из интерфейса (проще всего):** Настройки → Подключения → создать токен «HUD» — см. [connecting-clients.md](connecting-clients.md). Ниже — то же с хоста сервера.
+**From the interface (easiest):** Settings → «Подключения» (Connections) → create a “HUD” token — see [connecting-clients.md](connecting-clients.md). Below is the same from the server host.
 
 **Docker (compose `quests-api`):**
 
@@ -32,19 +32,19 @@ curl -sS http://SERVER:8765/api/auth/state
 ssh USER@SERVER
 docker exec quests-api quests-server token ls
 docker exec quests-api quests-server token add overlay-pc
-# сохранить строку QUESTS_API_TOKEN=… — второй раз не отдаст
+# save the line QUESTS_API_TOKEN=… — it will not be shown a second time
 ```
 
-**systemd / бинарь на хосте:**
+**systemd / a binary on the host:**
 
 ```bash
 quests-server token add overlay-pc
 ```
 
-Старый токен `overlay` в `token ls` без секрета бесполезен — либо новый
-`token add …`, либо `token rm <id>` и заново.
+An old `overlay` token in `token ls` without its secret is useless — either a new
+`token add …`, or `token rm <id>` and start over.
 
-## 2. Env на ПК
+## 2. Env on the PC
 
 ```bash
 mkdir -p ~/.config/quests
@@ -52,27 +52,27 @@ umask 077
 cat > ~/.config/quests/overlay.env <<'EOF'
 QUESTS_API=http://SERVER:8765
 QUESTS_WEB_URL=http://SERVER:8765
-QUESTS_API_TOKEN=<секрет>
+QUESTS_API_TOKEN=<secret>
 EOF
 chmod 600 ~/.config/quests/overlay.env
 ```
 
-Опционально `api_base` в `data/overlay.json` (env важнее файла). Токен в json
-не класть.
+`api_base` in `data/overlay.json` is optional (the env wins over the file). Do not put the token
+in the json.
 
-Проверка до запуска HUD:
+Check before starting the HUD:
 
 ```bash
 set -a && source ~/.config/quests/overlay.env && set +a
 curl -sS -H "Authorization: Bearer $QUESTS_API_TOKEN" "$QUESTS_API/api/health"
 ```
 
-## 3. Репо и systemd unit
+## 3. The repo and the systemd unit
 
-Юниты ждут дерево в `~/Quests`:
+The units expect the tree in `~/Quests`:
 
 ```bash
-# если клон лежит иначе:
+# if the clone lives elsewhere:
 ln -sfn /path/to/quests ~/Quests
 
 mkdir -p ~/.config/systemd/user/quests-overlay.service.d
@@ -85,11 +85,11 @@ EnvironmentFile=-%h/.config/quests/overlay.env
 EOF
 ```
 
-Deps оверлея (Arch/CachyOS): `gtk4`, `gtk4-layer-shell`, `python-gobject`.
+Overlay dependencies (Arch/CachyOS): `gtk4`, `gtk4-layer-shell`, `python-gobject`.
 
-## 4. Старт
+## 4. Starting
 
-В графической сессии (иначе нет `WAYLAND_DISPLAY`):
+In a graphical session (otherwise there is no `WAYLAND_DISPLAY`):
 
 ```bash
 systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR DISPLAY NIRI_SOCKET
@@ -98,15 +98,15 @@ systemctl --user enable --now quests-overlay.service
 systemctl --user status quests-overlay.service
 ```
 
-Ожидание: `components.overlay.status == "ok"` в `/api/health` (чип HUD в SPA).
+Expected: `components.overlay.status == "ok"` in `/api/health` (the HUD chip in the SPA).
 
-Разовый смоук без systemd: `just run-overlay` с теми же env —
-для отладки. Для постоянной работы — только unit.
+A one-off smoke run without systemd: `just run-overlay` with the same env —
+for debugging. For permanent operation use the unit only.
 
-## 5. Бинды niri
+## 5. niri binds
 
-IPC: `python3 -m overlay toggle|monitor|status` (сокет
-`$XDG_RUNTIME_DIR/quests-overlay.sock`). Запускать из корня репо:
+IPC: `python3 -m overlay toggle|monitor|status` (the socket is
+`$XDG_RUNTIME_DIR/quests-overlay.sock`). Run it from the repo root:
 
 ```kdl
 // ~/.config/niri/config.kdl
@@ -122,19 +122,19 @@ layer-rule {
 }
 ```
 
-## Чеклист «почему не встаёт»
+## Checklist: why it does not come up
 
-| Симптом | Что проверить |
+| Symptom | What to check |
 |---------|----------------|
-| `401` / пустой HUD | нет / протух `QUESTS_API_TOKEN`; auth required |
-| unit inactive, GTK errors | не сделан `import-environment` Wayland |
-| `Overlay socket not found` | daemon не запущен (`quests-overlay.service`) |
-| unit падает на `~/Quests/...` | нет симлинка / неверный `WorkingDirectory` |
-| heartbeat offline | токен/API ок в curl, но env не в unit (нет drop-in) |
-| бинд niri молчит | `cd` в несуществующий путь в `spawn-sh` |
+| `401` / an empty HUD | `QUESTS_API_TOKEN` is missing / expired; auth is required |
+| unit inactive, GTK errors | the Wayland `import-environment` was not done |
+| `Overlay socket not found` | the daemon is not running (`quests-overlay.service`) |
+| the unit fails on `~/Quests/...` | no symlink / a wrong `WorkingDirectory` |
+| heartbeat offline | the token and API are fine in curl, but the env is not in the unit (no drop-in) |
+| the niri bind does nothing | `cd` into a path that does not exist in `spawn-sh` |
 
-## Связанное
+## Related
 
-- Деплой API на сервер: [`../deploy/SERVER.md`](../deploy/SERVER.md)
+- Deploying the API to a server: [`../deploy/SERVER.md`](../deploy/SERVER.md)
 - User units: [`../deploy/systemd/README.md`](../deploy/systemd/README.md)
-- Auth / токены: [`auth.md`](auth.md)
+- Auth / tokens: [`auth.md`](auth.md)

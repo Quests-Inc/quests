@@ -1,91 +1,102 @@
 # Quests
 
-Менеджер задач в духе игрового журнала: веб-UI, API и Wayland-оверлей (HUD + тосты) для niri / CachyOS.
+A task manager in the spirit of a game quest log: web UI, API, CLI, check runner and a Wayland overlay (HUD + toasts) for niri / CachyOS.
 
-Стек: **Go (API + CLI + раннер) · PostgreSQL · Svelte + TypeScript (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
+Stack: **Go (API + CLI + runner) · PostgreSQL · Svelte 5 + TypeScript (Vite) · Python (MCP / Telegram / STT / overlay) · GTK4 + gtk4-layer-shell**
 
-## Требования
+The web interface is in Russian, so interface labels are quoted as they appear on screen (with a gloss where needed).
 
-- Go ≥ 1.26 (сборка API/CLI)
-- Docker (локальный PostgreSQL: `just dev-db`)
-- Python ≥ 3.12, [uv](https://docs.astral.sh/uv/) (MCP, Telegram, STT, оверлей)
-- Bun (фронт)
-- Для оверлея: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
+How the parts fit together: [`docs/architecture.md`](docs/architecture.md). Terms: [`docs/glossary.md`](docs/glossary.md).
+
+## Requirements
+
+- Go ≥ 1.26 (builds the API, CLI and runner)
+- Docker (local PostgreSQL: `just dev-db`)
+- Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/) (MCP server, Telegram bot, STT, overlay)
+- [Bun](https://bun.sh) (frontend)
+- [`just`](https://just.systems) (task runner)
+- For the overlay: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
 
 ```bash
-# Arch / CachyOS (оверлей)
+# Arch / CachyOS (overlay)
 sudo pacman -S gtk4 gtk4-layer-shell python-gobject
 ```
 
-## Развёртывание
+## Setup
 
 ```bash
 just bootstrap
 ```
 
-Нужен [`just`](https://just.systems). Список всех рецептов (сборка, запуск, `just check` = линтеры + тесты) — просто `just`.
+`just` alone lists every recipe (build, run, `just check` = linters + tests).
 
-Подтянет Python-зависимости (`uv sync --group dev --all-extras`), соберёт Go CLI/API, `bun install` во `frontend/` и создаст `data/`; схему БД сервер накатывает сам при старте. Устройство системы — `docs/architecture.md`.
+`bootstrap` starts the local PostgreSQL in Docker, installs the Python dependencies (`uv sync --group dev --all-extras`) and the
+frontend ones (`bun install`), creates `data/` and builds the Go CLI and API. The server applies the database schema itself when it starts.
 
-## Запуск
+## Running
 
-| Что | Команда | URL / заметка |
-|-----|---------|----------------|
-| API + SPA | `just run-server` | http://127.0.0.1:8765 (нужен собранный `frontend/dist`) |
-| Сборка API | `just build-server` | → `go/bin/quests-server` |
-| Фронт (HMR) | `just run-frontend` | http://127.0.0.1:5173 (нужен запущенный API) |
-| Сборка SPA | `just build-frontend` | в `frontend/dist` |
-| Схема БД | `just schema` | сервер сам мигрирует схему при старте; `quests-server schema` показывает ревизию (нужен `QUESTS_DATABASE_URL`; локально — `just dev-db`) |
-| CLI | `just quests …` / `go/bin/quests` | см. [`docs/cli.md`](docs/cli.md) |
-| Оверлей | `just run-overlay` | или `python -m overlay` |
-| Telegram | `just run-telegram` | HTTP-клиент к API |
-| STT (голос → текст) | `just run-stt` | сайдкар для бота, http://127.0.0.1:8766, нужен для голосовых сообщений |
-| Шаблоны | UI «Шаблоны» / `/api/templates` | daily/weekly → инстансы-квесты |
+| What | Command | URL / note |
+|------|---------|------------|
+| API + SPA | `just run-server` | http://127.0.0.1:8765 (the UI needs a built `frontend/dist`) |
+| Build the API | `just build-server` | → `go/bin/quests-server` |
+| Frontend (HMR) | `just run-frontend` | http://127.0.0.1:5173 (an API must be running) |
+| Build the SPA | `just build-frontend` | → `frontend/dist` |
+| Database schema | `just schema` | the server migrates by itself on start; `quests-server schema` prints the revision (needs `QUESTS_DATABASE_URL`; locally `just dev-db`) |
+| CLI | `just quests …` / `go/bin/quests` | see [`docs/cli.md`](docs/cli.md) |
+| Check runner | `just build-runner` → `go/bin/quests-runner` | executes check and emit commands on a device ([`docs/note-check.md`](docs/note-check.md)) |
+| Overlay | `just run-overlay` | or `python -m overlay` |
+| Telegram bot | `just run-telegram` | an HTTP client of the API |
+| STT (voice → text) | `just run-stt` | sidecar of the bot, http://127.0.0.1:8766, needed for voice messages |
+| API in Docker | `just dev-api` | container `quests-api-dev` on :8765 with its own PostgreSQL |
+| Templates | the “Шаблоны” (Templates) page / `/api/templates` | daily/weekly → quest instances |
 
-Оверлей (IPC):
+Overlay (IPC):
 
 ```bash
 python -m overlay toggle    # passthrough ↔ interactive
-python -m overlay monitor   # следующий монитор
+python -m overlay monitor   # next monitor
 python -m overlay status
 ```
 
-Тема / позиция HUD сохраняются в `data/overlay.json` (`style_pack`, `monitor_connector`, `margins`). Переключение стиля — в interactive-режиме (dropdown). Env `QUESTS_STYLE_PACK` перекрывает конфиг на старте.
+The HUD theme and position are stored in `data/overlay.json` (`style_pack`, `monitor_connector`, `margins`). Switch the style in interactive mode (dropdown). The environment variable `QUESTS_STYLE_PACK` overrides the config at startup.
 
 ```bash
 QUESTS_STYLE_PACK=cyberpunk just run-overlay
 ```
 
-Layer-shell namespaces (для `niri msg layers` / `layer-rule`): `quests-overlay` (HUD), `quests-major`, `quests-minor`.
+Layer-shell namespaces (for `niri msg layers` / `layer-rule`): `quests-overlay` (HUD), `quests-major`, `quests-minor`.
 
 ```kdl
-// ~/.config/niri/config.kdl — пример
+// ~/.config/niri/config.kdl — example
 layer-rule {
     match namespace="^quests-"
     // block-out-from "screencast"
 }
 ```
 
-## Доступ
+## Access
 
-Локальный инстанс на `127.0.0.1` работает без логина, как раньше. Как только в
-БД появляется аккаунт — API закрывается целиком, а SPA просит войти:
+A local instance on `127.0.0.1` works without a login. As soon as the database holds an account the whole API is locked
+and the SPA asks for a login:
 
 ```bash
-quests-server useradd <username>   # пароль спрашивается интерактивно
-quests-server token add overlay    # bearer-токен для HUD / бота / CLI / MCP
+quests-server useradd <username>   # the password is asked for interactively
+quests-server token add overlay    # a bearer token for the HUD / bot / CLI / MCP
 ```
 
-Наружу инстанс без аккаунтов не поднимется — сервер откажется биндиться не на
-loopback. Подробности: [`docs/auth.md`](docs/auth.md).
+An instance without accounts will not come up on a public address: the server refuses to bind anywhere but loopback.
+Details: [`docs/auth.md`](docs/auth.md).
 
-База — PostgreSQL (`QUESTS_DATABASE_URL`); локально `just dev-db` поднимает её в Docker, схему накатывает сам сервер при старте (см. [`docs/postgres.md`](docs/postgres.md)).
+The database is PostgreSQL (`QUESTS_DATABASE_URL`); `just dev-db` starts one in Docker locally and the server applies the schema on start (see [`docs/postgres.md`](docs/postgres.md)).
 
-User systemd units: [`deploy/systemd/`](deploy/systemd/).  
-Деплой на сервер после клона: [`deploy/SERVER.md`](deploy/SERVER.md).  
-Docker (api / bot / frontend): [`deploy/docker/`](deploy/docker/).  
-HUD на удалённый API (токен, unit, niri): [`docs/hud-workstation.md`](docs/hud-workstation.md).  
-Релизы (SemVer) и деплой на прод: [`deploy/README.md`](deploy/README.md) — прод обновляется только явным GitHub Release.
+## More
 
-> **Не запускайте голый `uv sync`.** Он синхронизирует окружение точно и удаляет необязательные пакеты (`mcp`, `aiogram`, `faster-whisper`):
-> `quests-mcp`, бот и STT тогда падают с `No module named …`. Всегда `uv sync --group dev --all-extras` (так делает `just bootstrap`).
+- User systemd units: [`deploy/systemd/`](deploy/systemd/)
+- Deploying the server after a clone: [`deploy/SERVER.md`](deploy/SERVER.md)
+- Docker images (api / bot / stt / frontend): [`deploy/docker/`](deploy/docker/)
+- The HUD against a remote API (token, unit, niri): [`docs/hud-workstation.md`](docs/hud-workstation.md)
+- Releases (SemVer) and production: [`deploy/README.md`](deploy/README.md). Production lives in the separate repository `Quests-Inc/quests-deploy` and is updated only by an explicit GitHub Release: `just release X.Y.Z`.
+- Monitoring: [`docs/monitoring.md`](docs/monitoring.md); security model: [`docs/security.md`](docs/security.md)
+
+> **Never run a bare `uv sync`.** It syncs the environment exactly and removes the optional packages (`mcp`, `aiogram`, `faster-whisper`),
+> after which `quests-mcp`, the bot and STT fail with `No module named …`. Always `uv sync --group dev --all-extras` (which is what `just bootstrap` does).
