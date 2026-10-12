@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createNoteScroll } from '../model/noteScroll.ts'
+  import { createTitleEdit } from '../model/noteTitleEdit.svelte.ts'
   import { tick } from 'svelte'
   import {
     createNote,
@@ -15,7 +17,7 @@
   import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
   import { flattenAttachmentIndex, attachmentCatalog } from '@/entities/attachment'
-  import { NOTE_SPEC, moveTargetItems, noteCatalog, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { NOTE_SPEC, moveTargetItems, noteCatalog, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, ancestorIds, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { parseQuery, passes } from '@/shared/lib/searchFlags.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
@@ -180,18 +182,16 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   const cancelRename = rename.cancel
   const commitRename = rename.commit
 
-  /** Title commits on blur/Enter, independent of the ed.description draft. */
-  async function commitTitle() {
-    if (selectedId == null || titleReadonly) return
-    await ed.commitTitle()
-  }
-
-  function onTitleKeydown(event: { key: string; preventDefault: () => void }) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      titleEl?.blur()
-    }
-  }
+  const titleEdit = createTitleEdit({
+    selectedId: () => selectedId,
+    title: () => ed.title,
+    save: (t) => ed.commitTitle(t),
+    input: () => titleEl,
+  })
+  $effect(() => {
+    void selectedId
+    titleEdit.cancel()
+  })
 
   function rowDirty(n: { id: number }) {
     return n.id === selectedId ? ed.dirty : noteDrafts[String(n.id)] != null
@@ -264,13 +264,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
   let previewEl = $state((null as HTMLDivElement | null))
   let pageEl = $state((null as HTMLElement | null))
-  let titleEditing = $state(false)
-
-  let titleReadonly = $derived(viewMode === 'formatted' && !titleEditing)
-
-  $effect(() => {
-    if (viewMode !== 'formatted') titleEditing = false
-  })
 
   // Grow the editor to fit its text so Текст/Оба flow like Просмотр: no inner
   // scrollbar, the whole note visible, the page the only thing that scrolls.
@@ -299,6 +292,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top
     if (window.scrollY !== winTop) window.scrollTo({ top: winTop })
   }
+
+  const scroll = createNoteScroll({ shownId: () => ed.loadedId, selectedId: () => selectedId, page: () => pageEl })
+  $effect(() => scroll.sync())
 
   $effect(() => {
     // Re-measure whenever the text or the mode changes (mode switch remounts
@@ -355,14 +351,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (editEl) placeTextareaCaret(editEl, offset)
   }
 
-  async function startTitleEdit() {
-    if (!titleReadonly) return
-    titleEditing = true
-    await tick()
-    titleEl?.focus()
-    titleEl?.select()
-  }
-
   /** Esc в сыром/оба при фокусе в textarea → режим просмотра около каретки. */
   async function onEditKeydown(event: { key: string; preventDefault: () => void }) {
     if (event.key !== 'Escape') return
@@ -400,6 +388,16 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const key = String(id)
     treeOpen = { ...treeOpen, [key]: treeOpen[key] !== true }
   }
+
+  /** After a reload (or a link) the open note must be visible: expand its ancestors once per selection. */
+  let revealedFor: number | null = null
+  $effect(() => {
+    const id = selectedId
+    if (id == null || revealedFor === id || !noteById(id)) return
+    revealedFor = id
+    treeOpen = { ...treeOpen, ...Object.fromEntries(ancestorIds(notes, id).map((a) => [String(a), true])) }
+    void tick().then(() => document.querySelector('.notes__row--on')?.scrollIntoView({ block: 'nearest' }))
+  })
 
   function showChildren(id: any) {
     if (!hasChildren(id)) return false
@@ -641,7 +639,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onRowDrop={dnd.onRowDrop}
   />
 
-  <section class="notes__page" bind:this={pageEl}>
+  <section class="notes__page" bind:this={pageEl} onscroll={scroll.onScroll}>
     <NoteCanvas
       {ed}
       {selectedId}
@@ -651,7 +649,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       bind:findOpen
       bind:refsOpen
       bind:backlinksOpen
-      {titleReadonly}
+      titleReadonly={!titleEdit.editing}
+      titleEditing={titleEdit.editing}
+      bind:titleDraft={() => titleEdit.draft, (v) => (titleEdit.draft = v)}
       {noteIsOutdated}
       {exportBusy}
       {crumbs}
@@ -664,9 +664,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       {notes}
       {attachments}
       onOpenNoteMenu={openNoteMenu}
-      onTitleDblClick={startTitleEdit}
-      onTitleBlur={commitTitle}
-      {onTitleKeydown}
+      onTitleDblClick={titleEdit.start}
+      onTitleBlur={titleEdit.commit}
+      onTitleKeydown={titleEdit.onKeydown}
       onTogglePin={() => selectedId != null && togglePinNote(selectedId)}
       onToggleReadme={() => selectedId != null && toggleReadmeNote(selectedId)}
       onTogglePrivate={() => selectedId != null && togglePrivateNote(selectedId)}

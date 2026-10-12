@@ -33,6 +33,7 @@
   import renew from '@/assets/icons/renew.svg?raw'
   import repeat from '@/assets/icons/repeat.svg?raw'
   import save from '@/assets/icons/save.svg?raw'
+  import search from '@/assets/icons/search.svg?raw'
   import scroll from '@/assets/icons/scroll.svg?raw'
   import settings from '@/assets/icons/settings.svg?raw'
   import arrange from '@/assets/icons/arrange.svg?raw'
@@ -73,6 +74,7 @@
     fullscreen,
     'fullscreen-exit': fullscreenExit,
     filter,
+    search,
     flag,
     folder,
     key,

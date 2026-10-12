@@ -212,7 +212,7 @@
 
   /**
    * Day board: one row per quest with a deadline window on this day,
-   * a concurrent-count load chart, no-window creates, and the event log.
+   * no-window creates, and the event log.
    */
   let dayLoad = $derived.by(() => {
     if (!selectedKey) return null
@@ -271,25 +271,6 @@
       (a, b) =>
         a.left - b.left || b.width - a.width || a.id - b.id,
     )
-
-    // Concurrent count at midpoints of LOAD_BUCKETS slots across the day.
-    const LOAD_BUCKETS = 48
-    const load: number[] = new Array(LOAD_BUCKETS).fill(0)
-    for (let i = 0; i < LOAD_BUCKETS; i++) {
-      const t0 = dayStart.getTime() + (dayMs * i) / LOAD_BUCKETS
-      const t1 = dayStart.getTime() + (dayMs * (i + 1)) / LOAD_BUCKETS
-      const mid = (t0 + t1) / 2
-      let n = 0
-      for (const row of rows) {
-        if (row.point) {
-          if (row.startMs >= t0 && row.startMs < t1) n += 1
-        } else if (row.startMs <= mid && row.endMs > mid) {
-          n += 1
-        }
-      }
-      load[i] = n
-    }
-    const loadMax = Math.max(1, ...load)
 
     /** Created today, no board row (load undefined — keep off the strip). */
     const noWindow: any[] = []
@@ -361,8 +342,6 @@
       key: selectedKey,
       title: formatDayTitle(selectedKey),
       rows,
-      load,
-      loadMax,
       noWindow,
       events,
     }
@@ -606,28 +585,6 @@
               {#each HOUR_TICKS as h}
                 <span style:left="{(h / 24) * 100}%">{String(h).padStart(2, '0')}</span>
               {/each}
-            </div>
-          </div>
-
-          <div class="day-board__load" aria-label="Загруженность">
-            <div class="day-board__gutter day-board__gutter--muted">нагрузка</div>
-            <div
-              class="day-load-chart"
-              role="img"
-              aria-label="Одновременных окон: пик {dayLoad.loadMax}"
-            >
-              {#each HOUR_TICKS as h}
-                <div class="day-tl__gridline" style:left="{(h / 24) * 100}%"></div>
-              {/each}
-              <div class="day-load-chart__bars" aria-hidden="true">
-                {#each dayLoad.load as n, i (i)}
-                  <span
-                    class="day-load-chart__col"
-                    style:height="{n === 0 ? 0 : Math.max(8, (n / dayLoad.loadMax) * 100)}%"
-                    title={String(n)}
-                  ></span>
-                {/each}
-              </div>
             </div>
           </div>
 

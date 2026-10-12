@@ -23,6 +23,8 @@
     refsOpen = $bindable(false),
     backlinksOpen = $bindable(false),
     titleReadonly,
+    titleEditing = false,
+    titleDraft = $bindable(''),
     noteIsOutdated,
     exportBusy,
     crumbs,
@@ -64,6 +66,8 @@
     refsOpen?: boolean
     backlinksOpen?: boolean
     titleReadonly: boolean
+    titleEditing?: boolean
+    titleDraft?: string
     noteIsOutdated: boolean
     exportBusy: boolean
     crumbs: Crumb[]
@@ -116,7 +120,8 @@
     </div>
   {/if}
   <NoteHead
-    bind:title={ed.title}
+    bind:title={() => (titleEditing ? titleDraft : ed.title), (v) => (titleDraft = v)}
+    {titleEditing}
     bind:titleEl
     {titleReadonly}
     dirty={ed.dirty}

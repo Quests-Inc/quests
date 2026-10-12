@@ -100,12 +100,11 @@
           {/if}
         {/each}
       </div>
-      <div class="date-input__foot">
-        <button type="button" onclick={() => { value = today; open = false }}>Сегодня</button>
-        {#if clearable && value}
+      {#if clearable && value}
+        <div class="date-input__foot">
           <button type="button" onclick={() => { value = ''; open = false }}>Сбросить</button>
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
   {/if}
 </span>

@@ -2,6 +2,8 @@
   import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
+  import AttachmentGroupHead from './AttachmentGroupHead.svelte'
+  import { createFoldedGroups } from '../model/foldedGroups.svelte.ts'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import AttachmentPanel from './AttachmentPanel.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
@@ -65,6 +67,8 @@
   let sort = $state('new')
   let grouped = $state(true)
   let versionInput = $state((null as HTMLInputElement | null))
+
+  const foldedGroups = createFoldedGroups()
 
   let ctxOpen = $state(false)
   let ctxX = $state(0)
@@ -289,20 +293,21 @@
         <p class="empty">Ничего не найдено</p>
       {:else if grouped}
         {#each groups as g (g.key)}
+          {@const isFolded = foldedGroups.has(String(g.key))}
           <section class="attpage__group">
-            <button
-              type="button"
-              class="attpage__ghead"
-              title="Открыть владельца"
-              onclick={() => onOpenOwner?.(g.kind, g.id)}
-            >
-              <span class="attpage__kind">{KIND_ONE[g.kind]}</span>
-              <span class="attpage__gtitle">{g.title}</span>
-              <span class="attpage__n">{g.files.length}</span>
-            </button>
-            {#each g.files as a (a.id)}
-              {@render row(a, false)}
-            {/each}
+            <AttachmentGroupHead
+              kind={KIND_ONE[g.kind]}
+              title={g.title}
+              count={g.files.length}
+              folded={isFolded}
+              onToggle={() => foldedGroups.toggle(String(g.key))}
+              onOpen={() => onOpenOwner?.(g.kind, g.id)}
+            />
+            {#if !isFolded}
+              {#each g.files as a (a.id)}
+                {@render row(a, false)}
+              {/each}
+            {/if}
           </section>
         {/each}
       {:else}
@@ -570,39 +575,6 @@
 
   .attpage__group {
     margin-bottom: 0.5rem;
-  }
-
-  .attpage__ghead {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.5rem 1rem 0.3rem;
-    border: 0;
-    background: transparent;
-    text-align: left;
-  }
-
-  .attpage__ghead:hover .attpage__gtitle {
-    color: var(--color-accent, #c9a227);
-  }
-
-  .attpage__kind {
-    flex: 0 0 auto;
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .attpage__gtitle {
-    min-width: 0;
-    flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--font-body, Georgia, serif);
-    font-size: var(--text-sm, 0.875rem);
   }
 
   .attpage__item {

@@ -204,12 +204,34 @@ function linkifyRefs(source: string, opts: { labels?: Record<string, string> } =
   return withMdLinks
 }
 
+/** Rendered notes by source and the labels their refs resolve to: switching tabs back to a note must not redo marked + DOMPurify. */
+const RENDER_CACHE_MAX = 60
+const renderCache = new Map<string, string>()
+
+function renderKey(text: string, labels: Record<string, string>) {
+  const refs = new Set<string>()
+  for (const m of text.matchAll(REF_RE)) refs.add(`${m[1]}:${m[2]}`)
+  let sig = ''
+  for (const r of refs) sig += `\u0001${labels[r] ?? ''}`
+  return `${text}\u0000${sig}`
+}
+
 /** Render markdown to sanitized HTML. Journal refs become in-app `?kind=id` links. */
-export function renderMarkdown(source: any, opts = {}) {
+export function renderMarkdown(source: any, opts: { labels?: Record<string, string> } = {}) {
   const text = String(source ?? '')
   if (!text.trim()) return ''
+  const key = renderKey(text, opts.labels ?? {})
+  const hit = renderCache.get(key)
+  if (hit !== undefined) {
+    renderCache.delete(key)
+    renderCache.set(key, hit)
+    return hit
+  }
   const dirty = marked.parse(linkifyRefs(text, opts), { async: false })
   if (typeof dirty !== 'string' || typeof window === 'undefined') return ''
   ensureLinkHook()
-  return DOMPurify.sanitize(dirty, PURIFY_OPTS)
+  const html = DOMPurify.sanitize(dirty, PURIFY_OPTS)
+  renderCache.set(key, html)
+  if (renderCache.size > RENDER_CACHE_MAX) renderCache.delete(renderCache.keys().next().value as string)
+  return html
 }

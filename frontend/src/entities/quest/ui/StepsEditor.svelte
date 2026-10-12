@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import { MentionTextarea } from '@/entities/template/@x/quest'
   import StepAutoCheck from './StepAutoCheck.svelte'
@@ -34,8 +35,14 @@
     return isQuest ? questStepDraft() : templateStepDraft()
   }
 
-  function add() {
+  let rootEl: HTMLElement | undefined = $state()
+
+  async function add() {
     steps = [...steps, blank()]
+    await tick()
+    // The new step's title field takes the cursor at once.
+    const titles = rootEl?.querySelectorAll<HTMLInputElement>('.steps-ed__title')
+    titles?.[titles.length - 1]?.focus()
   }
 
   function remove(key: any) {
@@ -60,7 +67,7 @@
   }
 </script>
 
-<div class="steps-ed">
+<div class="steps-ed" bind:this={rootEl}>
   {#each steps as s, i (s.key)}
     <div class="steps-ed__item">
       <div class="steps-ed__row">
