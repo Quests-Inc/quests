@@ -68,3 +68,17 @@ export function isUnder(notes: any[], candidateId: number, ancestorId: number) {
   }
   return false
 }
+
+/** Ids of all ancestors of a note, nearest first (cycle-safe). */
+export function ancestorIds(notes: any[], id: number): number[] {
+  const byId = new Map(notes.map((n) => [n.id, n]))
+  const out: number[] = []
+  for (
+    let cur = byId.get(id);
+    cur && cur.parent_id != null && !out.includes(cur.parent_id);
+    cur = byId.get(cur.parent_id)
+  ) {
+    out.push(cur.parent_id)
+  }
+  return out
+}

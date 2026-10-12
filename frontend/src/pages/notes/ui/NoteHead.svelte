@@ -8,6 +8,7 @@
     title = $bindable(''),
     titleEl = $bindable(null),
     titleReadonly,
+    titleEditing = false,
     dirty,
     pinned,
     isReadme,
@@ -43,6 +44,7 @@
     title?: string
     titleEl?: HTMLInputElement | null
     titleReadonly: boolean
+    titleEditing?: boolean
     dirty: boolean
     pinned: boolean
     isReadme: boolean
@@ -82,7 +84,7 @@
       oncontextmenu={onContextMenu}
     >
       <div class="notes__head-row">
-        <div class="notes__title-cluster">
+        <div class="notes__title-cluster" class:notes__title-cluster--editing={titleEditing}>
           <span class="notes__title-grow">
             <span class="notes__title-sizer" aria-hidden="true">{title || '\u00a0'}</span>
             <input
@@ -92,14 +94,15 @@
               bind:this={titleEl}
               bind:value={title}
               readonly={titleReadonly}
-              title={titleReadonly ? 'Двойной клик — править заголовок' : undefined}
+              title={titleReadonly ? 'Двойной клик — переименовать' : 'Enter — сохранить, Esc — отмена'}
               ondblclick={onTitleDblClick}
               onblur={onTitleBlur}
               onkeydown={onTitleKeydown}
             />
           </span>
-          {#if dirty}<span class="notes__unsaved" title="Несохранено">*</span>{/if}
+          {#if dirty && !titleEditing}<span class="notes__unsaved" title="Несохранено">*</span>{/if}
         </div>
+        {#if !titleEditing}
         <div class="detail__actions notes__actions">
           <button
             type="button"
@@ -156,6 +159,17 @@
           >
             <Icon name="clock-alert" />
           </button>
+          <button
+            type="button"
+            class="btn btn--icon"
+            class:notes__status-btn--on={findOpen}
+            onclick={() => (findOpen = !findOpen)}
+            title="Поиск в заметке (Ctrl+F)"
+            aria-label="Поиск в заметке"
+            aria-pressed={findOpen}
+          >
+            <Icon name="search" />
+          </button>
           {#if dirty}
             <button
               type="button"
@@ -198,6 +212,7 @@
             <Icon name="delete" />
           </button>
         </div>
+        {/if}
       </div>
       <div class="notes__colophon">
         <nav class="notes__crumbs" aria-label="Родитель">
@@ -218,7 +233,6 @@
           {/each}
         </nav>
         <div class="notes__modes" role="radiogroup" aria-label="Режим просмотра">
-          <button type="button" class="notes__mode" class:notes__mode--on={findOpen} aria-pressed={findOpen} title="Поиск в заметке (Ctrl+F)" onclick={() => (findOpen = !findOpen)}>Найти</button>
           {#each viewModes as mode (mode.id)}
             <button
               type="button"
@@ -328,6 +342,19 @@
   }
 
   .notes__title--locked:focus {
+    outline: none;
+  }
+
+  /* Editing the name: the whole cluster becomes an obvious field. */
+  .notes__title-cluster--editing {
+    padding: 0.1rem 0.6rem;
+    border: 1px solid var(--color-accent, #c9a227);
+    border-radius: var(--radius-md, 4px);
+    background: var(--color-bg-raised, #1a1a1a);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent, #c9a227) 22%, transparent);
+  }
+
+  .notes__title-cluster--editing .notes__title:focus {
     outline: none;
   }
 

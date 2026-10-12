@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { compareNotes, isUnder, withAncestors } from '../../src/entities/note/model/tree.ts'
+import { ancestorIds, compareNotes, isUnder, withAncestors } from '../../src/entities/note/model/tree.ts'
 
 const notes = [
   { id: 1, parent_id: null, title: 'корень' },
@@ -40,4 +40,18 @@ test('compareNotes: с детьми, затем закреплённые, зат
     { id: 3, pinned: false, sort_order: -1 },
   ]
   expect(list.sort((a, b) => compareNotes(a, b, hasKids)).map((n) => n.id)).toEqual([10, 2, 3, 1])
+})
+
+test('ancestorIds: цепочка предков от ближайшего; у корня и у неизвестной заметки пусто', () => {
+  expect(ancestorIds(notes, 3)).toEqual([2, 1])
+  expect(ancestorIds(notes, 1)).toEqual([])
+  expect(ancestorIds(notes, 99)).toEqual([])
+})
+
+test('ancestorIds: цикл в родителях не зацикливает', () => {
+  const loop = [
+    { id: 1, parent_id: 2 },
+    { id: 2, parent_id: 1 },
+  ]
+  expect(ancestorIds(loop, 1)).toEqual([2, 1])
 })

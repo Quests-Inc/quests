@@ -24,6 +24,15 @@ const EMPTY: NoteForm = {
   isCategory: false,
 }
 
+/** Opened notes by id, kept while the app lives: coming back to a tab shows the note at once, the server is asked quietly. */
+const NOTE_CACHE_MAX = 30
+const noteCache = new Map<number, NotePayload>()
+function cachePut(row: NotePayload) {
+  noteCache.delete(row.id)
+  noteCache.set(row.id, row)
+  if (noteCache.size > NOTE_CACHE_MAX) noteCache.delete(noteCache.keys().next().value as number)
+}
+
 const messageOf = (e: unknown) => (e as { message?: string })?.message || String(e)
 
 export function createNoteEditor(deps: {
@@ -92,23 +101,40 @@ export function createNoteEditor(deps: {
       return
     }
     let cancelled = false
+    const show = (row: NotePayload) => {
+      detail = row
+      const next = noteFormFromRow(row)
+      apply({ ...next, ...getNoteDraft(id) })
+      saved = next
+      loadedId = id
+      error = ''
+    }
+    const cached = noteCache.get(id)
+    if (cached) untrack(() => show(cached))
     getNote(id)
       .then((row) => {
         if (cancelled) return
-        detail = row
-        const next = noteFormFromRow(row)
-        apply({ ...next, ...getNoteDraft(id) })
-        saved = next
-        loadedId = id
-        error = ''
+        cachePut(row)
+        // Cached copy already shown: replace it only if the server has a newer one and nothing is being typed.
+        if (cached && cached.updated_at === row.updated_at) return
+        if (cached && loadedId === id && untrack(() => dirty)) {
+          detail = row
+          saved = noteFormFromRow(row)
+          return
+        }
+        show(row)
       })
       .catch((e) => {
-        if (!cancelled) error = messageOf(e)
+        if (!cancelled && !cached) error = messageOf(e)
       })
     return () => {
       cancelled = true
       untrack(() => syncDraft(id))
     }
+  })
+
+  $effect(() => {
+    if (detail) cachePut(detail)
   })
 
   // Черновик пишется по мере правки.
@@ -200,10 +226,10 @@ export function createNoteEditor(deps: {
   }
 
   /** Заголовок сохраняется отдельно от описания: по blur/Enter. */
-  async function commitTitle() {
+  async function commitTitle(next: string = title) {
     const id = deps.selectedId()
     if (id == null) return
-    const t = title.trim()
+    const t = next.trim()
     if (!t || t === saved.title) {
       title = saved.title
       return

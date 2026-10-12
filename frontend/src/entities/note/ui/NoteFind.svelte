@@ -1,5 +1,6 @@
 <script lang="ts">
   import { searchInNote } from '@/shared/api/client.ts'
+  import Icon from '@/shared/ui/Icon.svelte'
 
   /**
    * Search inside the open note with the notes search's rules (word forms, prefix, other layout…):
@@ -125,6 +126,7 @@
 </script>
 
 <div class="nf" role="search">
+  <span class="nf__icon" aria-hidden="true"><Icon name="search" /></span>
   <input
     class="nf__input"
     type="search"
@@ -140,9 +142,9 @@
     {:else if q.trim() && ranges.length === 0}не найдено
     {:else if ranges.length}{cur + 1} / {ranges.length}{/if}
   </span>
-  <button type="button" class="btn" disabled={ranges.length === 0} onclick={() => step(-1)} title="Предыдущее (Shift+Enter)" aria-label="Предыдущее">↑</button>
-  <button type="button" class="btn" disabled={ranges.length === 0} onclick={() => step(1)} title="Следующее (Enter)" aria-label="Следующее">↓</button>
-  <button type="button" class="btn" onclick={onClose} title="Закрыть (Esc)" aria-label="Закрыть поиск">✕</button>
+  <button type="button" class="nf__btn nf__btn--up" disabled={ranges.length === 0} onclick={() => step(-1)} title="Предыдущее (Shift+Enter)" aria-label="Предыдущее"><Icon name="arrow-up" /></button>
+  <button type="button" class="nf__btn nf__btn--down" disabled={ranges.length === 0} onclick={() => step(1)} title="Следующее (Enter)" aria-label="Следующее"><Icon name="arrow-up" /></button>
+  <button type="button" class="nf__btn" onclick={onClose} title="Закрыть (Esc)" aria-label="Закрыть поиск"><Icon name="close" /></button>
 </div>
 
 <style>
@@ -152,20 +154,79 @@
     z-index: 5;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0;
-    background: var(--bg, var(--surface, Canvas));
+    gap: 0.3rem;
+    margin: 0.5rem 0;
+    padding: 0.2rem 0.35rem 0.2rem 0.65rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: var(--color-bg-raised, #1a1a1a);
+    transition: border-color 0.12s;
+  }
+  .nf:focus-within {
+    border-color: var(--color-accent, #c9a227);
+  }
+  .nf__icon {
+    display: inline-flex;
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-fg-subtle, #6e6e6e);
+  }
+  .nf__icon :global(svg) {
+    width: 100%;
+    height: 100%;
   }
   .nf__input {
     flex: 1 1 auto;
     min-width: 0;
+    padding: 0.3rem 0.2rem;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--color-fg, #e8e8e8);
+    font: inherit;
+    font-size: var(--text-sm, 0.875rem);
+  }
+  .nf__input::placeholder {
+    color: var(--color-fg-subtle, #6e6e6e);
+  }
+  .nf__input::-webkit-search-cancel-button {
+    display: none;
   }
   .nf__count {
     min-width: 4.5rem;
-    font-size: 0.8rem;
-    opacity: 0.7;
+    font-family: var(--font-ui, sans-serif);
+    font-size: 0.75rem;
+    color: var(--color-fg-muted, #9a9a9a);
     text-align: right;
     white-space: nowrap;
+  }
+  .nf__btn {
+    display: grid;
+    place-items: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm, 3px);
+    background: transparent;
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+  .nf__btn :global(svg) {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+  .nf__btn--down :global(svg) {
+    transform: rotate(180deg);
+  }
+  .nf__btn:hover:not(:disabled),
+  .nf__btn:focus-visible {
+    background: rgba(127, 127, 127, 0.2);
+    color: var(--color-fg, #e8e8e8);
+  }
+  .nf__btn:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
   :global(::highlight(note-find)) {
     background: rgba(255, 200, 0, 0.35);
