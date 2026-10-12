@@ -289,7 +289,6 @@
 }
 
 .day-board__axis,
-.day-board__load,
 .day-board__row {
   display: grid;
   grid-template-columns: minmax(7.5rem, 12rem) minmax(0, 1fr);
@@ -299,42 +298,6 @@
 
 .day-board__gutter {
   min-width: 0;
-}
-
-.day-board__gutter--muted {
-  display: flex;
-  align-items: flex-end;
-  padding-bottom: 0.15rem;
-  font-family: var(--font-ui, sans-serif);
-  font-size: 0.65rem;
-  color: var(--color-fg-subtle, #6e6e6e);
-  text-transform: lowercase;
-}
-
-.day-load-chart {
-  position: relative;
-  height: 2.75rem;
-  border-radius: 6px;
-  border: 1px solid var(--color-border, #333);
-  background: var(--color-bg-muted, #242424);
-  overflow: hidden;
-}
-
-.day-load-chart__bars {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 0;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.day-load-chart__col {
-  flex: 1 1 0;
-  min-width: 0;
-  background: color-mix(in srgb, var(--color-fg, #e8e8e8) 28%, transparent);
-  border-radius: 1px 1px 0 0;
 }
 
 .day-board__rows {
@@ -453,7 +416,6 @@
   }
 
   .day-board__axis,
-  .day-board__load,
   .day-board__row {
     grid-template-columns: minmax(5.5rem, 8rem) minmax(0, 1fr);
   }
