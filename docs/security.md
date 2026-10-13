@@ -70,7 +70,7 @@ and changed only from a browser session (not with an API token).
 
 - A user-typed endpoint must be `https` and resolve to public addresses only (no loopback, LAN, link-local/metadata,
   CGNAT); the request goes to the address resolved and checked at that moment (TLS and `Host` keep the real name), so DNS
-  cannot be re-pointed inward between the check and the connection — also when the operator routes LLM traffic
+  cannot be re-pointed inward between the check and the connection — also when the host admin routes LLM traffic
   through a proxy; redirects are not followed, and the provider's reply
   body is not echoed back. Otherwise the field would be a server-side request forgery.
 - Accounts without a key get the server's key (`QUESTS_GROQ_API_KEY`) only if the host set `QUESTS_LLM_SHARED=1`;
