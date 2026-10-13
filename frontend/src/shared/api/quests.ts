@@ -26,6 +26,13 @@ export function updateQuest(id: number, payload: object, { quiet = true } = {}) 
   })
 }
 
+/** Hide a failed quest from the journal «Провалено» inbox (status stays failed). */
+export function ackQuestFailure(id: number, { quiet = true } = {}) {
+  return request(`/api/quests/${id}/ack-failure${quietQs(quiet)}`, {
+    method: 'POST',
+  })
+}
+
 export function addQuestStep(questId: number, payload: object, { quiet = true } = {}) {
   return request(`/api/quests/${questId}/steps${quietQs(quiet)}`, {
     method: 'POST',

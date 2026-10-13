@@ -226,21 +226,37 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		}
 		qid := createdQ.ID
 		detail := "Период " + key
-		hub.Publish("quest_appeared", events.PublishOpts{
-			Workspace:   wsctx.From(ctx),
-			QuestID:     &qid,
-			Title:       createdQ.Title,
-			Description: createdQ.Description,
-			Detail:      detail,
-			// Periodic materialization is routine, not something to notice —
-			// a fullscreen major toast for every daily template at midnight
-			// is exactly the "pack of identical alerts" this was meant to fix.
-			Toast:        false,
-			Source:       "system",
-			Significance: string(createdQ.Significance),
-			Automated:    createdQ.Automated,
-			Sound:        strPtr("quest_created"),
-		})
+		if poolFailed {
+			// Already-failed emit must surface like any other failure — quiet
+			// quest_appeared would skip overlay/Telegram entirely (toast=false).
+			hub.Publish("quest_failed", events.PublishOpts{
+				Workspace:    wsctx.From(ctx),
+				QuestID:      &qid,
+				Title:        createdQ.Title,
+				Description:  createdQ.Description,
+				Detail:       "провалено",
+				Toast:        true,
+				Source:       "system",
+				Significance: string(createdQ.Significance),
+				Automated:    createdQ.Automated,
+			})
+		} else {
+			hub.Publish("quest_appeared", events.PublishOpts{
+				Workspace:   wsctx.From(ctx),
+				QuestID:     &qid,
+				Title:       createdQ.Title,
+				Description: createdQ.Description,
+				Detail:      detail,
+				// Periodic materialization is routine, not something to notice —
+				// a fullscreen major toast for every daily template at midnight
+				// is exactly the "pack of identical alerts" this was meant to fix.
+				Toast:        false,
+				Source:       "system",
+				Significance: string(createdQ.Significance),
+				Automated:    createdQ.Automated,
+				Sound:        strPtr("quest_created"),
+			})
+		}
 		created = append(created, qid)
 	}
 	return created, nil

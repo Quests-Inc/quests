@@ -146,6 +146,8 @@ type Quest struct {
 	PeriodKey       *string
 	Source          *string // 'template:<id>' or the creating client; nil = unknown
 	Automated       bool
+	// FailureInbox: undismissed row in quest_failure_inbox (journal «Провалено»).
+	FailureInbox bool
 
 	CategorySlug       *string
 	CategoryLabel      *string

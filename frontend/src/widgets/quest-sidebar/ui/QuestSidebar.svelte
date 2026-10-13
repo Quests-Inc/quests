@@ -23,6 +23,8 @@
     byCategory,
     frozenQuests,
     frozenOpen,
+    failedInboxQuests = [],
+    failedOpen = true,
     selectedId,
     searchQuery = $bindable(''),
     showAllQuests = false,
@@ -39,6 +41,7 @@
     onToggleCategory,
     onToggleLine,
     onToggleFrozen,
+    onToggleFailed,
     categories,
     scopeCategoryId,
     scopeQuestlineId,
@@ -55,6 +58,8 @@
     byCategory: any[],
     frozenQuests: any[],
     frozenOpen: boolean,
+    failedInboxQuests?: any[],
+    failedOpen?: boolean,
     selectedId: number | null,
     searchQuery: string,
     showAllQuests: boolean,
@@ -71,6 +76,7 @@
     onToggleCategory: (key: string) => void,
     onToggleLine: (catKey: string, lineKey: string) => void,
     onToggleFrozen: () => void,
+    onToggleFailed?: () => void,
     categories: any[],
     scopeCategoryId: number | 'none' | null,
     scopeQuestlineId: number | null,
@@ -173,7 +179,7 @@
       class="quest-row"
       class:quest-row--active={q.id === selectedId}
       class:quest-row--pinned={q.pinned}
-      class:quest-row--inactive={isQuestInactive(q) && q.status !== 'frozen'}
+      class:quest-row--inactive={isQuestInactive(q) && q.status !== 'frozen' && !(q.status === 'failed' && q.failure_inbox)}
       style:--tag-n={q.tags?.length || 0}
       onclick={() => onSelect(q.id)}
       oncontextmenu={(e) => onQuestContextMenu(e, q)}
@@ -228,6 +234,30 @@
   {/snippet}
 
   <div class="sidebar__list" aria-label="Список квестов">
+    {#if failedInboxQuests.length > 0}
+      <div class="sidebar__failed">
+        <button
+          type="button"
+          data-nav
+          class="sidebar__failed-toggle"
+          aria-expanded={failedOpen}
+          onclick={onToggleFailed}
+        >
+          <span class="sidebar__failed-label">Провалено</span>
+          <span class="sidebar__failed-hint">{failedInboxQuests.length}</span>
+          <span class="sidebar__failed-chevron" aria-hidden="true">
+            <Icon name={failedOpen ? 'chevron-down' : 'chevron-right'} size={12} />
+          </span>
+        </button>
+        {#if failedOpen}
+          <div class="sidebar__failed-body">
+            {#each failedInboxQuests as q (q.id)}
+              {@render questRow(q)}
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
     {#if frozenQuests.length > 0}
       <div class="sidebar__frozen">
         <button

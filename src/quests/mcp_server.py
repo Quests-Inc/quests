@@ -342,6 +342,7 @@ def _quest_summary(q: dict[str, Any]) -> dict[str, Any]:
         "significance": q.get("significance"),
         "pinned": q.get("pinned"),
         "overlay_hidden": q.get("overlay_hidden"),
+        "failure_inbox": q.get("failure_inbox"),
         "progress_label": q.get("progress_label"),
         "steps_done": q.get("steps_done"),
         "steps_total": q.get("steps_total"),

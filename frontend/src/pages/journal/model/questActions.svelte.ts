@@ -16,6 +16,7 @@ export function postponePatch(minutes: number, now = Date.now()) {
 
 export function createQuestActions(deps: {
   updateQuest: (id: number, patch: Record<string, unknown>) => Promise<QuestFull>
+  ackFailure?: (id: number) => Promise<QuestFull>
   /** Положить ответ сервера в список; `select: false` — не переключать выбранный квест. */
   applyQuest: (quest: QuestFull, opts?: { select?: boolean }) => void
   setError: (message: string) => void
@@ -48,6 +49,13 @@ export function createQuestActions(deps: {
       await guarded(async () => {
         deps.applyQuest(await deps.updateQuest(quest.id, { status }))
         toast(`Статус: ${statusToastLabel(status)}`, { kind: 'success' })
+      })
+    },
+    async ackFailure(quest: Quest) {
+      if (!quest || !deps.ackFailure) return
+      await guarded(async () => {
+        deps.applyQuest(await deps.ackFailure!(quest.id), { select: false })
+        toast('Скрыт из провалов', { kind: 'success' })
       })
     },
     async postpone(quest: Quest, minutes: number) {

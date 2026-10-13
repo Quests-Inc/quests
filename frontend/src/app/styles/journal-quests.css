@@ -259,7 +259,8 @@
   padding-left: 0.85rem;
 }
 
-.sidebar__frozen-body > .quest-row {
+.sidebar__frozen-body > .quest-row,
+.sidebar__failed-body > .quest-row {
   padding-left: 0.85rem;
 }
 

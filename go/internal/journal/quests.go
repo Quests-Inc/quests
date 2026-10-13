@@ -61,10 +61,12 @@ func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]Quest, error) {
 			q.deadline_at, q.duration_seconds, q.category_id, q.questline_id,
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
-			l.title, l.color, l.icon, l.custom_icon, l.updated_at
+			l.title, l.color, l.icon, l.custom_icon, l.updated_at,
+			(fi.quest_id IS NOT NULL AND fi.dismissed_at IS NULL)
 		FROM quest q
 		LEFT JOIN questcategory c ON c.id = q.category_id
 		LEFT JOIN questline l ON l.id = q.questline_id
+		LEFT JOIN quest_failure_inbox fi ON fi.quest_id = q.id
 		WHERE 1=1`
 	args := []any{}
 	if f.Status != nil {
@@ -125,10 +127,12 @@ func (s *Store) GetQuest(ctx context.Context, id int64) (Quest, error) {
 			q.deadline_at, q.duration_seconds, q.category_id, q.questline_id,
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
-			l.title, l.color, l.icon, l.custom_icon, l.updated_at
+			l.title, l.color, l.icon, l.custom_icon, l.updated_at,
+			(fi.quest_id IS NOT NULL AND fi.dismissed_at IS NULL)
 		FROM quest q
 		LEFT JOIN questcategory c ON c.id = q.category_id
 		LEFT JOIN questline l ON l.id = q.questline_id
+		LEFT JOIN quest_failure_inbox fi ON fi.quest_id = q.id
 		WHERE q.id = ?`, id)
 	quest, err := scanQuest(row)
 	if err == sql.ErrNoRows {
@@ -156,6 +160,7 @@ func scanQuest(row rowScanner) (Quest, error) {
 	var period, source sql.NullString
 	var catID, lineID, tmplID sql.NullInt64
 	var pinned, automated int
+	var failureInbox bool
 	var cSlug, cLabel, cColor sql.NullString
 	var lTitle, lColor, lIcon, lCustom sql.NullString
 	var lUpdated sql.NullString
@@ -165,12 +170,14 @@ func scanQuest(row rowScanner) (Quest, error) {
 		&created, &updated, &completed, &tmplID, &period, &automated, &source,
 		&cSlug, &cLabel, &cColor,
 		&lTitle, &lColor, &lIcon, &lCustom, &lUpdated,
+		&failureInbox,
 	)
 	if err != nil {
 		return q, err
 	}
 	q.Pinned, q.OverlayHidden = SplitPinState(pinned)
 	q.Automated = automated != 0
+	q.FailureInbox = failureInbox
 	if source.Valid {
 		v := source.String
 		q.Source = &v
@@ -266,7 +273,11 @@ func (s *Store) CreateQuest(ctx context.Context, q Quest) (Quest, error) {
 }
 
 // CreateQuestAppeared inserts a template instance and stages quest_appeared.
+// When the instance is already failed (emit_pool exhausted), stages quest_failed instead.
 func (s *Store) CreateQuestAppeared(ctx context.Context, q Quest) (Quest, error) {
+	if q.Status == StatusFailed {
+		return s.createQuest(ctx, q, "quest_failed", "провалено")
+	}
 	detail := "Период"
 	if q.PeriodKey != nil {
 		detail = "Период " + *q.PeriodKey
@@ -325,6 +336,11 @@ func (s *Store) createQuest(ctx context.Context, q Quest, changeKind, changeDeta
 	if err := stageChange(tx, ctx, changeKind, &qid, q.Title, changeDetail, string(q.Significance)); err != nil {
 		return Quest{}, err
 	}
+	if q.Status == StatusFailed {
+		if err := ensureFailureInboxTx(tx, ctx, qid, q.UpdatedAt); err != nil {
+			return Quest{}, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return Quest{}, err
 	}
@@ -353,6 +369,11 @@ func (s *Store) UpdateQuest(ctx context.Context, q Quest, changeKind, changeDeta
 	}
 	if changeKind != "" {
 		if err := stageChangeComment(tx, ctx, changeKind, &q.ID, q.Title, changeDetail, string(q.Significance), ""); err != nil {
+			return Quest{}, err
+		}
+	}
+	if q.Status == StatusFailed {
+		if err := ensureFailureInboxTx(tx, ctx, q.ID, q.UpdatedAt); err != nil {
 			return Quest{}, err
 		}
 	}
@@ -390,7 +411,13 @@ func persistQuestRow(tx *sql.Tx, ctx context.Context, q Quest) error {
 		UPDATE quest SET status=?, updated_at=?, completed_at=? WHERE id=?`,
 		string(q.Status), timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), q.ID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if q.Status == StatusFailed {
+		return ensureFailureInboxTx(tx, ctx, q.ID, q.UpdatedAt)
+	}
+	return nil
 }
 
 func stageChange(tx *sql.Tx, ctx context.Context, kind string, questID *int64, title, detail, significance string) error {
@@ -472,6 +499,11 @@ func (s *Store) UpdateQuestComment(ctx context.Context, q Quest, changeKind, cha
 	}
 	if changeKind != "" {
 		if err := stageChangeComment(tx, ctx, changeKind, &q.ID, q.Title, changeDetail, string(q.Significance), comment); err != nil {
+			return Quest{}, err
+		}
+	}
+	if q.Status == StatusFailed {
+		if err := ensureFailureInboxTx(tx, ctx, q.ID, q.UpdatedAt); err != nil {
 			return Quest{}, err
 		}
 	}

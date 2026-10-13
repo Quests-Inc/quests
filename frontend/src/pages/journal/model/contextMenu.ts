@@ -20,7 +20,7 @@ export function contextMenuItems({
 }: {
   kind: string
   lineId: number | null
-  quest?: { status?: string; significance?: string }
+  quest?: { status?: string; significance?: string; failure_inbox?: boolean }
   questId: number | null
   stepId: number | null
   step?: { progress_total?: number }
@@ -50,7 +50,7 @@ export function contextMenuItems({
     if (status === 'frozen') {
       delayChildren.push({ id: 'sep-undelay', sep: true }, { id: 'status:active', label: 'Вернуть в активные' })
     }
-    return [
+    const items: MenuItem[] = [
       { id: 'copy-id', label: `Копировать quest=${questId}` },
       { id: 'sep-copy', sep: true },
       { id: 'edit', label: 'Редактировать' },
@@ -84,9 +84,12 @@ export function contextMenuItems({
           { id: 'export-pdf-simple', label: 'PDF (просто)' },
         ],
       },
-      { id: 'sep-danger', sep: true },
-      { id: 'delete', label: 'Удалить', danger: true },
     ]
+    if (quest?.failure_inbox) {
+      items.push({ id: 'sep-ack', sep: true }, { id: 'ack-failure', label: 'Скрыть из провалов' })
+    }
+    items.push({ id: 'sep-danger', sep: true }, { id: 'delete', label: 'Удалить', danger: true })
+    return items
   }
   if (kind === 'step') {
     const total = Math.max(1, Number(step?.progress_total) || 1)

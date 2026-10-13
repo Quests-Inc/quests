@@ -1,7 +1,14 @@
 // Действия журнала: меню, модалки квеста и квестлайна, удаление, прогресс шага, закрепление.
 // Оболочка только создаёт стол и открывает его с шапки; вкладка журнала и оверлеи читают его.
 import { replaceQuest } from '@/entities/quest'
-import { deleteQuest, deleteQuestline, deleteQuestStep, updateQuest, updateQuestStep } from '@/shared/api/client.ts'
+import {
+  ackQuestFailure,
+  deleteQuest,
+  deleteQuestline,
+  deleteQuestStep,
+  updateQuest,
+  updateQuestStep,
+} from '@/shared/api/client.ts'
 import { copyText } from '@/shared/lib/clipboard.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
@@ -147,6 +154,7 @@ export function createJournalDesk(deps: {
 
   const questActions = createQuestActions({
     updateQuest,
+    ackFailure: (id) => ackQuestFailure(id),
     applyQuest: (quest, opts) => applyQuest(quest, opts),
     setError: (message) => deps.setError(message),
     refLabels: () => deps.getRefLabels(),

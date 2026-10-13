@@ -394,6 +394,37 @@ func (h *Handler) patchQuest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, journal.ToQuestRead(updated, timeutil.NowUTC()))
 }
 
+func (h *Handler) ackFailure(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.Store.DismissFailureInbox(r.Context(), id); err != nil {
+		if errors.Is(err, journal.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, "Quest not found")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	updated, err := h.Store.GetQuest(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	_, source := publishOpts(r)
+	qid := updated.ID
+	h.Hub.Publish("quest_updated", events.PublishOpts{
+		Workspace: wsctx.From(r.Context()),
+		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
+		Detail: "провал скрыт", Toast: false, Source: source,
+		Significance: string(updated.Significance),
+		Automated:    updated.Automated,
+	})
+	writeJSON(w, http.StatusOK, journal.ToQuestRead(updated, timeutil.NowUTC()))
+}
+
 func (h *Handler) deleteQuest(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {

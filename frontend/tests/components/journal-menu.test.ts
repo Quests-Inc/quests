@@ -9,6 +9,7 @@ function make() {
   const quests = [
     { id: 1, status: 'active' },
     { id: 2, status: 'frozen' },
+    { id: 3, status: 'failed', failure_inbox: true },
   ]
   const step = { id: 10, title: 'шаг', progress_total: 4 }
   let selected: number | null = null
@@ -34,6 +35,7 @@ function make() {
         patchStatus: (q, s) => log.push(['status', q.id, s]),
         patchSignificance: (q, v) => log.push(['sig', q.id, v]),
         exportQuest: (q, m) => log.push(['export', q.id, m]),
+        ackFailure: (q) => log.push(['ack', q.id]),
       },
       step: {
         bump: (s, d, q) => log.push(['bump', s.id, d, q]),
@@ -74,6 +76,15 @@ test('пункты квеста: статус меняется только на
     ['askQuest', 1],
     ['copy', 'quest', 1],
   ])
+  t.stop()
+})
+
+test('проваленный квест в инбоксе: скрыть из провалов', async () => {
+  const t = make()
+  t.menu.openQuest(t.ev, { id: 3 })
+  expect(t.menu.items.some((i) => i.id === 'ack-failure')).toBe(true)
+  await t.menu.select('ack-failure')
+  expect(t.log).toEqual([['ack', 3]])
   t.stop()
 })
 

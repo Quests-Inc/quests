@@ -130,6 +130,10 @@ export interface Quest {
   PeriodKey?: string;
   Source?: string; // 'template:<id>' or the creating client; nil = unknown
   Automated: boolean;
+  /**
+   * FailureInbox: undismissed row in quest_failure_inbox (journal «Провалено»).
+   */
+  FailureInbox: boolean;
   CategorySlug?: string;
   CategoryLabel?: string;
   CategoryColor?: string;
@@ -265,6 +269,7 @@ export interface QuestRead {
   period_key?: string;
   source?: string;
   automated: boolean;
+  failure_inbox: boolean;
   steps: StepRead[];
   steps_done: number /* int */;
   steps_total: number /* int */;

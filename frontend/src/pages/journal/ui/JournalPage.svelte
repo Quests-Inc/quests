@@ -80,6 +80,7 @@
   let categoryOpen = $state({} as Record<string, boolean>)
   let lineOpen = $state({} as Record<string, boolean>)
   let frozenOpen = $state(false)
+  let failedOpen = $state(true)
 
   let questQuerySpec = $derived(questSpec({ categories }))
   let parsedQuestSearch = $derived(parseQuery(searchQuery, questQuerySpec))
@@ -102,6 +103,12 @@
   let scopedQuests = $derived(inScope(listedQuests, { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
   let byCategory = $derived(groupQuestsByCategory(scopedQuests, categories, questlines))
   let frozenQuests = $derived(inScope(matchedQuests.filter((q) => q.status === 'frozen'), { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
+  let failedInboxQuests = $derived(
+    inScope(
+      matchedQuests.filter((q) => q.status === 'failed' && q.failure_inbox),
+      { categoryId: scopeCategoryId, questlineId: scopeQuestlineId },
+    ),
+  )
 
   function setShowAll(on: boolean) {
     const rest = tokenValues(parsedQuestSearch, 'status').filter((v) => v !== 'all')
@@ -140,6 +147,9 @@
     {frozenQuests}
     {frozenOpen}
     onToggleFrozen={() => (frozenOpen = !frozenOpen)}
+    {failedInboxQuests}
+    {failedOpen}
+    onToggleFailed={() => (failedOpen = !failedOpen)}
     {categories}
     {scopeCategoryId}
     {scopeQuestlineId}

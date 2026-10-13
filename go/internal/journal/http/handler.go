@@ -44,6 +44,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/quests", h.createQuest)
 	mux.HandleFunc("GET /api/quests/{id}", h.getQuest)
 	mux.HandleFunc("PATCH /api/quests/{id}", h.patchQuest)
+	mux.HandleFunc("POST /api/quests/{id}/ack-failure", h.ackFailure)
 	mux.HandleFunc("DELETE /api/quests/{id}", h.deleteQuest)
 	mux.HandleFunc("POST /api/quests/{id}/steps", h.addStep)
 	mux.HandleFunc("PATCH /api/quests/{id}/steps/{step_id}", h.patchStep)

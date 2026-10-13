@@ -4,7 +4,7 @@ import { contextMenuItems } from './contextMenu.ts'
 
 type Kind = 'line' | 'quest' | 'step'
 type Pt = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }
-type Quest = { id: number; status?: string }
+type Quest = { id: number; status?: string; failure_inbox?: boolean }
 type Step = { id: number; title?: string; progress_total?: number }
 type Line = { id: number; category_id?: number | null }
 
@@ -28,6 +28,7 @@ export function createJournalMenu(deps: {
     patchStatus: (q: Quest, status: string) => unknown
     patchSignificance: (q: Quest, value: string) => unknown
     exportQuest: (q: Quest, mode: 'md' | 'rich' | 'simple') => unknown
+    ackFailure?: (q: Quest) => unknown
   }
   step: {
     bump: (s: Step, delta: number, questId: number) => unknown
@@ -113,6 +114,7 @@ export function createJournalMenu(deps: {
     else if (action === 'export-md') deps.quest.exportQuest(quest, 'md')
     else if (action === 'export-pdf') deps.quest.exportQuest(quest, 'rich')
     else if (action === 'export-pdf-simple') deps.quest.exportQuest(quest, 'simple')
+    else if (action === 'ack-failure') deps.quest.ackFailure?.(quest)
     else if (action === 'delete') deps.askDeleteQuest(quest)
   }
 

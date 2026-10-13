@@ -35,6 +35,7 @@ type QuestRead struct {
 	PeriodKey        *string      `json:"period_key"`
 	Source           *string      `json:"source"`
 	Automated        bool         `json:"automated"`
+	FailureInbox     bool         `json:"failure_inbox"`
 	Steps            []StepRead   `json:"steps"`
 	StepsDone        int          `json:"steps_done"`
 	StepsTotal       int          `json:"steps_total"`
@@ -121,6 +122,7 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 		PeriodKey:        q.PeriodKey,
 		Source:           q.Source,
 		Automated:        q.Automated,
+		FailureInbox:     q.FailureInbox,
 		StepsDone:        done,
 		StepsTotal:       total,
 		ProgressLabel:    label,
