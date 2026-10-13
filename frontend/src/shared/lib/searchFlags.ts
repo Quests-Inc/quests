@@ -118,6 +118,10 @@ export function suggestions(raw: string, spec: FlagSpec) {
   const items = def.values.filter(
     (v) => !part || v.id.toLowerCase().startsWith(part) || v.aliases?.some((a) => a.startsWith(part))
   )
+  // A finished token (`cat:work` and nothing else would complete it) has nothing left to suggest.
+  const only = items[0]
+  if (items.length === 1 && part && (only.id.toLowerCase() === part || only.aliases?.some((a) => a === part)))
+    return null
   return items.length ? { key: m[3].toLowerCase(), neg: m[2] === '-', items } : null
 }
 

@@ -3,6 +3,11 @@ import { OPEN_STATUSES } from './questFormat.ts'
 
 type QuestLike = { status: string; category_id?: number | null; questline_id?: number | null }
 
+/** Сужение по разделу: id раздела, 'none' — квесты без раздела, null — без сужения. */
+export type CategoryScope = number | 'none' | null
+
+const categoryOf = (scope: Exclude<CategoryScope, null>) => (scope === 'none' ? null : scope)
+
 /** Без фильтра по статусу в запросе и без «показывать завершённые» — только открытые (active/expired). */
 export function listOpenOrAll<Q extends QuestLike>(
   quests: Q[],
@@ -14,10 +19,10 @@ export function listOpenOrAll<Q extends QuestLike>(
 /** Квесты выбранного раздела и/или квестлайна; null — без сужения. */
 export function inScope<Q extends QuestLike>(
   quests: Q[],
-  scope: { categoryId: number | null; questlineId: number | null }
+  scope: { categoryId: CategoryScope; questlineId: number | null }
 ): Q[] {
   return quests.filter((q) => {
-    if (scope.categoryId != null && (q.category_id ?? null) !== scope.categoryId) return false
+    if (scope.categoryId != null && (q.category_id ?? null) !== categoryOf(scope.categoryId)) return false
     if (scope.questlineId != null && q.questline_id !== scope.questlineId) return false
     return true
   })
@@ -34,15 +39,16 @@ export function scopeQuestlineChoices<L extends { id: number; category_id?: numb
   quests,
   showAll,
 }: {
-  scopeCategoryId: number | null
+  scopeCategoryId: CategoryScope
   questlines: L[]
   quests: (QuestLike & { questline_id?: number | null })[]
   showAll: boolean
 }): L[] {
   if (scopeCategoryId == null) return []
-  const ids = new Set(questlines.filter((l) => (l.category_id ?? null) === scopeCategoryId).map((l) => l.id))
+  const cat = categoryOf(scopeCategoryId)
+  const ids = new Set(questlines.filter((l) => (l.category_id ?? null) === cat).map((l) => l.id))
   for (const q of quests) {
-    if (q.questline_id != null && (q.category_id ?? null) === scopeCategoryId) ids.add(q.questline_id)
+    if (q.questline_id != null && (q.category_id ?? null) === cat) ids.add(q.questline_id)
   }
   const inCategory = questlines.filter((l) => ids.has(l.id))
   if (showAll) return inCategory

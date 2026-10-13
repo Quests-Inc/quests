@@ -3,6 +3,7 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import RefText from '@/shared/ui/RefText.svelte'
   import { QuestlineIcon } from '@/entities/questline'
+  import ScopePicker from '@/shared/ui/ScopePicker.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
   import {
@@ -41,7 +42,7 @@
     categories,
     scopeCategoryId,
     scopeQuestlineId,
-    scopeQuestlineOptions,
+    scopeQuestlinesFor,
     onScopeCategory,
     onScopeQuestline,
     labels = {},
@@ -71,22 +72,19 @@
     onToggleLine: (catKey: string, lineKey: string) => void,
     onToggleFrozen: () => void,
     categories: any[],
-    scopeCategoryId: number | null,
+    scopeCategoryId: number | 'none' | null,
     scopeQuestlineId: number | null,
-    scopeQuestlineOptions: any[],
-    onScopeCategory: (id: number | null) => void,
+    scopeQuestlinesFor: (cat: number | 'none') => { id: number; title: string }[],
+    onScopeCategory: (id: number | 'none' | null) => void,
     onScopeQuestline: (id: number | null) => void,
     labels?: Record<string, string>,
     onRef?: (kind: string, id: number) => void,
   } = $props()
 
-  function onScopeCategoryChange(event: { currentTarget: { value: any } }) {
-    const v = event.currentTarget.value
-    onScopeCategory(v === '' ? null : Number(v))
-  }
-  function onScopeQuestlineChange(event: { currentTarget: { value: any } }) {
-    const v = event.currentTarget.value
-    onScopeQuestline(v === '' ? null : Number(v))
+  /** The picker chooses a category and, optionally, one of its questlines in one go. */
+  function pickScope(category: number | 'none' | null, questline: number | null) {
+    if (category !== scopeCategoryId) onScopeCategory(category)
+    if (questline !== scopeQuestlineId || category !== scopeCategoryId) onScopeQuestline(questline)
   }
 
   let rootEl: HTMLElement | null = $state(null)
@@ -143,35 +141,27 @@
       title={`Фильтры: ${helpLine(querySpec)}; -key:value — исключить`}
     />
     <FlagHints value={searchQuery} spec={querySpec} parsed={parsedSearch} onPick={(v) => (searchQuery = v)} />
-    <label class="sidebar__filter">
-      <input type="checkbox" checked={showAllQuests} onchange={(e) => onShowAll?.(e.currentTarget.checked)} />
-      <span>Показывать завершённые</span>
-    </label>
     <div class="sidebar__scope">
-      <select
-        class="sidebar__scope-select"
-        value={scopeCategoryId ?? ''}
-        onchange={onScopeCategoryChange}
-        aria-label="Сузить до раздела"
+      <div class="sidebar__scope-pick">
+        <ScopePicker
+          categories={categories}
+          category={scopeCategoryId}
+          questline={scopeQuestlineId}
+          linesFor={scopeQuestlinesFor}
+          onPick={pickScope}
+        />
+      </div>
+      <button
+        type="button"
+        class="sidebar__showall"
+        class:sidebar__showall--on={showAllQuests}
+        aria-pressed={showAllQuests}
+        aria-label="Показывать завершённые"
+        title={showAllQuests ? 'Показаны и завершённые — клик: только открытые' : 'Только открытые — клик: показать и завершённые'}
+        onclick={() => onShowAll?.(!showAllQuests)}
       >
-        <option value="">Все разделы</option>
-        {#each categories as cat (cat.id)}
-          <option value={cat.id}>{cat.label}</option>
-        {/each}
-      </select>
-      {#if scopeCategoryId != null}
-        <select
-          class="sidebar__scope-select"
-          value={scopeQuestlineId ?? ''}
-          onchange={onScopeQuestlineChange}
-          aria-label="Сузить до квестлайна"
-        >
-          <option value="">Весь раздел</option>
-          {#each scopeQuestlineOptions as line (line.id)}
-            <option value={line.id}>{line.title}</option>
-          {/each}
-        </select>
-      {/if}
+        <Icon name={showAllQuests ? 'eye' : 'eye-off'} size={16} />
+      </button>
     </div>
   </div>
   {#snippet questRow(q: any)}
@@ -269,7 +259,7 @@
     {:else if matchedQuests.length === 0}
       <p class="empty">Ничего не найдено</p>
     {:else if listedQuests.length === 0}
-      <p class="empty">Нет активных — включи «Показывать завершённые»</p>
+      <p class="empty">Нет активных — покажите завершённые кнопкой с глазом рядом с разделом</p>
     {:else}
       {#snippet categoryBody(g: any)}
         {#if g.lines.length === 0}

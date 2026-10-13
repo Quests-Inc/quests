@@ -36,6 +36,27 @@ test('scopeQuestlineChoices: без «все» — только квестлай
   ).toEqual([10])
 })
 
+test('«без раздела»: inScope и варианты квестлайнов', () => {
+  const qs = [
+    { id: 1, status: 'active', category_id: null, questline_id: 20 },
+    { id: 2, status: 'active', category_id: 1, questline_id: 10 },
+    { id: 3, status: 'active', category_id: null, questline_id: null },
+  ]
+  expect(inScope(qs, { categoryId: 'none', questlineId: null }).map((q) => q.id)).toEqual([1, 3])
+  expect(inScope(qs, { categoryId: 'none', questlineId: 20 }).map((q) => q.id)).toEqual([1])
+  const lines = [
+    { id: 10, category_id: 1 },
+    { id: 20, category_id: null },
+    { id: 21, category_id: null },
+  ]
+  expect(
+    scopeQuestlineChoices({ scopeCategoryId: 'none', questlines: lines, quests: qs, showAll: true }).map((l) => l.id)
+  ).toEqual([20, 21])
+  expect(
+    scopeQuestlineChoices({ scopeCategoryId: 'none', questlines: lines, quests: qs, showAll: false }).map((l) => l.id)
+  ).toEqual([20])
+})
+
 test('buildRefLabels: подписи ссылок всех видов, пустое название — kind=id', () => {
   const labels = buildRefLabels({
     notes: [{ id: 1, title: 'Заметка' }],

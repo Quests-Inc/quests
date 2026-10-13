@@ -21,44 +21,41 @@
   border-bottom: 1px solid var(--color-border, #333);
 }
 
-.sidebar__filter {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0;
-  padding: 0.1rem 0.05rem 0.15rem;
-  border: 0;
-  font-size: var(--text-xs, 0.75rem);
-  color: var(--color-fg-muted, #9a9a9a);
-  cursor: pointer;
-  user-select: none;
-}
-
-.sidebar__filter input {
-  accent-color: var(--color-accent, #c9a227);
-}
-
 .sidebar__scope {
   display: flex;
   gap: 0.35rem;
 }
 
-.sidebar__scope-select {
-  flex: 1;
+.sidebar__scope-pick {
+  flex: 1 1 auto;
   min-width: 0;
-  height: 1.9rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--color-border-strong, #4a4a4a);
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-bg-muted, #242424);
-  color: var(--color-fg, #e8e8e8);
-  font-family: var(--font-ui, sans-serif);
-  font-size: var(--text-xs, 0.75rem);
 }
 
-.sidebar__scope-select:focus {
-  outline: 1px solid var(--color-accent, #c9a227);
-  outline-offset: 1px;
+/* «Показывать завершённые»: a toggle next to the scope button; on = completed quests listed too. */
+.sidebar__showall {
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--color-border-strong, #4a4a4a);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-bg-muted, #242424);
+  color: var(--color-fg-muted, #9a9a9a);
+  cursor: pointer;
+}
+
+.sidebar__showall:hover {
+  color: var(--color-fg, #e8e8e8);
+  border-color: var(--color-fg-muted, #9a9a9a);
+}
+
+.sidebar__showall--on {
+  color: var(--color-accent, #c9a227);
+  border-color: var(--color-accent, #c9a227);
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-muted, #242424));
 }
 
 .sidebar__list {

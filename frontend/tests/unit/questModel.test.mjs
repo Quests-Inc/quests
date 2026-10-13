@@ -97,6 +97,7 @@ test('questSpec: фильтры поиска по статусу, флагам, 
   expect(ok('tag:infra')).toBe(true)
   expect(ok('tag:нет')).toBe(false)
   expect(ok('cat:work')).toBe(true)
+  expect(ok('cat:none')).toBe(false)
   expect(ok('line:5')).toBe(true)
   expect(ok('line:моя_линия')).toBe(true)
 })
@@ -124,4 +125,13 @@ test('historyKinds: подписи видов и значимая подробн
   expect(detailOf({ detail: 'Период 2026-01-01', title: 'x' })).toBe('Период 2026-01-01')
   expect(detailOf({ detail: 'x', title: 'x' })).toBe('')
   expect(detailOf({})).toBe('')
+})
+
+test('questSpec: cat:none — квесты без раздела', () => {
+  const spec = questSpec({ categories: [{ id: 1, slug: 'work', label: 'Работа' }] })
+  const free = { status: 'active', category_slug: null }
+  const work = { status: 'active', category_slug: 'work' }
+  expect(passes(parseQuery('cat:none', spec), spec, free)).toBe(true)
+  expect(passes(parseQuery('cat:none', spec), spec, work)).toBe(false)
+  expect(spec.cat.values.some((v) => v.id === 'none')).toBe(true)
 })

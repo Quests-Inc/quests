@@ -97,3 +97,32 @@ test('time: даты API без зоны — UTC, формат поля ввод
   expect(timerTone(100, 0)).toBeNull()
   expect(remainingFromDeadline('2026-03-01T10:00:10Z', Date.parse('2026-03-01T10:00:00Z'))).toBe(10)
 })
+
+import { suggestions } from '../../src/shared/lib/searchFlags.ts'
+
+test('suggestions: пока токен не дописан — подсказки; готовый единственный вариант подсказки не просит', () => {
+  const spec = {
+    cat: {
+      values: [
+        { id: 'work', label: 'Работа', aliases: ['1'] },
+        { id: 'home', label: 'Дом' },
+      ],
+    },
+  }
+  expect(suggestions('cat:', spec).items).toHaveLength(2)
+  expect(suggestions('cat:wo', spec).items.map((i) => i.id)).toEqual(['work'])
+  expect(suggestions('cat:work', spec)).toBeNull()
+  expect(suggestions('cat:1', spec)).toBeNull()
+  // токен закрыт пробелом — подсказок нет и раньше
+  expect(suggestions('cat:work ', spec)).toBeNull()
+  // точное совпадение, но есть и более длинный вариант: подсказка остаётся
+  const two = {
+    tag: {
+      values: [
+        { id: 'api', label: 'api' },
+        { id: 'apix', label: 'apix' },
+      ],
+    },
+  }
+  expect(suggestions('tag:api', two).items).toHaveLength(2)
+})
