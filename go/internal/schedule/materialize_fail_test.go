@@ -25,12 +25,11 @@ func TestMaterializeDuePoolFailNotifiesAndInboxes(t *testing.T) {
 		if i > 0 {
 			now = now.Add(emitPoolRetryDelays[min(i-1, len(emitPoolRetryDelays)-1)] + time.Second)
 		}
-		got, err := MaterializeDue(bg(), st, hub, now, rng)
-		if err != nil {
+		if _, err := MaterializeDue(bg(), st, hub, now, rng); err != nil {
 			t.Fatal(err)
 		}
 		runQueuedJobs(t, st, nil)
-		got, err = MaterializeDue(bg(), st, hub, now, rng)
+		got, err := MaterializeDue(bg(), st, hub, now, rng)
 		if err != nil {
 			t.Fatal(err)
 		}
