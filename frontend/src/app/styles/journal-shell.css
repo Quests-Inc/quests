@@ -223,6 +223,24 @@
   display: none;
 }
 
+/* Labels do not fit even on their own row (JournalHeader measures it): icons only, as in the 480px override. */
+.journal__header--icon-tabs .view-tab {
+  padding: 0 0.5rem;
+}
+
+.journal__header--icon-tabs .view-tabs .view-tab .icon {
+  display: inline-flex;
+}
+
+.journal__header--icon-tabs .view-tab__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
 .view-tab + .view-tab {
   border-left: 0;
 }

@@ -274,6 +274,8 @@
   /** True when the centred tabs cannot fit between the side clusters even at their most collapsed:
    * the tabs then drop onto their own row (like in portrait) instead of painting over the chips and buttons. */
   let stacked = $state(false)
+  /** Even on their own row the labelled tabs are wider than the header: icons only, like on a phone. */
+  let iconTabs = $state(false)
   let tabsNaturalW = 0
 
   function recomputeStacked() {
@@ -281,7 +283,7 @@
     // The tabs' own width, whatever row they sit on: the sum of the tab buttons (a stacked row stretches).
     const items = [...tabsEl.children] as HTMLElement[]
     const natural = items.reduce((w, el) => w + el.offsetWidth, 0) + 2.4 * Math.max(0, items.length - 1)
-    if (natural > 0) tabsNaturalW = natural
+    if (natural > 0 && !iconTabs) tabsNaturalW = natural
     const cs = getComputedStyle(headerEl)
     const gap = parseFloat(cs.columnGap) || 12
     const width = headerEl.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
@@ -295,6 +297,8 @@
     const need = tabsNaturalW + 2 * Math.max(leftMin, rightMin) + 2 * gap
     // Hysteresis so the layout does not flip back and forth around the threshold.
     stacked = stacked ? need + 24 > width : need > width
+    // On their own row the tabs need the whole header width; when even that is short, they lose their labels.
+    iconTabs = stacked && (iconTabs ? tabsNaturalW + 24 > width : tabsNaturalW > width)
   }
 
   /** Actions that still collide with the centred tabs after every stage has been tried push the tabs onto their own row. */
@@ -357,7 +361,7 @@
   })
 </script>
 
-<header class="journal__header" class:journal__header--stacked={stacked} bind:this={headerEl}>
+<header class="journal__header" class:journal__header--stacked={stacked} class:journal__header--icon-tabs={iconTabs} bind:this={headerEl}>
   <div class="header-left" bind:this={leftEl}>
     {#if showSidebarToggle}
       <button
