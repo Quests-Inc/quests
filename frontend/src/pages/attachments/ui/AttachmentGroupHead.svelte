@@ -33,7 +33,7 @@
 <style>
   .agh {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     padding-left: 0.6rem;
   }
 
@@ -41,7 +41,6 @@
     flex: 0 0 auto;
     display: grid;
     place-items: center;
-    align-self: center;
     width: 1.4rem;
     height: 1.4rem;
     padding: 0;
@@ -63,7 +62,7 @@
     gap: 0.5rem;
     flex: 1 1 auto;
     min-width: 0;
-    padding: 0.5rem 1rem 0.3rem 0.3rem;
+    padding: 0.4rem 1rem 0.4rem 0.3rem;
     border: 0;
     background: transparent;
     text-align: left;
