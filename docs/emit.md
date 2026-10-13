@@ -1,53 +1,55 @@
-# Эмит квестов по шаблону
+# Emitting quests from a template
 
-Шаблон создаёт квест по расписанию (`freq`/`weekdays`, режим `fixed` или `surprise`). По умолчанию квест строится из полей шаблона. Если задан `emit_pool_command`, то **команда печатает квест**.
+A template creates a quest on a schedule (`freq`/`weekdays`, mode `fixed` or `surprise`). By default the quest is built from the template's fields. If `emit_pool_command` is set, **the command prints the quest**. It runs on a runner (`emit_run_on`, one device or an ordered list of fallbacks; see [`note-check.md`](note-check.md)), never on the server.
 
-## Формат вывода
+## Output format
 
-Один JSON-объект, по форме как тело `POST /api/quests`. Заданное в нём перекрывает поля шаблона, остальное берётся из шаблона:
+One JSON object shaped like the body of `POST /api/quests`. What it sets overrides the template's fields; the rest comes from the template:
 
 ```json
 {
-  "title": "Счёт от МТС",
-  "description": "markdown, quest=N и note=N как обычно",
+  "title": "Phone bill",
+  "description": "markdown, quest=N and note=N as usual",
   "significance": "uncommon",
   "pinned": false,
   "automated": true,
-  "questline": "Рутина",
+  "questline": "Routine",
   "category": "home",
   "tags": ["infra", "api"],
   "deadline_at": "2026-10-03T12:00:00Z",
   "duration_seconds": 3600,
   "steps": [
-    {"title": "Оплатить"},
-    {"title": "Ждать письмо", "progress_total": 3, "check_command": "quests progress 300", "run_mode": "watch"}
+    {"title": "Pay"},
+    {"title": "Wait for the e-mail", "progress_total": 3, "check_command": "quests progress 300", "run_on": "main-pc", "run_mode": "watch"}
   ]
 }
 ```
 
-- `questline`, `category`, `tags` можно задавать id или именем (точное совпадение приоритетнее подстроки, неоднозначность это ошибка). Квестлайн приносит свою категорию.
-- Дедлайн только абсолютный: `deadline_at` (+ `duration_seconds`); без них действуют правила шаблона.
-- Нет `steps`: берутся шаги шаблона.
-- `null`, `{}` или пустой вывод означают «в этот период квеста нет» (не ошибка).
-- Поля вне формата игнорируются, их имена попадают в лог попытки (`list_emit_attempts`), так что формат можно расширять без поломок.
-- Старый формат (JSON-массив) больше не принимается: это ошибка разбора. Вес, число выбираемых штук и защита от повторов убраны.
+- `questline`, `category` and `tags` can be given by id or by name (an exact match wins over a substring; an ambiguity is an error). A questline brings its own category.
+- The deadline is absolute only: `deadline_at` (+ `duration_seconds`); without them the template's rules apply.
+- No `steps`: the template's steps are used.
+- `null`, `{}` or empty output mean “no quest for this period” (not an error).
+- Fields outside the format are ignored and their names go into the attempt's log (`list_emit_attempts`), so the format can grow without breaking anything.
+- The old format (a JSON array) is no longer accepted: it is a parse error. Weight, the number of items to pick and repeat protection are gone.
 
-## Повторы
+## Repeats
 
-Защиты нет, осознанно: пока письмо не прочитано, квест о нём будет появляться снова. Хеш по заголовку не годится (разные письма с одной темой), а повторы заодно мотивируют закрывать задачи вовремя. Если на практике это окажется неприемлемым, вернёмся к вопросу.
+There is no protection, deliberately: while a letter is unread, a quest about it will keep coming back. A hash of the title will not do (different letters share a subject), and repeats happen to motivate closing tasks in time. If that proves unacceptable in practice, the question will be reopened.
 
-## Лимиты
+## Limits
 
-По умолчанию `max_steps` 30, `max_title` 200, `max_description` 20 000, `max_command` 2000. Шаблон может переопределить любой из них в JSON-поле `emit_limits` (в UI шаблона, секция «Контент»): `{"max_steps": 50}`. Опечатка в ключе или неположительное число это ошибка при сохранении.
+By default `max_steps` is 30, `max_title` 200, `max_description` 20,000 and `max_command` 2000. A template can override any of them in the JSON field `emit_limits` (in the template's UI, the «Контент» (Content) section): `{"max_steps": 50}`. A typo in a key or a non-positive number is an error on save.
 
-## Ошибки и ретраи
+## Errors and retries
 
-Падение команды, таймаут (20 с), невалидный JSON или недопустимый квест (лимиты, неизвестный квестлайн/тег, плохая значимость) это неудачная попытка. Паузы между попытками 1/5/15 минут, всего 4; после этого следующий эмит создаёт квест со статусом `failed`, в описании трейс последней попытки (значения секретов замаскированы). Каждая попытка записана в лог: `GET /api/templates/{id}/emit-attempts`, MCP `list_emit_attempts`.
+A command that fails, a timeout (20 s), invalid JSON or an invalid quest (limits, an unknown questline/tag, a bad significance) is a failed attempt. The pauses between attempts are 1/5/15 minutes, 4 attempts in all; after that the next emit creates a quest with the status `failed`, whose description holds the trace of the last attempt (secret values masked). Every attempt is logged: `GET /api/templates/{id}/emit-attempts`, MCP `list_emit_attempts`.
 
-## Источник квеста
+A runner that never shows up is not a failed attempt: the job stays `skipped` as a marker for the period, nothing is re-queued and the template is not marked as failing.
 
-Поле `quest.source` показывает, как создан квест: `template:<id>` для эмитированных, иначе клиент из заголовка `X-Quests-Source` (`web`, `cli`, `mcp`, `telegram`, `assistant`; по умолчанию `api`).
+## Where a quest came from
 
-## Секреты
+The field `quest.source` shows how a quest was created: `template:<id>` for emitted ones, otherwise the client from the `X-Quests-Source` header (`web`, `cli`, `mcp`, `telegram`, `assistant`; `api` by default).
 
-Команда и шаги эмитированного квеста видят секреты шаблона и его квестлайна, см. `docs/secrets.md`.
+## Secrets
+
+The command and the steps of an emitted quest see the secrets of the template and of its questline, see [`secrets.md`](secrets.md).

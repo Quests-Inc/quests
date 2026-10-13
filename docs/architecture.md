@@ -1,73 +1,73 @@
-# Архитектура
+# Architecture
 
-Из чего состоит Quests, на чём каждая часть написана и как они общаются. Устройство кода внутри Go-ядра и фронтенда и правила зависимостей — в [ADR-0001](adr/0001-architecture.md); термины — в [глоссарии](glossary.md).
+What Quests consists of, what each part is written in and how the parts talk to each other. The structure of the Go core and of the frontend, and the dependency rules, are in [ADR-0001](adr/0001-architecture.md); terms are in the [glossary](glossary.md).
 
-## Компоненты
+## Components
 
-| Компонент | Язык | Где | Что делает |
+| Component | Language | Where | What it does |
 |---|---|---|---|
-| **API-сервер** `quests-server` | Go | `go/cmd/quests-server`, `go/internal/*` | HTTP API, раздача SPA, планировщик (шаблоны, проверки заметок, бэкапы), события; сам накатывает схему БД при старте |
-| **CLI** `quests` | Go | `go/cmd/quests` | Клиент API в терминале (`docs/cli.md`) |
-| **Раннер** `quests-runner` | Go | `go/cmd/quests-runner` | Исполняет команды проверок и эмита на устройстве владельца; сервер команд не исполняет (`docs/security.md`) |
-| **Веб-интерфейс** | Svelte 5 + TypeScript | `frontend/` | SPA; типы ответов API генерируются из Go (`just gen-types`) |
-| **MCP-сервер** `quests-mcp` | Python | `src/quests/mcp_server.py` | Инструменты для ИИ-агентов поверх HTTP API |
-| **Telegram-бот** | Python | `src/quests/telegram/` | Уведомления, быстрое добавление, голос через STT |
-| **STT** `quests-stt` | Python | `src/quests/stt_server.py` | Распознавание речи (faster-whisper) отдельным контейнером |
-| **Оверлей** | Python + GTK4 | `overlay/` | Wayland-HUD и тосты на рабочей станции |
-| **Android HUD** | Kotlin | `android/` | Foreground-сервис с ongoing-уведомлением поверх того же REST API |
+| **API server** `quests-server` | Go | `go/cmd/quests-server`, `go/internal/*` | HTTP API, serves the SPA, scheduler (templates, note checks, backups), events; applies the database schema itself on start |
+| **CLI** `quests` | Go | `go/cmd/quests` | Terminal client of the API (`docs/cli.md`) |
+| **Runner** `quests-runner` | Go | `go/cmd/quests-runner` | Executes check and emit commands on the owner's device; the server runs no commands (`docs/security.md`) |
+| **Web UI** | Svelte 5 + TypeScript | `frontend/` | SPA; the API response types are generated from Go (`just gen-types`) |
+| **MCP server** `quests-mcp` | Python | `src/quests/mcp_server.py` | Tools for AI agents on top of the HTTP API |
+| **Telegram bot** | Python | `src/quests/telegram/` | Notifications, quick add, voice through STT |
+| **STT** `quests-stt` | Python | `src/quests/stt_server.py` | Speech recognition (faster-whisper) in a separate container |
+| **Overlay** | Python + GTK4 | `overlay/` | Wayland HUD and toasts on a workstation |
+| **Android HUD** | Kotlin | `android/` | A foreground service with an ongoing notification on top of the same REST API |
 
-Всё, что не API, общается с сервером **только по HTTP** (`/api/*`, токен или сессия): прямого доступа к БД у них нет.
+Everything that is not the API talks to the server **only over HTTP** (`/api/*`, token or session): none of them has direct access to the database.
 
-## Карта Go-ядра
+## The Go core
 
-| Пакет | Что внутри |
+| Package | What is inside |
 |---|---|
-| `identity`, `identity/http` | аккаунты, сессии, MFA, токены, пространства, роли |
-| `knowledge`, `knowledge/http` | заметки, вложения, ревизии, поиск, квоты |
-| `journal`, `journal/http` | квесты, шаги, цепочки, категории, теги, журнал изменений |
-| `automation`, `automation/http` | шаблоны, раннеры и их задания, секреты, попытки эмита |
-| `schedule` | планировщик: решает *когда* (материализация шаблонов, просрочка, проверки, бэкапы, очистка); в БД ходит только через хранилища контекстов |
-| `httpapi` | корень композиции: подключает обработчики контекстов и сквозные срезы, аутентификация, рендер PDF |
-| `assistant` | сквозной срез: настройки ИИ-ассистента аккаунта и пакеты действий из текста |
-| `graphdraft` | сквозной срез: черновик карты связей (операции копятся на сервере, фиксация применяет их через API) |
-| `wsarchive` | сквозной срез: архив воркспейса (экспорт и импорт zip) |
-| `store` | остаток: сквозные чтения (граф, экспорт/импорт, статистика) и журнал бэкапов |
-| `kernel`, `refs`, `platform/*` | общее ядро, ссылки `kind=ID`, техническая инфраструктура (БД, события, ratelimit, apiclient…) |
-| `cli`, `llmassist` | клиенты API: командная строка и ИИ-ассистент (общий HTTP-клиент — `platform/apiclient`) |
+| `identity`, `identity/http` | accounts, sessions, MFA, tokens, workspaces, roles |
+| `knowledge`, `knowledge/http` | notes, attachments, revisions, search, quotas |
+| `journal`, `journal/http` | quests, steps, chains, categories, tags, the change log |
+| `automation`, `automation/http` | templates, runners and their jobs, secrets, emit attempts |
+| `schedule` | the scheduler: decides *when* (template materialization, expiry, checks, backups, purging); reaches the database only through the contexts' stores |
+| `httpapi` | the composition root: wires the contexts' handlers and the cross-cutting slices, authentication, PDF rendering |
+| `assistant` | cross-cutting slice: an account's AI assistant settings and action batches built from text |
+| `graphdraft` | cross-cutting slice: the draft of the relations map (operations accumulate on the server, committing applies them through the API) |
+| `wsarchive` | cross-cutting slice: the workspace archive (zip export and import) |
+| `store` | the remainder: cross-context reads (graph, export/import, statistics) and the backup log |
+| `kernel`, `refs`, `platform/*` | the shared kernel, `kind=ID` references, technical infrastructure (database, events, rate limiting, apiclient…) |
+| `cli`, `llmassist` | API clients: the command line and the AI assistant (the shared HTTP client is `platform/apiclient`) |
 
-Фронтенд устроен по слоям FSD (`frontend/README.md`).
+The frontend is organized in Feature-Sliced Design layers (`frontend/README.md`).
 
-## Данные
+## Data
 
-PostgreSQL 17 — единственная БД (`docs/postgres.md`). Изоляция пространств — row-level security, роль `quests_app`
-(`docs/security.md`). Схема — встроенные SQL-миграции `go/internal/platform/db/sql/pg`; версия лежит в таблице `alembic_version`
-(имя осталось от Alembic, которым когда-то создавалась боевая БД; самого Alembic в репозитории нет).
+PostgreSQL 17 is the only database (`docs/postgres.md`). Workspaces are isolated by row-level security under the role `quests_app`
+(`docs/security.md`). The schema is embedded SQL migrations in `go/internal/platform/db/sql/pg`; the applied revision is kept in the table `alembic_version`
+(the name is a leftover from Alembic, which once created the production database; Alembic itself is not in the repository).
 
-## Образы и выкатка
+## Images and rollout
 
-Три образа собираются из одного `deploy/docker/Dockerfile`: `quests-api` (Go-бинарь + SPA, без интерпретаторов),
-`quests-bot` и `quests-stt` (Python). Релиз `vX.Y.Z` → образы в GHCR → PR в репозиторий `quests-deploy` → doco-cd на
-сервере подтягивает изменения (`deploy/README.md`).
+Three images are built from one `deploy/docker/Dockerfile`: `quests-api` (the Go binary + SPA, no interpreters),
+`quests-bot` and `quests-stt` (Python). A release `vX.Y.Z` → images in GHCR → a pull request in the `quests-deploy` repository → doco-cd on the
+server picks the change up (`deploy/README.md`).
 
-## Что осталось на Python и почему
+## What stays in Python and why
 
-Бот, MCP, STT и оверлей — отдельные процессы со своим жизненным циклом и тяжёлыми зависимостями (aiogram, whisper, GTK).
-Переписывать их ради единого языка не планируется: границей служит HTTP API, и они не влияют ни на схему данных, ни на
-образ API. Python в API-образе нет совсем.
+The bot, MCP, STT and the overlay are separate processes with their own life cycle and heavy dependencies (aiogram, whisper, GTK).
+There are no plans to rewrite them for the sake of a single language: the boundary is the HTTP API, and they affect neither the data schema nor
+the API image. There is no Python in the API image at all.
 
-## Гейты против регрессий
+## Gates against regressions
 
-Все гейты гоняются локально (`just test`, `cd frontend && bun run verify`) и теми же командами в CI.
+All gates run locally (`just test`, `cd frontend && bun run verify`) and, with the same commands, in CI.
 
-| Гейт | Что держит |
+| Gate | What it holds |
 |---|---|
-| `golangci-lint` + depguard (`go/.golangci.yml`) | направление зависимостей пакетов Go (контексты, `platform`, корень) |
-| `internal/archtest` | нетестовый Go-файл ≤ 600 строк |
-| `tools/coverage_gate.py` (+ `go/.coverage-baseline.json`) | покрытие Go по пакетам не падает; новый пакет — не меньше 50 %; интеграционные тесты засчитываются обработчикам (`-coverpkg`) |
-| `go tool tygo generate` без diff | типы фронта совпадают с Go-структурами |
-| `check:fsd` | слои FSD, импорты только через `index.ts`, кросс-импорты сущностей только через `@x` |
-| `check:arch` (+ `frontend/.arch-baseline.json`) | файл не растёт сверх планки, новый — ≤ 800 строк; `model/` и `lib/` не знают про компоненты, контроллеры `.svelte.ts` — только в них; сеть — только в `shared/api`; **каждый файл `model/` и `shared/lib/` подключён тестом** |
-| `check` (svelte-check) и `check:any` | число ошибок типов и явных `any` не растёт |
-| `tests/unit`, `tests/components`, `tests/security` | чистая логика; компоненты, контроллеры и сквозной обход всего приложения над фальшивым бэкендом (ловит зацикленные эффекты и «битые» вкладки); санитайзер markdown на jsdom |
+| `golangci-lint` + depguard (`go/.golangci.yml`) | the direction of Go package dependencies (contexts, `platform`, the root) |
+| `internal/archtest` | a non-test Go file is at most 600 lines |
+| `tools/coverage_gate.py` (+ `go/.coverage-baseline.json`) | Go coverage per package does not drop; a new package gets at least 50 %; integration tests count for the handlers (`-coverpkg`) |
+| `go tool tygo generate` with no diff | the frontend types match the Go structs |
+| `check:fsd` | FSD layers, imports only through `index.ts`, cross-imports between entities only through `@x` |
+| `check:arch` (+ `frontend/.arch-baseline.json`) | a file does not grow past its bar, a new one is ≤ 800 lines; `model/` and `lib/` know nothing about components, `.svelte.ts` controllers live only there; the network only in `shared/api`; **every file of `model/` and `shared/lib/` is covered by a test** |
+| `check` (svelte-check) and `check:any` | the number of type errors and explicit `any` does not grow |
+| `tests/unit`, `tests/components`, `tests/security` | pure logic; components, controllers and a walk through the whole app over a fake backend (catches looping effects and broken tabs); the markdown sanitizer on jsdom |
 
-Новые планки ставятся командами `--update` (`check:any`, `check:arch`, `coverage_gate.py`) и только вниз: долг можно гасить, наращивать — нет.
+New bars are set with the `--update` commands (`check:any`, `check:arch`, `coverage_gate.py`) and only downwards: debt may be paid off, never increased.

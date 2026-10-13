@@ -1,38 +1,40 @@
-# Секреты
+# Secrets
 
-Значения (пароли, токены) для команд, которые исполняет раннер: `emit_pool_command` шаблонов и `check_command` шагов (сервер сам команд не запускает, см. `docs/security.md`). Секрет это переменная окружения команды.
+Values (passwords, tokens) for the commands a runner executes: a template's `emit_pool_command` and a step's `check_command` (the server runs no commands itself, see [`security.md`](security.md)). A secret is an environment variable of the command.
 
-## Уровни и наследование
+## Levels and inheritance
 
-Секрет привязывается к одному из четырёх владельцев: **квестлайн**, **шаблон**, **квест**, **шаг**. Команда видит секреты своего владельца и всех, кто выше, от частного к общему:
+A secret belongs to one of four owners: a **questline**, a **template**, a **quest** or a **step**. A command sees the secrets of its own owner and of everyone above it, from the particular to the general:
 
 ```
-шаг  >  квест  >  шаблон (quest.template_id)  >  квестлайн
+step  >  quest  >  template (quest.template_id)  >  questline
 ```
 
-- Одноимённый секрет более частного владельца перекрывает общий.
-- `emit_pool_command` шаблона видит секреты шаблона и его квестлайна.
-- `check_command` шага видит секреты шага, его квеста, шаблона, который квест создал, и квестлайна квеста.
-- Смена пароля делается в одном месте (на самом общем владельце), копировать по квестам не нужно.
+- A secret with the same name on a more particular owner overrides the general one.
+- A template's `emit_pool_command` sees the secrets of the template and of its questline.
+- A step's `check_command` sees the secrets of the step, of its quest, of the template that created the quest and of the quest's questline.
+- Changing a password is done in one place (on the most general owner); there is no need to copy it across quests.
 
-При удалении владельца его секреты удаляются вместе с ним. Исключение: при удалении **шаблона** секреты шаблона копируются на его ещё открытые квесты, у которых есть шаги с автопроверкой (иначе эти проверки потеряли бы пароль, потому что `quest.template_id` обнуляется).
+When an owner is deleted, its secrets are deleted with it. The exception: when a **template** is deleted, its secrets are copied onto its still-open quests that have steps with an auto-check (otherwise those checks would lose their password, since `quest.template_id` is cleared).
 
 ## UI
 
-Меню «Секреты» в шапке, а также пункт «Секреты» в контекстном меню (ПКМ) квеста, шага, квестлайна и шаблона (в списке шаблонов): открывается на этой сущности. В поле «Чьи секреты» можно набрать `@название` (подставит `quest=12`, `template=5`, …) или вставить ссылку; предлагаются только сущности, которые могут владеть секретами (квестлайн, шаблон, квест, шаг). Список показывает собственные имена и унаследованные с указанием источника.
+The «Секреты» (Secrets) menu in the header, and the «Секреты» item in the context menu (right click) of a quest, a step, a questline and a template (in the template list): it opens on that entity. In the «Чьи секреты» (Whose secrets) field you can type `@title` (it inserts `quest=12`, `template=5`, …) or paste a reference; only entities that can own secrets are offered (questline, template, quest, step). The list shows own names and inherited ones with their source.
 
-## API и MCP
+## API and MCP
 
-`GET|PUT|DELETE /api/{questlines|templates|quests|steps}/{id}/secrets[/{key}]`. Список отдаёт только имена: `{"keys": [...собственные...], "inherited": [{"key", "from", "id"}]}`. Значения не читаются ни через API, ни через MCP.
+`GET|PUT|DELETE /api/{questlines|templates|quests|steps}/{id}/secrets[/{key}]`. The list returns only names: `{"keys": [...own...], "inherited": [{"key", "from", "id"}]}`. Values cannot be read through the API or MCP.
 
-MCP: `list_secrets(owner)`, `set_secret(owner, key, value)`, `delete_secret(owner, key)`, где `owner` это `questline=N`, `template=N`, `quest=N` или `step=N`. Старые `*_template_secret` работают как раньше.
+MCP: `list_secrets(owner)`, `set_secret(owner, key, value)`, `delete_secret(owner, key)`, where `owner` is `questline=N`, `template=N`, `quest=N` or `step=N`. The old `*_template_secret` tools work as before.
 
-Имя секрета — допустимое имя переменной окружения (`[A-Za-z_][A-Za-z0-9_]*`).
+A secret's name is a valid environment variable name (`[A-Za-z_][A-Za-z0-9_]*`). Names that would bend how a process starts (`PATH`, `LD_*`, `BASH_ENV`, `QUESTS_*`…) are refused.
 
-## Маскирование
+## Masking
 
-Всё, что команда печатает (stdout, stderr, трейсы, лог попыток эмита), проходит через замену значений секретов на `***` (значения короче 4 символов не маскируются). Это защита от случайной утечки, а не от умысла: base64 или разбиение значения маскирование не поймает.
+Everything a command prints (stdout, stderr, traces, the emit attempts' log) passes through a replacement of secret values with `***` (values shorter than 4 characters are not masked). This protects against an accidental leak, not against intent: base64 or splitting the value defeats masking.
 
-## Риск
+## At rest and risk
 
-Кто может создать или изменить шаг с командой в квестлайне, может вывести его секреты. Держите секрет на самом узком владельце, которому он нужен. Хранятся значения открытым текстом: сервер и так выполняет эти команды на своём хосте, как и корневой `.env`.
+Values are sealed in the database with the server key (AES-256-GCM, see [`security.md`](security.md)): a dump or a backup alone does not reveal them. A runner receives them in the environment of the command, on the owner's own device.
+
+Whoever can create or change a step with a command in a questline can print its secrets (only owners of a workspace can write commands). Keep a secret on the narrowest owner that needs it.
