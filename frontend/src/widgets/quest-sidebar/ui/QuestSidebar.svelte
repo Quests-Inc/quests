@@ -141,18 +141,27 @@
       title={`Фильтры: ${helpLine(querySpec)}; -key:value — исключить`}
     />
     <FlagHints value={searchQuery} spec={querySpec} parsed={parsedSearch} onPick={(v) => (searchQuery = v)} />
-    <label class="sidebar__filter">
-      <input type="checkbox" checked={showAllQuests} onchange={(e) => onShowAll?.(e.currentTarget.checked)} />
-      <span>Показывать завершённые</span>
-    </label>
     <div class="sidebar__scope">
-      <ScopePicker
-        categories={categories}
-        category={scopeCategoryId}
-        questline={scopeQuestlineId}
-        linesFor={scopeQuestlinesFor}
-        onPick={pickScope}
-      />
+      <div class="sidebar__scope-pick">
+        <ScopePicker
+          categories={categories}
+          category={scopeCategoryId}
+          questline={scopeQuestlineId}
+          linesFor={scopeQuestlinesFor}
+          onPick={pickScope}
+        />
+      </div>
+      <button
+        type="button"
+        class="sidebar__showall"
+        class:sidebar__showall--on={showAllQuests}
+        aria-pressed={showAllQuests}
+        aria-label="Показывать завершённые"
+        title={showAllQuests ? 'Показаны и завершённые — клик: только открытые' : 'Только открытые — клик: показать и завершённые'}
+        onclick={() => onShowAll?.(!showAllQuests)}
+      >
+        <Icon name={showAllQuests ? 'eye' : 'eye-off'} size={16} />
+      </button>
     </div>
   </div>
   {#snippet questRow(q: any)}
@@ -250,7 +259,7 @@
     {:else if matchedQuests.length === 0}
       <p class="empty">Ничего не найдено</p>
     {:else if listedQuests.length === 0}
-      <p class="empty">Нет активных — включи «Показывать завершённые»</p>
+      <p class="empty">Нет активных — покажите завершённые кнопкой с глазом рядом с разделом</p>
     {:else}
       {#snippet categoryBody(g: any)}
         {#if g.lines.length === 0}
