@@ -222,7 +222,6 @@
   onkeydown={onTriggerKey}
 >
   <span class="scope__text">{triggerText}</span>
-  <Icon name="chevron-down" size={12} />
 </button>
 
 {#if open}
@@ -313,18 +312,20 @@
   .scope__btn {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    justify-content: center;
+    box-sizing: border-box;
     width: 100%;
     min-width: 0;
-    height: 1.9rem;
-    padding: 0 0.5rem;
+    height: 2.25rem;
+    padding: 0 var(--space-3, 0.75rem);
     border: 1px solid var(--color-border-strong, #4a4a4a);
-    border-radius: var(--radius-md, 8px);
+    border-radius: var(--radius-lg, 12px);
     background: var(--color-bg-muted, #242424);
     color: var(--color-fg, #e8e8e8);
     font-family: var(--font-ui, sans-serif);
-    font-size: var(--text-xs, 0.75rem);
-    text-align: left;
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1;
+    text-align: center;
     cursor: pointer;
   }
   .scope__btn:hover,
@@ -332,7 +333,6 @@
     border-color: var(--color-accent, #c9a227);
   }
   .scope__text {
-    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
