@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
 
@@ -270,7 +271,44 @@
     return false
   }
 
-  function recomputeAll() {
+  /** True when the centred tabs cannot fit between the side clusters even at their most collapsed:
+   * the tabs then drop onto their own row (like in portrait) instead of painting over the chips and buttons. */
+  let stacked = $state(false)
+  let tabsNaturalW = 0
+
+  function recomputeStacked() {
+    if (!headerEl || !leftEl || !tabsEl || !actionsEl) return
+    // The tabs' own width, whatever row they sit on: the sum of the tab buttons (a stacked row stretches).
+    const items = [...tabsEl.children] as HTMLElement[]
+    const natural = items.reduce((w, el) => w + el.offsetWidth, 0) + 2.4 * Math.max(0, items.length - 1)
+    if (natural > 0) tabsNaturalW = natural
+    const cs = getComputedStyle(headerEl)
+    const gap = parseFloat(cs.columnGap) || 12
+    const width = headerEl.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
+    const healthW = healthEl?.offsetWidth ?? 0
+    // Narrowest left cluster: toggle + brand + health reduced to dots (about 3.5rem when it is still labeled).
+    // header-left itself stretches across the free space, so its own width says nothing: add up its children.
+    const kids = [...leftEl.children].filter((el) => el !== healthEl) as HTMLElement[]
+    const chrome = kids.reduce((w, el) => w + el.offsetWidth, 0) + gap * kids.length
+    const leftMin = chrome + (healthCollapsed ? healthW : 56)
+    const rightMin = measurePrimaryEl?.scrollWidth ?? actionsEl.offsetWidth
+    const need = tabsNaturalW + 2 * Math.max(leftMin, rightMin) + 2 * gap
+    // Hysteresis so the layout does not flip back and forth around the threshold.
+    stacked = stacked ? need + 24 > width : need > width
+  }
+
+  /** Actions that still collide with the centred tabs after every stage has been tried push the tabs onto their own row. */
+  function tabsCollide(gap = 6) {
+    if (!tabsEl || !actionsEl || !healthEl || getComputedStyle(tabsEl).position !== 'absolute') return false
+    const t = tabsEl.getBoundingClientRect()
+    return t.right + gap > actionsEl.getBoundingClientRect().left || t.left - gap < healthEl.getBoundingClientRect().right
+  }
+
+  async function recomputeAll() {
+    const was = stacked
+    recomputeStacked()
+    // The collapse maths below reads the tabs' position: let the new layout land first.
+    if (stacked !== was) await tick()
     // Health first so a wide labeled row yields budget to actions, then
     // actions pick a stage; finally a geometry check stops residual overlap
     // the slot math missed (toggle chrome, font swap, absolute tabs).
@@ -282,6 +320,9 @@
         if (resolveOverlap()) requestAnimationFrame(recomputeCollapse)
       })
     }
+    requestAnimationFrame(() => {
+      if (!stacked && actionsMode === 'icons-primary' && tabsCollide()) stacked = true
+    })
   }
 
   $effect(() => {
@@ -316,7 +357,7 @@
   })
 </script>
 
-<header class="journal__header" bind:this={headerEl}>
+<header class="journal__header" class:journal__header--stacked={stacked} bind:this={headerEl}>
   <div class="header-left" bind:this={leftEl}>
     {#if showSidebarToggle}
       <button

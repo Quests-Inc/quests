@@ -180,6 +180,25 @@
   background: transparent;
 }
 
+/* The centred tabs do not fit between the clusters (JournalHeader measures it): own row under them, as in portrait. */
+.journal__header--stacked {
+  flex-wrap: wrap;
+}
+
+.journal__header--stacked .view-tabs {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  margin: 0;
+  order: 3;
+  flex: 1 1 100%;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  border-top: 1px solid var(--color-border, #333);
+}
+
 .view-tab {
   display: inline-flex;
   align-items: center;
