@@ -43,24 +43,6 @@
   gap: 0.35rem;
 }
 
-.sidebar__scope-select {
-  flex: 1;
-  min-width: 0;
-  height: 1.9rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--color-border-strong, #4a4a4a);
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-bg-muted, #242424);
-  color: var(--color-fg, #e8e8e8);
-  font-family: var(--font-ui, sans-serif);
-  font-size: var(--text-xs, 0.75rem);
-}
-
-.sidebar__scope-select:focus {
-  outline: 1px solid var(--color-accent, #c9a227);
-  outline-offset: 1px;
-}
-
 .sidebar__list {
   flex: 1;
   overflow-y: auto;

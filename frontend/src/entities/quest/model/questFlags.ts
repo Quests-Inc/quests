@@ -50,8 +50,14 @@ export function questSpec({ categories = [] }: { categories?: any[] } = {}) {
     },
     cat: {
       label: 'раздел',
-      values: categories.map((c) => ({ id: c.slug, label: c.label, aliases: [String(c.id)] })),
-      test: (q: { category_slug: any }, v: string) => (q.category_slug || '').toLowerCase() === v.toLowerCase(),
+      values: [
+        ...categories.map((c) => ({ id: c.slug, label: c.label, aliases: [String(c.id)] })),
+        { id: 'none', label: 'без раздела' },
+      ],
+      test: (q: { category_slug: any }, v: string) =>
+        v.toLowerCase() === 'none' && !q.category_slug
+          ? true
+          : (q.category_slug || '').toLowerCase() === v.toLowerCase(),
     },
     line: {
       label: 'квестлайн',

@@ -3,6 +3,7 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import RefText from '@/shared/ui/RefText.svelte'
   import { QuestlineIcon } from '@/entities/questline'
+  import ScopePicker from '@/shared/ui/ScopePicker.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
   import {
@@ -41,7 +42,7 @@
     categories,
     scopeCategoryId,
     scopeQuestlineId,
-    scopeQuestlineOptions,
+    scopeQuestlinesFor,
     onScopeCategory,
     onScopeQuestline,
     labels = {},
@@ -71,22 +72,19 @@
     onToggleLine: (catKey: string, lineKey: string) => void,
     onToggleFrozen: () => void,
     categories: any[],
-    scopeCategoryId: number | null,
+    scopeCategoryId: number | 'none' | null,
     scopeQuestlineId: number | null,
-    scopeQuestlineOptions: any[],
-    onScopeCategory: (id: number | null) => void,
+    scopeQuestlinesFor: (cat: number | 'none') => { id: number; title: string }[],
+    onScopeCategory: (id: number | 'none' | null) => void,
     onScopeQuestline: (id: number | null) => void,
     labels?: Record<string, string>,
     onRef?: (kind: string, id: number) => void,
   } = $props()
 
-  function onScopeCategoryChange(event: { currentTarget: { value: any } }) {
-    const v = event.currentTarget.value
-    onScopeCategory(v === '' ? null : Number(v))
-  }
-  function onScopeQuestlineChange(event: { currentTarget: { value: any } }) {
-    const v = event.currentTarget.value
-    onScopeQuestline(v === '' ? null : Number(v))
+  /** The picker chooses a category and, optionally, one of its questlines in one go. */
+  function pickScope(category: number | 'none' | null, questline: number | null) {
+    if (category !== scopeCategoryId) onScopeCategory(category)
+    if (questline !== scopeQuestlineId || category !== scopeCategoryId) onScopeQuestline(questline)
   }
 
   let rootEl: HTMLElement | null = $state(null)
@@ -148,30 +146,13 @@
       <span>Показывать завершённые</span>
     </label>
     <div class="sidebar__scope">
-      <select
-        class="sidebar__scope-select"
-        value={scopeCategoryId ?? ''}
-        onchange={onScopeCategoryChange}
-        aria-label="Сузить до раздела"
-      >
-        <option value="">Все разделы</option>
-        {#each categories as cat (cat.id)}
-          <option value={cat.id}>{cat.label}</option>
-        {/each}
-      </select>
-      {#if scopeCategoryId != null}
-        <select
-          class="sidebar__scope-select"
-          value={scopeQuestlineId ?? ''}
-          onchange={onScopeQuestlineChange}
-          aria-label="Сузить до квестлайна"
-        >
-          <option value="">Весь раздел</option>
-          {#each scopeQuestlineOptions as line (line.id)}
-            <option value={line.id}>{line.title}</option>
-          {/each}
-        </select>
-      {/if}
+      <ScopePicker
+        categories={categories}
+        category={scopeCategoryId}
+        questline={scopeQuestlineId}
+        linesFor={scopeQuestlinesFor}
+        onPick={pickScope}
+      />
     </div>
   </div>
   {#snippet questRow(q: any)}

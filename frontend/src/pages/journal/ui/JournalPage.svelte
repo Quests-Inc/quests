@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { questCatalog, groupQuestsByCategory, inScope, listOpenOrAll, questSpec, scopeQuestlineChoices } from '@/entities/quest'
+  import { questCatalog, groupQuestsByCategory, inScope, listOpenOrAll, questSpec, scopeQuestlineChoices, type CategoryScope } from '@/entities/quest'
   import { noteCatalog } from '@/entities/note'
   import { QuestDetail } from '@/widgets/quest-detail'
   import { QuestSidebar } from '@/widgets/quest-sidebar'
@@ -86,6 +86,7 @@
   let showAllQuests = $derived(tokenValues(parsedQuestSearch, 'status').includes('all'))
   let scopeCategoryId = $derived.by(() => {
     const slug = tokenValues(parsedQuestSearch, 'cat')[0]
+    if (slug === 'none') return 'none' as const
     return slug ? (categories.find((c) => c.slug === slug)?.id ?? null) : null
   })
   let scopeQuestlineId = $derived.by(() => {
@@ -95,7 +96,7 @@
     if (byId) return byId.id
     return questlines.find((l) => (l.title || '').replace(/\s+/g, '_').toLowerCase() === v.toLowerCase())?.id ?? null
   })
-  let scopeQuestlineOptions = $derived(scopeQuestlineChoices({ scopeCategoryId, questlines, quests, showAll: showAllQuests }))
+  const scopeQuestlinesFor = (cat: CategoryScope) => scopeQuestlineChoices({ scopeCategoryId: cat, questlines, quests, showAll: showAllQuests })
   let matchedQuests = $derived(quests.filter((q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q)))
   let listedQuests = $derived(listOpenOrAll(matchedQuests, { showAll: showAllQuests, statusTokens: tokenValues(parsedQuestSearch, 'status') }))
   let scopedQuests = $derived(inScope(listedQuests, { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
@@ -106,8 +107,8 @@
     const rest = tokenValues(parsedQuestSearch, 'status').filter((v) => v !== 'all')
     searchQuery = setToken(searchQuery, 'status', on ? [...rest, 'all'] : rest)
   }
-  function setScopeCategory(id: number | null) {
-    const slug = id == null ? null : categories.find((c) => c.id === id)?.slug
+  function setScopeCategory(id: CategoryScope) {
+    const slug = id == null ? null : id === 'none' ? 'none' : categories.find((c) => c.id === id)?.slug
     searchQuery = setToken(setToken(searchQuery, 'line', []), 'cat', slug ? [slug] : [])
   }
   function setScopeQuestline(id: number | null) {
@@ -142,7 +143,7 @@
     {categories}
     {scopeCategoryId}
     {scopeQuestlineId}
-    {scopeQuestlineOptions}
+    {scopeQuestlinesFor}
     onScopeCategory={setScopeCategory}
     onScopeQuestline={setScopeQuestline}
     bind:searchQuery
