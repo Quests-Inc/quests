@@ -39,6 +39,14 @@ build-runner:
     cd go
     CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$version" -o "${QUESTS_RUNNER_OUT:-bin/quests-runner}" ./cmd/quests-runner
 
+# MCP server for AI agents (stdio) → go/bin/quests-mcp
+build-mcp:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version="${QUESTS_MCP_VERSION:-$(git describe --always --dirty 2>/dev/null || echo dev)}"
+    cd go
+    CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$version" -o "${QUESTS_MCP_OUT:-bin/quests-mcp}" ./cmd/quests-mcp
+
 # Wayland HUD (Go/gotk4) → go/bin/quests-overlay  (needs gtk4 + gtk4-layer-shell; tag keeps CI free of CGO)
 build-overlay:
     #!/usr/bin/env bash
