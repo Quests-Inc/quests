@@ -19,7 +19,10 @@ func TestMaterializeDuePoolFailNotifiesAndInboxes(t *testing.T) {
 
 	hub := events.New()
 	rng := rand.New(rand.NewSource(1))
-	now := time.Now()
+	// The retries walk the clock ~21 minutes ahead; a daily period must not roll over meanwhile,
+	// so start at noon Moscow time (the templates' default zone) rather than at the wall clock.
+	today := time.Now().UTC()
+	now := time.Date(today.Year(), today.Month(), today.Day(), 9, 0, 0, 0, time.UTC)
 	var ids []int64
 	for i := 0; i < emitPoolMaxAttempts+2; i++ {
 		if i > 0 {
