@@ -53,12 +53,32 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	if v := r.URL.Query().Get("category_id"); v != "" {
+		rows, err = h.notesUnderCategory(r, rows, v)
+		if err != nil {
+			var he httpError
+			if errors.As(err, &he) {
+				writeErr(w, he.code, he.msg)
+			} else {
+				writeErr(w, 500, err.Error())
+			}
+			return
+		}
+	}
 	checks, _ := h.Store.NoteChecks(r.Context())
 	out := make([]NoteListItem, 0, len(rows))
 	for _, n := range rows {
 		read := knowledge.NoteToRead(n)
 		redactPrivateNote(r, n, &read)
 		out = append(out, NoteListItem{NoteRead: read, NoteVerdict: verdictOf(checks[n.ID])})
+	}
+	if fl := r.URL.Query().Get("flags"); fl != "" {
+		kept, ferr := filterNoteFlags(out, fl)
+		if ferr != nil {
+			writeErr(w, 422, ferr.Error())
+			return
+		}
+		out = kept
 	}
 	if r.URL.Query().Get("sort") == "popular" {
 		// Reading history: decayed score first, then the boost (newness, manual weight); explained per note.
@@ -82,6 +102,16 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 			}
 			return pi.Boost > pj.Boost
 		})
+	}
+	if q := r.URL.Query(); q.Get("brief") == "1" || strings.EqualFold(q.Get("brief"), "true") {
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		page, perr := briefNotePage(out, limit, q.Get("cursor"))
+		if perr != nil {
+			writeErr(w, 400, perr.Error())
+			return
+		}
+		writeJSON(w, 200, page)
+		return
 	}
 	writeJSON(w, 200, out)
 }

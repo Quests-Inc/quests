@@ -14,6 +14,58 @@ import (
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
+// StepView is one step with a brief of its quest (GET /api/steps/{id}).
+type StepView struct {
+	Step  journal.StepRead `json:"step"`
+	Quest StepQuestBrief   `json:"quest"`
+}
+
+// StepQuestBrief is the part of a quest worth showing next to one of its steps.
+type StepQuestBrief struct {
+	ID            int64               `json:"id"`
+	Title         string              `json:"title"`
+	Status        journal.QuestStatus `json:"status"`
+	ProgressLabel string              `json:"progress_label"`
+}
+
+// getStep answers for a step by its id alone, without loading anything but its own quest.
+func (h *Handler) getStep(w http.ResponseWriter, r *http.Request) {
+	sid, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	qid, err := h.Store.QuestIDForStep(r.Context(), sid)
+	if errors.Is(err, journal.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "Step not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	q, err := h.Store.GetQuest(r.Context(), qid)
+	if errors.Is(err, journal.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "Step not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	read := journal.ToQuestRead(q, timeutil.NowUTC())
+	for _, st := range read.Steps {
+		if st.ID == sid {
+			writeJSON(w, http.StatusOK, StepView{
+				Step:  st,
+				Quest: StepQuestBrief{ID: read.ID, Title: read.Title, Status: read.Status, ProgressLabel: read.ProgressLabel},
+			})
+			return
+		}
+	}
+	writeErr(w, http.StatusNotFound, "Step not found")
+}
+
 func (h *Handler) addStep(w http.ResponseWriter, r *http.Request) {
 	qid, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
