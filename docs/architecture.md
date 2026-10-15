@@ -13,7 +13,7 @@ What Quests consists of, what each part is written in and how the parts talk to 
 | **MCP server** `quests-mcp` | Python | `src/quests/mcp_server.py` | Tools for AI agents on top of the HTTP API |
 | **Telegram bot** | Python | `src/quests/telegram/` | Notifications, quick add, voice through STT |
 | **STT** `quests-stt` | Python | `src/quests/stt_server.py` | Speech recognition (faster-whisper) in a separate container |
-| **Overlay** | Python + GTK4 | `overlay/` | Wayland HUD and toasts on a workstation |
+| **Overlay** | Go + gotk4 + gtk4-layer-shell | `go/cmd/quests-overlay`, `go/internal/overlay/` | Wayland HUD and toasts on a workstation (`just run-overlay`) |
 | **Android HUD** | Kotlin | `android/` | A foreground service with an ongoing notification on top of the same REST API |
 
 Everything that is not the API talks to the server **only over HTTP** (`/api/*`, token or session): none of them has direct access to the database.
@@ -51,9 +51,9 @@ server picks the change up (`deploy/README.md`).
 
 ## What stays in Python and why
 
-The bot, MCP, STT and the overlay are separate processes with their own life cycle and heavy dependencies (aiogram, whisper, GTK).
+The bot, MCP and STT are separate processes with their own life cycle and heavy dependencies (aiogram, whisper).
 There are no plans to rewrite them for the sake of a single language: the boundary is the HTTP API, and they affect neither the data schema nor
-the API image. There is no Python in the API image at all.
+the API image. There is no Python in the API image at all. The Wayland overlay is Go (`quests-overlay`).
 
 ## Gates against regressions
 

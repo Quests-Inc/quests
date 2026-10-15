@@ -85,7 +85,7 @@ EnvironmentFile=-%h/.config/quests/overlay.env
 EOF
 ```
 
-Overlay dependencies (Arch/CachyOS): `gtk4`, `gtk4-layer-shell`, `python-gobject`.
+Overlay dependencies (Arch/CachyOS): `gtk4`, `gtk4-layer-shell`.
 
 ## 4. Starting
 
@@ -105,16 +105,16 @@ for debugging. For permanent operation use the unit only.
 
 ## 5. niri binds
 
-IPC: `python3 -m overlay toggle|monitor|status` (the socket is
-`$XDG_RUNTIME_DIR/quests-overlay.sock`). Run it from the repo root:
+IPC: `go/bin/quests-overlay toggle|monitor|status` (the socket is
+`$XDG_RUNTIME_DIR/quests-overlay.sock`). Absolute path is fine if the binary is built:
 
 ```kdl
 // ~/.config/niri/config.kdl
 Mod+Space hotkey-overlay-title="Quests HUD: toggle" {
-    spawn-sh "cd ~/Quests && python3 -m overlay toggle"
+    spawn "/home/YOU/Quests/go/bin/quests-overlay" "toggle"
 }
 Mod+Shift+Space hotkey-overlay-title="Quests HUD: next monitor" {
-    spawn-sh "cd ~/Quests && python3 -m overlay monitor"
+    spawn "/home/YOU/Quests/go/bin/quests-overlay" "monitor"
 }
 
 layer-rule {
