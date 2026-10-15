@@ -30,20 +30,33 @@ func (h *Handler) listCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listQuests(w http.ResponseWriter, r *http.Request) {
+	qs := r.URL.Query()
+	summary := qs.Get("summary") == "1" || strings.EqualFold(qs.Get("summary"), "true")
 	var f journal.ListFilter
-	if st := r.URL.Query().Get("status"); st != "" {
-		s := journal.QuestStatus(st)
-		if !s.Valid() {
-			writeErr(w, http.StatusUnprocessableEntity, journal.InvalidStatusMsg(st))
-			return
+	var statuses []journal.QuestStatus
+	if st := qs.Get("status"); st != "" {
+		if summary {
+			// The compact list takes several statuses ("active,expired").
+			parsed, err := journal.ParseStatuses(st)
+			if err != nil {
+				writeErr(w, http.StatusUnprocessableEntity, err.Error())
+				return
+			}
+			statuses = parsed
+		} else {
+			s := journal.QuestStatus(st)
+			if !s.Valid() {
+				writeErr(w, http.StatusUnprocessableEntity, journal.InvalidStatusMsg(st))
+				return
+			}
+			f.Status = &s
 		}
-		f.Status = &s
 	}
-	if p := r.URL.Query().Get("pinned"); p != "" {
+	if p := qs.Get("pinned"); p != "" {
 		v := p == "1" || strings.EqualFold(p, "true")
 		f.Pinned = &v
 	}
-	if ql := r.URL.Query().Get("questline_id"); ql != "" {
+	if ql := qs.Get("questline_id"); ql != "" {
 		if n, err := strconv.ParseInt(ql, 10, 64); err == nil {
 			f.QuestlineID = &n
 		}
@@ -51,6 +64,18 @@ func (h *Handler) listQuests(w http.ResponseWriter, r *http.Request) {
 	quests, err := h.Store.ListQuests(r.Context(), f)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if summary {
+		limit, _ := strconv.Atoi(qs.Get("limit"))
+		page, err := journal.SummarizeQuests(quests, journal.SummaryQuery{
+			Statuses: statuses, Limit: limit, Cursor: qs.Get("cursor"),
+		})
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, page)
 		return
 	}
 	now := timeutil.NowUTC()

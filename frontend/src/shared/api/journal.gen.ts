@@ -314,6 +314,67 @@ export interface Store {
 }
 
 //////////
+// source: summary.go
+
+/**
+ * Page-size bounds for the compact quest list (GET /api/quests?summary=1).
+ */
+export const SummaryDefaultLimit = 20;
+/**
+ * Page-size bounds for the compact quest list (GET /api/quests?summary=1).
+ */
+export const SummaryMaxLimit = 100;
+/**
+ * NextStepRead is the first unfinished step of a quest — enough to act on it by id.
+ */
+export interface NextStepRead {
+  id: number /* int64 */;
+  title: string;
+}
+/**
+ * QuestSummary is a quest without its description, steps or attachments: the shape
+ * for listings that must stay small however many quests there are.
+ */
+export interface QuestSummary {
+  id: number /* int64 */;
+  title: string;
+  status: QuestStatus;
+  significance: Significance;
+  pinned: boolean;
+  overlay_hidden: boolean;
+  failure_inbox: boolean;
+  automated: boolean;
+  deadline_at?: string;
+  category_id?: number /* int64 */;
+  category_slug?: string;
+  questline_id?: number /* int64 */;
+  questline_title?: string;
+  updated_at: string;
+  steps_done: number /* int */;
+  steps_total: number /* int */;
+  progress_label: string;
+  next_step?: NextStepRead;
+  description_len: number /* int */;
+}
+/**
+ * QuestSummaryPage is one page of summaries. Next is empty on the last page.
+ */
+export interface QuestSummaryPage {
+  items: QuestSummary[];
+  total: number /* int */;
+  truncated: boolean;
+  next?: string;
+}
+/**
+ * SummaryQuery selects a page. Statuses empty = every status.
+ */
+export interface SummaryQuery {
+  Statuses: QuestStatus[];
+  Limit: number /* int */;
+  Cursor: string;
+}
+
+//////////
 // source: tags.go
 
 export const MaxTagsPerOwner = 5;

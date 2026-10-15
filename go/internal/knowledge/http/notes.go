@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/events"
@@ -53,6 +54,18 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	if v := r.URL.Query().Get("category_id"); v != "" {
+		rows, err = h.notesUnderCategory(r, rows, v)
+		if err != nil {
+			var he httpError
+			if errors.As(err, &he) {
+				writeErr(w, he.code, he.msg)
+			} else {
+				writeErr(w, 500, err.Error())
+			}
+			return
+		}
+	}
 	checks, _ := h.Store.NoteChecks(r.Context())
 	out := make([]NoteListItem, 0, len(rows))
 	for _, n := range rows {
@@ -82,6 +95,16 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 			}
 			return pi.Boost > pj.Boost
 		})
+	}
+	if q := r.URL.Query(); q.Get("brief") == "1" || strings.EqualFold(q.Get("brief"), "true") {
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		page, perr := briefNotePage(out, limit, q.Get("cursor"))
+		if perr != nil {
+			writeErr(w, 400, perr.Error())
+			return
+		}
+		writeJSON(w, 200, page)
+		return
 	}
 	writeJSON(w, 200, out)
 }
@@ -445,4 +468,131 @@ func noteJSONInt(v any) (int, bool) {
 		return 0, false
 	}
 	return int(*p), true
+}
+
+// Page sizes of the brief note list (GET /api/notes?brief=1), same bounds as the quest summary.
+const (
+	briefDefaultLimit = 20
+	briefMaxLimit     = 100
+)
+
+// NoteBriefListItem is a note in a list without its text: the fields to pick one, and how long it is.
+type NoteBriefListItem struct {
+	ID             int64   `json:"id"`
+	Title          string  `json:"title"`
+	ParentID       *int64  `json:"parent_id"`
+	Pinned         bool    `json:"pinned"`
+	IsReadme       bool    `json:"is_readme"`
+	IsPrivate      bool    `json:"is_private"`
+	IsCategory     bool    `json:"is_category"`
+	UpdatedAt      *string `json:"updated_at"`
+	DescriptionLen int     `json:"description_len"`
+	NoteVerdict
+	Popularity *knowledge.NotePopularity `json:"popularity,omitempty"`
+}
+
+// NoteBriefPage is one page of the brief list. Next is the id of the last note of this page.
+type NoteBriefPage struct {
+	Items     []NoteBriefListItem `json:"items"`
+	Total     int                 `json:"total"`
+	Truncated bool                `json:"truncated"`
+	Next      string              `json:"next,omitempty"`
+}
+
+var errBadNoteCursor = errors.New("invalid cursor")
+
+// briefNotePage cuts a list (already in its final order) into a page; the cursor is the id of the last
+// note handed out, so the tree order of the list is kept and nothing is skipped when notes are added later.
+func briefNotePage(items []NoteListItem, limit int, cursor string) (NoteBriefPage, error) {
+	if limit <= 0 {
+		limit = briefDefaultLimit
+	}
+	if limit > briefMaxLimit {
+		limit = briefMaxLimit
+	}
+	start := 0
+	if cursor != "" {
+		id, err := strconv.ParseInt(cursor, 10, 64)
+		if err != nil {
+			return NoteBriefPage{}, errBadNoteCursor
+		}
+		found := false
+		for i, it := range items {
+			if it.ID == id {
+				start, found = i+1, true
+				break
+			}
+		}
+		if !found {
+			return NoteBriefPage{}, errBadNoteCursor
+		}
+	}
+	page := NoteBriefPage{Total: len(items), Items: []NoteBriefListItem{}}
+	for i := start; i < len(items); i++ {
+		if len(page.Items) == limit {
+			page.Truncated = true
+			page.Next = strconv.FormatInt(page.Items[len(page.Items)-1].ID, 10)
+			break
+		}
+		it := items[i]
+		page.Items = append(page.Items, NoteBriefListItem{
+			ID: it.ID, Title: it.Title, ParentID: it.ParentID, Pinned: it.Pinned, IsReadme: it.IsReadme,
+			IsPrivate: it.IsPrivate, IsCategory: it.IsCategory, UpdatedAt: it.UpdatedAt,
+			DescriptionLen: utf8.RuneCountInString(it.Description), NoteVerdict: it.NoteVerdict, Popularity: it.Popularity,
+		})
+	}
+	return page, nil
+}
+
+type httpError struct {
+	code int
+	msg  string
+}
+
+func (e httpError) Error() string { return e.msg }
+
+// notesUnderCategory keeps the notes nested anywhere below a CATEGORY note (not the category itself).
+func (h *Handler) notesUnderCategory(r *http.Request, rows []knowledge.Note, raw string) ([]knowledge.Note, error) {
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return nil, httpError{400, "invalid category_id"}
+	}
+	all, err := h.Store.ListNotes(r.Context(), knowledge.NoteFilter{})
+	if err != nil {
+		return nil, err
+	}
+	children := map[int64][]int64{}
+	var root *knowledge.Note
+	for i, n := range all {
+		if n.ID == id {
+			root = &all[i]
+		}
+		if n.ParentID != nil {
+			children[*n.ParentID] = append(children[*n.ParentID], n.ID)
+		}
+	}
+	if root == nil {
+		return nil, httpError{404, "Note not found"}
+	}
+	if !root.IsCategory {
+		return nil, httpError{422, "note is not a CATEGORY note"}
+	}
+	under := map[int64]bool{}
+	stack := append([]int64(nil), children[id]...)
+	for len(stack) > 0 {
+		cur := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if under[cur] {
+			continue
+		}
+		under[cur] = true
+		stack = append(stack, children[cur]...)
+	}
+	out := rows[:0:0]
+	for _, n := range rows {
+		if under[n.ID] {
+			out = append(out, n)
+		}
+	}
+	return out, nil
 }
