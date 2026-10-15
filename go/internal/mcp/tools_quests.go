@@ -165,45 +165,27 @@ func questTools(c *Client) []Tool {
 		})
 
 	type stepGet struct {
-		ID       int64  `json:"id" desc:"step id"`
-		QuestID  *int64 `json:"quest_id,omitempty" desc:"its quest, if known: much cheaper than looking the step up"`
-		MaxChars int    `json:"max_chars,omitempty"`
-		Offset   int    `json:"offset,omitempty"`
+		ID       int64 `json:"id" desc:"step id"`
+		MaxChars int   `json:"max_chars,omitempty"`
+		Offset   int   `json:"offset,omitempty"`
 	}
 	getStep := Typed("get_step", "One step with its full description and check settings, plus a brief of its quest.",
 		func(ctx context.Context, a stepGet) (any, error) {
 			var resp struct {
-				Quests []map[string]any `json:"quests"`
+				Step  map[string]any `json:"step"`
+				Quest map[string]any `json:"quest"`
 			}
-			if a.QuestID != nil {
-				var q map[string]any
-				if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/quests/%d", *a.QuestID), nil, nil, &q); err != nil {
-					return nil, err
-				}
-				resp.Quests = []map[string]any{q}
-			} else if err := c.Do(ctx, http.MethodGet, "/api/context", values("step", itoa(a.ID)), nil, &resp); err != nil {
+			if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/steps/%d", a.ID), nil, nil, &resp); err != nil {
 				return nil, err
 			}
-			for _, q := range resp.Quests {
-				steps, _ := q["steps"].([]any)
-				for _, raw := range steps {
-					s, _ := raw.(map[string]any)
-					if int64(num(s["id"])) != a.ID {
-						continue
-					}
-					step := map[string]any{}
-					for k, v := range s {
-						if k != "description" {
-							step[k] = v
-						}
-					}
-					withText(step, "description", str(s["description"]), a.MaxChars, a.Offset)
-					return map[string]any{"step": step, "quest": map[string]any{
-						"id": q["id"], "title": q["title"], "status": q["status"], "progress_label": q["progress_label"],
-					}, "workspace": c.Workspace(ctx)}, nil
+			step := map[string]any{}
+			for k, v := range resp.Step {
+				if k != "description" {
+					step[k] = v
 				}
 			}
-			return nil, &Err{404, fmt.Sprintf("step=%d not found", a.ID)}
+			withText(step, "description", str(resp.Step["description"]), a.MaxChars, a.Offset)
+			return map[string]any{"step": step, "quest": resp.Quest, "workspace": c.Workspace(ctx)}, nil
 		})
 
 	type createArgs struct {

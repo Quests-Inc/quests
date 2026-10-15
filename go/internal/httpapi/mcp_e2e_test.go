@@ -100,9 +100,12 @@ func TestMCPAgainstRealAPI(t *testing.T) {
 		t.Fatalf("update_steps: %s", text)
 	}
 
-	step, text, isErr := m.call("get_step", map[string]any{"id": stepID, "quest_id": qid})
-	if isErr || step["step"].(map[string]any)["description"] != "step body" {
+	step, text, isErr := m.call("get_step", map[string]any{"id": stepID})
+	if isErr || step["step"].(map[string]any)["description"] != "step body" || step["quest"].(map[string]any)["id"].(float64) != float64(qid) {
 		t.Fatalf("get_step: %s", text)
+	}
+	if _, text, isErr = m.call("get_step", map[string]any{"id": 987654}); !isErr || !strings.HasPrefix(text, "404:") {
+		t.Fatalf("missing step: %q", text)
 	}
 
 	// finishing it moves it out of the default (live) list into history
