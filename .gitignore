@@ -55,9 +55,6 @@ sandbox.json
 *.log
 *.sock
 
-# Vendored overlay deps (installed by `just run-overlay`)
-overlay/_vendor/
-
 # Homelab dashboard (not part of Quests)
 deploy/homer/
 deploy/docker/docker-compose.watchtower.yml

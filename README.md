@@ -2,7 +2,7 @@
 
 A task manager in the spirit of a game quest log: web UI, API, CLI, check runner and a Wayland overlay (HUD + toasts) for niri / CachyOS.
 
-Stack: **Go (API + CLI + runner) · PostgreSQL · Svelte 5 + TypeScript (Vite) · Python (MCP / Telegram / STT / overlay) · GTK4 + gtk4-layer-shell**
+Stack: **Go (API + CLI + runner + overlay) · PostgreSQL · Svelte 5 + TypeScript (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
 
 The web interface is in Russian, so interface labels are quoted as they appear on screen (with a gloss where needed).
 
@@ -12,14 +12,14 @@ How the parts fit together: [`docs/architecture.md`](docs/architecture.md). Term
 
 - Go ≥ 1.26 (builds the API, CLI and runner)
 - Docker (local PostgreSQL: `just dev-db`)
-- Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/) (MCP server, Telegram bot, STT, overlay)
+- Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/) (MCP server, Telegram bot, STT)
 - [Bun](https://bun.sh) (frontend)
 - [`just`](https://just.systems) (task runner)
-- For the overlay: `gtk4`, `gtk4-layer-shell`, `python-gobject` (Wayland)
+- For the overlay: `gtk4`, `gtk4-layer-shell` (Wayland)
 
 ```bash
 # Arch / CachyOS (overlay)
-sudo pacman -S gtk4 gtk4-layer-shell python-gobject
+sudo pacman -S gtk4 gtk4-layer-shell
 ```
 
 ## Setup
@@ -44,21 +44,21 @@ frontend ones (`bun install`), creates `data/` and builds the Go CLI and API. Th
 | Database schema | `just schema` | the server migrates by itself on start; `quests-server schema` prints the revision (needs `QUESTS_DATABASE_URL`; locally `just dev-db`) |
 | CLI | `just quests …` / `go/bin/quests` | see [`docs/cli.md`](docs/cli.md) |
 | Check runner | `just build-runner` → `go/bin/quests-runner` | executes check and emit commands on a device ([`docs/note-check.md`](docs/note-check.md)) |
-| Overlay | `just run-overlay` | or `python -m overlay` |
+| Overlay | `just run-overlay` | Go HUD (`go/bin/quests-overlay`); needs gtk4 + gtk4-layer-shell |
 | Telegram bot | `just run-telegram` | an HTTP client of the API |
 | STT (voice → text) | `just run-stt` | sidecar of the bot, http://127.0.0.1:8766, needed for voice messages |
 | API in Docker | `just dev-api` | container `quests-api-dev` on :8765 with its own PostgreSQL |
 | Templates | the “Шаблоны” (Templates) page / `/api/templates` | daily/weekly → quest instances |
 
-Overlay (IPC):
+Overlay (IPC — binary talks to the running daemon via `$XDG_RUNTIME_DIR/quests-overlay.sock`):
 
 ```bash
-python -m overlay toggle    # passthrough ↔ interactive
-python -m overlay monitor   # next monitor
-python -m overlay status
+go/bin/quests-overlay toggle    # passthrough ↔ interactive
+go/bin/quests-overlay monitor   # next monitor
+go/bin/quests-overlay status
 ```
 
-The HUD theme and position are stored in `data/overlay.json` (`style_pack`, `monitor_connector`, `margins`). Switch the style in interactive mode (dropdown). The environment variable `QUESTS_STYLE_PACK` overrides the config at startup.
+The HUD theme and position are stored in `data/overlay.json` (`style_pack`, `monitor_connector`, `margins`). Switch the style in interactive mode (settings). The environment variable `QUESTS_STYLE_PACK` overrides the config at startup.
 
 ```bash
 QUESTS_STYLE_PACK=cyberpunk just run-overlay

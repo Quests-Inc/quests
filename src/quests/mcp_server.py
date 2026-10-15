@@ -22,6 +22,12 @@ Global Cursor config (``~/.cursor/mcp.json``) so any workspace can use it::
 
 Local open API: omit ``QUESTS_API_TOKEN`` and point ``QUESTS_API`` at loopback.
 Or: ``QUESTS_API=… QUESTS_API_TOKEN=… uv run --directory ~/Quests quests-mcp``.
+
+Multiple workspaces (same API, several accounts/tenants): set
+``QUESTS_WORKSPACES="name1:token1,name2:token2"`` instead of
+``QUESTS_API_TOKEN``. The first entry is active by default; use the
+``list_workspaces`` / ``switch_workspace`` tools to see and change which one
+subsequent calls hit.
 """
 
 from __future__ import annotations
@@ -57,6 +63,36 @@ def _check_significance(value: str) -> str:
 
 
 API_BASE = (os.environ.get("QUESTS_API") or f"http://{HOST}:{PORT}").rstrip("/")
+
+# Multiple workspaces (separate accounts/tenants on the same API) as
+# "name:token,name:token,...". Falls back to the single QUESTS_API_TOKEN
+# under the implicit name "default" when unset.
+def _parse_workspaces() -> dict[str, str]:
+    raw = (os.environ.get("QUESTS_WORKSPACES") or "").strip()
+    out: dict[str, str] = {}
+    if raw:
+        for pair in raw.split(","):
+            pair = pair.strip()
+            if not pair or ":" not in pair:
+                continue
+            name, token = pair.split(":", 1)
+            name = name.strip()
+            token = token.strip()
+            if name and token:
+                out[name] = token
+    if not out:
+        legacy = (os.environ.get("QUESTS_API_TOKEN") or "").strip()
+        if legacy:
+            out["default"] = legacy
+    return out
+
+
+_WORKSPACES = _parse_workspaces()
+_current_workspace: str = next(iter(_WORKSPACES), "")
+
+
+def _current_token() -> str:
+    return _WORKSPACES.get(_current_workspace, "")
 
 # IDs of your own vault notes holding the agent guide / session-report parent.
 # Unset (default) → the instructions skip the pointer instead of citing a note
@@ -162,7 +198,7 @@ def _api(
     data = None
     headers = {"Accept": "application/json", "X-Quests-Source": "mcp"}
     # Bearer token for an instance with accounts enabled; empty when the API is open.
-    token = (os.environ.get("QUESTS_API_TOKEN") or "").strip()
+    token = _current_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     if body is not None:
@@ -199,7 +235,7 @@ def _api_raw(
         if q:
             url = f"{url}?{urllib.parse.urlencode(q)}"
     headers = {"Accept": "*/*"}
-    token = (os.environ.get("QUESTS_API_TOKEN") or "").strip()
+    token = _current_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, headers=headers, method=method.upper())
@@ -262,7 +298,7 @@ def _api_upload_file(
         "Accept": "application/json",
         "Content-Type": f"multipart/form-data; boundary={boundary}",
     }
-    token = (os.environ.get("QUESTS_API_TOKEN") or "").strip()
+    token = _current_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
@@ -782,6 +818,33 @@ def list_questlines() -> list[dict[str, Any]]:
 
 @server.tool(
     description=(
+        "List configured workspaces (separate Quests accounts/tenants on the "
+        "same API, from QUESTS_WORKSPACES) and which one is currently active."
+    )
+)
+def list_workspaces() -> dict[str, Any]:
+    return {"workspaces": sorted(_WORKSPACES), "current": _current_workspace}
+
+
+@server.tool(
+    description=(
+        "Switch the active workspace for all subsequent tool calls in this "
+        "session (name from list_workspaces). Stays switched until changed "
+        "again or the session restarts."
+    )
+)
+def switch_workspace(name: str) -> dict[str, Any]:
+    global _current_workspace
+    if name not in _WORKSPACES:
+        raise ValueError(
+            f"unknown workspace {name!r}; known: {', '.join(sorted(_WORKSPACES)) or '(none configured)'}"
+        )
+    _current_workspace = name
+    return {"current": _current_workspace}
+
+
+@server.tool(
+    description=(
         "List tags — flat work-surface labels (frontend, api, mcp…). "
         "Optional q filters by slug/label substring. Always call this before "
         "create_tag; prefer attaching an existing tag."
@@ -824,7 +887,7 @@ def _api_create_tag(body: dict[str, Any]) -> dict[str, Any]:
     """POST /api/tags; 409 body is the existing tag (reuse)."""
     url = f"{API_BASE}/api/tags"
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
-    token = (os.environ.get("QUESTS_API_TOKEN") or "").strip()
+    token = _current_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(

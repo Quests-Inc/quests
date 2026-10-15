@@ -39,6 +39,17 @@ build-runner:
     cd go
     CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$version" -o "${QUESTS_RUNNER_OUT:-bin/quests-runner}" ./cmd/quests-runner
 
+# Wayland HUD (Go/gotk4) → go/bin/quests-overlay  (needs gtk4 + gtk4-layer-shell; tag keeps CI free of CGO)
+build-overlay:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! pkg-config --exists gtk4-layer-shell-0; then
+        echo "Missing gtk4-layer-shell. Install with: sudo pacman -S gtk4 gtk4-layer-shell" >&2
+        exit 1
+    fi
+    cd go
+    CGO_ENABLED=1 go build -tags quests_overlay -o "${QUESTS_OVERLAY_OUT:-bin/quests-overlay}" ./cmd/quests-overlay
+
 # SPA → frontend/dist (served by the API)
 build-frontend:
     cd frontend && bun run build
@@ -64,22 +75,41 @@ run-telegram:
 run-stt:
     uv run quests-stt
 
-# Wayland HUD (needs gtk4, gtk4-layer-shell, python-gobject; installs pywayland into overlay/_vendor once)
+# Wayland HUD (Go/gotk4 + layer-shell). Used by quests-overlay.service.
+# First build of gotk4 can take several minutes (single-core cgo on gtk/v4); then cached.
+# Loads ~/.config/quests/overlay.env (same as systemd) so QUESTS_API / TOKEN match the unit.
 run-overlay:
     #!/usr/bin/env bash
     set -euo pipefail
-    if ! pacman -Q gtk4-layer-shell &>/dev/null; then
-        echo "Missing gtk4-layer-shell. Install with: sudo pacman -S gtk4-layer-shell" >&2
-        exit 1
+    if ! pkg-config --exists gtk4-layer-shell-0 2>/dev/null; then
+        if ! pacman -Q gtk4-layer-shell &>/dev/null; then
+            echo "Missing gtk4-layer-shell. Install with: sudo pacman -S gtk4 gtk4-layer-shell" >&2
+            exit 1
+        fi
     fi
-    vendor="{{ justfile_directory() }}/overlay/_vendor"
-    if [[ ! -d "$vendor/pywayland" ]]; then
-        mkdir -p "$vendor"
-        uv pip install --target "$vendor" pywayland >/dev/null 2>&1 || true
+    envf="${QUESTS_OVERLAY_ENV:-$HOME/.config/quests/overlay.env}"
+    if [[ -f "$envf" ]]; then
+        set -a
+        # shellcheck disable=SC1090
+        source "$envf"
+        set +a
     fi
-    export PYTHONPATH="${vendor}${PYTHONPATH:+:$PYTHONPATH}"
-    cd "{{ justfile_directory() }}"
-    exec python3 -m overlay
+    bin="{{ justfile_directory() }}/go/bin/quests-overlay"
+    if [[ ! -x "$bin" ]]; then
+        echo "quests-overlay missing — building (gotk4/cgo, first time is slow)…" >&2
+        just build-overlay
+    else
+        # Rebuild only if our sources are newer than the binary.
+        newer="$(find "{{ justfile_directory() }}/go/cmd/quests-overlay" \
+            "{{ justfile_directory() }}/go/internal/overlay" \
+            -type f -name '*.go' -newer "$bin" 2>/dev/null | head -1 || true)"
+        if [[ -n "$newer" ]]; then
+            echo "overlay sources changed — rebuilding…" >&2
+            just build-overlay
+        fi
+    fi
+    echo "quests-overlay → ${QUESTS_API:-http://127.0.0.1:8765} (token=${QUESTS_API_TOKEN:+yes})" >&2
+    exec "$bin"
 
 # The CLI: `just quests list --json` (builds it first)
 quests *args: build-cli

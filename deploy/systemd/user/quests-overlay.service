@@ -11,13 +11,13 @@ Wants=graphical-session.target
 [Service]
 Type=simple
 WorkingDirectory=%h/Quests
-Environment=PYTHONUNBUFFERED=1
 Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
 # WAYLAND_DISPLAY / XDG_RUNTIME_DIR / NIRI_SOCKET: import into user manager
 # (see deploy/systemd/README.md).
 # Remote API (when server is not on this machine):
 # Environment=QUESTS_API=http://api-host:8765
 # Environment=QUESTS_WEB_URL=http://api-host:8765
+# Go HUD: `just run-overlay` → go/bin/quests-overlay
 ExecStart=/usr/bin/env just run-overlay
 Restart=on-failure
 RestartSec=3

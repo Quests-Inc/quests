@@ -61,7 +61,7 @@ go/cmd/*                wiring the dependencies (composition root)
 
 **Amendment (#21): the scheduler is a coordinating package.** `internal/schedule` (template materialization, expiry, maintenance, purging) belongs to no single context: it decides *when* to do what and calls the contexts (`journal`, `automation`, `knowledge`). So it stays a top-level package allowed to depend on them, but it **does not touch the database directly** — only through the contexts' stores (`automation.Store.EmitRollFor/InsertEmitRoll/ListEnabledTemplateRows…`, `journal.Store.QuestIDForPeriod/ActiveQuestIDsPastDeadline`). The templates' rules (what “it is time” means) live in `schedule`, the data in `automation`.
 
-Working components outside the Go core (the bot, MCP, STT, the overlay, the runner) are not part of this scheme: they talk to the API only over HTTP (`docs/architecture.md`).
+Working components outside the API package layout (the bot, MCP, STT, and the workstation binaries `quests-overlay` / `quests-runner`) are not part of this scheme: they talk to the API only over HTTP (`docs/architecture.md`).
 
 ### 2. Frontend: Feature-Sliced Design
 
