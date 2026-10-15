@@ -15,7 +15,7 @@ client, switch to it in the web interface and mint a separate token there. Revok
 | Client | Where the two values go |
 |---|---|
 | **HUD** (desktop overlay) | `~/.config/quests/overlay.env`, see [hud-workstation.md](hud-workstation.md) (step 1 there can be skipped: use the token from the interface) |
-| **MCP / agents** | environment of `quests-mcp` (`uv run quests-mcp`), e.g. in the MCP server config of your agent |
+| **MCP / agents** | environment of `quests-mcp` (`just build-mcp` → `go/bin/quests-mcp`, a static binary), e.g. in the MCP server config of your agent: `{"command": ".../go/bin/quests-mcp", "env": {"QUESTS_API": "…", "QUESTS_API_TOKEN": "…"}}`. One token reaches every workspace of its account: `list_workspaces` / `switch_workspace` pick one |
 | **Android HUD** | app settings: server address and token |
 | **CLI** | `export QUESTS_API=… QUESTS_API_TOKEN=…`, then `quests list`; `QUESTS_WORKSPACE=<id>` picks a workspace if the token allows it |
 | **Telegram bot** | optional personal client, see [telegram-bot.md](telegram-bot.md) |

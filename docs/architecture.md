@@ -10,7 +10,7 @@ What Quests consists of, what each part is written in and how the parts talk to 
 | **CLI** `quests` | Go | `go/cmd/quests` | Terminal client of the API (`docs/cli.md`) |
 | **Runner** `quests-runner` | Go | `go/cmd/quests-runner` | Executes check and emit commands on the owner's device; the server runs no commands (`docs/security.md`) |
 | **Web UI** | Svelte 5 + TypeScript | `frontend/` | SPA; the API response types are generated from Go (`just gen-types`) |
-| **MCP server** `quests-mcp` | Python | `src/quests/mcp_server.py` | Tools for AI agents on top of the HTTP API |
+| **MCP server** `quests-mcp` | Go | `go/cmd/quests-mcp`, `go/internal/mcp` | Tools for AI agents on top of the HTTP API (stdio; compact paged lists) |
 | **Telegram bot** | Python | `src/quests/telegram/` | Notifications, quick add, voice through STT |
 | **STT** `quests-stt` | Python | `src/quests/stt_server.py` | Speech recognition (faster-whisper) in a separate container |
 | **Overlay** | Go + gotk4 + gtk4-layer-shell | `go/cmd/quests-overlay`, `go/internal/overlay/` | Wayland HUD and toasts on a workstation (`just run-overlay`) |
@@ -51,9 +51,9 @@ server picks the change up (`deploy/README.md`).
 
 ## What stays in Python and why
 
-The bot, MCP and STT are separate processes with their own life cycle and heavy dependencies (aiogram, whisper).
+The bot and STT are separate processes with their own life cycle and heavy dependencies (aiogram, whisper).
 There are no plans to rewrite them for the sake of a single language: the boundary is the HTTP API, and they affect neither the data schema nor
-the API image. There is no Python in the API image at all. The Wayland overlay is Go (`quests-overlay`).
+the API image. There is no Python in the API image at all. The Wayland overlay (`quests-overlay`) and the MCP server (`quests-mcp`) are Go.
 
 ## Gates against regressions
 

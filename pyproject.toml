@@ -19,9 +19,6 @@ bot = [
     "aiohttp>=3.9",
     "aiohttp-socks>=0.11.0",
 ]
-mcp = [
-    "mcp>=2.0.0",
-]
 # Standalone STT sidecar (quests-stt) — split out from `bot` because
 # faster-whisper drags in ctranslate2/onnxruntime/av (~450MB unpacked), which
 # has nothing to do with aiogram and would otherwise redownload on every
@@ -33,7 +30,6 @@ stt = [
 
 [project.scripts]
 quests-telegram = "quests.telegram.main:main"
-quests-mcp = "quests.mcp_server:main"
 quests-stt = "quests.stt_server:main"
 
 [build-system]

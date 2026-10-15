@@ -98,5 +98,5 @@ The database is PostgreSQL (`QUESTS_DATABASE_URL`); `just dev-db` starts one in 
 - Releases (SemVer) and production: [`deploy/README.md`](deploy/README.md). Production lives in the separate repository `Quests-Inc/quests-deploy` and is updated only by an explicit GitHub Release: `just release X.Y.Z`.
 - Monitoring: [`docs/monitoring.md`](docs/monitoring.md); security model: [`docs/security.md`](docs/security.md)
 
-> **Never run a bare `uv sync`.** It syncs the environment exactly and removes the optional packages (`mcp`, `aiogram`, `faster-whisper`),
-> after which `quests-mcp`, the bot and STT fail with `No module named …`. Always `uv sync --group dev --all-extras` (which is what `just bootstrap` does).
+> **Never run a bare `uv sync`.** It syncs the environment exactly and removes the optional packages (`aiogram`, `faster-whisper`),
+> after which the bot and STT fail with `No module named …`. Always `uv sync --group dev --all-extras` (which is what `just bootstrap` does).
