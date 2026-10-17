@@ -1,8 +1,6 @@
 // Command quests-mcp is the Quests MCP server (stdio) for AI agents.
 //
 //	QUESTS_API=https://host QUESTS_API_TOKEN=… quests-mcp
-//
-// QUESTS_GUIDE_NOTE (optional) is the id of a vault note with a fuller agent guide.
 package main
 
 import (

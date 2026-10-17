@@ -476,16 +476,14 @@ func TestCreateQuestNeedsAnExplicitQuestline(t *testing.T) {
 }
 
 func TestInstructionsTellToLayOutWork(t *testing.T) {
-	t.Setenv("QUESTS_GUIDE_NOTE", "")
 	got := Instructions()
-	for _, want := range []string{"list_questlines", "list_tags", `"none"`, "search_notes"} {
+	for _, want := range []string{"list_questlines", "list_tags", `"none"`} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("instructions miss %q:\n%s", want, got)
 		}
 	}
-	t.Setenv("QUESTS_GUIDE_NOTE", "30")
-	if got := Instructions(); !strings.Contains(got, "note=30") || strings.Contains(got, "search_notes") {
-		t.Fatalf("an explicit guide note replaces the search hint:\n%s", got)
+	if strings.Contains(got, "guide") {
+		t.Fatalf("no pointer to a vault note: a note may not exist, the instructions stand on their own:\n%s", got)
 	}
 }
 
