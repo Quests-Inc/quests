@@ -109,22 +109,3 @@ RUN chmod +x /entrypoint.sh
 VOLUME ["/app/data"]
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["quests-telegram"]
-
-# --- STT sidecar: faster-whisper (ctranslate2/onnxruntime/av) isolated here
-# so it only rebuilds/redownloads when STT itself changes, not on every
-# aiogram bump. Bot talks to it over HTTP (quests.telegram.sttclient). ---
-FROM python-base AS stt
-LABEL org.opencontainers.image.source="https://github.com/Quests-Inc/quests"
-RUN uv sync --locked --no-dev --extra stt
-COPY deploy/docker/entrypoint-stt.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENV QUESTS_STT_HOST=0.0.0.0 \
-    QUESTS_STT_PORT=8766 \
-    HF_HOME=/app/data/hf-cache
-EXPOSE 8766
-# Whisper model weights download here on first use (faster-whisper → HF
-# cache, redirected into the volume via HF_HOME) — a redeploy/restart then
-# doesn't refetch them.
-VOLUME ["/app/data"]
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["quests-stt"]

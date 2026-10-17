@@ -11,8 +11,7 @@ What Quests consists of, what each part is written in and how the parts talk to 
 | **Runner** `quests-runner` | Go | `go/cmd/quests-runner` | Executes check and emit commands on the owner's device; the server runs no commands (`docs/security.md`, rules in `docs/automation.md`) |
 | **Web UI** | Svelte 5 + TypeScript | `frontend/` | SPA; the API response types are generated from Go (`just gen-types`) |
 | **MCP server** `quests-mcp` | Go | `go/cmd/quests-mcp`, `go/internal/mcp` | Tools for AI agents on top of the HTTP API (stdio; compact paged lists) |
-| **Telegram bot** | Python | `src/quests/telegram/` | Notifications, quick add, voice through STT |
-| **STT** `quests-stt` | Python | `src/quests/stt_server.py` | Speech recognition (faster-whisper) in a separate container |
+| **Telegram bot** | Python | `src/quests/telegram/` | Notifications, quick add, the action assistant |
 | **Overlay** | Go + gotk4 + gtk4-layer-shell | `go/cmd/quests-overlay`, `go/internal/overlay/` | Wayland HUD and toasts on a workstation (`just run-overlay`) |
 | **Android HUD** | Kotlin | `android/` | A foreground service with an ongoing notification on top of the same REST API |
 
@@ -45,13 +44,13 @@ PostgreSQL 17 is the only database (`docs/postgres.md`). Workspaces are isolated
 
 ## Images and rollout
 
-Three images are built from one `deploy/docker/Dockerfile`: `quests-api` (the Go binary + SPA, no interpreters),
-`quests-bot` and `quests-stt` (Python). A release `vX.Y.Z` → images in GHCR → a pull request in the `quests-deploy` repository → doco-cd on the
+Two images are built from one `deploy/docker/Dockerfile`: `quests-api` (the Go binary + SPA, no interpreters),
+`quests-bot` (Python). A release `vX.Y.Z` → images in GHCR → a pull request in the `quests-deploy` repository → doco-cd on the
 server picks the change up (`deploy/README.md`).
 
 ## What stays in Python and why
 
-The bot and STT are separate processes with their own life cycle and heavy dependencies (aiogram, whisper).
+The bot is a separate process with its own life cycle and dependencies (aiogram).
 There are no plans to rewrite them for the sake of a single language: the boundary is the HTTP API, and they affect neither the data schema nor
 the API image. There is no Python in the API image at all. The Wayland overlay (`quests-overlay`) and the MCP server (`quests-mcp`) are Go.
 

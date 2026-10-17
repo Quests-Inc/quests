@@ -80,9 +80,6 @@ run-telegram:
     uv run quests-telegram
 
 # Speech-to-text sidecar for the bot on :8766
-run-stt:
-    uv run quests-stt
-
 # Wayland HUD (Go/gotk4 + layer-shell). Used by quests-overlay.service.
 # First build of gotk4 can take several minutes (single-core cgo on gtk/v4); then cached.
 # Loads ~/.config/quests/overlay.env (same as systemd) so QUESTS_API / TOKEN match the unit.

@@ -109,10 +109,9 @@ curl -sS http://127.0.0.1:8765/api/health
 curl -sS http://SERVER_IP:8765/api/health
 ```
 
-Бот (после заполнения TG-переменных; сначала STT-сайдкар, если нужны голосовые):
+Бот (после заполнения TG-переменных):
 
 ```bash
-just run-stt &
 just run-telegram
 ```
 
@@ -149,11 +148,9 @@ sudo loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable --now quests-server.service
 systemctl --user enable --now quests-telegram.service   # если бот здесь
-systemctl --user enable --now quests-stt.service        # если нужны голосовые в боте
 
 systemctl --user status quests-server.service
 systemctl --user status quests-telegram.service
-systemctl --user status quests-stt.service
 ```
 
 Логи:
@@ -161,7 +158,6 @@ systemctl --user status quests-stt.service
 ```bash
 journalctl --user -u quests-server.service -f
 journalctl --user -u quests-telegram.service -f
-journalctl --user -u quests-stt.service -f
 ```
 
 `quests-overlay.service` на сервере **не** включай (нужен Wayland).
@@ -291,7 +287,7 @@ curl -X DELETE http://127.0.0.1:8765/api/templates/5/secrets/MAIL_PASSWORD
 | 1 | сервер | `git clone` → `bootstrap` → `build-frontend` |
 | 2 | сервер | `.env` (`QUESTS_HOST=0.0.0.0`, TG-токены) |
 | 3 | сервер | firewall :8765 |
-| 4 | сервер | `enable --now quests-server` (+ `quests-telegram`, `quests-stt`) |
+| 4 | сервер | `enable --now quests-server` (+ `quests-telegram`) |
 | 5 | ПК | `QUESTS_API` / `api_base` → оверлей |
 | 6 | браузер | `http://SERVER_IP:8765` — проверить API/HUD/Bot |
 

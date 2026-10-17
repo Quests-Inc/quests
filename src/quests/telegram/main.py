@@ -18,7 +18,6 @@ from quests.telegram.handlers import build_router
 from quests.telegram.notify import events_loop, window_start_loop
 from quests.telegram.settings import TgSettings, build_settings
 from quests.telegram.store import ChatRegistry, NotifyDedup
-from quests.telegram.sttclient import SttClient
 
 log = logging.getLogger("quests.telegram")
 
@@ -34,11 +33,10 @@ async def _run(settings: TgSettings) -> None:
 
     api_http = aiohttp.ClientSession()
     api = QuestsApi(settings.api_base, api_http)
-    stt = SttClient(settings.stt_base, api_http)
     chats = ChatRegistry(settings.chats_path)
     dedup = NotifyDedup(settings.dedup_path)
 
-    dp.include_router(build_router(api=api, stt=stt, settings=settings, chats=chats))
+    dp.include_router(build_router(api=api, settings=settings, chats=chats))
 
     notify_events = asyncio.create_task(
         events_loop(bot, api, chats, dedup, settings),
@@ -50,10 +48,9 @@ async def _run(settings: TgSettings) -> None:
     )
 
     log.info(
-        "telegram bot starting (proxy=%s api=%s stt=%s users=%s)",
+        "telegram bot starting (proxy=%s api=%s users=%s)",
         settings.proxy,
         settings.api_base,
-        settings.stt_base,
         ",".join(str(u) for u in sorted(settings.user_ids)),
     )
     try:

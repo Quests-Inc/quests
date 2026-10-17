@@ -2,7 +2,7 @@
 
 A task manager in the spirit of a game quest log: web UI, API, CLI, check runner and a Wayland overlay (HUD + toasts) for niri / CachyOS.
 
-Stack: **Go (API + CLI + runner + overlay) · PostgreSQL · Svelte 5 + TypeScript (Vite) · Python (MCP / Telegram / STT) · GTK4 + gtk4-layer-shell**
+Stack: **Go (API + CLI + runner + overlay) · PostgreSQL · Svelte 5 + TypeScript (Vite) · Python (Telegram bot) · GTK4 + gtk4-layer-shell**
 
 The web interface is in Russian, so interface labels are quoted as they appear on screen (with a gloss where needed).
 
@@ -12,7 +12,7 @@ How the parts fit together: [`docs/architecture.md`](docs/architecture.md). Term
 
 - Go ≥ 1.26 (builds the API, CLI and runner)
 - Docker (local PostgreSQL: `just dev-db`)
-- Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/) (MCP server, Telegram bot, STT)
+- Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/) (Telegram bot)
 - [Bun](https://bun.sh) (frontend)
 - [`just`](https://just.systems) (task runner)
 - For the overlay: `gtk4`, `gtk4-layer-shell` (Wayland)
@@ -46,7 +46,6 @@ frontend ones (`bun install`), creates `data/` and builds the Go CLI and API. Th
 | Check runner | `just build-runner` → `go/bin/quests-runner` | executes check and emit commands on a device ([`docs/note-check.md`](docs/note-check.md)) |
 | Overlay | `just run-overlay` | Go HUD (`go/bin/quests-overlay`); needs gtk4 + gtk4-layer-shell |
 | Telegram bot | `just run-telegram` | an HTTP client of the API |
-| STT (voice → text) | `just run-stt` | sidecar of the bot, http://127.0.0.1:8766, needed for voice messages |
 | API in Docker | `just dev-api` | container `quests-api-dev` on :8765 with its own PostgreSQL |
 | Templates | the “Шаблоны” (Templates) page / `/api/templates` | daily/weekly → quest instances |
 
@@ -93,10 +92,10 @@ The database is PostgreSQL (`QUESTS_DATABASE_URL`); `just dev-db` starts one in 
 
 - User systemd units: [`deploy/systemd/`](deploy/systemd/)
 - Deploying the server after a clone: [`deploy/SERVER.md`](deploy/SERVER.md)
-- Docker images (api / bot / stt / frontend): [`deploy/docker/`](deploy/docker/)
+- Docker images (api / bot / frontend): [`deploy/docker/`](deploy/docker/)
 - The HUD against a remote API (token, unit, niri): [`docs/hud-workstation.md`](docs/hud-workstation.md)
 - Releases (SemVer) and production: [`deploy/README.md`](deploy/README.md). Production lives in the separate repository `Quests-Inc/quests-deploy` and is updated only by an explicit GitHub Release: `just release X.Y.Z`.
 - Monitoring: [`docs/monitoring.md`](docs/monitoring.md); security model: [`docs/security.md`](docs/security.md)
 
-> **Never run a bare `uv sync`.** It syncs the environment exactly and removes the optional packages (`aiogram`, `faster-whisper`),
-> after which the bot and STT fail with `No module named …`. Always `uv sync --group dev --all-extras` (which is what `just bootstrap` does).
+> **Never run a bare `uv sync`.** It syncs the environment exactly and removes the optional packages (`aiogram`),
+> after which the bot fails with `No module named …`. Always `uv sync --group dev --all-extras` (which is what `just bootstrap` does).

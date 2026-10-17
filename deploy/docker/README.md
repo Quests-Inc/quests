@@ -4,10 +4,10 @@
 
 | Файл | Что |
 |---|---|
-| `Dockerfile` | цели `api` (Go-бинарь + SPA, `debian:bookworm-slim`), `bot`, `stt` |
+| `Dockerfile` | цели `api` (Go-бинарь + SPA, `debian:bookworm-slim`), `bot` |
 | `docker-bake.hcl` | сборка всех целей разом (`just` не нужен: `docker buildx bake -f deploy/docker/docker-bake.hcl`); теги — `TAG` (версия релиза), версия в бинаре — `VERSION` |
 | `docker-compose.dev.yml` | локальный API с собственным PostgreSQL (`just dev-api`, `just dev-db`) |
-| `entrypoint-bot.sh`, `entrypoint-stt.sh` | точки входа Python-образов |
+| `entrypoint-bot.sh` | точка входа Python-образа бота |
 | `backup-monitoring.sh`, `disk-guard.sh` | cron-скрипты обслуживания хоста |
 
 Локально:
