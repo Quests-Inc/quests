@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +28,10 @@ func (h *Handler) RegisterNotes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes/{id}", h.getNote)
 	mux.HandleFunc("PATCH /api/notes/{id}", h.patchNote)
 	mux.HandleFunc("DELETE /api/notes/{id}", h.deleteNote)
+	mux.HandleFunc("GET /api/trash/notes", h.listTrashNotes)
+	mux.HandleFunc("POST /api/trash/notes/{id}/restore", h.restoreNote)
+	mux.HandleFunc("DELETE /api/trash/notes/{id}", h.purgeNote)
+	mux.HandleFunc("DELETE /api/trash/notes", h.emptyTrashNotes)
 	mux.HandleFunc("GET /api/notes/{id}/icon", h.getNoteIcon)
 	mux.HandleFunc("POST /api/notes/{id}/icon", h.postNoteIcon)
 	mux.HandleFunc("DELETE /api/notes/{id}/icon", h.deleteNoteIcon)
@@ -341,11 +343,8 @@ func (h *Handler) deleteNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	h.PurgeAttachments(r.Context(), ownerNote, id)
-	if cur.CustomIcon != nil && *cur.CustomIcon != "" {
-		_ = os.Remove(filepath.Join(h.DataDir, "note-icons", *cur.CustomIcon))
-	}
-	if err := h.Store.DeleteNote(r.Context(), id); err != nil {
+	// Into the trash: attachments and the icon file stay until the note is purged (trash.go) or restored.
+	if err := h.Store.TrashNote(r.Context(), id); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}

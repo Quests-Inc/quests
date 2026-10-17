@@ -230,12 +230,40 @@ func noteTools(c *Client) []Tool {
 	type idArg struct {
 		ID int64 `json:"id"`
 	}
-	del := Typed("delete_note", "Delete a note.", func(ctx context.Context, a idArg) (any, error) {
+	del := Typed("delete_note", "Move a note to the trash (children go to the root). It stays restorable for 30 days: trash.", func(ctx context.Context, a idArg) (any, error) {
 		if err := c.Do(ctx, http.MethodDelete, fmt.Sprintf("/api/notes/%d", a.ID), nil, nil, nil); err != nil {
 			return nil, err
 		}
-		return ok(ctx, c, a.ID, map[string]any{"deleted": true}), nil
+		return ok(ctx, c, a.ID, map[string]any{"deleted": true, "trashed": true}), nil
 	})
+
+	type trashArgs struct {
+		Action string `json:"action" enum:"list,restore"`
+		Kind   string `json:"kind,omitempty" enum:"quest,note" desc:"restore: what to bring back"`
+		ID     int64  `json:"id,omitempty" desc:"restore: its id"`
+	}
+	trash := Typed("trash", "The trash of deleted quests and notes (kept 30 days). list: what can be restored, newest first, with the date it is erased; restore: bring a quest or note back (a note returns under its parent with its children).",
+		func(ctx context.Context, a trashArgs) (any, error) {
+			if a.Action == "restore" {
+				if a.ID == 0 || (a.Kind != "quest" && a.Kind != "note") {
+					return nil, &Err{422, "restore needs kind (quest or note) and id"}
+				}
+				if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/trash/%ss/%d/restore", a.Kind, a.ID), nil, nil, nil); err != nil {
+					return nil, err
+				}
+				return ok(ctx, c, a.ID, map[string]any{"kind": a.Kind, "restored": true}), nil
+			}
+			var quests, notes []map[string]any
+			if err := c.Do(ctx, http.MethodGet, "/api/trash/quests", nil, nil, &quests); err != nil {
+				return nil, err
+			}
+			if err := c.Do(ctx, http.MethodGet, "/api/trash/notes", nil, nil, &notes); err != nil {
+				return nil, err
+			}
+			items := append(quests, notes...)
+			sort.SliceStable(items, func(i, j int) bool { return fmt.Sprint(items[i]["deleted_at"]) > fmt.Sprint(items[j]["deleted_at"]) })
+			return map[string]any{"items": items, "total": len(items), "workspace": c.Workspace(ctx)}, nil
+		})
 
 	type flagArgs struct {
 		ID     int64  `json:"id"`
@@ -296,7 +324,7 @@ func noteTools(c *Client) []Tool {
 		return ok(ctx, c, a.ID, map[string]any{"check": res}), nil
 	})
 
-	return []Tool{list, get, search, cats, create, update, del, flag, rate, check, runNow}
+	return []Tool{list, get, search, cats, create, update, del, trash, flag, rate, check, runNow}
 }
 
 // setIf puts v under key when the pointer is set.

@@ -14,6 +14,7 @@ var minorChange = map[string]string{
 	"step_completed": "Шаг выполнен",
 	"status_changed": "Статус изменён",
 	"quest_deleted":  "Удалено",
+	"quest_restored": "Восстановлено",
 	"step_progress":  "Прогресс",
 	"pin_changed":    "Закрепление",
 	"quest_updated":  "Обновлено",

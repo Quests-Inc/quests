@@ -200,7 +200,7 @@ func (s *Store) CancelRunnerJob(ctx context.Context, id int64) error {
 // once, one already running is asked to stop. Returns how many it touched.
 func (s *Store) CancelOrphanJobs(ctx context.Context) (int64, error) {
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	gone := `(step_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM queststep WHERE queststep.id = runner_job.step_id))
+	gone := `(step_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM queststep JOIN quest ON quest.id = queststep.quest_id WHERE queststep.id = runner_job.step_id))
 		OR (note_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM note WHERE note.id = runner_job.note_id))`
 
 	res, err := s.DB.ExecContext(ctx, `UPDATE runner_job SET state = 'canceled', finished_at = ?, reason = 'квест, шаг или заметка удалены'

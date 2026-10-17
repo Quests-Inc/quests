@@ -418,7 +418,8 @@ func TestAttachmentWrongOwnerIs404(t *testing.T) {
 	}
 }
 
-func TestAttachmentDeleteQuestPurgesFiles(t *testing.T) {
+// Deleting a quest only trashes it: its files stay (restorable) until the quest is purged from the trash.
+func TestAttachmentsOfATrashedQuestLiveUntilPurged(t *testing.T) {
 	davSrv := newFakeDAV()
 	t.Cleanup(davSrv.Close)
 	clam := fakeClamd(t, "stream: OK")
@@ -429,18 +430,35 @@ func TestAttachmentDeleteQuestPurgesFiles(t *testing.T) {
 	if up.Code != 201 {
 		t.Fatalf("upload = %d %s", up.Code, up.Body.String())
 	}
+	rowsLeft := func() int {
+		rows, err := s.Store.Knowledge.ListAttachments(t.Context(), ownerQuest, qid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(rows)
+	}
 
 	del := httptest.NewRecorder()
 	h.ServeHTTP(del, httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/quests/%d", qid), nil))
 	if del.Code != 204 {
 		t.Fatalf("delete quest = %d %s", del.Code, del.Body.String())
 	}
-	rows, err := s.Store.Knowledge.ListAttachments(t.Context(), ownerQuest, qid)
-	if err != nil {
-		t.Fatal(err)
+	if rowsLeft() != 1 {
+		t.Fatalf("a trashed quest keeps its files, rows = %d", rowsLeft())
 	}
-	if len(rows) != 0 {
-		t.Fatalf("rows left = %d", len(rows))
+	all := httptest.NewRecorder()
+	h.ServeHTTP(all, httptest.NewRequest(http.MethodGet, "/api/attachments", nil))
+	if strings.Contains(all.Body.String(), "keep.txt") {
+		t.Fatalf("the Attachments tab must not list the files of a trashed quest: %s", all.Body.String())
+	}
+
+	purge := httptest.NewRecorder()
+	h.ServeHTTP(purge, httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/trash/quests/%d", qid), nil))
+	if purge.Code != 204 {
+		t.Fatalf("purge = %d %s", purge.Code, purge.Body.String())
+	}
+	if rowsLeft() != 0 {
+		t.Fatalf("rows left after the purge = %d", rowsLeft())
 	}
 }
 

@@ -486,7 +486,7 @@ func (s *Store) ListLinkCorpus(ctx context.Context) ([]LinkDoc, error) {
 	if err := add(`SELECT 'questline', id, title, description FROM questline`); err != nil {
 		return nil, err
 	}
-	if err := add(`SELECT 'step', id, title, description FROM queststep`); err != nil {
+	if err := add(`SELECT 'step', id, title, description FROM queststep WHERE quest_id IN (SELECT id FROM quest)`); err != nil {
 		return nil, err
 	}
 	return out, nil

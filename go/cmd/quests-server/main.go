@@ -161,6 +161,7 @@ func main() {
 	go schedule.RunMaintenanceLoop(ctx, st, hub, windows, checks)
 	go srv.RunProbes(ctx)
 	go schedule.RunWorkspacePurgeLoop(ctx, st, srv.WebDAV)
+	go srv.RunTrashPurgeLoop(ctx)
 	go schedule.RunBackupLoop(ctx, st, srv.WebDAV, cfg.DataDir, cfg.BackupInterval, cfg.BackupKeep, schedule.BackupRemote{
 		Host: cfg.BackupRemoteHost,
 		Dir:  cfg.BackupRemoteDir,

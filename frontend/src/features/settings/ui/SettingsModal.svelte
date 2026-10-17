@@ -6,6 +6,7 @@
   import HotkeysSection from './sections/HotkeysSection.svelte'
   import WorkspaceSection from './sections/WorkspaceSection.svelte'
   import ArchiveSection from './sections/ArchiveSection.svelte'
+  import TrashSection from './sections/TrashSection.svelte'
   import AccountSection from './sections/AccountSection.svelte'
   import ConnectionsSection from './sections/ConnectionsSection.svelte'
   import AssistantSection from './sections/AssistantSection.svelte'
@@ -26,6 +27,7 @@
     { id: 'services', label: 'Сервисы' },
     { id: 'appearance', label: 'Внешний вид' },
     { id: 'hotkeys', label: 'Клавиши' },
+    { id: 'trash', label: 'Корзина' },
     ...(onLogout && wsx.loaded
       ? [
           { id: 'workspace', label: 'Пространство' },
@@ -82,6 +84,8 @@
           <AppearanceSection />
         {:else if active === 'hotkeys'}
           <HotkeysSection />
+        {:else if active === 'trash'}
+          <TrashSection />
         {:else if active === 'workspace'}
           <WorkspaceSection {username} />
         {:else if active === 'archive'}

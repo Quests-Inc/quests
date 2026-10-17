@@ -465,8 +465,8 @@ func (h *Handler) deleteQuest(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	h.PurgeAttachments(r.Context(), ownerQuest, id)
-	if err := h.Store.DeleteQuest(r.Context(), id, q.Title); err != nil {
+	// Into the trash, not erased: attachments, steps, secrets and history stay until it is purged or restored.
+	if err := h.Store.TrashQuest(r.Context(), id, q.Title); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
