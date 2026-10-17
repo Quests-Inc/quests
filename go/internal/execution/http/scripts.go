@@ -64,6 +64,10 @@ func (h *Handler) listScripts(w http.ResponseWriter, r *http.Request) {
 		scriptErr(w, err)
 		return
 	}
+	if err := h.Store.MarkTemplates(r.Context(), list); err != nil {
+		scriptErr(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, list)
 }
 

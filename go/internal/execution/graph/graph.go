@@ -113,3 +113,17 @@ func (g Graph) WithoutLayout() Graph {
 	}
 	return Graph{Nodes: nodes, Edges: g.Edges}
 }
+
+// Structure is the graph's skeleton: which nodes of which types are joined how. Parameters (the text of a Code node, a
+// Compare's operand) and positions are left out, so a script an owner only tuned still has the skeleton of its sample.
+func (g Graph) Structure() string {
+	parts := make([]string, 0, len(g.Nodes)+len(g.Edges))
+	for _, n := range g.Nodes {
+		parts = append(parts, fmt.Sprintf("n%d:%s", n.ID, n.Type))
+	}
+	for _, e := range g.Edges {
+		parts = append(parts, fmt.Sprintf("e%d.%s>%d.%s|%s|%t", e.From.Node, e.From.Port, e.To.Node, e.To.Port, e.Alias, e.Optional))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ";")
+}

@@ -3,10 +3,12 @@ package execution
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
@@ -149,5 +151,49 @@ func TestScriptsAreIsolatedByWorkspace(t *testing.T) {
 	}
 	if err := st.DeleteScript(ws2, sc.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("another workspace deletes it: %v", err)
+	}
+}
+
+func TestMarkTemplatesIgnoresParametersAndPositions(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	sm := graph.Samples()[0]
+	raw, _ := json.Marshal(sm.Graph)
+	same, err := st.CreateScript(ctx, "как образец", "", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Moved nodes and another text of the code are still the sample's skeleton.
+	tuned := sm.Graph
+	tuned.Nodes = append([]graph.Node(nil), tuned.Nodes...)
+	for i := range tuned.Nodes {
+		tuned.Nodes[i].X, tuned.Nodes[i].Y = 500, 40
+		if tuned.Nodes[i].Type == "code" {
+			tuned.Nodes[i].Params = json.RawMessage(`{"text":"echo 1"}`)
+		}
+	}
+	raw, _ = json.Marshal(tuned)
+	moved, err := st.CreateScript(ctx, "подправлен", "", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A different skeleton is nobody's template.
+	own, err := st.CreateScript(ctx, "свой", "", scriptGraph("echo 1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := st.ListScripts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTemplates(ctx, list); err != nil {
+		t.Fatal(err)
+	}
+	got := map[int64]string{}
+	for _, s := range list {
+		got[s.ID] = s.Template
+	}
+	if got[same.ID] != sm.ID || got[moved.ID] != sm.ID || got[own.ID] != "" {
+		t.Fatalf("templates: %v (sample %s)", got, sm.ID)
 	}
 }

@@ -7,6 +7,7 @@
   import { createScript, deleteScript, getScript, getScriptSamples, getScriptUses } from '@/shared/api/client.ts'
   import type { ScriptUse } from '@/shared/api/execution.gen.ts'
   import type { Sample } from '@/shared/api/scriptgraph.gen.ts'
+  import { groupScripts } from '../model/groups.ts'
   import { createCanvas } from '../model/canvas.svelte.ts'
   import { createScriptEditor } from '../model/editor.svelte.ts'
   import Inspector from './Inspector.svelte'
@@ -29,6 +30,13 @@
   let busy = $state(false)
   let menu = $state(false)
   let uses = $state<ScriptUse[]>([])
+  let folded = $state<Set<string>>(new Set())
+  const groups = $derived(groupScripts(scriptsList.items, samples))
+  function fold(key: string) {
+    const next = new Set(folded)
+    if (!next.delete(key)) next.add(key)
+    folded = next
+  }
   // 'leave' asks before dropping unsaved edits for another script; 'delete' before removing this one.
   let ask = $state<{ kind: 'leave'; id: number | null } | { kind: 'delete' } | null>(null)
 
@@ -129,18 +137,31 @@
         {/each}
       </ul>
     {/if}
-    <ul class="scripts__items">
-      {#each scriptsList.items as s (s.id)}
-        <li>
-          <button type="button" class="scripts__item" class:scripts__item--on={s.id === selectedId} onclick={() => pick(s.id)}>
-            <span>{s.title}</span>
-            <small>{(s.subjects ?? []).join(', ')} · {s.needs_runner ? 'раннер' : 'сервер'} · v{s.version}</small>
+    <div class="scripts__items">
+      {#each groups as g (g.key)}
+        <section class="sgroup" style:--c={g.color}>
+          <button type="button" class="sgroup__head" aria-expanded={!folded.has(g.key)} onclick={() => fold(g.key)}>
+            <Icon name={folded.has(g.key) ? 'chevron-right' : 'chevron-down'} size={14} />
+            <span class="sgroup__title">{g.title}</span>
+            <span class="sgroup__count">{g.items.length}</span>
           </button>
-        </li>
+          {#if !folded.has(g.key)}
+            <ul>
+              {#each g.items as s (s.id)}
+                <li>
+                  <button type="button" class="scripts__item" class:scripts__item--on={s.id === selectedId} onclick={() => pick(s.id)}>
+                    <span>{s.title}</span>
+                    <small>{(s.subjects ?? []).join(', ')} · {s.needs_runner ? 'раннер' : 'сервер'} · v{s.version}</small>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
       {:else}
-        <li class="scripts__none">Скриптов пока нет. Начните с образца.</li>
+        <p class="scripts__none">Скриптов пока нет. Начните с образца.</p>
       {/each}
-    </ul>
+    </div>
   </aside>
 
   <section class="scripts__main formscope">
@@ -259,6 +280,47 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    padding-bottom: 0.5rem;
+  }
+  /* A group of scripts made from one sample: a title bar in the sample's colour and the scripts under it on a rail of that colour. */
+  .sgroup {
+    margin-top: 0.6rem;
+  }
+  .sgroup__head {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.3rem 0.6rem;
+    border: 0;
+    border-left: 3px solid var(--c);
+    background: color-mix(in srgb, var(--c) 12%, var(--color-bg-raised, #1a1a1a));
+    color: inherit;
+    font-family: var(--font-ui, sans-serif);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+  }
+  .sgroup__head:hover {
+    background: color-mix(in srgb, var(--c) 20%, var(--color-bg-raised, #1a1a1a));
+  }
+  .sgroup__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sgroup__count {
+    color: var(--color-fg-muted, #9a9a9a);
+    font-weight: 400;
+  }
+  .sgroup ul {
+    margin-left: 0.55rem !important;
+    border-left: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
   }
   .scripts__samples {
     display: grid;

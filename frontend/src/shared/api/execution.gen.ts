@@ -273,6 +273,10 @@ export interface Script {
   needs_runner: boolean;
   created_at: string;
   updated_at: string;
+  /**
+   * Template is the id of the sample whose skeleton (nodes and links, not their parameters) the current graph still has.
+   */
+  template?: string;
   graph?: any /* json.RawMessage */;
 }
 /**

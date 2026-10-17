@@ -36,15 +36,17 @@ func (e *GraphError) Error() string {
 
 // Script is a stored script as the API shows it. Graph is set when one script is read, not in a list.
 type Script struct {
-	ID          int64           `json:"id"`
-	Title       string          `json:"title"`
-	Description string          `json:"description"`
-	Version     int             `json:"version"`
-	Subjects    []string        `json:"subjects"`
-	NeedsRunner bool            `json:"needs_runner"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
-	Graph       json.RawMessage `json:"graph,omitempty"`
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Version     int       `json:"version"`
+	Subjects    []string  `json:"subjects"`
+	NeedsRunner bool      `json:"needs_runner"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	// Template is the id of the sample whose skeleton (nodes and links, not their parameters) the current graph still has.
+	Template string          `json:"template,omitempty"`
+	Graph    json.RawMessage `json:"graph,omitempty"`
 }
 
 // ScriptUpdate is a change to a script. Graph nil leaves the graph as it is; ExpectedVersion is the version the editor
@@ -177,6 +179,59 @@ func (s *Store) ListScripts(ctx context.Context) ([]Script, error) {
 		out = append(out, sc)
 	}
 	return out, rows.Err()
+}
+
+// MarkTemplates sets Template on each script whose current graph has the skeleton of one of the samples. Samples that
+// share a skeleton (two ways to poll a number) are told apart by how many nodes still carry the sample's own parameters.
+func (s *Store) MarkTemplates(ctx context.Context, list []Script) error {
+	samples := graph.Samples()
+	skeletons := make([]string, len(samples))
+	for i, sm := range samples {
+		skeletons[i] = sm.Graph.Structure()
+	}
+	for i := range list {
+		raw, err := s.ScriptGraph(ctx, list[i].ID, list[i].Version)
+		if err != nil {
+			return err
+		}
+		g, err := graph.Decode(raw)
+		if err != nil {
+			continue // a stored graph that no longer decodes has no template
+		}
+		skeleton, best := g.Structure(), -1
+		for j, sm := range samples {
+			if skeletons[j] != skeleton {
+				continue
+			}
+			if score := sameParams(g, sm.Graph); score > best {
+				best, list[i].Template = score, sm.ID
+			}
+		}
+	}
+	return nil
+}
+
+// sameParams counts the nodes of a that have the parameters b gives the node with the same id.
+func sameParams(a, b graph.Graph) int {
+	want := map[int]string{}
+	for _, n := range b.Nodes {
+		want[n.ID] = compactJSON(n.Params)
+	}
+	score := 0
+	for _, n := range a.Nodes {
+		if w, ok := want[n.ID]; ok && w == compactJSON(n.Params) {
+			score++
+		}
+	}
+	return score
+}
+
+func compactJSON(raw json.RawMessage) string {
+	var buf bytes.Buffer
+	if json.Compact(&buf, raw) != nil {
+		return string(raw)
+	}
+	return buf.String()
 }
 
 // GetScript returns one script with its current graph.
