@@ -125,33 +125,35 @@ func runState(run *graph.Run, err error) (string, string) {
 	return execution.RunWaiting, ""
 }
 
-// outcomeOf maps how a job ended to the port of the Code node it leaves by. ok is false for the states that say nothing
-// (a lost lease may still deliver a result, so the run keeps waiting).
+// outcomeOf maps how a job ended to the output of the Code node it leaves by: a clean exit by `stdout`, anything else by
+// `failed` with a document that says which kind of ending it was. ok is false for the states that say nothing (a lost lease may
+// still deliver a result, so the run keeps waiting).
 func outcomeOf(j execution.RunnerJob) (graph.CodeOutcome, bool) {
 	switch j.State {
 	case execution.JobSuccess:
 		return graph.CodeOutcome{Port: "stdout", Text: j.Stdout}, true
 	case execution.JobFail:
+		if j.TimedOut {
+			return graph.Failure{Kind: graph.FailTimeout, Message: "таймаут"}.Outcome(), true
+		}
 		exit := -1
 		if j.ExitCode != nil {
 			exit = *j.ExitCode
 		}
-		if j.TimedOut {
-			return graph.CodeOutcome{Port: "timeout", Text: "таймаут"}, true
+		blob := trimCheckOut(j.Stderr, j.Stdout)
+		msg := "код " + strconv.Itoa(exit)
+		if blob != "" {
+			msg += ": " + blob
 		}
-		text := "код " + strconv.Itoa(exit)
-		if blob := trimCheckOut(j.Stderr, j.Stdout); blob != "" {
-			text += ": " + blob
-		}
-		return graph.CodeOutcome{Port: "failed", Text: text}, true
+		return graph.Failure{Kind: graph.FailExit, Message: msg, ExitCode: &exit, Stderr: blob}.Outcome(), true
 	case execution.JobTimeout:
-		return graph.CodeOutcome{Port: "timeout", Text: "таймаут"}, true
+		return graph.Failure{Kind: graph.FailTimeout, Message: "таймаут"}.Outcome(), true
 	case execution.JobSkipped:
-		return graph.CodeOutcome{Port: "unreachable", Text: "устройство «" + j.RunnerLabel + "» не вышло на связь"}, true
+		return graph.Failure{Kind: graph.FailUnreachable, Message: "устройство «" + j.RunnerLabel + "» не вышло на связь"}.Outcome(), true
 	case execution.JobAbandoned:
-		return graph.CodeOutcome{Port: "abandoned", Text: "устройство «" + j.RunnerLabel + "» пропало во время выполнения, результат неизвестен"}, true
+		return graph.Failure{Kind: graph.FailAbandoned, Message: "устройство «" + j.RunnerLabel + "» пропало во время выполнения, результат неизвестен"}.Outcome(), true
 	case execution.JobCanceled:
-		return graph.CodeOutcome{Port: "canceled", Text: "запуск отменён"}, true
+		return graph.Failure{Kind: graph.FailCanceled, Message: "запуск отменён"}.Outcome(), true
 	}
 	return graph.CodeOutcome{}, false
 }

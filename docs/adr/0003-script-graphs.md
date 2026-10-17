@@ -50,7 +50,7 @@ A link carries a **token**: either a *value* or an *exit signal*.
   Both outputs may be wired: the branch with the value runs, the other does not.
 - A run is finished when every node has settled (ran, or received an exit signal, or failed). The run log keeps the state of
   each node, so "why did the step not update" is answerable.
-- Failures are ports, not hidden code: a `Code` node has an output per outcome, an unconnected outcome port does nothing.
+- Failures are data, not hidden code: a `Code` node leaves by `stdout` or by `failed` (a document with a `kind`); an unconnected `failed` does nothing.
 
 Graph shape: acyclic; a path holds at most one `Code` node (two would be a chain of jobs with state between them: not v1);
 fan-out is free; fan-in only through `Any of` / `All of`.
@@ -71,10 +71,13 @@ the entity as separate output ports, so a `Code` node gets them without calling 
 else changes.
 
 **Code** (runner, the only one): inputs `secrets` and parameters (environment variables); the script text is a parameter.
-Outputs one per outcome: `stdout: str` (exit 0), `failed: str` (non-zero exit, with the stderr tail), `timeout: str`,
-`unreachable: str` (no runner picked it up in time), `abandoned: str` (the runner vanished mid-run), `canceled: str`.
+Two outputs. `stdout: str` is a clean exit (what the command printed). `failed: doc` is every other ending, as a JSON document
+that says which: `{"kind": "failed" | "timeout" | "unreachable" | "abandoned" | "canceled", "message": "…", "exit_code"?, "stderr"?}`
+(`unreachable`: no runner picked the job up in time; `abandoned`: the runner vanished mid-run, the result is unknown). A graph
+tells the kinds apart by reading the document with a `Parse` node and branching on `kind` with `Compare`; a graph that does not
+care sends `message` to an error sink. (This replaced one output port per kind: six ports made every graph a thicket.)
 
-**Parse** (server): input `str`; parameters: a schema (name, type, required, constraints). Output per schema field (value, or
+**Parse** (server): input `str`, or a `doc` (such as a Code node's `failed`) or a scalar, read as its text; parameters: a schema (name, type, required, constraints). Output per schema field (value, or
 exit signal for an optional field that is absent or invalid) and `bad_output: str`. **Strict**: the text is read as JSON,
 the whole trimmed `stdout` first (multi-line objects work), and if that is not JSON its last non-empty line (a script may log
 above its result). The value must be a JSON object matching the schema, or a single scalar that fits the first field (that is

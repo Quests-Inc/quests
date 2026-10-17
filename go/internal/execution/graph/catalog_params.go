@@ -32,7 +32,8 @@ func strictParams(raw json.RawMessage, into any) error {
 	return nil
 }
 
-// codePorts: Code takes the secrets and any number of values over links (the environment of the job); an output per outcome.
+// codePorts: Code takes the secrets and any number of values over links (the environment of the job). It leaves by `stdout`
+// (a clean exit: the text it printed) or by `failed` (anything else: a JSON document, see Failure).
 func codePorts(raw json.RawMessage) ([]Port, []Port, error) {
 	var p struct {
 		Language string `json:"language"`
@@ -53,7 +54,7 @@ func codePorts(raw json.RawMessage) ([]Port, []Port, error) {
 		return nil, nil, fmt.Errorf("текст кода длиннее %d КБ", MaxCodeBytes>>10)
 	}
 	in := []Port{opt("secrets", TSecret), {Name: "in", Type: TValue, Optional: true, Multi: true}}
-	out := []Port{req("stdout", TStr), req("failed", TStr), req("timeout", TStr), req("unreachable", TStr), req("abandoned", TStr), req("canceled", TStr)}
+	out := []Port{req("stdout", TStr), req("failed", TDoc)}
 	return in, out, nil
 }
 
@@ -71,7 +72,8 @@ type parseField struct {
 	Min      *float64 `json:"min,omitempty"`
 }
 
-// parsePorts: one output per schema field, plus bad_output with the reason the text is not what the schema wants.
+// parsePorts: one output per schema field, plus bad_output with the reason the text is not what the schema wants. It reads
+// the text a command printed, or a document such as the one on a Code node's `failed` output.
 func parsePorts(raw json.RawMessage) ([]Port, []Port, error) {
 	var p parseParams
 	if err := strictParams(raw, &p); err != nil {
@@ -100,7 +102,7 @@ func parsePorts(raw json.RawMessage) ([]Port, []Port, error) {
 		out = append(out, Port{Name: f.Name, Type: f.Type, Optional: !f.Required})
 	}
 	out = append(out, req("bad_output", TStr))
-	return []Port{req("in", TStr)}, out, nil
+	return []Port{req("in", TValue)}, out, nil
 }
 
 // Operations of Compare per type.

@@ -11,7 +11,10 @@ afterEach(() => {
 const P = (name: string, type: string, extra: object = {}) => ({ name, type, ...extra })
 const PORTS: Record<string, any> = {
   'source.step': { inputs: [], outputs: [P('ref', 'ref<step>'), P('title', 'str'), P('progress', 'int')] },
-  code: { inputs: [P('in', 'value', { optional: true, multi: true })], outputs: [P('stdout', 'str')] },
+  code: {
+    inputs: [P('in', 'value', { optional: true, multi: true })],
+    outputs: [P('stdout', 'str'), P('failed', 'doc')],
+  },
   'sink.step_progress': {
     inputs: [P('ref', 'ref<step>'), P('progress', 'int', { optional: true, group: 'data' })],
     outputs: [],

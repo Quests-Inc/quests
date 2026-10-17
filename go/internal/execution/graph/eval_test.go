@@ -109,27 +109,56 @@ func TestStepPollParsesStrictly(t *testing.T) {
 	}
 }
 
-func TestStepOnceFollowsTheOutcomePorts(t *testing.T) {
+func TestStepOnceFollowsTheKindOfTheFailure(t *testing.T) {
 	g := legacyGraphs()["step once"]
+	exit3 := 3
 	for _, tc := range []struct {
-		port, wantResult string // the sink that ran is told apart by its parameters
-		want             string
+		name    string
+		outcome CodeOutcome
+		result  string // which sink ran, told apart by what it was asked to do
+		why     string
 	}{
-		{"stdout", "done", ""},
-		{"failed", "failed", "код 3: boom"},
-		{"timeout", "failed", "таймаут"},
-		{"unreachable", "not_started", ""},
-		{"canceled", "stopped", ""},
-		{"abandoned", "failed", "пропало"},
+		{"a clean exit", CodeOutcome{Port: "stdout"}, "done", ""},
+		{"an error exit", Failure{Kind: FailExit, Message: "код 3: boom", ExitCode: &exit3}.Outcome(), "failed", "код 3: boom"},
+		{"a timeout", Failure{Kind: FailTimeout, Message: "таймаут"}.Outcome(), "failed", "таймаут"},
+		{"a device that never came", Failure{Kind: FailUnreachable, Message: "устройство не вышло на связь"}.Outcome(), "not_started", "устройство не вышло на связь"},
+		{"a cancel by hand", Failure{Kind: FailCanceled, Message: "запуск отменён"}.Outcome(), "stopped", "запуск отменён"},
+		{"a device that vanished", Failure{Kind: FailAbandoned, Message: "пропало"}.Outcome(), "failed", "пропало"},
 	} {
-		_, h, _ := runGraph(t, g, &CodeOutcome{Port: tc.port, Text: tc.want})
-		if len(h.sinks) != 1 {
-			t.Errorf("%s: %d sinks ran, want exactly one", tc.port, len(h.sinks))
+		o := tc.outcome
+		r, h, _ := runGraph(t, g, &o)
+		if len(h.sinks) != 1 || !r.Finished() {
+			t.Errorf("%s: %d sinks ran, want exactly one", tc.name, len(h.sinks))
 			continue
 		}
-		if why, _ := h.last(t).in["why"].(string); tc.want != "" && why != tc.want {
-			t.Errorf("%s: why = %q, want %q", tc.port, why, tc.want)
+		var want string
+		for _, n := range g.Nodes {
+			if n.Type == "sink.step_result" && r.State(n.ID) == StateRan {
+				want = strings.TrimSuffix(strings.TrimPrefix(string(n.Params), `{"result":"`), `"}`)
+			}
 		}
+		if want != tc.result {
+			t.Errorf("%s: the %q sink ran, want %q", tc.name, want, tc.result)
+		}
+		if why, _ := h.last(t).in["why"].(string); tc.why != "" && why != tc.why {
+			t.Errorf("%s: why = %q, want %q", tc.name, why, tc.why)
+		}
+	}
+}
+
+func TestFailureIsADocumentWithAKind(t *testing.T) {
+	exit := 7
+	o := Failure{Kind: FailExit, Message: "код 7: boom", ExitCode: &exit, Stderr: "boom"}.Outcome()
+	if o.Port != "failed" {
+		t.Fatalf("port %q", o.Port)
+	}
+	var back Failure
+	if err := json.Unmarshal([]byte(o.Text), &back); err != nil || back.Kind != "failed" || back.ExitCode == nil || *back.ExitCode != 7 || back.Stderr != "boom" {
+		t.Fatalf("%s %+v %v", o.Text, back, err)
+	}
+	// Only what the kind has is in it.
+	if strings.Contains(Failure{Kind: FailCanceled, Message: "x"}.Outcome().Text, "exit_code") {
+		t.Fatal("a cancel has no exit code")
 	}
 }
 
@@ -152,9 +181,13 @@ func TestNoteVerdictAndErrors(t *testing.T) {
 	if h.last(t).typ != "sink.note_error" || !strings.Contains(h.last(t).in["message"].(string), `"outdated"`) {
 		t.Fatalf("a missing required field: %+v", h.sinks)
 	}
-	_, h, _ = runGraph(t, g, &CodeOutcome{Port: "failed", Text: "код 2"})
-	if h.last(t).typ != "sink.note_error" || h.last(t).in["message"] != "код 2" {
-		t.Fatalf("a failed run: %+v", h.sinks)
+	// Every ending but a clean exit is an error on the note, with the message the failure carries.
+	for _, f := range []Failure{{Kind: FailExit, Message: "код 2"}, {Kind: FailTimeout, Message: "таймаут"}, {Kind: FailUnreachable, Message: "нет устройства"}, {Kind: FailCanceled, Message: "запуск отменён"}} {
+		o := f.Outcome()
+		_, h, _ = runGraph(t, g, &o)
+		if len(h.sinks) != 1 || h.last(t).typ != "sink.note_error" || h.last(t).in["message"] != f.Message {
+			t.Fatalf("%s: %+v", f.Kind, h.sinks)
+		}
 	}
 }
 
@@ -173,12 +206,11 @@ func TestTemplateDocumentIsTheWholeOutput(t *testing.T) {
 	if h.last(t).typ != "sink.template_error" {
 		t.Fatalf("bad output: %+v", h.sinks)
 	}
-	// The unreachable device and a cancel leave the period alone: no sink at all.
-	for _, port := range []string{"unreachable", "canceled"} {
-		r, h, _ := runGraph(t, g, &CodeOutcome{Port: port})
-		if len(h.sinks) != 0 || !r.Finished() {
-			t.Fatalf("%s: %+v", port, h.sinks)
-		}
+	// A failed run is an attempt that failed, with the message the failure carries.
+	o := Failure{Kind: FailTimeout, Message: "таймаут"}.Outcome()
+	_, h, _ = runGraph(t, g, &o)
+	if len(h.sinks) != 1 || h.last(t).typ != "sink.template_error" || h.last(t).in["message"] != "таймаут" {
+		t.Fatalf("a failed run: %+v", h.sinks)
 	}
 }
 

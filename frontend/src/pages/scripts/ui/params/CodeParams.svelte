@@ -24,8 +24,11 @@
   <textarea class="mono code" rows="12" spellcheck="false" bind:value={text} onchange={commit} aria-label="Текст кода"></textarea>
 </label>
 <p class="note">
-  Значения со связей приходят в окружение: <code>QUESTS_IN_N&lt;номер&gt;_&lt;ПОРТ&gt;</code> или псевдоним связи. Результат — JSON в stdout.
-  Исполняется только на раннере.
+  Значения со связей приходят в окружение: <code>QUESTS_IN_N&lt;номер&gt;_&lt;ПОРТ&gt;</code> или псевдоним связи. Выход
+  <code>stdout</code> — вывод при коде 0 (JSON). Выход <code>failed</code> — любой другой исход документом:
+  <code>kind</code> (<code>failed</code>, <code>timeout</code>, <code>unreachable</code>, <code>abandoned</code>,
+  <code>canceled</code>), <code>message</code>, а у ошибки ещё <code>exit_code</code> и <code>stderr</code>. Разберите его нодой
+  «Разбор» и ветвите по <code>kind</code>. Исполняется только на раннере.
 </p>
 
 <style>

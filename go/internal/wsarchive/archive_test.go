@@ -265,8 +265,8 @@ func TestWorkspaceSecretSurvivesExportAndImport(t *testing.T) {
 // Scripts and their versions travel with the workspace.
 func TestScriptsSurviveExportAndImport(t *testing.T) {
 	f := newFixture(t)
-	g := []byte(`{"nodes":[{"id":1,"type":"source.note"},{"id":2,"type":"sink.note_error"},{"id":3,"type":"code","params":{"text":"echo 1"}}],
-		"edges":[{"from":{"node":1,"port":"ref"},"to":{"node":2,"port":"ref"}},{"from":{"node":3,"port":"failed"},"to":{"node":2,"port":"message"}}]}`)
+	g := []byte(`{"nodes":[{"id":1,"type":"source.note"},{"id":2,"type":"sink.note_error"},{"id":3,"type":"code","params":{"text":"echo 1"}},{"id":4,"type":"parse","params":{"schema":[{"name":"message","type":"str","required":true}]}}],
+		"edges":[{"from":{"node":1,"port":"ref"},"to":{"node":2,"port":"ref"}},{"from":{"node":3,"port":"failed"},"to":{"node":4,"port":"in"}},{"from":{"node":4,"port":"message"},"to":{"node":2,"port":"message"}}]}`)
 	sc, err := f.st.Execution.CreateScript(f.ctx(), "Из архива", "", g)
 	if err != nil {
 		t.Fatal(err)

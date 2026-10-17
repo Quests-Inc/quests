@@ -32,37 +32,18 @@ func legacyGraphs() map[string]Graph {
 		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "in"), link(3, "progress", 4, "progress"),
 			link(3, "total", 4, "total"), link(3, "description", 4, "description"), link(1, "ref", 4, "ref")},
 	}
-	stepOnce := Graph{
-		Nodes: []Node{node(1, "source.step", ""), node(2, "code", codeEcho),
-			node(3, "sink.step_result", `{"result":"done"}`), node(4, "sink.step_result", `{"result":"failed"}`),
-			node(5, "sink.step_result", `{"result":"not_started"}`), node(6, "sink.step_result", `{"result":"stopped"}`),
-			node(7, "sink.step_result", `{"result":"failed"}`), node(8, "sink.step_result", `{"result":"failed"}`)},
-		Edges: []Edge{link(1, "secrets", 2, "secrets"),
-			link(1, "ref", 3, "ref"), link(2, "stdout", 3, "trigger"),
-			link(1, "ref", 4, "ref"), link(2, "failed", 4, "trigger"), link(2, "failed", 4, "why"),
-			link(1, "ref", 5, "ref"), link(2, "unreachable", 5, "trigger"),
-			link(1, "ref", 6, "ref"), link(2, "canceled", 6, "trigger"),
-			link(1, "ref", 7, "ref"), link(2, "abandoned", 7, "trigger"), link(2, "abandoned", 7, "why"),
-			link(1, "ref", 8, "ref"), link(2, "timeout", 8, "trigger"), link(2, "timeout", 8, "why")},
-	}
-	note := Graph{
-		Nodes: []Node{node(1, "source.note", ""), node(2, "code", codeEcho), node(3, "parse", noteSchema), node(4, "sink.note_verdict", ""),
-			node(5, "sink.note_error", ""), node(6, "sink.note_error", ""), node(7, "sink.note_error", "")},
-		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "in"),
-			link(1, "ref", 4, "ref"), link(3, "outdated", 4, "outdated"), link(3, "reason", 4, "reason"),
-			link(1, "ref", 5, "ref"), link(3, "bad_output", 5, "message"),
-			link(1, "ref", 6, "ref"), link(2, "failed", 6, "message"),
-			link(1, "ref", 7, "ref"), link(2, "unreachable", 7, "message")},
-	}
+	// A template's emit: the document is the whole answer; a failed run is recorded as an attempt that failed. (Telling an
+	// unreachable device from an error, which emit treats differently, is the template migration's to design.)
 	tmpl := Graph{
 		Nodes: []Node{node(1, "source.template", ""), node(2, "code", codeEcho), node(3, "parse", docSchema), node(4, "sink.template_create", ""),
-			node(5, "sink.template_error", `{"kind":"bad_json"}`), node(6, "sink.template_error", `{"kind":"timeout"}`)},
+			node(5, "sink.template_error", `{"kind":"bad_json"}`), node(6, "parse", `{"schema":[{"name":"message","type":"str","required":true}]}`),
+			node(7, "sink.template_error", `{"kind":"error"}`)},
 		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "in"),
 			link(1, "ref", 4, "ref"), link(3, "doc", 4, "doc"),
 			link(1, "ref", 5, "ref"), link(3, "bad_output", 5, "message"),
-			link(1, "ref", 6, "ref"), link(2, "timeout", 6, "message")},
+			link(2, "failed", 6, "in"), link(1, "ref", 7, "ref"), link(6, "message", 7, "message")},
 	}
-	return map[string]Graph{"step poll": stepPoll, "step once": stepOnce, "note": note, "template": tmpl}
+	return map[string]Graph{"step poll": stepPoll, "step once": StepOnce("echo 1"), "note": NoteCheck("echo 1"), "template": tmpl}
 }
 
 func TestTodaysChecksAreValidGraphs(t *testing.T) {
@@ -127,7 +108,7 @@ func TestValidateRefusals(t *testing.T) {
 		}, "больше одной ноды кода"},
 		{"no sink", func(g *Graph) { *g = Graph{Nodes: g.Nodes[:2], Edges: g.Edges[:1]} }, "нет ни одного приёмника"},
 		{"no source", func(g *Graph) {
-			*g = Graph{Nodes: []Node{node(2, "code", codeEcho), node(4, "sink.note_error", "")}, Edges: []Edge{link(2, "failed", 4, "message")}}
+			*g = Graph{Nodes: []Node{node(2, "code", codeEcho), node(4, "sink.note_error", "")}, Edges: []Edge{link(2, "stdout", 4, "message")}}
 		}, "нет ни одного источника"},
 		{"alias on a plain link", func(g *Graph) { g.Edges[3].Alias = "X" }, "только у значений, идущих в код"},
 		{"empty code", func(g *Graph) { g.Nodes[1] = node(2, "code", `{"text":"  "}`) }, "пустой текст кода"},

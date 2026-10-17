@@ -225,7 +225,11 @@ func (r *Run) Resume(ctx context.Context, h Host, node int, o CodeOutcome) ([]Co
 func (r *Run) finishCode(rs *resolved, o CodeOutcome) {
 	for _, p := range rs.outList {
 		if p.Name == o.Port {
-			r.tokens[End{rs.node.ID, p.Name}] = Token{Type: TStr, Value: o.Text}
+			var v any = o.Text
+			if p.Type == TDoc {
+				v = json.RawMessage(o.Text)
+			}
+			r.tokens[End{rs.node.ID, p.Name}] = Token{Type: p.Type, Value: v}
 		} else {
 			r.tokens[End{rs.node.ID, p.Name}] = exitToken()
 		}

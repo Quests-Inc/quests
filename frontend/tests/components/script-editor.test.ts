@@ -17,7 +17,7 @@ function portsFor(type: string, params: any) {
     case 'code':
       return {
         inputs: [P('secrets', 'secrets', { optional: true }), P('in', 'value', { optional: true, multi: true })],
-        outputs: [P('stdout', 'str'), P('failed', 'str')],
+        outputs: [P('stdout', 'str'), P('failed', 'doc')],
       }
     case 'parse': {
       const fields = (params?.schema ?? []).map((f: any) => P(f.name, f.type, { optional: !f.required }))

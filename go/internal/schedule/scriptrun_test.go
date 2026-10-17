@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -74,21 +75,39 @@ func TestOutcomeOfAJob(t *testing.T) {
 	exit3 := 3
 	for _, tc := range []struct {
 		job  execution.RunnerJob
-		port string
+		kind string // "" = a clean exit, which leaves by stdout
 		text string
 	}{
-		{execution.RunnerJob{State: execution.JobSuccess, Stdout: "42"}, "stdout", "42"},
-		{execution.RunnerJob{State: execution.JobFail, ExitCode: &exit3, Stderr: "no luck"}, "failed", "код 3: no luck"},
-		{execution.RunnerJob{State: execution.JobFail, ExitCode: &exit3, TimedOut: true}, "timeout", "таймаут"},
-		{execution.RunnerJob{State: execution.JobTimeout}, "timeout", "таймаут"},
-		{execution.RunnerJob{State: execution.JobSkipped, RunnerLabel: "pc"}, "unreachable", "устройство «pc» не вышло на связь"},
-		{execution.RunnerJob{State: execution.JobAbandoned, RunnerLabel: "pc"}, "abandoned", "пропало во время выполнения"},
-		{execution.RunnerJob{State: execution.JobCanceled}, "canceled", ""},
+		{execution.RunnerJob{State: execution.JobSuccess, Stdout: "42"}, "", "42"},
+		{execution.RunnerJob{State: execution.JobFail, ExitCode: &exit3, Stderr: "no luck"}, graph.FailExit, "код 3: no luck"},
+		{execution.RunnerJob{State: execution.JobFail, ExitCode: &exit3, TimedOut: true}, graph.FailTimeout, "таймаут"},
+		{execution.RunnerJob{State: execution.JobTimeout}, graph.FailTimeout, "таймаут"},
+		{execution.RunnerJob{State: execution.JobSkipped, RunnerLabel: "pc"}, graph.FailUnreachable, "устройство «pc» не вышло на связь"},
+		{execution.RunnerJob{State: execution.JobAbandoned, RunnerLabel: "pc"}, graph.FailAbandoned, "пропало во время выполнения"},
+		{execution.RunnerJob{State: execution.JobCanceled}, graph.FailCanceled, "запуск отменён"},
 	} {
 		o, ok := outcomeOf(tc.job)
-		if !ok || o.Port != tc.port || !strings.Contains(o.Text, tc.text) {
-			t.Errorf("%s: got %+v ok=%v, want port %s with %q", tc.job.State, o, ok, tc.port, tc.text)
+		if !ok {
+			t.Errorf("%s: no outcome", tc.job.State)
+			continue
 		}
+		if tc.kind == "" {
+			if o.Port != "stdout" || o.Text != tc.text {
+				t.Errorf("%s: %+v", tc.job.State, o)
+			}
+			continue
+		}
+		var f graph.Failure
+		if o.Port != "failed" || json.Unmarshal([]byte(o.Text), &f) != nil || f.Kind != tc.kind || !strings.Contains(f.Message, tc.text) {
+			t.Errorf("%s: got %+v (%s), want kind %s with %q", tc.job.State, o, o.Text, tc.kind, tc.text)
+		}
+	}
+	// The details a kind has travel with it.
+	o, _ := outcomeOf(execution.RunnerJob{State: execution.JobFail, ExitCode: &exit3, Stderr: "no luck"})
+	var f graph.Failure
+	_ = json.Unmarshal([]byte(o.Text), &f)
+	if f.ExitCode == nil || *f.ExitCode != 3 || f.Stderr != "no luck" {
+		t.Errorf("an error exit carries its code and stderr: %+v", f)
 	}
 	// A lost lease says nothing: the device may still deliver.
 	if _, ok := outcomeOf(execution.RunnerJob{State: execution.JobLost}); ok {

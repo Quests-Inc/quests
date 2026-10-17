@@ -171,7 +171,7 @@ func runParse(rs *resolved, in Token) (map[string]Token, error) {
 	if err := strictParams(rs.node.Params, &p); err != nil {
 		return nil, err
 	}
-	text, _ := in.Value.(string)
+	text := envString(in) // the text itself, or the JSON of a document, or a scalar written out
 	reject := func(msg string) (map[string]Token, error) {
 		return map[string]Token{"bad_output": {Type: TStr, Value: msg}}, nil
 	}

@@ -29,47 +29,48 @@ func buildGraph(nodes []nodeSpec, edges ...[4]any) Graph {
 
 type kv = map[string]any
 
-// NoteCheck: the note is read from its source, the command runs, the answer must be an `outdated` verdict; every way
-// the check can go wrong is recorded on the note as an error, and the verdict stays as it was.
+// NoteCheck: the note is read from its source, the command runs, the answer must be an `outdated` verdict. A run that goes
+// wrong (an error exit, a timeout, no device, a device that vanished, a cancel) leaves by `failed` and is recorded on the note as
+// an error with the message it carries; the verdict stays as it was.
 func NoteCheck(text string) Graph {
 	return buildGraph([]nodeSpec{
 		{1, "source.note", nil},
 		{2, "code", kv{"text": text}},
 		{3, "parse", kv{"schema": []kv{{"name": "outdated", "type": "bool", "required": true}, {"name": "reason", "type": "str"}}}},
 		{4, "sink.note_verdict", nil},
-		{5, "sink.note_error", nil}, {6, "sink.note_error", nil}, {7, "sink.note_error", nil}, {8, "sink.note_error", nil}, {9, "sink.note_error", nil},
+		{5, "parse", kv{"schema": []kv{{"name": "message", "type": "str", "required": true}}}},
+		{6, "sink.note_error", nil},
+		{7, "sink.note_error", nil},
 	},
 		[4]any{1, "secrets", 2, "secrets"}, [4]any{2, "stdout", 3, "in"},
 		[4]any{1, "ref", 4, "ref"}, [4]any{3, "outdated", 4, "outdated"}, [4]any{3, "reason", 4, "reason"},
-		[4]any{1, "ref", 5, "ref"}, [4]any{3, "bad_output", 5, "message"},
-		[4]any{1, "ref", 6, "ref"}, [4]any{2, "failed", 6, "message"},
-		[4]any{1, "ref", 7, "ref"}, [4]any{2, "timeout", 7, "message"},
-		[4]any{1, "ref", 8, "ref"}, [4]any{2, "unreachable", 8, "message"},
-		[4]any{1, "ref", 9, "ref"}, [4]any{2, "abandoned", 9, "message"},
+		[4]any{1, "ref", 6, "ref"}, [4]any{3, "bad_output", 6, "message"},
+		[4]any{2, "failed", 5, "in"}, [4]any{1, "ref", 7, "ref"}, [4]any{5, "message", 7, "message"},
 	)
 }
 
-// StepOnce: a one-shot step. A clean exit closes the step; a failure, a timeout or a device that vanished mid-run fails
-// the quest with the reason; a device that never showed up puts the step back to wait; a cancel stops it without failing
-// the quest.
+// StepOnce: a one-shot step. A clean exit closes the step. Whatever else happens leaves by `failed`, and its `kind` decides: a
+// device that never showed up puts the step back to wait; a cancel by hand stops it without failing the quest; anything else
+// (an error exit, a timeout, a device that vanished mid-run) fails the quest with the message.
 func StepOnce(text string) Graph {
 	return buildGraph([]nodeSpec{
 		{1, "source.step", nil},
 		{2, "code", kv{"text": text}},
 		{3, "sink.step_result", kv{"result": "done"}},
-		{4, "sink.step_result", kv{"result": "failed"}},
-		{5, "sink.step_result", kv{"result": "failed"}},
-		{6, "sink.step_result", kv{"result": "failed"}},
-		{7, "sink.step_result", kv{"result": "not_started"}},
+		{4, "parse", kv{"schema": []kv{{"name": "kind", "type": "str", "required": true}, {"name": "message", "type": "str", "required": true}}}},
+		{5, "compare", kv{"type": "str", "op": "eq", "operand": FailUnreachable}},
+		{6, "sink.step_result", kv{"result": "not_started"}},
+		{7, "compare", kv{"type": "str", "op": "eq", "operand": FailCanceled}},
 		{8, "sink.step_result", kv{"result": "stopped"}},
+		{9, "sink.step_result", kv{"result": "failed"}},
 	},
 		[4]any{1, "secrets", 2, "secrets"},
 		[4]any{1, "ref", 3, "ref"}, [4]any{2, "stdout", 3, "trigger"},
-		[4]any{1, "ref", 4, "ref"}, [4]any{2, "failed", 4, "trigger"}, [4]any{2, "failed", 4, "why"},
-		[4]any{1, "ref", 5, "ref"}, [4]any{2, "timeout", 5, "trigger"}, [4]any{2, "timeout", 5, "why"},
-		[4]any{1, "ref", 6, "ref"}, [4]any{2, "abandoned", 6, "trigger"}, [4]any{2, "abandoned", 6, "why"},
-		[4]any{1, "ref", 7, "ref"}, [4]any{2, "unreachable", 7, "trigger"}, [4]any{2, "unreachable", 7, "why"},
-		[4]any{1, "ref", 8, "ref"}, [4]any{2, "canceled", 8, "trigger"}, [4]any{2, "canceled", 8, "why"},
+		[4]any{2, "failed", 4, "in"}, [4]any{4, "kind", 5, "in"},
+		[4]any{1, "ref", 6, "ref"}, [4]any{5, "yes", 6, "trigger"}, [4]any{4, "message", 6, "why"},
+		[4]any{5, "no", 7, "in"},
+		[4]any{1, "ref", 8, "ref"}, [4]any{7, "yes", 8, "trigger"}, [4]any{4, "message", 8, "why"},
+		[4]any{1, "ref", 9, "ref"}, [4]any{7, "no", 9, "trigger"}, [4]any{4, "message", 9, "why"},
 	)
 }
 
