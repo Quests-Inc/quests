@@ -270,3 +270,18 @@ export interface InNoteResult {
   terms: string[];
   passages: number /* int */;
 }
+
+//////////
+// source: trash.go
+
+/**
+ * TrashedNote is a row of the trash list.
+ */
+export interface TrashedNote {
+  ID: number /* int64 */;
+  Title: string;
+  Size: number /* int */;
+  Children: number /* int */;
+  DeletedAt: string;
+  DeletedBy?: number /* int64 */;
+}
