@@ -30,6 +30,7 @@
     scrollRootToTextOffset,
   } from '@/shared/lib/mdCaretMap.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
+  import { toastTrashed } from '@/shared/lib/trashUndo.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import { NoteIconModal } from '@/features/note-icon'
   import NoteCanvas from './NoteCanvas.svelte'
@@ -227,7 +228,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       deleteTargetId = null
       if (id === selectedId) onSelect(null)
       onChanged()
-      toast('Заметка удалена', { kind: 'success' })
+      toastTrashed('note', [id], 'Заметка удалена')
     } catch (e) {
       ed.error = e.message || String(e)
       toast(ed.error, { kind: 'error' })
@@ -415,7 +416,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let crumbs = $derived(noteCrumbs(notes, ed.parentId))
   let parentMenuItems = $derived(parentMenu(notes, selectedId))
 
-
   function openParentPicker(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
@@ -535,7 +535,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onChanged: () => onChanged(),
     copy: copyText,
     downloadMarkdown: downloadNoteMarkdown,
-    toast: (message, kind) => toast(message, { kind }),
+    toast: (message, kind, action) => toast(message, { kind, action }),
   })
 
   function requestDelete(id: number) {

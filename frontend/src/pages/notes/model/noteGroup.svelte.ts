@@ -2,6 +2,8 @@
 // Флаги и перенос идут по одной заметке без перечитывания списка, список обновляется один раз в конце.
 import { allHave, moveSearchItems, noteGroupMenuItems, topLevelIds, type MenuItem } from '@/entities/note'
 import { createMultiSelect } from '@/shared/lib/multiSelect.svelte.ts'
+import type { ToastAction } from '@/shared/lib/toasts.svelte.ts'
+import { trashUndo } from '@/shared/lib/trashUndo.ts'
 
 type Row = {
   id: number
@@ -34,7 +36,7 @@ export function createNoteGroup(deps: {
   onChanged: () => void
   copy: (text: string) => Promise<void>
   downloadMarkdown: (note: { title: string; description: string }) => void
-  toast: (message: string, kind: 'success' | 'error') => void
+  toast: (message: string, kind: 'success' | 'error', action?: ToastAction) => void
 }) {
   const multi = createMultiSelect({ current: () => deps.selectedId() })
   let open = $state(false)
@@ -51,7 +53,12 @@ export function createNoteGroup(deps: {
   )
 
   /** Один проход по группе: ошибки считаем, остальных не бросаем; список перечитываем один раз. */
-  async function each(list: number[], step: (id: number) => Promise<unknown>, done: (n: number) => string) {
+  async function each(
+    list: number[],
+    step: (id: number) => Promise<unknown>,
+    done: (n: number) => string,
+    undo?: () => ToastAction | undefined
+  ) {
     if (busy) return
     busy = true
     let ok = 0
@@ -66,8 +73,8 @@ export function createNoteGroup(deps: {
     }
     busy = false
     deps.onChanged()
-    if (failed) deps.toast(`${done(ok)}, не удалось: ${failed}`, 'error')
-    else if (ok) deps.toast(done(ok), 'success')
+    if (failed) deps.toast(`${done(ok)}, не удалось: ${failed}`, 'error', ok ? undo?.() : undefined)
+    else if (ok) deps.toast(done(ok), 'success', undo?.())
   }
 
   async function flag(field: 'pinned' | 'is_readme' | 'is_private' | 'outdated') {
@@ -126,7 +133,8 @@ export function createNoteGroup(deps: {
             await deps.deleteNote(id)
             gone.push(id)
           },
-          (n) => `Удалено заметок: ${n}`
+          (n) => `Удалено заметок: ${n}`,
+          () => (gone.length ? trashUndo('note', [...gone]) : undefined)
         )
         deps.afterDelete(gone)
         multi.clear()

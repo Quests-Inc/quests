@@ -1,15 +1,26 @@
 <script lang="ts">
-  import { dismissToast, toasts } from '@/shared/lib/toasts.svelte.ts'
+  import { dismissToast, holdToast, releaseToast, runToastAction, toasts } from '@/shared/lib/toasts.svelte.ts'
 </script>
 
 {#if toasts.length}
   <div class="toasts" aria-live="polite" aria-relevant="additions text">
     {#each toasts as t (t.id)}
-      <div class="toast" data-kind={t.kind} role={t.kind === 'error' ? 'alert' : 'status'}>
+      <div
+        class="toast"
+        data-kind={t.kind}
+        role={t.kind === 'error' ? 'alert' : 'status'}
+        onmouseenter={() => holdToast(t.id)}
+        onmouseleave={() => releaseToast(t.id)}
+        onfocusin={() => holdToast(t.id)}
+        onfocusout={() => releaseToast(t.id)}
+      >
         {#if t.kind === 'progress'}
           <span class="toast__pulse" aria-hidden="true"></span>
         {/if}
         <span class="toast__msg">{t.message}</span>
+        {#if t.action}
+          <button type="button" class="toast__act" onclick={() => runToastAction(t.id)}>{t.action.label}</button>
+        {/if}
         <button
           type="button"
           class="toast__x"
@@ -72,6 +83,30 @@
   .toast__msg {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  /* The button of a toast ("Отменить"): text in the accent colour, no frame; it is the only thing in a toast to press. */
+  .toast__act {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0 0.1rem;
+    border: 0;
+    background: transparent;
+    color: var(--color-accent, #c9a227);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .toast__act:hover {
+    color: var(--color-fg, #e8e8e8);
+  }
+
+  .toast__act:focus-visible {
+    outline: 1px solid var(--color-accent, #c9a227);
+    outline-offset: 2px;
   }
 
   .toast__x {
