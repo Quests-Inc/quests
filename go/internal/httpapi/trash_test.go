@@ -8,6 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 func apiCall(t *testing.T, h http.Handler, method, path string, body any) (int, string) {
@@ -116,5 +121,62 @@ func TestNoteTrashOverHTTP(t *testing.T) {
 	apiCall(t, h, http.MethodDelete, url, nil)
 	if code, _ := apiCall(t, h, http.MethodDelete, "/api/trash/notes/"+strconv.FormatInt(n.ID, 10), nil); code != http.StatusNoContent {
 		t.Fatalf("purge: %d", code)
+	}
+}
+
+// backdate makes a trashed row look as if it had been deleted `age` ago.
+func backdate(t *testing.T, s *Server, table string, id int64, age time.Duration) {
+	t.Helper()
+	ctx := wsctx.With(t.Context(), 1)
+	tx, err := s.Store.DB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `SELECT set_config('app.trash', '1', true)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE `+table+` SET deleted_at = ? WHERE id = ?`, timeutil.ToDBUTC(timeutil.NowUTC().Add(-age)), id); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPurgeExpiredTrashErasesOnlyWhatIsOldEnough(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	ctx := wsctx.With(t.Context(), 1)
+	oldQ, freshQ := seedQuest(t, s), seedQuest(t, s)
+	oldN, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "old"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshN, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "fresh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{oldQ, freshQ} {
+		if err := s.Store.Journal.TrashQuest(ctx, id, "q"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, id := range []int64{oldN.ID, freshN.ID} {
+		if err := s.Store.Knowledge.TrashNote(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	backdate(t, s, "quest", oldQ, trashRetention+time.Hour)
+	backdate(t, s, "note", oldN.ID, trashRetention+time.Hour)
+
+	s.PurgeExpiredTrash(t.Context())
+
+	quests, err := s.Store.Journal.ListTrashedQuests(ctx)
+	if err != nil || len(quests) != 1 || quests[0].ID != freshQ {
+		t.Fatalf("only the fresh quest may be left: %+v %v", quests, err)
+	}
+	notes, err := s.Store.Knowledge.ListTrashedNotes(ctx)
+	if err != nil || len(notes) != 1 || notes[0].ID != freshN.ID {
+		t.Fatalf("only the fresh note may be left: %+v %v", notes, err)
 	}
 }
