@@ -18,8 +18,8 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 | Шаблон (Template) | template | automation | The rule of a periodic quest (schedule, mode, pool) |
 | Эмит (Emit) | emit | automation | Creating a quest from a template; with `emit_pool_command` a command prints the quest |
 | Проверка (Check) | check | automation | A step's or note's command that determines progress or freshness |
-| Раннер (Runner) | runner | automation | A process on the owner's device that executes commands; the server runs none |
-| Задание (Job) | job | automation | A unit of runner work |
+| Раннер (Runner) | runner | execution | A process on the owner's device that executes commands; the server runs none |
+| Задание (Job) | job | execution | A unit of runner work |
 | Пространство (Workspace) | workspace | identity | An isolated set of data; an account has several |
 | Роль (Role) | role | identity | Owner or member of a workspace |
 | Токен (Token) | token | identity | A bearer token for clients without a session (CLI, HUD, bot, MCP) |

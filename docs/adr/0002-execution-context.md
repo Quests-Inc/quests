@@ -62,6 +62,12 @@ allow-list and leaves it with step 5.
 
 - Step 2 (one policy): done. `kernel.Commands.Check` replaces the `guardAuthor` / `guardExec` pairs; each store keeps a single
   `guardCommand` wrapper that supplies its role lookup.
+- Step 3 (move): done. `go/internal/execution` (+ `execution/http`) owns runners, tokens, the queue, leases and the secrets of
+  commands; `automation` keeps templates and emit. `depguard` rules for the new context are in `.golangci.yml`
+  (`execution` imports `identity`, `kernel`, `platform` only; `automation` imports `execution`).
+- Step 4 (kinds): done in the shape `execution.Kind` (`Name`, `Owns`, `Finished`) and `execution.Kinds`; `schedule/jobkinds.go`
+  has the step, note and emit kinds. Jobs still are queued through `Store.EnqueueJob` at each kind's own site: building a
+  `JobSpec` is specific to the entity, so the shared part is the outcome routing, not a spec factory.
 
 ## Consequences
 

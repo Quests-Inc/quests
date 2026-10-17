@@ -459,13 +459,11 @@ func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.
 // remote counterpart of exec+apply: a delivered result goes through the same
 // apply/applyOnce; an unreachable device is not a failed command.
 func (r *CheckRunner) JobFinished(ctx context.Context, j execution.RunnerJob) {
-	if j.NoteID != nil {
-		r.noteJobFinished(ctx, j)
-		return
-	}
-	if j.StepID == nil || j.QuestID == nil {
-		return
-	}
+	r.Kinds().Finished(ctx, j)
+}
+
+// stepJobFinished is JobFinished for a job queued by a step check.
+func (r *CheckRunner) stepJobFinished(ctx context.Context, j execution.RunnerJob) {
 	once := j.Kind == execution.JobKindOnce
 	switch j.State {
 	case execution.JobSuccess, execution.JobFail, execution.JobTimeout:

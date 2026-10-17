@@ -24,7 +24,8 @@ Everything that is not the API talks to the server **only over HTTP** (`/api/*`,
 | `identity`, `identity/http` | accounts, sessions, MFA, tokens, workspaces, roles |
 | `knowledge`, `knowledge/http` | notes, attachments, revisions, search, quotas |
 | `journal`, `journal/http` | quests, steps, chains, categories, tags, the change log |
-| `automation`, `automation/http` | templates, runners and their jobs, secrets, emit attempts |
+| `automation`, `automation/http` | templates, emit rules and attempts |
+| `execution`, `execution/http` | runners, the job queue and leases, secrets of commands, the job-kind interface (ADR-0002); `automation` and `schedule` build on it |
 | `schedule` | the scheduler: decides *when* (template materialization, expiry, checks, backups, purging); reaches the database only through the contexts' stores |
 | `httpapi` | the composition root: wires the contexts' handlers and the cross-cutting slices, authentication, PDF rendering |
 | `assistant` | cross-cutting slice: an account's AI assistant settings and action batches built from text |

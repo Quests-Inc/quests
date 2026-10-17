@@ -50,6 +50,8 @@ go/cmd/*                wiring the dependencies (composition root)
 
 **Amendment (#20): secrets belong to `automation`.** A secret exists only as the environment of a command a runner executes, is inherited along the chain step → quest → template → questline and reads those entities' tables directly, so it belongs to `automation`, not to `knowledge` as the first edition had it.
 
+**Amendment (ADR-0002): runners, the job queue and secrets belong to `execution`.** The code that runs user commands is a context of its own (`execution`: `identity`, `kernel`, `platform` below it; `automation` and `schedule` above it), not a part of `automation`.
+
 **Dependency rules** (checked in CI, see “Checking the boundaries”):
 
 1. `platform` imports nothing from the contexts or from `httpapi`.

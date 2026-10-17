@@ -49,10 +49,10 @@ kind have their own validity window and timeout.
 | Concern | Place |
 |---|---|
 | Who may write a command, "a command needs a runner" | `internal/kernel/commands.go` (`kernel.Commands.Check`: author, then runner); each store (`journal`, `knowledge`, `automation`) has one `guardCommand` wrapper that supplies its role lookup |
-| Runners, tokens, queue, leases, expiry | `internal/automation/runner.go`, `runner_jobs.go`; HTTP `automation/http/runners.go` |
+| Runners, tokens, queue, leases, expiry | the `execution` context (ADR-0002): `internal/execution/runner.go`, `runner_jobs.go`; HTTP `execution/http/runners.go` |
 | Runner label rules | `internal/kernel/runlabel.go` |
-| What to enqueue and when | `internal/schedule`: `checks.go` (steps), `notecheck.go` (notes), `emit_remote.go` / `emit_roll.go` (templates) |
-| Secrets for a command | `internal/automation/secrets.go` |
+| What to enqueue and when | `internal/schedule`: `checks.go` (steps), `notecheck.go` (notes), `emit_remote.go` / `emit_roll.go` (templates). Each source is an `execution.Kind` (`schedule/jobkinds.go`): it owns the jobs it queued and receives their outcome; a new source (hooks, library scripts) is one more `Kind` |
+| Secrets for a command | `internal/execution/secrets.go` |
 | The executor | `cmd/quests-runner` (`agent.go`, `exec*.go`) |
 
 ## Known exceptions (to be removed or kept deliberately)
