@@ -122,7 +122,7 @@
   {#if pickedIds.size > 0}
     <div class="notes__picked" role="status">
       <span>Выбрано: {pickedIds.size}</span>
-      <button type="button" class="notes__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}>Снять</button>
+      <button type="button" class="notes__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}><Icon name="close" size={14} /></button>
     </div>
   {/if}
   <div class="notes__flaghints"><FlagHints value={search} spec={NOTE_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
@@ -390,17 +390,15 @@
     gap: 0.5rem;
     padding: 0.3rem 0.75rem;
     border-bottom: 1px solid var(--color-border, #333);
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 12%, var(--color-bg-raised, #1a1a1a));
     font-size: var(--text-sm, 0.875rem);
   }
 
   .notes__picked-clear {
-    padding: 0.1rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 999px;
+    display: inline-flex;
+    padding: 0.15rem;
+    border: 0;
     background: transparent;
     color: var(--color-fg-muted, #9a9a9a);
-    font: inherit;
     cursor: pointer;
   }
 
