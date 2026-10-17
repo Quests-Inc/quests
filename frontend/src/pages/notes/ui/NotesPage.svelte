@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createNoteScroll } from '../model/noteScroll.ts'
+  import { createNoteScroll, revealOpenRow } from '../model/noteScroll.ts'
   import { createTitleEdit } from '../model/noteTitleEdit.svelte.ts'
   import { tick } from 'svelte'
   import {
@@ -396,7 +396,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (id == null || revealedFor === id || !noteById(id)) return
     revealedFor = id
     treeOpen = { ...treeOpen, ...Object.fromEntries(ancestorIds(notes, id).map((a) => [String(a), true])) }
-    void tick().then(() => document.querySelector('.notes__row--on')?.scrollIntoView({ block: 'nearest' }))
+    void tick().then(() => revealOpenRow())
   })
 
   function showChildren(id: any) {

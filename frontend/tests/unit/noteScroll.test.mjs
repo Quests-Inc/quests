@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test'
 
-import { createNoteScroll, recalledScroll, rememberScroll } from '../../src/pages/notes/model/noteScroll.ts'
+import {
+  createNoteScroll,
+  recalledScroll,
+  rememberScroll,
+  revealOpenRow,
+} from '../../src/pages/notes/model/noteScroll.ts'
 
 test('позиция прокрутки запоминается по заметке и отдаётся обратно', () => {
   rememberScroll(7, 420)
@@ -41,4 +46,19 @@ test('createNoteScroll: после показа заметки страница 
   page.scrollTop = 999
   s.onScroll()
   expect(recalledScroll(6)).toBeNull()
+})
+
+test('revealOpenRow: прокручивает только список дерева, не трогая внешние контейнеры', () => {
+  const list = { scrollTop: 10, getBoundingClientRect: () => ({ top: 100, bottom: 300 }) }
+  const row = { closest: () => list, getBoundingClientRect: () => ({ top: 320, bottom: 340 }) }
+  const root = { querySelector: () => row }
+  revealOpenRow(root)
+  expect(list.scrollTop).toBe(50)
+  row.getBoundingClientRect = () => ({ top: 60, bottom: 80 })
+  revealOpenRow(root)
+  expect(list.scrollTop).toBe(10)
+  row.getBoundingClientRect = () => ({ top: 150, bottom: 170 })
+  revealOpenRow(root)
+  expect(list.scrollTop).toBe(10)
+  expect(() => revealOpenRow({ querySelector: () => null })).not.toThrow()
 })

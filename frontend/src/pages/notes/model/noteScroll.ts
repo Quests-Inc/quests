@@ -42,3 +42,17 @@ export function createNoteScroll(deps: {
     },
   }
 }
+
+/**
+ * Scrolls only the tree list to the open row. scrollIntoView would also scroll the tab
+ * stage horizontally while the page is still sliding in from the right, making the notes jerk sideways.
+ */
+export function revealOpenRow(root: ParentNode = document) {
+  const row = root.querySelector<HTMLElement>('.notes__row--on')
+  const list = row?.closest<HTMLElement>('.notes__list')
+  if (!row || !list) return
+  const r = row.getBoundingClientRect()
+  const l = list.getBoundingClientRect()
+  if (r.top < l.top) list.scrollTop += r.top - l.top
+  else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom
+}
