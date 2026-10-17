@@ -175,3 +175,49 @@ func TestImportRefusesBadArchives(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// The trash is not part of a workspace archive: a deleted quest or note must not travel with the export.
+func TestExportSkipsTheTrash(t *testing.T) {
+	f := newFixture(t)
+	keep, err := f.st.Journal.CreateQuest(f.ctx(), journal.Quest{Title: "Живой"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err := f.st.Journal.CreateQuest(f.ctx(), journal.Quest{Title: "Удалённый", Steps: []journal.Step{{Title: "шаг в корзине", ProgressTotal: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	note, err := f.st.Knowledge.CreateNote(f.ctx(), knowledge.Note{Title: "Удалённая заметка"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.st.Journal.TrashQuest(f.ctx(), gone.ID, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.st.Knowledge.TrashNote(f.ctx(), note.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	w := f.export(t)
+	zr, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
+	if err != nil {
+		t.Fatalf("not a zip: %v", err)
+	}
+	for _, e := range zr.File {
+		if !strings.HasPrefix(e.Name, "tables/") {
+			continue
+		}
+		rc, err := e.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(rc)
+		_ = rc.Close()
+		for _, leak := range []string{"Удалённый", "шаг в корзине", "Удалённая заметка"} {
+			if strings.Contains(string(body), leak) {
+				t.Fatalf("%s carries trashed %q", e.Name, leak)
+			}
+		}
+	}
+	_ = keep
+}

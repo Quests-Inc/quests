@@ -43,7 +43,18 @@ type TableSpec struct {
 	Text   []string          // columns scanned for kind=ID references
 	// Secret tables are exported only on request.
 	Secret bool
+	// Where drops the rows that belong to something in the trash. The trash policy hides a trashed quest or note
+	// itself, but not the rows hanging off it, and those must not travel with the archive.
+	Where string
 }
+
+const (
+	liveQuest  = `(SELECT id FROM quest)`
+	liveNote   = `(SELECT id FROM note)`
+	liveStep   = `(SELECT id FROM queststep WHERE quest_id IN ` + liveQuest + `)`
+	liveOwner  = `(owner_type NOT IN ('quest', 'note') OR owner_id IN (SELECT id FROM quest WHERE owner_type = 'quest' UNION ALL SELECT id FROM note WHERE owner_type = 'note'))`
+	liveAttach = `(SELECT id FROM attachment WHERE ` + liveOwner + `)`
+)
 
 // Kind names in kind=ID tokens and entity_type / owner_type columns → table.
 var kindTable = map[string]string{
@@ -57,16 +68,16 @@ var ExportTables = []TableSpec{
 	{Name: "questtemplate", HasID: true, FK: map[string]string{"category_id": "questcategory", "questline_id": "questline"}, Text: []string{"title", "description"}},
 	{Name: "questtemplatestep", HasID: true, FK: map[string]string{"template_id": "questtemplate"}, Text: []string{"title", "description", "check_command"}},
 	{Name: "quest", HasID: true, FK: map[string]string{"category_id": "questcategory", "questline_id": "questline", "template_id": "questtemplate"}, Text: []string{"title", "description", "source"}},
-	{Name: "queststep", HasID: true, FK: map[string]string{"quest_id": "quest"}, Text: []string{"title", "description", "check_command"}},
+	{Name: "queststep", HasID: true, Where: `quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest"}, Text: []string{"title", "description", "check_command"}},
 	{Name: "tag", HasID: true},
-	{Name: "quest_tag", FK: map[string]string{"quest_id": "quest", "tag_id": "tag"}},
+	{Name: "quest_tag", Where: `quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest", "tag_id": "tag"}},
 	{Name: "template_tag", FK: map[string]string{"template_id": "questtemplate", "tag_id": "tag"}},
 	{Name: "note", HasID: true, SelfFK: "parent_id", Text: []string{"title", "description"}},
-	{Name: "attachment", HasID: true, Poly: []polyFK{{"owner_type", "owner_id"}}, Text: []string{"comment"}},
-	{Name: "attachment_revision", HasID: true, FK: map[string]string{"attachment_id": "attachment"}, Text: []string{"comment"}},
+	{Name: "attachment", HasID: true, Where: liveOwner, Poly: []polyFK{{"owner_type", "owner_id"}}, Text: []string{"comment"}},
+	{Name: "attachment_revision", HasID: true, Where: `attachment_id IN ` + liveAttach, FK: map[string]string{"attachment_id": "attachment"}, Text: []string{"comment"}},
 	{Name: "templateemitroll", HasID: true, FK: map[string]string{"template_id": "questtemplate"}, Text: []string{"picked_refs"}},
-	{Name: "questchangelog", HasID: true, FK: map[string]string{"quest_id": "quest"}, Poly: []polyFK{{"entity_type", "entity_id"}, {"parent_type", "parent_id"}}, Text: []string{"title", "detail", "comment"}},
-	{Name: "secret", HasID: true, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note"}, Secret: true},
+	{Name: "questchangelog", HasID: true, Where: `quest_id IS NULL OR quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest"}, Poly: []polyFK{{"entity_type", "entity_id"}, {"parent_type", "parent_id"}}, Text: []string{"title", "detail", "comment"}},
+	{Name: "secret", HasID: true, Where: `(quest_id IS NULL OR quest_id IN ` + liveQuest + `) AND (note_id IS NULL OR note_id IN ` + liveNote + `) AND (step_id IS NULL OR step_id IN ` + liveStep + `)`, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note"}, Secret: true},
 }
 
 var identRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
@@ -75,6 +86,9 @@ var identRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 // as column→value maps ready for JSON.
 func (s *Store) ReadTable(ctx context.Context, spec TableSpec, fn func(row map[string]any) error) error {
 	q := `SELECT * FROM ` + spec.Name
+	if spec.Where != "" {
+		q += ` WHERE ` + spec.Where
+	}
 	if spec.HasID {
 		q += ` ORDER BY id`
 	}
