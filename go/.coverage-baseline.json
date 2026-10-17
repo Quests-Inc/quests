@@ -2,7 +2,7 @@
   "total": 55.6,
   "packages": {
     "assistant": 47.4,
-    "automation": 53.4,
+    "automation": 51.7,
     "automation/http": 30.7,
     "cli": 3.7,
     "execution": 81.0,
