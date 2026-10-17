@@ -24,50 +24,54 @@ export function createNoteActions(deps: {
 }) {
   const byId = (id: number) => deps.notes().find((n) => n.id === id) as NoteListItem | undefined
 
-  async function save(id: number, patch: Record<string, unknown>, form: Partial<NoteForm>) {
+  /** `silent`: не перечитывать список после каждой (группа делает это один раз в конце); ошибка при этом летит наружу. */
+  async function save(id: number, patch: Record<string, unknown>, form: Partial<NoteForm>, silent = false) {
     deps.editor.error = ''
     try {
       const row = await deps.api.updateNote(id, patch)
       deps.editor.patched(id, row, form)
-      deps.onChanged()
+      if (!silent) deps.onChanged()
     } catch (e) {
       deps.editor.error = messageOf(e)
+      if (silent) throw e
     }
   }
 
-  async function reparent(id: number, nextParent: number | null) {
+  async function reparent(id: number, nextParent: number | null, silent = false) {
     const n = byId(id)
     if (!n) return
     if ((n.parent_id ?? null) === nextParent) return
     if (nextParent != null && (nextParent === id || isUnder(deps.notes(), nextParent, id))) return
-    await save(id, { parent_id: nextParent }, { parentId: nextParent == null ? '' : String(nextParent) })
+    await save(id, { parent_id: nextParent }, { parentId: nextParent == null ? '' : String(nextParent) }, silent)
   }
 
-  async function togglePin(id: number) {
-    const n = byId(id)
-    if (!n) return
-    const next = !n.pinned
-    await save(id, { pinned: next }, { pinned: next })
-  }
+  const setPin = (id: number, next: boolean, silent = false) => save(id, { pinned: next }, { pinned: next }, silent)
+  const setFlag = (id: number, field: FlagField, next: boolean, silent = false) =>
+    save(id, { [field]: next }, { [FLAG_FORM[field]]: next }, silent)
 
-  async function toggleFlag(id: number, field: FlagField) {
-    const n = byId(id)
-    if (!n) return
-    const next = !n[field]
-    await save(id, { [field]: next }, { [FLAG_FORM[field]]: next })
-  }
-
-  async function toggleOutdated(id: number) {
-    const n = byId(id)
-    if (!n) return
+  async function setOutdated(id: number, next: boolean, silent = false) {
     deps.editor.error = ''
     try {
-      await deps.api.setNoteOutdated(id, !n.outdated)
+      await deps.api.setNoteOutdated(id, next)
       if (id === deps.selectedId()) deps.editor.detail = await deps.api.getNote(id)
-      deps.onChanged()
+      if (!silent) deps.onChanged()
     } catch (e) {
       deps.editor.error = messageOf(e)
+      if (silent) throw e
     }
+  }
+
+  const togglePin = async (id: number) => {
+    const n = byId(id)
+    if (n) await setPin(id, !n.pinned)
+  }
+  const toggleFlag = async (id: number, field: FlagField) => {
+    const n = byId(id)
+    if (n) await setFlag(id, field, !n[field])
+  }
+  const toggleOutdated = async (id: number) => {
+    const n = byId(id)
+    if (n) await setOutdated(id, !n.outdated)
   }
 
   async function moveUp(id: number) {
@@ -76,5 +80,5 @@ export function createNoteActions(deps: {
     await reparent(id, byId(n.parent_id)?.parent_id ?? null)
   }
 
-  return { reparent, togglePin, toggleFlag, toggleOutdated, moveUp }
+  return { reparent, togglePin, toggleFlag, toggleOutdated, moveUp, setPin, setFlag, setOutdated }
 }

@@ -17,6 +17,7 @@ export function contextMenuItems({
   questId,
   stepId,
   step,
+  count = 0,
 }: {
   kind: string
   lineId: number | null
@@ -24,7 +25,30 @@ export function contextMenuItems({
   questId: number | null
   stepId: number | null
   step?: { progress_total?: number }
+  /** сколько квестов в группе (kind === 'quests') */
+  count?: number
 }): MenuItem[] {
+  if (kind === 'quests') {
+    return [
+      { id: 'copy-ids', label: `Копировать ссылки (${count})` },
+      { id: 'sep-copy', sep: true },
+      {
+        id: 'status',
+        label: 'Изменить статус',
+        children: QUEST_STATUSES.map((s) => ({ id: `status:${s}`, label: QUEST_STATUS_LABELS[s] || s })),
+      },
+      {
+        id: 'delay',
+        label: 'Отложить',
+        children: [15, 30, 60, 90, 120].map((m) => ({ id: `delay-${m}`, label: `${m} мин` })),
+      },
+      {
+        id: 'sig',
+        label: 'Значимость',
+        children: QUEST_SIGNIFICANCES.map((s) => ({ id: `sig:${s.id}`, label: s.label })),
+      },
+    ]
+  }
   if (kind === 'line') {
     return [
       { id: 'copy-id', label: `Копировать questline=${lineId}` },

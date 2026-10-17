@@ -78,3 +78,20 @@ test('пока идёт одно действие, остальные игнор
   expect(toasts.at(-1)).toMatchObject({ kind: 'error', message: 'сервер недоступен' })
   expect(failing.actions.busy).toBe(false)
 })
+
+test('группа: один тост, пропуск тех, кому менять нечего, сбой одного не рвёт остальных', async () => {
+  const { actions, calls, applied } = make(async (id, patch) => {
+    if (id === 2) throw new Error('boom')
+    return { id, ...patch }
+  })
+  await actions.patchStatusMany([{ id: 1, status: 'frozen' }, { id: 2 }, { id: 3, status: 'active' }], 'frozen')
+  expect(calls.map((c) => c[0])).toEqual([2, 3])
+  expect(applied.map((a) => a[0].id)).toEqual([3])
+  expect(applied[0][1]).toEqual({ select: false })
+  expect(toasts.at(-1)?.message).toContain('не удалось: 1')
+  await actions.patchSignificanceMany([{ id: 5, significance: 'epic' }, { id: 6 }], 'epic')
+  expect(calls.at(-1)).toEqual([6, { significance: 'epic' }])
+  await actions.postponeMany([{ id: 7 }, { id: 8 }], 30)
+  expect(calls.slice(-2).map((c) => c[1].duration_seconds)).toEqual([1800, 1800])
+  expect(toasts.at(-1)?.message).toContain('(2)')
+})

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { filterMenuItems } from '@/shared/lib/menuSearch.ts'
 
   type CtxItem = {
     id: string,
@@ -9,6 +10,8 @@
     checked?: boolean,
     disabled?: boolean,
     children?: CtxItem[],
+    /** Подменю с полем поиска: пока поле пустое видны `children`, с запросом — совпадения из этого полного списка. */
+    search?: CtxItem[],
   }
 
 
@@ -22,7 +25,10 @@
   let subX = $state(0)
   let subY = $state(0)
   let subPlaced = $state(false)
-  let branch: { id: string, items: CtxItem[], left: number, right: number, top: number } | null = $state(null)
+  let branch: { id: string, items: CtxItem[], search?: CtxItem[], left: number, right: number, top: number } | null = $state(null)
+  let query = $state('')
+  const shown = $derived(branch ? (branch.search && query.trim() ? filterMenuItems(branch.search, query) : branch.items) : [])
+  const focusOnMount = (node: HTMLElement) => node.focus({ preventScroll: true })
 
   const PAD = 8
 
@@ -50,9 +56,11 @@
     if (branch?.id === item.id) return
     const rect = el.getBoundingClientRect()
     subPlaced = false
+    query = ''
     branch = {
       id: item.id,
       items: item.children,
+      search: item.search,
       left: rect.left,
       right: rect.right,
       top: rect.top,
@@ -129,7 +137,7 @@
       return
     }
     void branch.id
-    void branch.items.length
+    void shown.length
     let cancelled = false
     tick().then(() => {
       if (cancelled) return
@@ -225,12 +233,46 @@
       style="left: {subX}px; top: {subY}px"
       role="menu"
     >
-      {@render rows(branch.items, true)}
+      {#if branch.search}
+        <input
+          class="ctx-menu__search"
+          type="search"
+          placeholder="Найти…"
+          aria-label="Поиск по пунктам"
+          bind:value={query}
+          use:focusOnMount
+          onkeydown={(e) => {
+            if (e.key === 'Enter' && shown[0]) pick(shown[0])
+          }}
+        />
+      {/if}
+      {#if branch.search && !shown.length}
+        <div class="ctx-menu__empty">Ничего не найдено</div>
+      {/if}
+      {@render rows(shown, true)}
     </div>
   {/if}
 {/if}
 
 <style>
+  .ctx-menu__search {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 0 0.25rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-bg, #121212);
+    color: inherit;
+    font: inherit;
+  }
+
+  .ctx-menu__empty {
+    padding: 0.4rem 0.6rem;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-sm, 0.875rem);
+  }
+
   .ctx-menu {
     position: fixed;
     z-index: 80;

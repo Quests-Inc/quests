@@ -155,14 +155,6 @@
   margin-bottom: 0.35rem;
 }
 
-.detail__head[data-sig='epic'] .detail__title,
-.detail__head[data-sig='legendary'] .detail__title,
-.detail__head[data-sig='epic'] .detail__subtitle,
-.detail__head[data-sig='legendary'] .detail__subtitle {
-  padding-bottom: 0.4rem;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--sig-color) 70%, transparent);
-}
-
 .detail__actions {
   display: flex;
   flex-wrap: wrap;

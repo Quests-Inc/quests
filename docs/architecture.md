@@ -8,7 +8,7 @@ What Quests consists of, what each part is written in and how the parts talk to 
 |---|---|---|---|
 | **API server** `quests-server` | Go | `go/cmd/quests-server`, `go/internal/*` | HTTP API, serves the SPA, scheduler (templates, note checks, backups), events; applies the database schema itself on start |
 | **CLI** `quests` | Go | `go/cmd/quests` | Terminal client of the API (`docs/cli.md`) |
-| **Runner** `quests-runner` | Go | `go/cmd/quests-runner` | Executes check and emit commands on the owner's device; the server runs no commands (`docs/security.md`) |
+| **Runner** `quests-runner` | Go | `go/cmd/quests-runner` | Executes check and emit commands on the owner's device; the server runs no commands (`docs/security.md`, rules in `docs/automation.md`) |
 | **Web UI** | Svelte 5 + TypeScript | `frontend/` | SPA; the API response types are generated from Go (`just gen-types`) |
 | **MCP server** `quests-mcp` | Go | `go/cmd/quests-mcp`, `go/internal/mcp` | Tools for AI agents on top of the HTTP API (stdio; compact paged lists) |
 | **Telegram bot** | Python | `src/quests/telegram/` | Notifications, quick add, voice through STT |

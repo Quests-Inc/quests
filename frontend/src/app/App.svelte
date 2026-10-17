@@ -573,11 +573,11 @@
       {
         id: 'clear-selection',
         group: 'Список',
-        label: 'Снять выбор квеста',
+        label: 'Снять выделение квестов, затем выбор квеста',
         keys: 'Esc',
         codes: ['Escape'],
-        when: () => nav.view === 'journal' && nav.selectedId != null,
-        run: () => clearSelectedQuest(),
+        when: () => nav.view === 'journal' && (desk.multi.size > 0 || nav.selectedId != null),
+        run: () => (desk.multi.size > 0 ? desk.multi.clear() : clearSelectedQuest()),
       },
     ])
     const detach = installHotkeys()
@@ -692,6 +692,9 @@
       stepEditId={desk.stepEditId}
       stepEditValue={desk.stepEditValue}
       onSelect={(id) => selectQuestFromUi(id)}
+      pickedIds={desk.multi.picked}
+      onRowClick={(e, id, order) => desk.multi.click(e, id, order)}
+      onClearPicked={() => desk.multi.clear()}
       onTogglePin={desk.togglePin}
       onQuestContextMenu={desk.menu.openQuest}
       onLineContextMenu={desk.menu.openLine}

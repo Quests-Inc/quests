@@ -11,13 +11,14 @@
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { createNoteActions } from '../model/noteActions.svelte.ts'
+  import { createNoteGroup } from '../model/noteGroup.svelte.ts'
   import { createNoteEditor } from '../model/noteEditor.svelte.ts'
   import { createNoteRename } from '../model/noteRename.svelte.ts'
   import { createViewMode, VIEW_MODE_OPTIONS } from '../model/viewMode.svelte.ts'
   import { createNoteExport } from '../model/noteExport.svelte.ts'
   import { createTreeDnd } from '../model/treeDnd.svelte.ts'
   import { flattenAttachmentIndex, attachmentCatalog } from '@/entities/attachment'
-  import { NOTE_SPEC, moveTargetItems, noteCatalog, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, ancestorIds, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
+  import { NOTE_SPEC, moveSearchItems, moveTargetItems, noteCatalog, noteCrumbs, noteMenuItems, parentMenu, readmeBubbles, compareNotes, withAncestors, ancestorIds, clearNoteDraft, noteDrafts, downloadNoteMarkdown, downloadNotePdf, NoteOutline } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { parseQuery, passes } from '@/shared/lib/searchFlags.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
@@ -256,7 +257,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let titleEl = $state((null as HTMLInputElement | null))
   let findOpen = $state(false)
   let noteIsOutdated = $derived(selectedId != null && !!(ed.detail?.id === selectedId ? ed.detail.outdated : noteById(selectedId)?.outdated))
-  function onFindKey(e: { ctrlKey: any; metaKey: any; shiftKey: any; altKey: any; key: string; preventDefault: () => void }) {
+  function onFindKey(e: { ctrlKey: any; metaKey: any; shiftKey: any; altKey: any; key: string; target?: any; preventDefault: () => void }) {
+    if (e.key === 'Escape' && grp.multi.size > 0 && !(e.target instanceof Element && e.target.closest('input, textarea'))) grp.multi.clear()
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && selectedId) {
       e.preventDefault()
       findOpen = true
@@ -467,6 +469,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       searchActive,
       exportBusy,
       moveTargets: moveTargetItems(ctxNote, notes, hasChildren),
+      moveSearch: ctxNote ? moveSearchItems([ctxNote.id], notes) : [],
     }),
   )
 
@@ -474,6 +477,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (!note?.id) return
     event.preventDefault()
     event.stopPropagation()
+    if (grp.openMenu(event, note.id)) return
+    grp.multi.clear()
     ctxNoteId = note.id
     ctxX = event.clientX
     ctxY = event.clientY
@@ -517,76 +522,56 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     move: (id, newParentId) => reparentNote(id, newParentId),
   })
 
+  const grp = createNoteGroup({
+    notes: () => notes,
+    selectedId: () => selectedId,
+    isDirty: (id) => (id === selectedId && ed.dirty) || !!noteDrafts[String(id)],
+    actions,
+    deleteNote,
+    afterDelete: (ids) => {
+      ids.forEach(clearNoteDraft)
+      if (selectedId != null && ids.includes(selectedId)) onSelect(null)
+    },
+    onChanged: () => onChanged(),
+    copy: copyText,
+    downloadMarkdown: downloadNoteMarkdown,
+    toast: (message, kind) => toast(message, { kind }),
+  })
+
   function requestDelete(id: number) {
     if (id == null) return
     deleteTargetId = id
     deleteOpen = true
   }
 
+  const ctxRun: Record<string, (id: number) => unknown> = {
+    'copy-id': copyNoteRef,
+    rename: startRename,
+    pin: togglePinNote,
+    readme: toggleReadmeNote,
+    private: togglePrivateNote,
+    category: toggleCategoryNote,
+    outdated: toggleOutdatedNote,
+    'add-child': addNote,
+    'move-up': moveNoteUp,
+    'export-md': (id) => exportNoteById(id, 'md'),
+    'export-pdf': (id) => exportNoteById(id, 'pdf'),
+    icon: (id) => ((iconModalNoteId = id), (iconModalOpen = true)),
+    delete: requestDelete,
+  }
+
   async function onCtxSelect(action: string) {
     const id = ctxNoteId
-    if (action === 'copy-id') {
-      await copyNoteRef(id)
-      return
-    }
-    if (action === 'rename') {
-      startRename(id)
-      return
-    }
-    if (action === 'pin') {
-      await togglePinNote(id)
-      return
-    }
-    if (action === 'readme') {
-      await toggleReadmeNote(id)
-      return
-    }
-    if (action === 'private') {
-      await togglePrivateNote(id)
-      return
-    }
-    if (action === 'category') {
-      await toggleCategoryNote(id)
-      return
-    }
-    if (action === 'outdated') {
-      await toggleOutdatedNote(id)
-      return
-    }
-    if (action === 'add-child') {
-      await addNote(id)
-      return
-    }
-    if (action === 'move-up') {
-      await moveNoteUp(id)
-      return
-    }
+    if (id == null) return
     if (action.startsWith('move:')) {
       const raw = action.slice('move:'.length)
       await reparentNote(id, raw === 'root' ? null : Number(raw))
       return
     }
-    if (action === 'export-md') {
-      await exportNoteById(id, 'md')
-      return
-    }
-    if (action === 'export-pdf') {
-      await exportNoteById(id, 'pdf')
-      return
-    }
-    if (action === 'icon') {
-      iconModalNoteId = id
-      iconModalOpen = true
-      return
-    }
-    if (action === 'delete') {
-      requestDelete(id)
-    }
+    await ctxRun[action]?.(id)
   }
 
-  let iconModalNote = $derived(
-    iconModalNoteId == null ? null : noteById(iconModalNoteId),
-  )
+  let iconModalNote = $derived(iconModalNoteId == null ? null : noteById(iconModalNoteId))
 
   function onIconSaved(row: NotePayload) {
     if (selectedId === row?.id) {
@@ -619,6 +604,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     {labels}
     {onRef}
     {onSelect}
+    pickedIds={grp.multi.picked}
+    onRowClick={(e, id, order) => (grp.remember(order), grp.multi.click(e, id, order))}
+    onClearPicked={() => grp.multi.clear()}
     onAdd={() => addNote(null)}
     onMenu={openNoteMenu}
     {hasChildren}
@@ -695,6 +683,18 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   items={ctxItems}
   onSelect={onCtxSelect}
   onClose={closeNoteMenu}
+/>
+
+<ContextMenu open={grp.open} x={grp.x} y={grp.y} items={grp.items} onSelect={grp.select} onClose={grp.close} />
+
+<ConfirmModal
+  open={!!grp.confirm}
+  title={grp.confirm?.title}
+  message={grp.confirm?.message}
+  confirmLabel={grp.confirm?.label}
+  busy={grp.busy}
+  onCancel={grp.cancelConfirm}
+  onConfirm={grp.doConfirm}
 />
 
 <ContextMenu

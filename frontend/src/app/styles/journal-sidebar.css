@@ -205,3 +205,30 @@
   background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, var(--color-bg-muted, #242424));
   color: var(--color-accent, #c9a227);
 }
+
+/* «Выбрано: N» — под инструментами сайдбара, пока выделено больше нуля квестов. */
+.sidebar__picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, #333);
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 12%, var(--color-bg-raised, #1a1a1a));
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.sidebar__picked-clear {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg-muted, #9a9a9a);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sidebar__picked-clear:hover {
+  color: var(--color-fg, #e8e8e8);
+}

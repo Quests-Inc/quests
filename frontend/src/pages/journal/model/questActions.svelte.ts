@@ -40,10 +40,52 @@ export function createQuestActions(deps: {
     }
   }
 
+  /** Одно и то же действие над группой: один тост на всех, ошибки по одному не прерывают остальных. */
+  async function many(
+    quests: Quest[],
+    patchOf: (q: Quest) => Record<string, unknown> | null,
+    text: (n: number) => string
+  ) {
+    await guarded(async () => {
+      let done = 0
+      let failed = 0
+      for (const q of quests) {
+        const patch = patchOf(q)
+        if (!patch) continue
+        try {
+          deps.applyQuest(await deps.updateQuest(q.id, patch), { select: false })
+          done += 1
+        } catch {
+          failed += 1
+        }
+      }
+      if (failed) toast(`${text(done)}, не удалось: ${failed}`, { kind: 'error' })
+      else if (done) toast(text(done), { kind: 'success' })
+    })
+  }
+
   return {
     get busy() {
       return busy
     },
+    patchStatusMany: (quests: Quest[], status: string) =>
+      many(
+        quests,
+        (q) => (q.status === status ? null : { status }),
+        (n) => `Статус: ${statusToastLabel(status)} (${n})`
+      ),
+    postponeMany: (quests: Quest[], minutes: number) =>
+      many(
+        quests,
+        () => postponePatch(minutes),
+        (n) => `Отложено на ${minutes} мин (${n})`
+      ),
+    patchSignificanceMany: (quests: Quest[], significance: string) =>
+      many(
+        quests,
+        (q) => (significance === (q.significance || 'common') ? null : { significance }),
+        (n) => `Значимость: ${QUEST_SIGNIFICANCES.find((s) => s.id === significance)?.label || significance} (${n})`
+      ),
     async patchStatus(quest: Quest, status: string) {
       if (!quest) return
       await guarded(async () => {
