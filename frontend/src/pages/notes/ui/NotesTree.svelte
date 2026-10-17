@@ -28,6 +28,9 @@
     labels,
     onRef,
     onSelect,
+    pickedIds = new Set<number>(),
+    onRowClick,
+    onClearPicked,
     onAdd,
     onMenu,
     hasChildren,
@@ -62,6 +65,11 @@
     labels: ComponentProps<typeof RefText>['labels']
     onRef: ComponentProps<typeof RefText>['onRef']
     onSelect: (id: number) => void
+    /** Notes picked with Ctrl/Shift-click. */
+    pickedIds?: ReadonlySet<number>
+    /** Ctrl/Shift-click goes here first: true = taken into the selection, the row is not opened. */
+    onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean
+    onClearPicked?: () => void
     onAdd: () => void
     onMenu(e: MouseEvent, n: { id: number }): void
     hasChildren(id: number): boolean
@@ -81,9 +89,19 @@
     onRowDragLeave(e: DragEvent, id: number): void
     onRowDrop(e: DragEvent, id: number): void
   } = $props()
+
+  let treeEl: HTMLElement | null = $state(null)
+  /** Note ids in the order the rows are on screen now (folded branches are not there). */
+  function visibleOrder() {
+    const els: HTMLElement[] = treeEl ? [...treeEl.querySelectorAll<HTMLElement>('[data-nid]')] : []
+    return [...new Set(els.map((el) => Number(el.dataset.nid)))]
+  }
+  function rowClick(e: MouseEvent, id: number) {
+    if (!onRowClick?.(e, id, visibleOrder())) onSelect(id)
+  }
 </script>
 
-<aside class="notes__tree">
+<aside class="notes__tree" bind:this={treeEl}>
   <div class="notes__tools">
     <input
       class="search"
@@ -101,6 +119,12 @@
       +
     </button>
   </div>
+  {#if pickedIds.size > 0}
+    <div class="notes__picked" role="status">
+      <span>Выбрано: {pickedIds.size}</span>
+      <button type="button" class="notes__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}>Снять</button>
+    </div>
+  {/if}
   <div class="notes__flaghints"><FlagHints value={search} spec={NOTE_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
   <div
     class="notes__list"
@@ -117,7 +141,7 @@
         <ul class="hits">
           {#each searchHits as h (h.id)}
             <li>
-              <button type="button" data-nav class="hit" class:hit--on={h.id === selectedId} onclick={() => onSelect(h.id)} oncontextmenu={(e) => onMenu(e, h)}>
+              <button type="button" data-nav data-nid={h.id} class="hit" class:hit--on={h.id === selectedId} class:hit--picked={pickedIds.has(h.id)} onclick={(e) => rowClick(e, h.id)} oncontextmenu={(e) => onMenu(e, h)}>
                 <span class="hit__title">{h.title || 'Без названия'}{#if h.outdated}<span class="notes__status-dot notes__status-dot--outdated notes__hit-flag" title={h.outdated_reason || 'Устарела'}><Icon name="clock-alert" size={12} /></span>{/if}</span>
                 <span class="hit__where">{WHERE_LABEL[h.where] ?? ''}</span>
                 {#if h.snippet}<span class="hit__snippet">{@html snippetHtml(h.snippet)}</span>{/if}
@@ -154,11 +178,13 @@
               type="button"
               data-nav
               class="notes__row"
+              data-nid={n.id}
               class:notes__row--on={n.id === selectedId}
+              class:notes__row--picked={pickedIds.has(n.id)}
               class:notes__row--pin={n.pinned}
               class:notes__row--dragover={dragOverKey === String(n.id)}
               draggable={n.id !== renamingId}
-              onclick={() => onSelect(n.id)}
+              onclick={(e) => rowClick(e, n.id)}
               oncontextmenu={(e) => onMenu(e, n)}
               ondragstart={(e) => onRowDragStart(e, n.id)}
               ondragend={onRowDragEnd}
@@ -355,6 +381,37 @@
 
   .notes__fold--spacer {
     pointer-events: none;
+  }
+
+  .notes__picked {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.3rem 0.75rem;
+    border-bottom: 1px solid var(--color-border, #333);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 12%, var(--color-bg-raised, #1a1a1a));
+    font-size: var(--text-sm, 0.875rem);
+  }
+
+  .notes__picked-clear {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-fg-muted, #9a9a9a);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .notes__picked-clear:hover {
+    color: var(--color-fg, #e8e8e8);
+  }
+
+  .notes__row--picked,
+  .hit--picked {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227);
   }
 
   .notes__row--on {

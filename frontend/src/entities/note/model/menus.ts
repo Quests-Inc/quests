@@ -8,6 +8,8 @@ export interface MenuItem {
   danger?: boolean
   checked?: boolean
   children?: MenuItem[]
+  /** Подменю с полем поиска: полный список, из которого берутся совпадения. */
+  search?: MenuItem[]
 }
 
 type Row = {
@@ -131,12 +133,14 @@ export function noteMenuItems({
   searchActive,
   exportBusy,
   moveTargets,
+  moveSearch,
 }: {
   noteId: number | null
   note: Row | null
   searchActive: boolean
   exportBusy: boolean
   moveTargets: MenuItem[]
+  moveSearch?: MenuItem[]
 }): MenuItem[] {
   if (noteId == null) return []
   return [
@@ -155,7 +159,7 @@ export function noteMenuItems({
       ],
     },
     { id: 'add-child', label: 'Добавить дочернюю' },
-    { id: 'move', label: 'Переместить', children: moveTargets },
+    { id: 'move', label: 'Переместить', children: moveTargets, search: moveSearch },
     {
       id: 'export',
       label: 'Экспорт',
@@ -168,5 +172,55 @@ export function noteMenuItems({
     { id: 'icon', label: 'Иконка' },
     { id: 'sep-danger', sep: true },
     { id: 'delete', label: 'Удалить', danger: true },
+  ]
+}
+
+/** Every place the moved notes can go, for the search in «Переместить»: the root and each note outside their subtrees. */
+export function moveSearchItems(movedIds: number[], notes: Row[]): MenuItem[] {
+  const items: MenuItem[] = [{ id: 'move:root', label: 'Корень' }]
+  for (const n of notes) {
+    if (movedIds.includes(n.id) || movedIds.some((m) => isUnder(notes, n.id, m))) continue
+    const parent = byId(notes, n.parent_id)
+    const title = n.title || `note=${n.id}`
+    items.push({ id: `move:${n.id}`, label: parent ? `${title} — ${parent.title || `note=${parent.id}`}` : title })
+  }
+  return items
+}
+
+/** The selected notes that are not below another selected one: moving or exporting them already carries the rest. */
+export function topLevelIds(notes: Row[], ids: number[]): number[] {
+  return ids.filter((id) => !ids.some((other) => other !== id && isUnder(notes, id, other)))
+}
+
+type GroupFlag = 'pinned' | 'is_readme' | 'is_private' | 'outdated'
+
+/** `true` when every selected note already has the flag: the menu then offers to remove it, otherwise to set it. */
+export function allHave(rows: Row[], flag: GroupFlag): boolean {
+  return rows.length > 0 && rows.every((r) => !!r[flag])
+}
+
+/** The «several notes selected» menu: links, flags, move (with search), one-file Markdown export, delete. */
+export function noteGroupMenuItems({ rows, moveSearch }: { rows: Row[]; moveSearch: MenuItem[] }): MenuItem[] {
+  const flag = (id: string, f: GroupFlag, on: string, off: string): MenuItem => ({
+    id,
+    label: allHave(rows, f) ? off : on,
+  })
+  return [
+    { id: 'copy-ids', label: `Копировать ссылки (${rows.length})` },
+    { id: 'sep-copy', sep: true },
+    {
+      id: 'flags',
+      label: 'Флаги',
+      children: [
+        flag('pin', 'pinned', 'Закрепить', 'Снять закреп'),
+        flag('readme', 'is_readme', 'Пометить README', 'Снять README'),
+        flag('private', 'is_private', 'Пометить PRIVATE', 'Снять PRIVATE'),
+        flag('outdated', 'outdated', 'Пометить «устарела»', 'Снять «устарела»'),
+      ],
+    },
+    { id: 'move', label: 'Переместить', children: [{ id: 'move:root', label: 'Корень' }], search: moveSearch },
+    { id: 'export-md', label: 'Экспорт: Markdown одним файлом' },
+    { id: 'sep-danger', sep: true },
+    { id: 'delete', label: `Удалить (${rows.length})`, danger: true },
   ]
 }

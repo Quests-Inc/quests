@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { createMultiSelect, pickRange } from '@/pages/journal/model/multiSelect.svelte.ts'
+import { createMultiSelect, pickRange } from '@/shared/lib/multiSelect.svelte.ts'
 
 import { inRoot } from './root.svelte.ts'
 

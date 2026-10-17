@@ -12,11 +12,11 @@ import {
   updateQuestStep,
 } from '@/shared/api/client.ts'
 import { copyText } from '@/shared/lib/clipboard.ts'
+import { createMultiSelect } from '@/shared/lib/multiSelect.svelte.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 import { createDeletions } from './deletions.svelte.ts'
 import { createJournalMenu } from './journalMenu.svelte.ts'
-import { createMultiSelect } from './multiSelect.svelte.ts'
 import { createQuestActions } from './questActions.svelte.ts'
 import { createStepProgress, questIdOfStep, stepRef } from './stepProgress.svelte.ts'
 
