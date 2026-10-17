@@ -120,11 +120,14 @@ func templateTools(c *Client) []Tool {
 		templateFields
 		Title     string   `json:"title"`
 		Category  string   `json:"category,omitempty" desc:"id or name"`
-		Questline string   `json:"questline,omitempty" desc:"id or name"`
+		Questline string   `json:"questline" desc:"REQUIRED: id or name of the project (list_questlines), or \"none\" to deliberately leave it standalone"`
 		Steps     []stepIn `json:"steps,omitempty"`
 	}
 	create := Typed("create_template", "Create a recurring template (daily/weekly), optionally emitting its quest from a command.",
 		func(ctx context.Context, a createArgs) (any, error) {
+			if strings.TrimSpace(a.Questline) == "" {
+				return nil, &Err{422, `questline is required: pass the id or name of the project (see list_questlines) or "none" to leave the template standalone on purpose`}
+			}
 			a.templateFields.Title = &a.Title
 			body, err := templateBody(ctx, c, a.templateFields, a.Category, a.Questline, a.Steps)
 			if err != nil {
@@ -136,7 +139,11 @@ func templateTools(c *Client) []Tool {
 			if err := c.Do(ctx, http.MethodPost, "/api/templates", nil, body, &t); err != nil {
 				return nil, err
 			}
-			return ok(ctx, c, t.ID, nil), nil
+			extra := map[string]any{"hint": "no tags: pick from list_tags and set them with set_tags (owner template=N)"}
+			if body["questline_id"] == nil && body["category_id"] == nil {
+				extra["hint"] = "no questline and no category: the template is unsorted; set one with update_template; " + extra["hint"].(string)
+			}
+			return ok(ctx, c, t.ID, extra), nil
 		})
 
 	type updArgs struct {

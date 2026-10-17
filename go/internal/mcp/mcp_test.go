@@ -474,3 +474,30 @@ func TestCreateQuestNeedsAnExplicitQuestline(t *testing.T) {
 		t.Fatalf("category + tags → no hint: %s", text)
 	}
 }
+
+func TestInstructionsTellToLayOutWork(t *testing.T) {
+	got := Instructions()
+	for _, want := range []string{"list_questlines", "list_tags", `"none"`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("instructions miss %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "guide") {
+		t.Fatalf("no pointer to a vault note: a note may not exist, the instructions stand on their own:\n%s", got)
+	}
+}
+
+func TestCreateTemplateNeedsAnExplicitQuestline(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{"POST /api/templates": `{"id":4}`}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "create_template", `{"title":"t"}`),
+		call(2, "create_template", `{"title":"t","questline":"none"}`),
+	)
+	if text, isErr := result(t, resps[0]); !isErr || !strings.Contains(text, "questline is required") {
+		t.Fatalf("should be refused: %s", text)
+	}
+	if text, isErr := result(t, resps[1]); isErr || !strings.Contains(text, "unsorted") || !strings.Contains(text, "no tags") {
+		t.Fatalf("standalone template → hints: %s", text)
+	}
+}
