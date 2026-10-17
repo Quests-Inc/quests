@@ -27,6 +27,8 @@
     changed = false,
     editing = $bindable(null),
     onCardDown,
+    onRaise,
+    z = 0,
     onCtx,
     onStartEdit,
     onFinishEdit,
@@ -52,6 +54,10 @@
     changed?: boolean
     editing?: GraphNoteEditing | null
     onCardDown: (e: PointerEvent, n: GraphNodeView) => void
+    /** Touching a card brings it to the foreground. */
+    onRaise?: (key: string) => void
+    /** Stacking order among cards (higher = nearer). */
+    z?: number
     onCtx: (e: MouseEvent, n: GraphNodeView) => void
     onStartEdit(n: GraphNodeView): void
     onFinishEdit: (save: boolean) => void
@@ -99,13 +105,17 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         class:gcard--picked={picked}
         class:gcard--pill={!big && !square && !withText}
         style:--c={ownerless ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
+        style:z-index={editingHere ? 1_000_000 : z}
         style:left="{n.x - n.w / 2}px"
         style:top="{n.y - n.h / 2}px"
         style:width={big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
         style:height={ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
         data-gkey={n.key}
         title="{t.label}: {n.title}{orphan ? ' — на неё нет ссылок' : ''}"
-        onpointerdown={(e) => onCardDown(e, n)}
+        onpointerdown={(e) => {
+          onRaise?.(n.key)
+          onCardDown(e, n)
+        }}
         oncontextmenu={(e) => onCtx(e, n)}
         ondblclick={(e) => {
           if (n.type === 'note' && !(e.target instanceof Element && (e.target as Element).closest('a, button, textarea, input'))) void onStartEdit(n)
@@ -235,6 +245,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 
   .gcard {
     position: absolute;
+    /* The card's own stacking context (z-index is set inline): its badges stay under cards above it. */
+    z-index: 0;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -280,7 +292,6 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   }
 
   .gcard--editing {
-    z-index: 5;
     cursor: default;
     box-shadow: 0 6px 24px color-mix(in srgb, #000 55%, transparent);
   }
