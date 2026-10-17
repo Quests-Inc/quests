@@ -122,6 +122,8 @@ type Step struct {
 	// RunOn names the runner (device) that executes the check; nil = this server.
 	RunOn *string `json:"run_on"`
 	Done  bool    `json:"done"`
+	// ScriptID is the script this step runs instead of a command (ADR-0003); it is read from the binding, never written here.
+	ScriptID *int64 `json:"script_id"`
 }
 
 type Quest struct {

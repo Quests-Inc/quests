@@ -23,6 +23,7 @@ func (h *Handler) registerScripts(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/scripts/{id}/versions/{version}", h.getScriptVersion)
 	mux.HandleFunc("GET /api/script-nodes", h.listScriptNodes)
 	mux.HandleFunc("POST /api/script-nodes/ports", h.scriptNodePorts)
+	h.registerBindings(mux)
 }
 
 const maxScriptBody = graph.MaxBytes + 16<<10
@@ -30,7 +31,10 @@ const maxScriptBody = graph.MaxBytes + 16<<10
 // scriptErr maps a store error to a response.
 func scriptErr(w http.ResponseWriter, err error) {
 	var ge *execution.GraphError
+	var inUse *execution.ScriptInUse
 	switch {
+	case errors.As(err, &inUse):
+		writeJSON(w, http.StatusConflict, map[string]any{"detail": err.Error(), "uses": inUse.Uses})
 	case errors.As(err, &ge):
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"detail": err.Error(), "problems": ge.Problems})
 	case apperr.IsBad(err):
@@ -205,4 +209,78 @@ func (h *Handler) scriptNodePorts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"inputs": inputs, "outputs": outputs})
+}
+
+// Binding a script to a step or a note. The runner, interval and mode stay on the step or the note (they are edited there as
+// ever); choosing a script is what takes the command's place, so the command is cleared in the same request.
+func (h *Handler) registerBindings(mux *http.ServeMux) {
+	for _, seg := range []struct{ path, kind string }{{"steps", execution.SubjectStep}, {"notes", execution.SubjectNote}} {
+		mux.HandleFunc("PUT /api/"+seg.path+"/{id}/script", h.bindScript(seg.kind))
+		mux.HandleFunc("DELETE /api/"+seg.path+"/{id}/script", h.unbindScript(seg.kind))
+	}
+	mux.HandleFunc("GET /api/scripts/{id}/uses", h.scriptUses)
+}
+
+func (h *Handler) bindScript(kind string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.RequireOwner(w, r, "attach scripts") {
+			return
+		}
+		id, ok := scriptID(w, r)
+		if !ok {
+			return
+		}
+		var in struct {
+			ScriptID int64 `json:"script_id"`
+		}
+		if !decodeScriptBody(w, r, &in) {
+			return
+		}
+		if exists, err := h.SubjectExists(r.Context(), kind, id); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		} else if !exists {
+			writeErr(w, http.StatusNotFound, kind+" not found")
+			return
+		}
+		if err := h.Store.BindScript(r.Context(), kind, id, in.ScriptID); err != nil {
+			scriptErr(w, err)
+			return
+		}
+		if err := h.ClearCommand(r.Context(), kind, id); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (h *Handler) unbindScript(kind string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.RequireOwner(w, r, "detach scripts") {
+			return
+		}
+		id, ok := scriptID(w, r)
+		if !ok {
+			return
+		}
+		if err := h.Store.UnbindScript(r.Context(), kind, id); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (h *Handler) scriptUses(w http.ResponseWriter, r *http.Request) {
+	id, ok := scriptID(w, r)
+	if !ok {
+		return
+	}
+	uses, err := h.Store.ScriptUses(r.Context(), id)
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, uses)
 }

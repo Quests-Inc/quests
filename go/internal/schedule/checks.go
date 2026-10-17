@@ -118,10 +118,18 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 		return
 	}
 	now := timeutil.NowUTC()
+	bound, err := r.Store.Execution.Bindings(ctx, execution.SubjectStep)
+	if err != nil {
+		log.Printf("checks: script bindings: %v", err)
+	}
 	for _, q := range quests {
 		for i := range q.Steps {
 			st := q.Steps[i]
-			if st.CheckCommand == nil || strings.TrimSpace(*st.CheckCommand) == "" {
+			var script *execution.Binding
+			if b, ok := bound[st.ID]; ok {
+				script = &b // a bound script takes the place of the command
+			}
+			if script == nil && (st.CheckCommand == nil || strings.TrimSpace(*st.CheckCommand) == "") {
 				continue
 			}
 			mode := st.RunMode
@@ -145,7 +153,7 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 						continue
 					}
 				}
-				r.spawn(ctx, q, st, true)
+				r.spawn(ctx, q, st, true, script)
 				continue
 			}
 			iv := 15
@@ -158,15 +166,15 @@ func (r *CheckRunner) Tick(ctx context.Context) {
 			if st.CheckLastRunAt != nil && now.Sub(*st.CheckLastRunAt) < time.Duration(iv)*time.Second {
 				continue
 			}
-			r.spawn(ctx, q, st, false)
+			r.spawn(ctx, q, st, false, script)
 		}
 	}
 }
 
-func (r *CheckRunner) spawn(ctx context.Context, q journal.Quest, st journal.Step, once bool) {
+func (r *CheckRunner) spawn(ctx context.Context, q journal.Quest, st journal.Step, once bool, script *execution.Binding) {
 	// Commands run on runners only. A step that still has a command and no runner (stored before
-	// server-side execution was removed) stays idle until a runner is chosen for it.
-	if st.RunOn == nil {
+	// server-side execution was removed) stays idle until a runner is chosen for it. A script with no Code node needs none.
+	if st.RunOn == nil && (script == nil || script.NeedsRunner) {
 		return
 	}
 	if !r.tryLock(st.ID) {
@@ -185,7 +193,11 @@ func (r *CheckRunner) spawn(ctx context.Context, q journal.Quest, st journal.Ste
 	}
 	// Executed by a runner on another device: queue the job, the result is
 	// applied when it comes back (JobFinished).
-	r.dispatch(ctx, q, st, once)
+	if script != nil {
+		r.dispatchScript(ctx, q, st, once, *script)
+	} else {
+		r.dispatch(ctx, q, st, once)
+	}
 	r.unlock(st.ID)
 }
 
@@ -446,6 +458,9 @@ func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
 	}
 	if _, err := r.Store.Execution.PurgeRunnerJobs(ctx, timeutil.NowUTC().Add(-14*24*time.Hour)); err != nil {
 		log.Printf("checks: purge runner jobs: %v", err)
+	}
+	if _, err := r.Store.Execution.PurgeOrphanBindings(ctx); err != nil {
+		log.Printf("checks: purge script bindings: %v", err)
 	}
 	// Runs of scripts are a log, not an archive: the finished ones go after three days (a waiting run is never touched).
 	if _, err := r.Store.Execution.PurgeRuns(ctx, timeutil.NowUTC().Add(-3*24*time.Hour)); err != nil {

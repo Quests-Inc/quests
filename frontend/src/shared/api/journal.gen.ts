@@ -105,6 +105,10 @@ export interface Step {
    */
   run_on?: string;
   done: boolean;
+  /**
+   * ScriptID is the script this step runs instead of a command (ADR-0003); it is read from the binding, never written here.
+   */
+  script_id?: number /* int64 */;
 }
 export interface Quest {
   ID: number /* int64 */;
@@ -301,6 +305,7 @@ export interface StepRead {
   run_status?: string;
   run_on?: string;
   done: boolean;
+  script_id?: number /* int64 */;
 }
 
 //////////

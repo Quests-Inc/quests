@@ -96,6 +96,10 @@ export const MinCheckInterval = 15;
  */
 export interface NoteCheck {
   command?: string;
+  /**
+   * ScriptID is the script the note runs instead of a command (ADR-0003), read from its binding.
+   */
+  script_id?: number /* int64 */;
   interval_seconds?: number /* int */;
   run_on?: string;
   last_run_at?: string;
@@ -112,6 +116,10 @@ export interface DueNote {
   ID: number /* int64 */;
   Title: string;
   Command: string;
+  /**
+   * Scripted: the note runs the script bound to it, not Command.
+   */
+  Scripted: boolean;
   RunOn?: string;
 }
 /**

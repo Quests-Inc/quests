@@ -66,6 +66,7 @@ type StepRead struct {
 	RunStatus            *string `json:"run_status"`
 	RunOn                *string `json:"run_on"`
 	Done                 bool    `json:"done"`
+	ScriptID             *int64  `json:"script_id"`
 }
 
 func ToQuestRead(q Quest, now time.Time) QuestRead {
@@ -156,6 +157,7 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 			RunStatus:            s.RunStatus,
 			RunOn:                s.RunOn,
 			Done:                 s.Done,
+			ScriptID:             s.ScriptID,
 		})
 	}
 	return out

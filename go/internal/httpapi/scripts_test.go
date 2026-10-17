@@ -3,8 +3,11 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/quests-inc/quests/go/internal/knowledge"
 )
 
 const scriptBody = `{"nodes":[
@@ -128,4 +131,96 @@ func secretReqList(t *testing.T, h http.Handler, path string) (int, []map[string
 	var out []map[string]any
 	_ = json.Unmarshal([]byte(body), &out)
 	return code, out
+}
+
+func TestBindingAScriptToAStepAndANote(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	h := s.Handler()
+	qid := seedQuest(t, s)
+	var stepID int64
+	if err := s.Store.DB.QueryRow(`SELECT id FROM queststep WHERE quest_id = ?`, qid).Scan(&stepID); err != nil {
+		t.Fatal(err)
+	}
+	stepGraph := strings.ReplaceAll(scriptBody, "source.note", "source.step")
+	stepGraph = strings.Replace(stepGraph, `{"id":4,"type":"sink.note_verdict"}`, `{"id":4,"type":"sink.step_progress"}`, 1)
+	stepGraph = strings.Replace(stepGraph, `"outdated"`, `"progress"`, 3)
+	stepGraph = strings.Replace(stepGraph, `"type":"bool"`, `"type":"int"`, 1)
+	call := func(method, path, body string) (int, map[string]any) {
+		var in any
+		if body != "" {
+			in = json.RawMessage(body)
+		}
+		return secretReq(h, method, path, in)
+	}
+
+	code, step := call(http.MethodPost, "/api/scripts", `{"title":"для шага","graph":`+stepGraph+`}`)
+	if code != http.StatusCreated {
+		t.Fatalf("a step script: %d %v", code, step)
+	}
+	code, note := call(http.MethodPost, "/api/scripts", `{"title":"для заметки","graph":`+scriptBody+`}`)
+	if code != http.StatusCreated {
+		t.Fatalf("a note script: %d %v", code, note)
+	}
+	stepScript, noteScript := jsonNum(step["id"]), jsonNum(note["id"])
+	stepURL := "/api/steps/" + strconv.FormatInt(stepID, 10) + "/script"
+
+	// Mismatches and missing things are told apart.
+	if code, _ = call(http.MethodPut, stepURL, `{"script_id":`+noteScript+`}`); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a note script on a step: %d", code)
+	}
+	if code, _ = call(http.MethodPut, stepURL, `{"script_id":9999}`); code != http.StatusNotFound {
+		t.Fatalf("an unknown script: %d", code)
+	}
+	if code, _ = call(http.MethodPut, "/api/steps/9999/script", `{"script_id":`+stepScript+`}`); code != http.StatusNotFound {
+		t.Fatalf("an unknown step: %d", code)
+	}
+
+	if code, _ = call(http.MethodPut, stepURL, `{"script_id":`+stepScript+`}`); code != http.StatusNoContent {
+		t.Fatalf("bind: %d", code)
+	}
+	_, quest := call(http.MethodGet, "/api/quests/"+strconv.FormatInt(qid, 10), "")
+	first := quest["steps"].([]any)[0].(map[string]any)
+	if jsonNum(first["script_id"]) != stepScript || first["check_command"] != nil {
+		t.Fatalf("the step shows its script and no command: %v", first)
+	}
+
+	// A script in use is not deleted, and the answer says where it is used.
+	code, out := call(http.MethodDelete, "/api/scripts/"+stepScript, "")
+	if code != http.StatusConflict || len(out["uses"].([]any)) != 1 {
+		t.Fatalf("delete a bound script: %d %v", code, out)
+	}
+	code, uses := secretReqList(t, h, "/api/scripts/"+stepScript+"/uses")
+	if code != http.StatusOK || len(uses) != 1 || uses[0]["subject_type"] != "step" {
+		t.Fatalf("uses: %d %v", code, uses)
+	}
+
+	// A command typed over the script replaces it.
+	code, _ = call(http.MethodPatch, "/api/quests/"+strconv.FormatInt(qid, 10)+"/steps/"+strconv.FormatInt(stepID, 10), `{"check_command":"echo 1","run_on":"pc"}`)
+	if code != http.StatusOK {
+		t.Fatalf("patch: %d", code)
+	}
+	if code, _ = secretReqList(t, h, "/api/scripts/"+stepScript+"/uses"); code != http.StatusOK {
+		t.Fatal(code)
+	}
+	if _, uses = secretReqList(t, h, "/api/scripts/"+stepScript+"/uses"); len(uses) != 0 {
+		t.Fatalf("the binding must be gone: %v", uses)
+	}
+
+	// Notes take their own scripts the same way; detaching is idempotent.
+	noteRow, err := s.Store.Knowledge.CreateNote(t.Context(), knowledge.Note{Title: "n"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	noteURL := "/api/notes/" + strconv.FormatInt(noteRow.ID, 10) + "/script"
+	if code, _ = call(http.MethodPut, noteURL, `{"script_id":`+noteScript+`}`); code != http.StatusNoContent {
+		t.Fatalf("bind a note: %d", code)
+	}
+	for i := 0; i < 2; i++ {
+		if code, _ = call(http.MethodDelete, noteURL, ""); code != http.StatusNoContent {
+			t.Fatalf("unbind: %d", code)
+		}
+	}
+	if code, _ = call(http.MethodDelete, "/api/scripts/"+noteScript, ""); code != http.StatusNoContent {
+		t.Fatalf("a free script can be deleted: %d", code)
+	}
 }

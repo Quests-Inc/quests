@@ -186,7 +186,13 @@ func (h *Handler) patchStep(w http.ResponseWriter, r *http.Request) {
 	if body.SortOrder != nil {
 		st.SortOrder = *body.SortOrder
 	}
-	if body.CheckCommand != nil || body.CheckIntervalSeconds != nil {
+	if st.ScriptID != nil && (body.CheckCommand == nil || strings.TrimSpace(*body.CheckCommand) == "") {
+		// A step that runs a script has no command to normalise; its interval is its own.
+		if body.CheckIntervalSeconds != nil {
+			v := max(*body.CheckIntervalSeconds, 15)
+			st.CheckIntervalSeconds = &v
+		}
+	} else if body.CheckCommand != nil || body.CheckIntervalSeconds != nil {
 		cmd := st.CheckCommand
 		iv := st.CheckIntervalSeconds
 		if body.CheckCommand != nil {

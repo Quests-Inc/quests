@@ -17,6 +17,10 @@ type Handler struct {
 
 	// RequireOwner answers 403 and false unless the caller owns the workspace (identity decides who is the owner).
 	RequireOwner func(w http.ResponseWriter, r *http.Request, what string) bool
+	// SubjectExists says whether the step or note a script is bound to exists; ClearCommand removes its own command when a
+	// script takes over. Both are other contexts' business and come from the root.
+	SubjectExists func(ctx context.Context, kind string, id int64) (bool, error)
+	ClearCommand  func(ctx context.Context, kind string, id int64) error
 	// RunnerDone is called when a runner reports a job finished (the root reacts to its result).
 	RunnerDone func(ctx context.Context, job execution.RunnerJob)
 }

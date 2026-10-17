@@ -26,7 +26,9 @@ const (
 
 // NoteCheck is what a note's check looks like to the API.
 type NoteCheck struct {
-	Command         *string    `json:"command"`
+	Command *string `json:"command"`
+	// ScriptID is the script the note runs instead of a command (ADR-0003), read from its binding.
+	ScriptID        *int64     `json:"script_id"`
 	IntervalSeconds *int       `json:"interval_seconds"`
 	RunOn           *string    `json:"run_on"`
 	LastRunAt       *time.Time `json:"last_run_at"`
@@ -37,19 +39,28 @@ type NoteCheck struct {
 	ErrorAt         *time.Time `json:"error_at"`
 }
 
-// Active reports whether the note has a check command.
-func (c NoteCheck) Active() bool { return c.Command != nil && strings.TrimSpace(*c.Command) != "" }
+// Active reports whether the note has a check: a command, or a script.
+func (c NoteCheck) Active() bool {
+	return c.ScriptID != nil || (c.Command != nil && strings.TrimSpace(*c.Command) != "")
+}
 
-const noteCheckCols = `id, check_command, check_interval_seconds, run_on, check_last_run_at, outdated, outdated_at, check_reason, check_error, check_error_at`
+// noteBound is the script bound to a note, or NULL.
+const noteBound = `(SELECT script_id FROM script_binding b WHERE b.subject_type = 'note' AND b.subject_id = note.id)`
+
+const noteCheckCols = `id, check_command, check_interval_seconds, run_on, check_last_run_at, outdated, outdated_at, check_reason, check_error, check_error_at, ` + noteBound
 
 func scanNoteCheck(sc interface{ Scan(...any) error }) (int64, NoteCheck, error) {
 	var id int64
 	var c NoteCheck
 	var cmd, runOn, lastRun, outAt, errAt sql.NullString
-	var iv sql.NullInt64
+	var iv, script sql.NullInt64
 	var outdated int
-	if err := sc.Scan(&id, &cmd, &iv, &runOn, &lastRun, &outdated, &outAt, &c.Reason, &c.Error, &errAt); err != nil {
+	if err := sc.Scan(&id, &cmd, &iv, &runOn, &lastRun, &outdated, &outAt, &c.Reason, &c.Error, &errAt, &script); err != nil {
 		return 0, c, err
+	}
+	if script.Valid {
+		v := script.Int64
+		c.ScriptID = &v
 	}
 	if cmd.Valid && strings.TrimSpace(cmd.String) != "" {
 		v := cmd.String
@@ -72,7 +83,7 @@ func scanNoteCheck(sc interface{ Scan(...any) error }) (int64, NoteCheck, error)
 // note id (notes without either are absent).
 func (s *Store) NoteChecks(ctx context.Context) (map[int64]NoteCheck, error) {
 	out := map[int64]NoteCheck{}
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCheckCols+` FROM note WHERE check_command IS NOT NULL OR outdated <> 0 OR check_error <> ''`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCheckCols+` FROM note WHERE check_command IS NOT NULL OR `+noteBound+` IS NOT NULL OR outdated <> 0 OR check_error <> ''`)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +119,19 @@ func (s *Store) SetNoteCheck(ctx context.Context, id int64, command *string, int
 	if !ValidRunOn(runOn) {
 		return NoteCheck{}, errBad("run_on: " + ErrBadRunOn.Error())
 	}
+	if (command == nil || strings.TrimSpace(*command) == "") && cur.ScriptID != nil {
+		// A scripted note has no command to clear: its runner and interval are what is edited here.
+		iv := DefaultNoteCheckInterval
+		if interval != nil {
+			iv = max(*interval, MinCheckInterval)
+		} else if cur.IntervalSeconds != nil {
+			iv = *cur.IntervalSeconds
+		}
+		if _, err = s.DB.ExecContext(ctx, `UPDATE note SET check_interval_seconds = ?, run_on = ? WHERE id = ?`, iv, nullStr(runOn), id); err != nil {
+			return NoteCheck{}, err
+		}
+		return s.GetNoteCheck(ctx, id)
+	}
 	if command == nil || strings.TrimSpace(*command) == "" {
 		_, err = s.DB.ExecContext(ctx, `UPDATE note SET check_command = NULL, check_interval_seconds = NULL, check_last_run_at = NULL, run_on = NULL,
 			outdated = 0, outdated_at = NULL, check_reason = '', check_error = '', check_error_at = NULL WHERE id = ?`, id)
@@ -135,12 +159,22 @@ func (s *Store) SetNoteCheck(ctx context.Context, id int64, command *string, int
 	if err != nil {
 		return NoteCheck{}, err
 	}
+	// A note runs a command or a script, not both: a command written on top of a script replaces it.
+	if _, err = s.DB.ExecContext(ctx, `DELETE FROM script_binding WHERE subject_type = 'note' AND subject_id = ?`, id); err != nil {
+		return NoteCheck{}, err
+	}
 	return s.GetNoteCheck(ctx, id)
+}
+
+// ClearNoteCommand removes the note's own command (the one place a script takes over from it).
+func (s *Store) ClearNoteCommand(ctx context.Context, id int64) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE note SET check_command = NULL, check_last_run_at = NULL WHERE id = ?`, id)
+	return err
 }
 
 // RequestNoteCheckNow makes the next scheduler tick run the check (the "check now" button).
 func (s *Store) RequestNoteCheckNow(ctx context.Context, id int64) error {
-	res, err := s.DB.ExecContext(ctx, `UPDATE note SET check_last_run_at = NULL WHERE id = ? AND check_command IS NOT NULL`, id)
+	res, err := s.DB.ExecContext(ctx, `UPDATE note SET check_last_run_at = NULL WHERE id = ? AND (check_command IS NOT NULL OR `+noteBound+` IS NOT NULL)`, id)
 	if err != nil {
 		return err
 	}
@@ -152,7 +186,7 @@ func (s *Store) RequestNoteCheckNow(ctx context.Context, id int64) error {
 
 // DueNoteChecks lists the notes whose check should run now, in the context's workspace.
 func (s *Store) DueNoteChecks(ctx context.Context, now time.Time) ([]DueNote, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCheckCols+`, title FROM note WHERE check_command IS NOT NULL ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCheckCols+`, title FROM note WHERE check_command IS NOT NULL OR `+noteBound+` IS NOT NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -163,12 +197,12 @@ func (s *Store) DueNoteChecks(ctx context.Context, now time.Time) ([]DueNote, er
 		var c NoteCheck
 		var title string
 		var cmd, runOn, lastRun, outAt, errAt sql.NullString
-		var iv sql.NullInt64
+		var iv, script sql.NullInt64
 		var outdated int
-		if err := rows.Scan(&id, &cmd, &iv, &runOn, &lastRun, &outdated, &outAt, &c.Reason, &c.Error, &errAt, &title); err != nil {
+		if err := rows.Scan(&id, &cmd, &iv, &runOn, &lastRun, &outdated, &outAt, &c.Reason, &c.Error, &errAt, &script, &title); err != nil {
 			return nil, err
 		}
-		if !cmd.Valid || strings.TrimSpace(cmd.String) == "" {
+		if (!cmd.Valid || strings.TrimSpace(cmd.String) == "") && !script.Valid {
 			continue
 		}
 		every := DefaultNoteCheckInterval
@@ -179,7 +213,7 @@ func (s *Store) DueNoteChecks(ctx context.Context, now time.Time) ([]DueNote, er
 		if last != nil && now.Sub(*last) < time.Duration(every)*time.Second {
 			continue
 		}
-		d := DueNote{ID: id, Title: title, Command: strings.TrimSpace(cmd.String)}
+		d := DueNote{ID: id, Title: title, Command: strings.TrimSpace(cmd.String), Scripted: script.Valid}
 		if runOn.Valid && runOn.String != "" {
 			v := runOn.String
 			d.RunOn = &v
@@ -194,7 +228,9 @@ type DueNote struct {
 	ID      int64
 	Title   string
 	Command string
-	RunOn   *string
+	// Scripted: the note runs the script bound to it, not Command.
+	Scripted bool
+	RunOn    *string
 }
 
 // MarkNoteCheckStarted stamps the run time (so the next tick leaves the note alone for an interval).

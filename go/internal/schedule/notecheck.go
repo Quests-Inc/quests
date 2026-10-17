@@ -102,7 +102,15 @@ func (r *CheckRunner) TickNotes(ctx context.Context) {
 }
 
 func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now time.Time) {
-	if d.RunOn == nil {
+	var script *execution.Binding
+	if d.Scripted {
+		b, err := r.Store.Execution.BindingFor(ctx, execution.SubjectNote, d.ID)
+		if err != nil || b == nil {
+			return // unbound meanwhile
+		}
+		script = b
+	}
+	if d.RunOn == nil && (script == nil || script.NeedsRunner) {
 		// Commands run on runners only; one stored without a runner says so instead of staying silent.
 		r.noteError(ctx, d.ID, d.Title, store.ErrNoRunner.Error())
 		return
@@ -115,7 +123,11 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now ti
 		log.Printf("checks: mark note %d: %v", d.ID, err)
 		return
 	}
-	r.dispatchNote(ctx, d)
+	if script != nil {
+		r.dispatchNoteScript(ctx, d, *script)
+	} else {
+		r.dispatchNote(ctx, d)
+	}
 	r.unlock(noteKey(d.ID))
 }
 

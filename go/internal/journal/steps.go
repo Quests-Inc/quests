@@ -13,7 +13,8 @@ func (s *Store) loadSteps(ctx context.Context, questID int64) ([]Step, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, quest_id, title, description, progress_current, progress_total, sort_order,
 			check_command, check_interval_seconds, check_last_run_at,
-			wait_previous, run_mode, run_status, run_on
+			wait_previous, run_mode, run_status, run_on,
+			(SELECT script_id FROM script_binding b WHERE b.subject_type = 'step' AND b.subject_id = queststep.id)
 		FROM queststep WHERE quest_id = ? ORDER BY sort_order, id`, questID)
 	if err != nil {
 		return nil, err
@@ -29,14 +30,19 @@ func (s *Store) loadSteps(ctx context.Context, questID int64) ([]Step, error) {
 		var waitPrev int
 		var runMode sql.NullString
 		var runStatus, runOn sql.NullString
+		var script sql.NullInt64
 		if err := rows.Scan(
 			&st.ID, &qid, &st.Title, &st.Description, &st.ProgressCurrent, &st.ProgressTotal, &st.SortOrder,
-			&cmd, &interval, &last, &waitPrev, &runMode, &runStatus, &runOn,
+			&cmd, &interval, &last, &waitPrev, &runMode, &runStatus, &runOn, &script,
 		); err != nil {
 			return nil, err
 		}
 		if qid.Valid {
 			st.QuestID = qid.Int64
+		}
+		if script.Valid {
+			v := script.Int64
+			st.ScriptID = &v
 		}
 		if cmd.Valid {
 			s := cmd.String
@@ -124,6 +130,12 @@ func (s *Store) UpdateStep(ctx context.Context, st Step, q Quest, kind, detail s
 	}
 	if err := s.guardCommand(ctx, st.CheckCommand, oldPtr, st.RunOn); err != nil {
 		return Quest{}, err
+	}
+	if st.CheckCommand != nil && strings.TrimSpace(*st.CheckCommand) != "" {
+		// A step runs a command or a script, not both: a command written on top of a script replaces it.
+		if _, err := tx.ExecContext(ctx, `DELETE FROM script_binding WHERE subject_type = 'step' AND subject_id = ?`, st.ID); err != nil {
+			return Quest{}, err
+		}
 	}
 	_, err = tx.ExecContext(ctx, `
 		UPDATE queststep SET
@@ -252,7 +264,7 @@ func NormalizeStepCheck(st *Step) {
 	} else {
 		st.RunMode = NormalizeRunMode(st.RunMode)
 	}
-	if st.CheckCommand == nil || strings.TrimSpace(*st.CheckCommand) == "" {
+	if (st.CheckCommand == nil || strings.TrimSpace(*st.CheckCommand) == "") && st.ScriptID == nil {
 		st.CheckCommand = nil
 		st.CheckIntervalSeconds = nil
 		st.WaitPrevious = false
@@ -316,4 +328,10 @@ func (s *Store) UpdateStepComment(ctx context.Context, st Step, q Quest, kind, d
 		return Quest{}, err
 	}
 	return s.GetQuest(ctx, q.ID)
+}
+
+// ClearStepCommand removes the step's own command (the one place a script takes over from it).
+func (s *Store) ClearStepCommand(ctx context.Context, stepID int64) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE queststep SET check_command = NULL WHERE id = ?`, stepID)
+	return err
 }

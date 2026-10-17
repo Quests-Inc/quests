@@ -37,6 +37,23 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 		s.eh = &executionhttp.Handler{
 			Store:        s.Store.Execution,
 			RequireOwner: s.identityHTTP().RequireOwner,
+			SubjectExists: func(ctx context.Context, kind string, id int64) (bool, error) {
+				switch kind {
+				case execution.SubjectStep:
+					_, err := s.Store.Journal.QuestIDForStep(ctx, id)
+					return err == nil, nil
+				case execution.SubjectNote:
+					_, err := s.Store.Knowledge.GetNote(ctx, id)
+					return err == nil, nil
+				}
+				return false, nil
+			},
+			ClearCommand: func(ctx context.Context, kind string, id int64) error {
+				if kind == execution.SubjectStep {
+					return s.Store.Journal.ClearStepCommand(ctx, id)
+				}
+				return s.Store.Knowledge.ClearNoteCommand(ctx, id)
+			},
 			RunnerDone: func(ctx context.Context, j execution.RunnerJob) {
 				if s.RunnerDone != nil {
 					s.RunnerDone(ctx, j)

@@ -254,6 +254,11 @@ func (s *Store) UpdateScript(ctx context.Context, id int64, in ScriptUpdate) (Sc
 
 // DeleteScript removes a script and all its versions.
 func (s *Store) DeleteScript(ctx context.Context, id int64) error {
+	if uses, err := s.ScriptUses(ctx, id); err != nil {
+		return err
+	} else if len(uses) > 0 {
+		return &ScriptInUse{Uses: uses}
+	}
 	res, err := s.DB.ExecContext(ctx, `DELETE FROM script WHERE id = ?`, id)
 	if err != nil {
 		return err

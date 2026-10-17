@@ -12,6 +12,8 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/knowledge"
 )
 
 // A run of a script graph (ADR-0003), end to end: start it, hand the Code node to a runner as a job, resume the graph when
@@ -343,4 +345,64 @@ func stepPollGraph(text string) graph.Graph {
 		[4]any{1, "secrets", 2, "secrets"}, [4]any{2, "stdout", 3, "in"}, [4]any{1, "ref", 4, "ref"},
 		[4]any{3, "progress", 4, "progress"}, [4]any{3, "total", 4, "total"}, [4]any{3, "description", 4, "description"},
 	)
+}
+
+// runnerLabel is the runner a binding names, or "" for a script that needs none.
+func runnerLabel(on *string) string {
+	if on == nil {
+		return ""
+	}
+	return *on
+}
+
+// loadScriptGraph reads the graph of the version a binding points at.
+func (r *CheckRunner) loadScriptGraph(ctx context.Context, b execution.Binding) (graph.Graph, string, error) {
+	raw, err := r.Store.Execution.ScriptGraph(ctx, b.ScriptID, b.Version)
+	if err != nil {
+		return graph.Graph{}, "", err
+	}
+	g, err := graph.Decode(raw)
+	return g, fmt.Sprintf("script:%d:%d", b.ScriptID, b.Version), err
+}
+
+// dispatchScript runs the script bound to a step. Whether it polls or runs once is the step's mode (the schedule); what it
+// does with the answer is the script's graph.
+func (r *CheckRunner) dispatchScript(ctx context.Context, q journal.Quest, st journal.Step, once bool, b execution.Binding) {
+	g, ref, err := r.loadScriptGraph(ctx, b)
+	if err != nil {
+		log.Printf("checks: script %d for step %d: %v", b.ScriptID, st.ID, err)
+		return
+	}
+	kind, timeout, valid := execution.JobKindPoll, pollTimeout, pollJobValidFor
+	if once {
+		kind, timeout, valid = execution.JobKindOnce, onceSafetyTimeout, onceJobValidFor
+	}
+	qid, sid := q.ID, st.ID
+	id := b.ScriptID
+	_, err = r.startRun(ctx, ref, &id, g, runSubject{Type: "step", ID: st.ID}, runBinding{
+		Label: runnerLabel(st.RunOn), Kind: kind, Title: q.Title + " · " + st.Title,
+		Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + kind,
+		Timeout: timeout, ValidFor: valid, QuestID: &qid, StepID: &sid,
+	})
+	if err != nil {
+		log.Printf("checks: start script %d for step %d: %v", b.ScriptID, st.ID, err)
+	}
+}
+
+// dispatchNoteScript runs the script bound to a note.
+func (r *CheckRunner) dispatchNoteScript(ctx context.Context, d knowledge.DueNote, b execution.Binding) {
+	g, ref, err := r.loadScriptGraph(ctx, b)
+	if err != nil {
+		log.Printf("checks: script %d for note %d: %v", b.ScriptID, d.ID, err)
+		return
+	}
+	nid, id := d.ID, b.ScriptID
+	_, err = r.startRun(ctx, ref, &id, g, runSubject{Type: "note", ID: d.ID}, runBinding{
+		Label: runnerLabel(d.RunOn), Kind: execution.JobKindPoll, Title: "Заметка · " + d.Title,
+		Dedupe:  "note:" + strconv.FormatInt(d.ID, 10) + ":poll",
+		Timeout: pollTimeout, ValidFor: noteJobValidFor, NoteID: &nid,
+	})
+	if err != nil {
+		log.Printf("checks: start script %d for note %d: %v", b.ScriptID, d.ID, err)
+	}
 }
