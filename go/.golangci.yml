@@ -29,983 +29,983 @@ linters:
             - "**/internal/refs/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
         platform:
           files:
             - "**/internal/platform/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
         db:
           files:
             - "**/internal/platform/db/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "db зависит только от wsctx (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "db зависит только от wsctx (ADR-0001)"
         journal:
           files:
             - "**/internal/journal/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
         dbx:
           files:
             - "**/internal/platform/dbx/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "dbx зависит только от timeutil"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "dbx зависит только от timeutil"
         pgtest:
           files:
             - "**/internal/platform/pgtest/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "pgtest зависит только от db"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "pgtest зависит только от db"
         metrics:
           files:
             - "**/internal/platform/metrics/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
         identity:
           files:
             - "**/internal/identity/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
         store:
           files:
             - "**/internal/store/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "store не знает про обработчики, планировщик и клиентов (ADR-0001)"
         schedule:
           files:
             - "**/internal/schedule/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "schedule не зависит от httpapi, cli, llmassist, identity"
         knowledge:
           files:
             - "**/internal/knowledge/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
         automation:
           files:
             - "**/internal/automation/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "automation зависит от identity, journal, knowledge, kernel, refs и платформы (ADR-0001)"
         kernel:
           files:
             - "**/internal/kernel/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
         wsarchive:
           files:
             - "**/internal/wsarchive/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
         graphdraft:
           files:
             - "**/internal/graphdraft/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
         assistant:
           files:
             - "**/internal/assistant/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
         cli:
           files:
             - "**/internal/cli/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
         llmassist:
           files:
             - "**/internal/llmassist/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "llmassist ходит в API только через platform/apiclient"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "llmassist ходит в API только через platform/apiclient"
         runner:
           files:
             - "**/cmd/quests-runner/**"
             - "!**/*_test.go"
           deny:
-            - pkg: github.com/valirum/quests/go/internal/httpapi
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/store
+            - pkg: github.com/quests-inc/quests/go/internal/store
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/schedule
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/identity
+            - pkg: github.com/quests-inc/quests/go/internal/identity
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/knowledge
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/automation
+            - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/cli
+            - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/llmassist
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/pdfdoc
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/refs
+            - pkg: github.com/quests-inc/quests/go/internal/refs
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/journal
+            - pkg: github.com/quests-inc/quests/go/internal/journal
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/kernel
+            - pkg: github.com/quests-inc/quests/go/internal/kernel
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/wsarchive
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/graphdraft
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/assistant
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/db
+            - pkg: github.com/quests-inc/quests/go/internal/platform/db
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/wsctx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/wsctx
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/webdav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/webdav
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/clamav
+            - pkg: github.com/quests-inc/quests/go/internal/platform/clamav
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/secretbox
+            - pkg: github.com/quests-inc/quests/go/internal/platform/secretbox
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/timeutil
+            - pkg: github.com/quests-inc/quests/go/internal/platform/timeutil
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/metrics
+            - pkg: github.com/quests-inc/quests/go/internal/platform/metrics
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/health
+            - pkg: github.com/quests-inc/quests/go/internal/platform/health
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/events
+            - pkg: github.com/quests-inc/quests/go/internal/platform/events
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/config
+            - pkg: github.com/quests-inc/quests/go/internal/platform/config
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/pgtest
+            - pkg: github.com/quests-inc/quests/go/internal/platform/pgtest
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/hooks
+            - pkg: github.com/quests-inc/quests/go/internal/platform/hooks
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/tokens
+            - pkg: github.com/quests-inc/quests/go/internal/platform/tokens
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/apperr
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apperr
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/httpx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/httpx
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/ratelimit
+            - pkg: github.com/quests-inc/quests/go/internal/platform/ratelimit
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/dbx
+            - pkg: github.com/quests-inc/quests/go/internal/platform/dbx
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
-            - pkg: github.com/valirum/quests/go/internal/platform/apiclient
+            - pkg: github.com/quests-inc/quests/go/internal/platform/apiclient
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
     errcheck:
       # Best-effort cleanup: nothing useful can be done with these errors.
