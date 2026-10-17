@@ -22,7 +22,7 @@ const (
 	codeEcho   = `{"text":"echo 1"}`
 	stepSchema = `{"schema":[{"name":"progress","type":"int"},{"name":"total","type":"int","min":1},{"name":"description","type":"str"}]}`
 	noteSchema = `{"schema":[{"name":"outdated","type":"bool","required":true},{"name":"reason","type":"str"}]}`
-	docSchema  = `{"schema":[{"name":"doc","type":"doc","required":true}]}`
+	docSchema  = `{"schema":[{"name":"doc","type":"doc","required":true}],"whole":true}`
 )
 
 // The checks that exist today, wired as ADR-0003 section 9 says: they have to be valid graphs.

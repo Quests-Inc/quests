@@ -34,10 +34,12 @@ func (g Graph) Check(reg Registry) error {
 }
 
 type resolved struct {
-	node Node
-	typ  NodeType
-	in   map[string]Port
-	out  map[string]Port
+	node    Node
+	typ     NodeType
+	in      map[string]Port
+	out     map[string]Port
+	inList  []Port // in the order the node type declares them
+	outList []Port
 }
 
 // Validate finds every problem it can: unknown types and wrong parameters, links between ports that do not exist or do not

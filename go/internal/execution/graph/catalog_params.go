@@ -57,6 +57,13 @@ func codePorts(raw json.RawMessage) ([]Port, []Port, error) {
 	return in, out, nil
 }
 
+// parseParams: the schema, and Whole = the entire JSON value is the one field (a document that is itself the answer, as a
+// template's quest), rather than an object to take the field from.
+type parseParams struct {
+	Schema []parseField `json:"schema"`
+	Whole  bool         `json:"whole,omitempty"`
+}
+
 type parseField struct {
 	Name     string   `json:"name"`
 	Type     PortType `json:"type"`
@@ -66,14 +73,15 @@ type parseField struct {
 
 // parsePorts: one output per schema field, plus bad_output with the reason the text is not what the schema wants.
 func parsePorts(raw json.RawMessage) ([]Port, []Port, error) {
-	var p struct {
-		Schema []parseField `json:"schema"`
-	}
+	var p parseParams
 	if err := strictParams(raw, &p); err != nil {
 		return nil, nil, err
 	}
 	if len(p.Schema) == 0 || len(p.Schema) > MaxParseField {
 		return nil, nil, fmt.Errorf("в схеме от 1 до %d полей", MaxParseField)
+	}
+	if p.Whole && len(p.Schema) != 1 {
+		return nil, nil, errors.New("«всё значение целиком» — для схемы из одного поля")
 	}
 	seen := map[string]bool{"bad_output": true}
 	out := make([]Port, 0, len(p.Schema)+1)
