@@ -28,10 +28,11 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 		return nil, fmt.Errorf("источник %q в запуске для %q", kind, h.subj.Type)
 	}
 	ref := graph.Ref{Kind: kind, ID: h.subj.ID}
-	event := any(h.subj.Event)
-	if event == nil {
-		event = map[string]any{}
+	evMap := h.subj.Event
+	if evMap == nil {
+		evMap = map[string]any{}
 	}
+	event := any(evMap)
 	switch kind {
 	case "note":
 		note, err := h.r.Store.Knowledge.GetNote(ctx, h.subj.ID)

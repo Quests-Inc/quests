@@ -39,6 +39,47 @@ export interface ScriptInUse {
 }
 
 //////////
+// source: hooks.go
+
+export const MaxHookName = 200;
+export const MaxHookTimeout = 600;
+export const DefaultHookTimeout = 30;
+/**
+ * Hook is an event trigger bound to a library script (quest=438, ADR-0003).
+ */
+export interface Hook {
+  id: number /* int64 */;
+  name: string;
+  enabled: boolean;
+  events: string[];
+  events_raw: string[];
+  script_id: number /* int64 */;
+  quest_id?: number /* int64 */;
+  run_on: string;
+  timeout_sec: number /* int */;
+  created_at: string;
+  updated_at: string;
+  /**
+   * ScriptTitle is filled on list/get for the UI.
+   */
+  script_title?: string;
+  needs_runner?: boolean;
+}
+/**
+ * HookIn is what create and update accept.
+ */
+export interface HookIn {
+  Name?: string;
+  Enabled?: boolean;
+  Events: string[]; // required on create
+  ScriptID?: number /* int64 */;
+  QuestID?: number /* int64 */; // nil = leave; pointer to 0 / use ClearQuest
+  ClearQuest: boolean;
+  RunOn?: string;
+  TimeoutSec?: number /* int */;
+}
+
+//////////
 // source: kinds.go
 
 /**
@@ -121,6 +162,10 @@ export const JobKindOnce = "once";
  * Job kinds.
  */
 export const JobKindEmitPool = "emit_pool";
+/**
+ * Job kinds.
+ */
+export const JobKindHook = "hook";
 /**
  * RunnerJob is one command for a runner.
  */
