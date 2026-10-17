@@ -43,7 +43,7 @@
 
   $effect(() => {
     if (!open) return
-    active = section && ['services', 'appearance', 'hotkeys'].includes(section) ? section : 'services'
+    active = section && ['services', 'appearance', 'hotkeys', 'trash'].includes(section) ? section : 'services'
     pane = section ? 'content' : 'nav'
     if (onLogout) void loadWorkspaceState()
   })

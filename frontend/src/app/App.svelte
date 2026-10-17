@@ -609,6 +609,7 @@
     onOpenTemplates={openTemplates}
     onOpenSecrets={() => openSecrets()}
     onOpenTags={openTags}
+    onOpenTrash={() => openSettings({ section: 'trash' })}
     onOpenCreateQuestline={desk.openCreateQuestline}
     onOpenCreateQuest={() => desk.openCreate()}
     onOpenAssistant={() => (assistantOpen = true)}

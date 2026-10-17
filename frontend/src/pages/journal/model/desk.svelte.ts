@@ -14,6 +14,7 @@ import {
 import { copyText } from '@/shared/lib/clipboard.ts'
 import { createMultiSelect } from '@/shared/lib/multiSelect.svelte.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
+import { toastTrashed } from '@/shared/lib/trashUndo.ts'
 
 import { createDeletions } from './deletions.svelte.ts'
 import { createJournalMenu } from './journalMenu.svelte.ts'
@@ -166,7 +167,7 @@ export function createJournalDesk(deps: {
   function onDeleted(id: number) {
     if (deps.getSelectedId() === id) deps.setSelectedId(null)
     deps.reload()
-    toast('Квест удалён', { kind: 'success' })
+    toastTrashed('quest', [id], 'Квест удалён')
   }
   function onQuestlineSaved(_line: unknown, meta: { mode?: string } = {}) {
     deps.reload()

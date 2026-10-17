@@ -14,6 +14,7 @@
     onOpenTemplates,
     onOpenSecrets,
     onOpenTags,
+    onOpenTrash,
     onOpenCreateQuestline,
     onOpenCreateQuest,
     onOpenAssistant,
@@ -28,6 +29,7 @@
     onOpenTemplates: () => void,
     onOpenSecrets: () => void,
     onOpenTags: () => void,
+    onOpenTrash: () => void,
     onOpenCreateQuestline: () => void,
     onOpenCreateQuest: () => void,
     onOpenAssistant: () => void,
@@ -78,6 +80,7 @@
         { id: 'templates', label: 'Шаблоны' },
         { id: 'secrets', label: 'Секреты' },
         { id: 'tags', label: 'Теги' },
+        { id: 'trash', label: 'Корзина' },
         { id: 'questline', label: 'Новый квестлайн' },
       )
     }
@@ -97,6 +100,7 @@
     else if (id === 'templates') onOpenTemplates()
     else if (id === 'secrets') onOpenSecrets()
     else if (id === 'tags') onOpenTags()
+    else if (id === 'trash') onOpenTrash()
     else if (id === 'questline') onOpenCreateQuestline()
   }
 
@@ -569,6 +573,10 @@
         <Icon name="pin" />
         <span class="btn__text">Теги</span>
       </button>
+      <button type="button" class="btn" title="Корзина" aria-label="Корзина">
+        <Icon name="delete" />
+        <span class="btn__text">Корзина</span>
+      </button>
       <button type="button" class="btn" title="Квестлайн" aria-label="Новый квестлайн">
         <Icon name="flag" />
         <span class="btn__text">Квестлайн</span>
@@ -619,6 +627,10 @@
       <button type="button" class="btn" title="Теги" onclick={onOpenTags} aria-label="Теги">
         <Icon name="pin" />
         <span class="btn__text">Теги</span>
+      </button>
+      <button type="button" class="btn" title="Корзина" onclick={onOpenTrash} aria-label="Корзина">
+        <Icon name="delete" />
+        <span class="btn__text">Корзина</span>
       </button>
       <button
         type="button"

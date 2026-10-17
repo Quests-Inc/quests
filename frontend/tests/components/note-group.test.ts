@@ -36,7 +36,7 @@ function make(selected: number | null = null, patch: Record<number, object> = {}
       onChanged: () => log.push(['changed']),
       copy: async (t) => void log.push(['copy', t]),
       downloadMarkdown: (n) => log.push(['md', n]),
-      toast: (m, k) => log.push(['toast', k, m]),
+      toast: (m, k, a) => log.push(['toast', k, m, a?.label ?? null]),
     })
   })
   const ev = { clientX: 1, clientY: 2 }
@@ -133,6 +133,8 @@ test('удаление: подтверждение с перечнем и пом
     ['delete', 3],
   ])
   expect(t.log.find((e) => e[0] === 'after')?.[1]).toEqual([4, 3])
+  // the toast of the delete carries «Отменить» for what was erased
+  expect(t.log.find((e) => e[0] === 'toast' && e[1] === 'error')?.[3]).toBe('Отменить')
   expect(t.log.some((e) => e[0] === 'toast' && e[1] === 'error' && String(e[2]).includes('не удалось: 1'))).toBe(true)
   expect(t.grp.confirm).toBeNull()
   expect(t.grp.multi.size).toBe(0)
