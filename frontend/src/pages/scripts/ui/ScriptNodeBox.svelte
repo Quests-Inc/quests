@@ -89,15 +89,14 @@
 <style>
   /* The whole card is painted in the node's colour, lighter than the field, and raised by its shadow. */
   .snode {
-    --card: color-mix(in srgb, var(--c) 30%, var(--color-bg-raised, #1a1a1a));
+    --card: color-mix(in srgb, var(--c) 9%, var(--pill-bg, #0f0f0f));
     position: absolute;
     box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
     border-radius: 10px;
     background: var(--card);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.12),
-      0 4px 10px rgba(0, 0, 0, 0.5);
+      0 2px 6px rgba(0, 0, 0, 0.4);
     cursor: move;
     font-size: var(--text-xs, 0.78rem);
   }
@@ -123,7 +122,7 @@
     gap: 0.4rem;
     padding: 0 0.6rem;
     border-radius: 9px 9px 0 0;
-    background: color-mix(in srgb, var(--c) 52%, var(--color-bg-raised, #1a1a1a));
+    background: color-mix(in srgb, var(--c) 45%, var(--color-bg-raised, #1a1a1a));
     color: #fff;
     font-weight: 600;
     overflow: hidden;

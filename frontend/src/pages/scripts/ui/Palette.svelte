@@ -68,11 +68,9 @@
     gap: 0.4rem;
     padding: 0.4rem 0.6rem;
     border: 0;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--c) 30%, var(--color-bg-raised, #1a1a1a));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 2px 5px rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--c) 20%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     color: var(--color-fg, #e8e8e8);
     font: inherit;
     font-size: var(--text-sm, 0.85rem);
@@ -80,10 +78,10 @@
     cursor: pointer;
   }
   .pal__item:hover {
-    background: color-mix(in srgb, var(--c) 40%, var(--color-bg-raised, #1a1a1a));
+    background: color-mix(in srgb, var(--c) 28%, var(--color-bg-raised, #1a1a1a));
   }
   .pal__item:active {
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+    box-shadow: none;
   }
   small {
     color: color-mix(in srgb, var(--color-fg, #e8e8e8) 65%, transparent);
