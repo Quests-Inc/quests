@@ -64,7 +64,16 @@ export function searchForView(
   return { tab: nextView }
 }
 
-export type ViewName = 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks'
+export type ViewName =
+  | 'journal'
+  | 'notes'
+  | 'attachments'
+  | 'calendar'
+  | 'history'
+  | 'graph'
+  | 'runners'
+  | 'scripts'
+  | 'hooks'
 
 /** Where the app opens from the address: which tab, which object is selected, the map's centre. */
 export function initialRoute(): {

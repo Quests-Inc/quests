@@ -2,7 +2,16 @@
 // Всё, что «открывает» сущность из интерфейса (ссылки, карта, календарь), проходит здесь, чтобы адрес и выбор не расходились.
 import { initialRoute, replaceSearch, searchForView as searchForRoute } from '@/app/model/route.ts'
 
-export type View = 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks'
+export type View =
+  | 'journal'
+  | 'notes'
+  | 'attachments'
+  | 'calendar'
+  | 'history'
+  | 'graph'
+  | 'runners'
+  | 'scripts'
+  | 'hooks'
 export type GraphRoot = { type: 'quest' | 'note' | 'questline' | null; id: number | null }
 
 /** Порядок вкладок в шапке: определяет, в какую сторону «уезжает» переключение. */
