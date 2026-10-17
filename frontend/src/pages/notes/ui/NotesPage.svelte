@@ -396,8 +396,20 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     if (id == null || revealedFor === id || !noteById(id)) return
     revealedFor = id
     treeOpen = { ...treeOpen, ...Object.fromEntries(ancestorIds(notes, id).map((a) => [String(a), true])) }
-    void tick().then(() => document.querySelector('.notes__row--on')?.scrollIntoView({ block: 'nearest' }))
+    void tick().then(revealRow)
   })
+
+  /** Scroll only the tree list to the open row. scrollIntoView would also scroll the tab stage
+   * horizontally while the page is still sliding in from the right, making the notes jerk sideways. */
+  function revealRow() {
+    const row = document.querySelector<HTMLElement>('.notes__row--on')
+    const list = row?.closest<HTMLElement>('.notes__list')
+    if (!row || !list) return
+    const r = row.getBoundingClientRect()
+    const l = list.getBoundingClientRect()
+    if (r.top < l.top) list.scrollTop += r.top - l.top
+    else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom
+  }
 
   function showChildren(id: any) {
     if (!hasChildren(id)) return false
