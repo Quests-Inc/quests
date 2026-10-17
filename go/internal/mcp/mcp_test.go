@@ -474,3 +474,32 @@ func TestCreateQuestNeedsAnExplicitQuestline(t *testing.T) {
 		t.Fatalf("category + tags → no hint: %s", text)
 	}
 }
+
+func TestInstructionsTellToLayOutWork(t *testing.T) {
+	t.Setenv("QUESTS_GUIDE_NOTE", "")
+	got := Instructions()
+	for _, want := range []string{"list_questlines", "list_tags", `"none"`, "search_notes"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("instructions miss %q:\n%s", want, got)
+		}
+	}
+	t.Setenv("QUESTS_GUIDE_NOTE", "30")
+	if got := Instructions(); !strings.Contains(got, "note=30") || strings.Contains(got, "search_notes") {
+		t.Fatalf("an explicit guide note replaces the search hint:\n%s", got)
+	}
+}
+
+func TestCreateTemplateNeedsAnExplicitQuestline(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{"POST /api/templates": `{"id":4}`}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "create_template", `{"title":"t"}`),
+		call(2, "create_template", `{"title":"t","questline":"none"}`),
+	)
+	if text, isErr := result(t, resps[0]); !isErr || !strings.Contains(text, "questline is required") {
+		t.Fatalf("should be refused: %s", text)
+	}
+	if text, isErr := result(t, resps[1]); isErr || !strings.Contains(text, "unsorted") || !strings.Contains(text, "no tags") {
+		t.Fatalf("standalone template → hints: %s", text)
+	}
+}

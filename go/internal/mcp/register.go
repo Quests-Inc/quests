@@ -9,10 +9,13 @@ func Instructions() string {
 - The active workspace (list_workspaces / switch_workspace) applies to every call; mutation results say which one they hit.
 - description fields are markdown, titles are plain text. Link entities as quest=N, step=N, note=N, questline=N, template=N; images in notes only via upload_attachment + ![alt](attachment=N).
 - Change steps with add_step / update_step / update_steps (several at once), not by rewriting a quest. Lifecycle (status, pin, title…) is update_quest.
-- New notes go into a CATEGORY note (list_note_categories). Private notes are hidden from you on purpose.
+- Lay out what you create: before create_quest look at list_questlines (pass questline, or "none" on purpose) and list_tags; new notes go into a CATEGORY note (list_note_categories). Never leave work unsorted by default.
+- Private notes are hidden from you on purpose.
 - Only ping_user interrupts the user's screen: use it when you are blocked on their answer.`
 	if id := os.Getenv("QUESTS_GUIDE_NOTE"); id != "" {
 		s += "\n- Fuller agent guide: note=" + id + " (get_note)."
+	} else {
+		s += "\n- Fuller agent guide: find the note «Гайд для агента» (search_notes) and read it before real work."
 	}
 	return s
 }
