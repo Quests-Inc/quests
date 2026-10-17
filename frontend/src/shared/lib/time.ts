@@ -16,6 +16,8 @@ export function parseApiDate(value: string | Date | null | undefined) {
   }
   let s = String(value).trim()
   if (!s) return null
+  // The database form "2026-10-17 12:00:00" (a space, no zone) is UTC too.
+  s = s.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/, '$1T$2')
   // "...T12:00:00" / "...T12:00:00.123456" without zone → UTC
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && !/[zZ]$/.test(s) && !/[+-]\d{2}:?\d{2}$/.test(s)) {
     s += 'Z'
