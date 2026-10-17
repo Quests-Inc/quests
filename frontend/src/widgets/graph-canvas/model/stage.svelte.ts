@@ -70,6 +70,9 @@ export function createGraphStage(deps: {
   let selectMode = $state(false)
   let picked = $state<Set<string>>(new Set())
   let selectedKey = $state<string | null>(null)
+  /** Stacking order of touched cards: the last one touched has the highest number. */
+  let front = $state<Record<string, number>>({})
+  let frontSeq = 0
   let ownerless = $state<Set<string>>(new Set())
   let touched = $state<Map<string, number[]>>(new Map())
   let filteredOut = $state(0)
@@ -377,6 +380,14 @@ export function createGraphStage(deps: {
     },
     get drawEdges() {
       return drawableEdges({ edges: edges(), nodes: nodes(), groups: groupsNow(), showEdge })
+    },
+    get front() {
+      return front
+    },
+    /** Brings a card to the foreground (it keeps the order until another one is touched). */
+    raise(key: string) {
+      if (front[key] === frontSeq && frontSeq > 0) return
+      front = { ...front, [key]: ++frontSeq }
     },
     get selectedKey() {
       return selectedKey

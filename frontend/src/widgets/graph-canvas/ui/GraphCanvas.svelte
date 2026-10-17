@@ -131,6 +131,8 @@
         more={stage.moreMap.get(n.key) ?? []}
         changed={stage.touched.has(n.key) && !n.draft}
         bind:editing
+        z={stage.front[n.key] ?? 0}
+        onRaise={stage.raise}
         onCardDown={gest.onCardDown}
         {onCtx}
         {onStartEdit}

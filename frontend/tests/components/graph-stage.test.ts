@@ -139,3 +139,15 @@ test('кружок у скрытого соседа, открытие возвр
   stage.openMore(quest ?? { key: 'quest:1' }, 'note')
   expect(prefs.hidden.size).toBe(0)
 })
+
+test('raise: последняя тронутая карточка выше остальных, повторное касание порядок не раздувает', () => {
+  const { stage } = make()
+  expect(stage.front['quest:1']).toBeUndefined()
+  stage.raise('quest:1')
+  stage.raise('quest:2')
+  expect(stage.front['quest:2']).toBeGreaterThan(stage.front['quest:1'])
+  stage.raise('quest:2')
+  const top = stage.front['quest:2']
+  stage.raise('quest:1')
+  expect(stage.front['quest:1']).toBeGreaterThan(top)
+})
