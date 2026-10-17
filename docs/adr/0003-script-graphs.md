@@ -64,17 +64,21 @@ explicit node. A constraint (for example a minimum) may sit on a port declaratio
 
 ### 5. Nodes of v1
 
-**Sources** (server): `Step`, `Note`, `Template`, `Quest`, `Workspace`. Each gives its `ref` and `secrets`; when the run is
-triggered by an event also an optional `event: doc`.
+**Sources** (server): `Step`, `Note`, `Template`, `Quest`, `Workspace`. Each gives its `ref`, its `secrets` and the fields of
+the entity as separate output ports, so a `Code` node gets them without calling the API: `Step`: `title`, `description`,
+`progress`, `total`, `done`; `Note`: `title`; `Template`: `title`, `period`; `Quest`: `title`, `status`, `description`;
+`Workspace`: `name`. A run triggered by an event also has an optional `event: doc`. More fields later are more ports; nothing
+else changes.
 
 **Code** (runner, the only one): inputs `secrets` and parameters (environment variables); the script text is a parameter.
 Outputs one per outcome: `stdout: str` (exit 0), `failed: str` (non-zero exit, with the stderr tail), `timeout: str`,
 `unreachable: str` (no runner picked it up in time), `abandoned: str` (the runner vanished mid-run), `canceled: str`.
 
 **Parse** (server): input `str`; parameters: a schema (name, type, required, constraints). Output per schema field (value, or
-exit signal for an optional field that is absent or invalid) and `bad_output: str`. **Strict**: the output must be a JSON
-object matching the schema, or a single scalar that fits the first field (that is the `int → {"progress": int}` shorthand).
-There is no "find the last integer in the text" leniency.
+exit signal for an optional field that is absent or invalid) and `bad_output: str`. **Strict**: the text is read as JSON,
+the whole trimmed `stdout` first (multi-line objects work), and if that is not JSON its last non-empty line (a script may log
+above its result). The value must be a JSON object matching the schema, or a single scalar that fits the first field (that is
+the `int → {"progress": int}` shorthand). There is no "find the last integer in the text" leniency.
 
 **Sinks** (server):
 
@@ -127,6 +131,44 @@ same `Source → Code → Parse → Sink` wiring each of today's checks has), so
 command with a script. Parsing is strict in these implicit graphs too; **before the switch the real check commands of the
 workspaces are audited** for outputs the lenient reader accepts and the strict one would not.
 
+### 10. Execution: how a graph becomes a job
+
+The runner stays dumb: it receives one command, an environment and limits, and returns exit code, `stdout` and `stderr`. It
+knows nothing about graphs; the whole graph is evaluated on the server (a runner's claim about which branch to take could not
+be trusted anyway, and an old runner would break at every new node type).
+
+| Phase | What happens |
+|---|---|
+| Enqueue | The evaluator runs the nodes in front of `Code` (sources, a `Compare` used as a guard…). If `Code` gets an exit signal on an input, no job is queued and the run is settled. Otherwise the job takes the **snapshot** of the `Code` text, its environment, the timeout and the runner; the run (script version, state of every node) is stored in the database |
+| Claim | The secrets are resolved and put into the environment of the job, as today. They are in no stored row |
+| Complete | The evaluator resumes the stored run, puts the outcome on the ports of `Code` (`stdout` / `failed` / `timeout` / …) and goes on to the end; each node's state is recorded |
+
+The `Code` text:
+- It is plain text. A text that starts with `#!` is written to a file and executed by the runner as it already does; any
+  other text goes to `sh -c`. The node has a `language` parameter (`sh` by default, `python`, `node`…) only for the editor: if
+  the text has no interpreter line, the server prepends the matching one. A line in the text wins over the parameter. The
+  interpreter must exist on the runner's device; a missing one is an ordinary `failed` with its stderr.
+- Size: at most 64 KiB.
+- The server does not wrap the user's code; the contract (the output is JSON) is checked by `Parse`, not by a wrapper.
+
+Inputs of `Code`:
+- Only through the environment, never substituted into the text (this is what keeps a parameter from becoming a command).
+  A value arriving over a link is `QUESTS_IN_N<k>_<PORT>`, where `<k>` is the number of the node it comes from (a per-script
+  sequence number given when the node is created, never reused; the node's uuid stays internal) and `<PORT>` the port name,
+  so values from different nodes never overlap. A link can carry an optional alias (`QUESTS_IN_<ALIAS>`), unique in the node,
+  for readability. The total size of the environment is capped at 32 KiB: more is an error when the graph is saved, not a
+  silent cut.
+- Service variables: `QUESTS_JOB_ID`, `QUESTS_API` stay; `QUESTS_SUBJECT_TYPE` and `QUESTS_SUBJECT_ID` are added.
+  `QUESTS_STEP_ID` and `QUESTS_NOTE_ID` are **migrated**: they are given for one more release next to the new ones, the
+  existing check commands are scanned for them beforehand, and then they are removed.
+
+Output of `Code`: `stdout` is the only data channel. `stderr` is for logs and the text of an error. The `progress=N total=M`
+line the runner reads on the fly for the progress indicator stays a separate mechanism, outside the graph.
+
+Platforms: a non-Unix build of the runner exists, but a command still goes through `sh -c` and an interpreter line needs
+`exec` of a file with a shebang, so on Windows this works only where a POSIX shell exists (Git Bash, WSL). The same holds
+today; nothing in this ADR depends on it.
+
 ## What changes in ADR-0002
 
 `execution.Kind` (`Owns`, `Finished`) becomes the **sink** interface of this ADR; the planned registry of subjects (does it
@@ -134,9 +176,6 @@ still exist, where its secrets come from) becomes the **source** nodes. Nothing 
 
 ## Open (to be decided after this ADR)
 
-- **How a graph is executed and baked into a runnable command.** The server side is a small evaluator over the tokens above;
-  what exactly a `Code` node sends to the runner (the body, the environment, the output contract) and how the result comes
-  back into the evaluator is the next discussion.
 - The editor (comfy-ui style): the last step of quest=440.
 - Composite nodes: how a subgraph is declared and versioned.
 - `list<T>` as a port type, if `All of` should gather values.
@@ -153,6 +192,6 @@ outputs that worked.
 ## Rollout order (quest=440)
 
 1. This ADR accepted. 2. The graph model, node registry and validator (pure Go, no UI). 3. Storage and API of scripts, the
-`workspace` secret owner. 4. Evaluator and the job format; implicit graphs for today's checks; the old paths switch to it one
-by one. 5. The scripts tab and picking a script in a step, a note, a template. 6. Samples. 7. The graph editor. 8. Hooks
+`workspace` secret owner. 4. Evaluator, the stored run and the job format; implicit graphs for today's checks; the old paths switch to it one
+by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → `QUESTS_SUBJECT_*` spans two releases). 5. The scripts tab and picking a script in a step, a note, a template. 6. Samples. 7. The graph editor. 8. Hooks
 (quest=438) as one more trigger and two more sinks.
