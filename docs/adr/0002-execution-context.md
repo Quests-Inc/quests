@@ -1,0 +1,67 @@
+# ADR-0002. A context for running user code (runners, the job queue, the rules)
+
+- Status: **proposed** (nothing is moved yet; the decision is the owner's)
+- Date: 2026-10-17
+- Related: quest=439 (this), quest=438 (hooks in the web UI), quest=440 (script library), ADR-0001, `docs/automation.md`
+
+## Context
+
+Automation (step checks, note freshness checks, template emit, soon event hooks and a script library) keeps growing, and
+the code that makes it safe is spread over four places (measured 2026-10-17):
+
+| Concern | Where it lives today |
+|---|---|
+| "Only an owner writes a command", "a command needs a runner" | `kernel/commands.go`, plus **three identical** thin wrappers `guardAuthor` / `guardExec` in `journal`, `knowledge` and `automation` stores |
+| Runners, tokens, queue, leases, expiry | `automation/runner.go`, `runner_jobs.go` — inside the context that also owns templates, emit and secrets |
+| What to enqueue and when | `schedule/checks.go` (steps), `notecheck.go` (notes), `emit_remote.go` / `emit_roll.go` (templates): each builds its own `JobSpec`, dedupe key, timeouts and result handling |
+| Secrets of a command | `automation/secrets.go` |
+| The one exception | `platform/hooks` starts processes on the API host |
+
+The rules are written down (`docs/automation.md`) and since this ADR's gate (`archtest/exec_test.go`) the "no `os/exec` outside
+an allow-list" rule is checked. Everything else is convention: a new source of user code (hooks, library scripts) would copy
+a guard pair and a queue call site again.
+
+## Decision (proposed)
+
+A new context **`execution`** (`go/internal/execution`, own HTTP face, ADR-0001 dependency rules) that owns:
+
+1. **Command policy** — the one place for author and runner rules (today `kernel.CommandAuthor` / `CommandExec` and their
+   wrappers). Stores call it instead of keeping their own wrapper.
+2. **Runners and the job queue** — registry, tokens, `EnqueueJob` / `ClaimJob` / heartbeat / `CompleteJob` / expiry /
+   orphan cancelling. Moved out of `automation`.
+3. **Job kinds as handlers.** A kind (`poll`, `once`, `emit_pool`, later `hook`) registers: how to build the `JobSpec`
+   (command, runner, timeout, validity, dedupe key) from an entity, and what to do with the result. `schedule` decides
+   *when* and asks the kind to enqueue; it no longer builds `JobSpec`s itself.
+4. **Secrets of a command** — they only exist as the environment of a job, so they belong here (an amendment to ADR-0001
+   "secrets belong to automation", the same way that one amended "to knowledge").
+
+`automation` keeps templates, emit rules and attempts; `journal` and `knowledge` keep their entities and ask `execution` for
+the policy and for enqueueing. Frontend: the Runners page stays; a Scripts/Hooks screen (quest=438/440) is a client of the
+same context.
+
+## Order of work (each step ships on its own and keeps the tests green)
+
+1. This ADR accepted (or amended).
+2. One policy object replaces the three wrappers (`kernel.Commands`), no behaviour change.
+3. Move runners/queue/leases from `automation` to `execution` (package move + `depguard` rules).
+4. Introduce the job-kind interface and port `poll`/`once`, then `emit_pool`, then the note check, deleting the three
+   `EnqueueJob` call sites in `schedule`.
+5. Hooks (quest=438) and library scripts (quest=440) arrive as new kinds.
+
+The exec gate (`archtest/exec_test.go`) is already in place and stays; `platform/hooks` is the only server-side entry on its
+allow-list and leaves it with step 5.
+
+## Open questions for the owner
+
+- Are `runners` and `execution` the same context or should registration/auth of runners stay apart from job kinds?
+- Should the policy also decide *who may pick an existing script* (quest=440's open question: members choosing an
+  owner-published script), so that it is one function and not a new wrapper per store?
+- Is the amendment about secrets acceptable, or should they stay in `automation` and be handed to `execution` at enqueue time?
+
+## Consequences
+
+**Pros.** A new source of user code is one handler, not a copy of guards and queue calls; the rules sit in one package that can be
+read in a sitting; the layering is enforced by `depguard` like the other contexts.
+**Cons.** A package move touching `automation`, `schedule` and the HTTP wiring; during it two layouts coexist; the job-kind
+interface must fit three quite different kinds (a repeating poll, a one-shot, a template that prints a quest) — which is the
+point of designing it before the third and fourth kind exist.
