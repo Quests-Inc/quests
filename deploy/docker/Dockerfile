@@ -70,9 +70,8 @@ COPY src ./src
 RUN uv sync --locked --no-dev
 
 # --- API runtime: Go server + SPA. The server migrates its own schema (embedded migrations), PDF export is
-# in-process Go (go/internal/pdfdoc), and the server executes no user commands: check/emit commands run
-# on runners (quests-runner), so there is no Python or other interpreter here. The only things it starts
-# are pg_dump (backups) and the operator's event hooks (`sh -c`, data/hooks.json). ---
+# in-process Go (go/internal/pdfdoc), and the server executes no user shell: check/emit/hook Code run on
+# runners (quests-runner). Trusted sinks may dial HTTP/unix; pg_dump is for backups. ---
 FROM debian:bookworm-slim AS api
 LABEL org.opencontainers.image.source="https://github.com/Quests-Inc/quests"
 RUN apt-get update \

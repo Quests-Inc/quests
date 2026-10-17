@@ -30,6 +30,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerSecretRoutes(mux)
 	h.registerRunner(mux)
 	h.registerScripts(mux)
+	h.registerHooks(mux)
 }
 
 var writeJSON = httpx.WriteJSON

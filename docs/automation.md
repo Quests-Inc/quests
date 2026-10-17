@@ -106,9 +106,9 @@ Jobs queued before runs existed have no `run_id` and are served by the older kin
 
 ## Known exceptions (to be removed or kept deliberately)
 
-- **Event hooks** (`internal/platform/hooks`, `data/hooks.json`) still execute `script` hooks on the server's own host
-  and `webhook` / `socket` from the server process. They are the host admin's, not a workspace owner's. Moving them
-  under these rules is quest=438.
+- **Event hooks** are workspace rows (`hook` + a library script). Matching events enqueue a `script_run` / runner job;
+  Code runs on the runner. HTTP and unix delivery use trusted sinks `sink.http` and `sink.socket` on the API host
+  (SSRF host checks apply). Owners write hooks; members may list them.
 - **`dry_run_emit_pool` in the MCP server** runs the command on the machine where the MCP server runs (the user's
   own, over stdio) to preview a template; it does not touch the API host.
 - **The HUD** (`internal/overlay`) runs local window-manager calls on the workstation it is installed on; it is not

@@ -27,6 +27,8 @@ type runSubject struct {
 	// RunID is the run itself, known to the nodes that hand a result back through it; Period is the period of a template's emit.
 	RunID  int64
 	Period string
+	// Event is the payload that started a hook run (source.*.event).
+	Event map[string]any
 	// Now, Took and Stderr are what an emit sink records on the attempt: the tick's clock, how long the job ran, and its stderr.
 	Now    time.Time
 	Took   time.Duration
@@ -47,6 +49,8 @@ type runBinding struct {
 	NoteID     *int64
 	// Key names the run for whoever waits for its result by name (a template's emit).
 	Key string
+	// Env is merged into every Code job of the run (a hook's event payload, for example).
+	Env map[string]string
 }
 
 // A run's graph is named by a reference: "script:<id>:<version>" (a stored script version) or "implicit:<name>" (the graph a
@@ -107,13 +111,28 @@ func (r *CheckRunner) enqueueCode(ctx context.Context, runID int64, req graph.Co
 		dedupe += "#" + strconv.Itoa(req.Node)
 	}
 	node := req.Node
+	env := req.Env
+	if len(b.Env) > 0 {
+		env = mergeEnv(b.Env, req.Env)
+	}
 	_, created, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
 		RunnerLabel: b.Label, Kind: b.Kind, QuestID: b.QuestID, StepID: b.StepID, TemplateID: b.TemplateID, NoteID: b.NoteID,
 		Title: b.Title, DedupeKey: dedupe, Command: bakeCommand(req.Text, req.Language),
 		TimeoutSeconds: int(b.Timeout / time.Second), ValidFor: b.ValidFor,
-		RunID: &runID, RunNode: &node, Env: req.Env,
+		RunID: &runID, RunNode: &node, Env: env,
 	})
 	return created, err
+}
+
+func mergeEnv(base, over map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range over {
+		out[k] = v
+	}
+	return out
 }
 
 // bakeCommand is the text the runner gets: the code as written, with an interpreter line in front when the node names a

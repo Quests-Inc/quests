@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // NodeType describes a kind of node. Ports may depend on the node's parameters (a Parse node has a port per schema field).
@@ -76,7 +77,52 @@ func Builtin() Registry {
 	sink("sink.template_create", "Шаблон: создать квест", nil,
 		req("ref", TRefTemplate), req("doc", TDoc))
 	add(NodeType{Name: "sink.template_error", Title: "Шаблон: ошибка попытки", Kind: KindSink, Trusted: true, Ports: templateErrorPorts})
+	// Done: the run finished (a hook's Code node already did the work on the runner).
+	sink("sink.done", "Готово", nil, req("trigger", TAny))
+	// HTTP / Socket: delivery for event hooks (quest=438). Trusted server nodes; body is JSON or text.
+	add(NodeType{Name: "sink.http", Title: "HTTP-запрос", Kind: KindSink, Trusted: true, Ports: httpSinkPorts})
+	add(NodeType{Name: "sink.socket", Title: "Сокет (unix)", Kind: KindSink, Trusted: true, Ports: socketSinkPorts})
 	return r
+}
+
+func httpSinkPorts(raw json.RawMessage) ([]Port, []Port, error) {
+	var p struct {
+		URL    string `json:"url"`
+		Method string `json:"method"`
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return nil, nil, fmt.Errorf("параметры: %w", err)
+		}
+	}
+	if strings.TrimSpace(p.URL) == "" {
+		return nil, nil, fmt.Errorf("параметр %q: нужен URL", "url")
+	}
+	m := strings.ToUpper(strings.TrimSpace(p.Method))
+	if m == "" {
+		m = "POST"
+	}
+	switch m {
+	case "GET", "POST", "PUT", "PATCH", "DELETE":
+	default:
+		return nil, nil, fmt.Errorf("параметр %q: GET, POST, PUT, PATCH или DELETE", "method")
+	}
+	return []Port{req("body", TDoc), opt("trigger", TAny)}, nil, nil
+}
+
+func socketSinkPorts(raw json.RawMessage) ([]Port, []Port, error) {
+	var p struct {
+		Path string `json:"path"`
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return nil, nil, fmt.Errorf("параметры: %w", err)
+		}
+	}
+	if strings.TrimSpace(p.Path) == "" {
+		return nil, nil, fmt.Errorf("параметр %q: нужен путь сокета", "path")
+	}
+	return []Port{req("body", TDoc), opt("trigger", TAny)}, nil, nil
 }
 
 // templateErrorPorts: kind is which attempt this is (error, timeout, bad JSON) or "closed" (the period ends and nothing

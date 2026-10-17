@@ -19,8 +19,6 @@ var execAllowed = map[string]string{
 	"internal/schedule/backup_pg.go":     "pg_dump of the server's own database: a fixed command, no user input",
 	"internal/overlay/shell/monitors.go": "the HUD on a workstation (window-manager calls), not part of the server",
 	"internal/mcp/tools_templates.go":    "dry_run_emit_pool: runs on the MCP server's machine (the user's own, over stdio), never on the API host",
-	// To be removed (quest=438): event hooks still run script hooks on the API host, as the host admin's.
-	"internal/platform/hooks/dispatch.go": "event hooks of the host admin (data/hooks.json); moves to runners, quest=438",
 }
 
 func TestOnlyAllowedPackagesStartProcesses(t *testing.T) {

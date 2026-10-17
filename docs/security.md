@@ -8,14 +8,13 @@ Who can do what, what is enforced where, and how to re-check it.
 |---|---|---|
 | Anyone (no account) | `/api/ping`, login (throttled), open an invitation link and sign up through it | anything else |
 | Member of a workspace | read and write that workspace's quests, notes, attachments, tags; make API tokens for it; see the server health chips; export nothing | set commands, secrets, runners; invite; rename/delete/export; see other workspaces |
-| Owner of a workspace | everything above + commands (for runners), secrets, runners, invitations, rename, delete (not the main workspace), export | — |
-| Host admin | `quests-server` admin CLI (accounts, tokens, backups, workspace restore), event hooks (`data/hooks.json`) | — |
+| Owner of a workspace | everything above + commands (for runners), secrets, runners, event hooks, invitations, rename, delete (not the main workspace), export | — |
+| Host admin | `quests-server` admin CLI (accounts, tokens, backups, workspace restore) | — |
 
-**The server executes no user commands.** Check and emit commands run on runners (`quests-runner` on any device, the
-server's own host included): a runner sits where its owner put it, with the rights of the user it runs as. There is no
-"trusted workspace" and no operator role in the web interface; what is left of the host's own authority lives in the
-admin CLI and in the event hooks. The full rule set for running user code (owner-only authoring, runners only, the job
-queue, secrets) is in [`automation.md`](automation.md).
+**The server executes no user shell.** Check, emit and hook Code nodes run on runners (`quests-runner` on any device, the
+server's own host included): a runner sits where its owner put it, with the rights of the user it runs as. Trusted
+`sink.http` / `sink.socket` may dial from the API process after host checks. There is no "trusted workspace" and no
+operator role in the web interface. The full rule set is in [`automation.md`](automation.md).
 
 ## Where each rule lives
 

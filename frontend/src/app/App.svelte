@@ -5,6 +5,7 @@
   import { JournalOverlays, JournalPage, createJournalDesk } from '@/pages/journal'
   import { RunnersPage } from '@/pages/runners'
   import { ScriptsPage } from '@/pages/scripts'
+  import { HooksPage } from '@/pages/hooks'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
@@ -658,6 +659,8 @@
     </div>
   {:else if nav.view === 'scripts'}
     <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} sidebarCollapsed={sidebarCollapsed.scripts} /></div>
+  {:else if nav.view === 'hooks'}
+    <div class="journal__hooks"><HooksPage active={nav.view === 'hooks'} /></div>
   {:else if nav.view === 'history'}
     <div class="journal__history">
       <HistoryPage

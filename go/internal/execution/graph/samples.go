@@ -73,5 +73,26 @@ func Samples() []Sample {
 			Description: "Сравнивает зафиксированный коммит с origin/main по списку файлов: изменились — заметка устарела, с причиной.",
 			Graph:       NoteCheck(freshnessScript),
 		},
+		{
+			ID: "event-hook", Title: "Хук: команда на событие", Subject: "quest", NeedsRunner: true,
+			Description: "Срабатывает на событие квеста (хук в пространстве). Команда видит JSON события в $QUESTS_PAYLOAD; код 0 — готово.",
+			Graph: buildGraph([]nodeSpec{
+				{1, "source.quest", nil},
+				{2, "code", kv{"text": "# событие в $QUESTS_PAYLOAD\ntrue"}},
+				{3, "sink.done", nil},
+			},
+				[4]any{1, "secrets", 2, "secrets"}, [4]any{2, "stdout", 3, "trigger"},
+			),
+		},
+		{
+			ID: "event-webhook", Title: "Хук: webhook", Subject: "quest", NeedsRunner: false,
+			Description: "Шлёт JSON события POST-ом на URL (параметр ноды «HTTP-запрос»). Без раннера: сервер сам делает запрос.",
+			Graph: buildGraph([]nodeSpec{
+				{1, "source.quest", nil},
+				{2, "sink.http", kv{"url": "https://example.com/hook", "method": "POST"}},
+			},
+				[4]any{1, "event", 2, "body"},
+			),
+		},
 	}
 }

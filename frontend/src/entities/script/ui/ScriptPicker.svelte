@@ -17,7 +17,7 @@
     label = 'Скрипт',
     legacy = '',
     onClearLegacy,
-  }: { value?: string; kind: 'step' | 'note' | 'template'; onchange?: () => void; label?: string; legacy?: string; onClearLegacy?: () => void } = $props()
+  }: { value?: string; kind: 'step' | 'note' | 'template' | 'quest' | 'workspace'; onchange?: () => void; label?: string; legacy?: string; onClearLegacy?: () => void } = $props()
 
   let samples = $state<Sample[]>([])
   let menu = $state(false)

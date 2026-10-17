@@ -119,7 +119,9 @@ func (s *Store) ScriptUses(ctx context.Context, scriptID int64) ([]ScriptUse, er
 		FROM script_binding b WHERE b.script_id = ?
 		UNION ALL
 		SELECT 'template_step', id, title FROM questtemplatestep WHERE script_id = ?
-		ORDER BY 1, 2`, scriptID, scriptID)
+		UNION ALL
+		SELECT 'hook', id, COALESCE(NULLIF(name, ''), 'хук') FROM hook WHERE script_id = ?
+		ORDER BY 1, 2`, scriptID, scriptID, scriptID)
 	if err != nil {
 		return nil, err
 	}

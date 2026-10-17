@@ -25,5 +25,5 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 | Токен (Token) | token | identity | A bearer token for clients without a session (CLI, HUD, bot, MCP) |
 | Карта (Map) | graph | cross-cutting | The map of relations between entities |
 | Черновик карты (Map draft) | graph draft | cross-cutting | Edits on the map not applied until saved |
-| Хук (Hook) | hook | platform | An administrator's command on an event (`data/hooks.json`) |
+| Хук (Hook) | hook | execution | Workspace event → library script (`script_id`); owners write, runners / trusted sinks deliver |
 | HUD / оверлей (Overlay) | overlay | outside the core | A Wayland panel with pinned quests and toasts |

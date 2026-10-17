@@ -82,9 +82,9 @@ even through a query that forgot a filter.
   API: `GET/DELETE /api/workspaces/{id}/members`, `POST /api/workspaces/{id}/invites`,
   `GET|POST /api/invites/{token}[/accept]`.
 - **Commands run on runners only.** The API container executes no check or emit command: `check_command`,
-  `emit_pool_command` and note checks need a runner label (`run_on` / `emit_run_on`); saving a command without one is
-  refused (422), and anything stored without one is never run. A runner on the server's own host is an ordinary runner.
-  (Event hooks, `data/hooks.json`, are the host admin's and still run `sh -c` in the API container.)
+  `emit_pool_command`, note checks and hook Code nodes need a runner label (`run_on` / `emit_run_on`); saving a
+  command without one is refused (422), and anything stored without one is never run. A runner on the server's own
+  host is an ordinary runner. Trusted sinks `sink.http` / `sink.socket` may dial from the API after host checks.
 - **Rename / delete (quest=347):** owners rename and delete from Settings → Пространства (deleting needs the
   exact name typed). A deleted workspace disappears at once — its tokens, runners and sessions stop (a token
   never falls back to another workspace; a session moves to the user's next one) — and is purged after 7 days

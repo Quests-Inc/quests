@@ -48,6 +48,7 @@ const (
 	JobKindPoll     = "poll"
 	JobKindOnce     = "once"
 	JobKindEmitPool = "emit_pool"
+	JobKindHook     = "hook"
 )
 
 // RunnerJob is one command for a runner.

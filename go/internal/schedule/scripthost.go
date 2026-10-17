@@ -28,26 +28,43 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 		return nil, fmt.Errorf("источник %q в запуске для %q", kind, h.subj.Type)
 	}
 	ref := graph.Ref{Kind: kind, ID: h.subj.ID}
+	event := any(h.subj.Event)
+	if event == nil {
+		event = map[string]any{}
+	}
 	switch kind {
 	case "note":
 		note, err := h.r.Store.Knowledge.GetNote(ctx, h.subj.ID)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": note.Title}, nil
+		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": note.Title, "event": event}, nil
 	case "template":
 		t, err := h.r.Store.Automation.TemplateRowByID(ctx, h.subj.ID)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": t.Title, "period": h.subj.Period}, nil
+		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": t.Title, "period": h.subj.Period, "event": event}, nil
 	case "step":
 		_, st, ok := h.r.stepByID(ctx, h.subj.ID)
 		if !ok {
 			return nil, errors.New("шаг не найден")
 		}
 		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": st.Title, "description": st.Description,
-			"progress": st.ProgressCurrent, "total": st.ProgressTotal, "done": st.Done}, nil
+			"progress": st.ProgressCurrent, "total": st.ProgressTotal, "done": st.Done, "event": event}, nil
+	case "quest":
+		q, err := h.r.Store.Journal.GetQuest(ctx, h.subj.ID)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": q.Title, "status": string(q.Status),
+			"description": q.Description, "event": event}, nil
+	case "workspace":
+		name, err := h.r.Store.Execution.Identity.WorkspaceName(ctx, h.subj.ID)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "name": name, "event": event}, nil
 	}
 	return nil, fmt.Errorf("источник %q ещё не подключён", n.Type)
 }
@@ -64,6 +81,12 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		return h.r.sinkStepProgress(ctx, in)
 	case "sink.template_create", "sink.template_error":
 		return h.r.sinkTemplate(ctx, h.subj, n, in)
+	case "sink.done":
+		return nil
+	case "sink.http":
+		return h.r.sinkHTTP(ctx, n, in)
+	case "sink.socket":
+		return h.r.sinkSocket(ctx, n, in)
 	}
 	return fmt.Errorf("приёмник %q ещё не подключён", n.Type)
 }

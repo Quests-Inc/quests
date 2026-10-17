@@ -1,6 +1,6 @@
 # Quests CLI
 
-A client of the journal: quests through the local API, plus hooks (script / webhook / unix socket).
+A client of the journal: quests and hooks through the local API.
 
 The implementation is a **Go binary**, `go/bin/quests` (no Python or `go run` at runtime):
 
@@ -14,14 +14,13 @@ uv run quests list              # launcher → the same binary
 
 Optionally put it on PATH: `cp go/bin/quests ~/.local/bin/quests`
 
-A running API is required (`just run-server`), except for the `hook *` commands — they work on a file directly.
+A running API is required (`just run-server`).
 
 | Env / flag | Default | Purpose |
 |-----|---------|------------|
 | `QUESTS_API` / `--api URL` | `http://127.0.0.1:8765` | the API base (`--api` overrides the env) |
 | `QUESTS_API_TOKEN` | — | bearer token when the instance has accounts ([`auth.md`](auth.md)) |
 | `QUESTS_WORKSPACE` | the token's workspace | which workspace a call works in (checked against membership) |
-| `QUESTS_HOOKS` | `data/hooks.json` | where hooks are stored |
 
 `llm-add TEXT…` sends the text to the server's assistant (`POST /api/llm/actions/preview`), shows the action plan and, after confirmation (`-y` skips the question), applies it through `/api/llm/actions/apply`. The LLM provider, key and limits are **server** settings (`GROQ_API_KEY`, `QUESTS_LLM_*`, see `docs/security.md`); the CLI does not read them. Exit code `2` means the assistant asks for a clarification (the question is on stderr).
 
@@ -109,58 +108,39 @@ quests note add "Style guide" -d "Instructions. Data: note=2"
 quests notes ls --json
 ```
 
-## Hooks: global and per quest
+## Hooks: workspace-wide and per quest
 
-**Both kinds.**
+A hook is an **event + a script** from the library (ADR-0003). Owners manage them in the web («Хуки») or here; members can list.
+Delivery is through the graph evaluator (Code on a runner, or `sink.http` / `sink.socket` on the server).
 
-- Without `--quest` — **global**: fires on any event of the given kind.
+- Without `--quest` — workspace-wide: any event of the kind in this workspace.
 - With `--quest ID` — only that quest's events.
-- One event can fire both global and quest hooks.
 
-Types:
-
-| `--type` | Parameter | Behaviour |
-|----------|-----------|-----------|
-| `script` | `--command` | `shell=True`; the event JSON on stdin; env `QUESTS_KIND`, `QUESTS_QUEST_ID`, `QUESTS_TITLE`, `QUESTS_DETAIL`, `QUESTS_PAYLOAD` |
-| `webhook` | `--url` | `POST` `application/json` |
-| `socket` | `--path` | a unix stream, one JSON line + `\n` |
-
-Events (`--event` / `-e`, repeatable): aliases or raw kinds.
+Events (`--event` / `-e`, repeatable): aliases or raw kinds (`GET /api/hook-events`).
 
 ```bash
-quests hook events          # table of aliases → kinds
+quests hook events
 quests hook events --json
 ```
 
-Useful aliases: `complete`, `step`, `status`, `fail`, `created`, `deleted` (also `on_complete` / `on_step` / `on_status_change`).
+Useful aliases: `complete`, `step`, `status`, `fail`, `created`, `deleted`.
 
 ```bash
-# global: any complete
-quests hook add -e complete -t script \
-  -c 'notify-send "Quest" "$QUESTS_TITLE"'
+# any complete in the workspace — script 3 must read a quest (sample «Хук: команда на событие»)
+quests hook add -e complete --script 3 --run-on home --name notify
 
 # only quest #12
-quests hook add -e step -e complete -t script --quest 12 \
-  --name daily-ping \
-  -c 'echo "$QUESTS_PAYLOAD" >> /tmp/quests-12.log'
-
-# webhook
-quests hook add -e fail -t webhook --url http://127.0.0.1:9000/hook
+quests hook add -e step -e complete --script 3 --quest 12 --name daily-ping --run-on home
 
 quests hook list
 quests hook list --global
 quests hook list --quest 12 --json
-quests hook disable <id>
-quests hook enable <id>
-quests hook remove <id>
+quests hook disable 1
+quests hook enable 1
+quests hook remove 1
 ```
 
-**Workspaces.** A hook is bound to one workspace and fires only on its events: the `workspace` field in `hooks.json`
-(no field = workspace 1, so old hooks keep working as before). `quests hook add … --workspace 3` is for workspace 3,
-`--workspace all` is for the host admin and fires on the events of every workspace (the payload then carries the titles and descriptions of other
-people's quests: use it deliberately). Hooks are configured by the host admin; they cannot be created from the interface — a `script` is a shell command on the server.
-
-Hooks are read by the **server** on `hub.publish` (the UI, the CLI through the API, expiry, the periodic tick). The file is picked up on every dispatch — no server restart is needed after `hook add`.
+The active workspace is `QUESTS_WORKSPACE` / the token's workspace (same as every other CLI command).
 
 ## Exit codes
 

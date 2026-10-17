@@ -61,7 +61,7 @@ func Run(argv []string) int {
 	case "note", "notes":
 		code, err = cmdNote(c, args)
 	case "hook":
-		code, err = cmdHook(args, asJSON)
+		code, err = cmdHook(c, args, asJSON)
 	case "-v", "--version", "version":
 		fmt.Println("quests 0.2.0 (go)")
 		return 0
@@ -121,7 +121,7 @@ Commands:
   note|notes …     list|show|add|set|delete
   hook …           list|show|add|remove|enable|disable|events
 
-Env: QUESTS_API, QUESTS_HOOKS, QUESTS_ROOT
+Env: QUESTS_API, QUESTS_API_TOKEN, QUESTS_WORKSPACE, QUESTS_ROOT
 Docs: docs/cli.md
 `)
 }

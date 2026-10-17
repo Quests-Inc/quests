@@ -19,12 +19,12 @@
     onOpenCreateQuest,
     onOpenAssistant,
   }: {
-    view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts',
+    view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks',
     liveStatus: string,
     health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
     sidebarCollapsed?: boolean,
     onToggleSidebar?: (() => void) | null,
-    onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts') => void,
+    onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks') => void,
     onOpenSettings: () => void,
     onOpenTemplates: () => void,
     onOpenSecrets: () => void,
@@ -561,6 +561,18 @@
     >
       <Icon name="edit" size={15} />
       <span class="view-tab__label">Скрипты</span>
+    </button>
+    <button
+      type="button"
+      class="view-tab"
+      class:view-tab--on={view === 'hooks'}
+      role="tab"
+      aria-selected={view === 'hooks'}
+      title="Хуки: скрипт на событие квеста"
+      onclick={() => onViewChange('hooks')}
+    >
+      <Icon name="flag" size={15} />
+      <span class="view-tab__label">Хуки</span>
     </button>
   </div>
   {#snippet fullActions()}

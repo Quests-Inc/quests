@@ -201,7 +201,7 @@ by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → 
 
 ## Progress
 
-- Step 2 (model, registry, validator): done in `go/internal/execution/graph` (pure Go: `Graph`, `Builtin()` registry of the 16 node
+- Step 2 (model, registry, validator): done in `go/internal/execution/graph` (pure Go: `Graph`, `Builtin()` registry of the node
   types, `Validate` / `Check`, `Decode`, `EnvName`). The four checks that exist today are tests: each is a valid graph.
 - Step 3 (storage, API, `workspace` secret owner): done. `script` / `script_version` (migration 0017) with versions and an
   optimistic check, `/api/scripts*` and `/api/script-nodes*`, scripts in the workspace export/import; the `workspace` owner of
@@ -217,3 +217,7 @@ by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → 
 - Steps 5–7 (UI): done. Scripts bind to steps, notes and templates (`script_binding`, migration 0019); the «Скрипты» tab has the
   list, the samples (`graph/samples.go`) and the graph editor, which runs on the map's gestures, minimap and camera fit. A
   template picks its emit script in the template form.
+
+- Step 8 (hooks, quest=438): done. Table `hook` (migration 0021), `/api/hooks*` and `/api/hook-events`, web «Хуки»,
+  enqueue on publish, samples for Code / HTTP / socket, trusted `sink.http` and `sink.socket`. File `data/hooks.json`
+  dispatch is retired.

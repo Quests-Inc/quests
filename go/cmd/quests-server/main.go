@@ -17,7 +17,6 @@ import (
 	"github.com/quests-inc/quests/go/internal/platform/db"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/health"
-	"github.com/quests-inc/quests/go/internal/platform/hooks"
 	"github.com/quests-inc/quests/go/internal/platform/metrics"
 	"github.com/quests-inc/quests/go/internal/platform/secretbox"
 	"github.com/quests-inc/quests/go/internal/platform/tokens"
@@ -109,8 +108,6 @@ func main() {
 	}
 
 	hub := events.New()
-	// User hooks (data/hooks.json) listen to events; events itself does not know about them.
-	hub.OnPublish(func(p events.Payload) { hooks.Dispatch(p) })
 	st := store.New(sqlDB, cfg.DatabaseURL, secrets)
 	if n, err := st.Execution.SealLegacySecrets(context.Background()); err != nil {
 		log.Printf("secrets: sealing existing values: %v", err)
@@ -158,6 +155,7 @@ func main() {
 	windows := schedule.NewWindowNotifier()
 	checks := schedule.NewCheckRunner(st, hub)
 	srv.RunnerDone = checks.JobFinished
+	hub.OnPublish(func(p events.Payload) { checks.DispatchHooks(p) })
 	go schedule.RunMaintenanceLoop(ctx, st, hub, windows, checks)
 	go srv.RunProbes(ctx)
 	go schedule.RunWorkspacePurgeLoop(ctx, st, srv.WebDAV)

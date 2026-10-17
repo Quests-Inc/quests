@@ -19,7 +19,7 @@ func (s *Store) ClaimJob(ctx context.Context, label string, lease time.Duration)
 		var id int64
 		err := s.DB.QueryRowContext(ctx, `SELECT id FROM runner_job
 			WHERE runner_label = ? AND state = 'queued' AND valid_until > ?
-			ORDER BY CASE kind WHEN 'once' THEN 0 ELSE 1 END, id LIMIT 1`, label, timeutil.ToDBUTC(now)).Scan(&id)
+			ORDER BY CASE kind WHEN 'once' THEN 0 WHEN 'hook' THEN 0 ELSE 1 END, id LIMIT 1`, label, timeutil.ToDBUTC(now)).Scan(&id)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}

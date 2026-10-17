@@ -149,29 +149,3 @@ func FmtNoteDetail(n map[string]any) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-func FmtHookLine(h Hook) string {
-	en := "on "
-	if !h.Enabled {
-		en = "off"
-	}
-	scope := "global"
-	if h.QuestID != nil {
-		scope = fmt.Sprintf("quest#%d", *h.QuestID)
-	}
-	switch h.Workspace {
-	case 0:
-		scope += "@all"
-	default:
-		scope += fmt.Sprintf("@ws%d", h.Workspace)
-	}
-	ev := strings.Join(h.EventsRaw, ",")
-	if ev == "" {
-		ev = strings.Join(h.Events, ",")
-	}
-	name := h.Name
-	if name == "" {
-		name = "—"
-	}
-	return fmt.Sprintf("%s  %s  %-8s  %-12s  %-20s  %s", h.ID, en, h.Type, scope, ev, name)
-}
