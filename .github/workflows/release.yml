@@ -88,6 +88,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the plan below diffs against the previous release tag
       - name: Image names
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
@@ -101,6 +103,34 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # An image whose inputs did not change since the previous release is not rebuilt: it is re-tagged under the new
+      # version (same manifest and layers), so the server pulls nothing for it. Every release still carries a tag for
+      # each image, which is what the deploy repository's compose file expects. See deploy/docker/release-plan.sh.
+      - name: Plan (build or re-tag)
+        id: plan
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          out="$(bash deploy/docker/release-plan.sh "$VERSION" "$GITHUB_SHA")"
+          prev="$(sed -n 's/^prev=//p' <<<"$out")"
+          unchanged="$(sed -n 's/^unchanged=//p' <<<"$out")"
+          targets="api"
+          retag=""
+          for img in bot; do
+            repo_var="${img^^}_IMAGE"
+            if [[ " $unchanged " == *" $img "* ]] && docker buildx imagetools inspect "${!repo_var}:${prev}" >/dev/null 2>&1; then
+              retag="${retag:+$retag }$img"
+            else
+              targets="$targets,$img"
+            fi
+          done
+          {
+            echo "prev=$prev"
+            echo "targets=$targets"
+            echo "retag=$retag"
+          } >> "$GITHUB_OUTPUT"
+          echo "build: $targets; re-tag from ${prev:-none}: ${retag:-nothing}" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: docker/bake-action@v6
         env:
           TAG: ${{ needs.meta.outputs.version }}
@@ -108,11 +138,31 @@ jobs:
         with:
           source: .
           files: deploy/docker/docker-bake.hcl
-          targets: api,bot
+          targets: ${{ steps.plan.outputs.targets }}
           push: true
           set: |
             *.cache-from=type=gha,scope=quests
             *.cache-to=type=gha,mode=max,scope=quests
+      - name: Re-tag unchanged images
+        if: steps.plan.outputs.retag != ''
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          PREV: ${{ steps.plan.outputs.prev }}
+          RETAG: ${{ steps.plan.outputs.retag }}
+        run: |
+          set -euo pipefail
+          for img in $RETAG; do
+            repo_var="${img^^}_IMAGE"
+            repo="${!repo_var}"
+            docker buildx imagetools create --tag "${repo}:${VERSION}" "${repo}:${PREV}"
+            a="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${repo}:${PREV}")"
+            b="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${repo}:${VERSION}")"
+            if [ "$a" != "$b" ]; then
+              echo "::error::${repo}:${VERSION} is $b, expected the digest of ${PREV} ($a)"
+              exit 1
+            fi
+            echo "${repo}:${VERSION} = ${repo}:${PREV} (${a})" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
 
   # Production is not touched from here: the release is announced to the deploy repository as a pull request that
   # sets QUESTS_VERSION. Merging it there is the explicit step that makes doco-cd roll the version out, and
