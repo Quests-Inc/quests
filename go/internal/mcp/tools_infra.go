@@ -102,20 +102,23 @@ func parseOwner(s string) (string, int64, error) {
 }
 
 func secretPath(owner string) (string, error) {
+	if strings.EqualFold(strings.TrimSpace(owner), "workspace") {
+		return "/api/workspace/secrets", nil // the workspace has no id: it is the active one
+	}
 	kind, id, err := parseOwner(owner)
 	if err != nil {
 		return "", err
 	}
 	seg, ok := secretOwners[kind]
 	if !ok {
-		return "", &Err{422, "owner kind must be one of: questline, template, quest, step, note"}
+		return "", &Err{422, "owner must be one of: questline=N, template=N, quest=N, step=N, note=N, workspace"}
 	}
 	return fmt.Sprintf("/api/%s/%d/secrets", seg, id), nil
 }
 
 func secretTools(c *Client) []Tool {
 	type listArgs struct {
-		Owner string `json:"owner" desc:"questline=N | template=N | quest=N | step=N | note=N"`
+		Owner string `json:"owner" desc:"questline=N | template=N | quest=N | step=N | note=N | workspace (the active one: inherited by everything in it)"`
 	}
 	list := Typed("list_secrets", "Names of the secrets set on an owner (values are never readable).",
 		func(ctx context.Context, a listArgs) (any, error) {

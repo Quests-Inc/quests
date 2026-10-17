@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/identity"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
@@ -220,4 +221,43 @@ func TestExportSkipsTheTrash(t *testing.T) {
 		}
 	}
 	_ = keep
+}
+
+// A secret of the workspace itself travels with the archive (when secrets are asked for) and lands on the new workspace.
+func TestWorkspaceSecretSurvivesExportAndImport(t *testing.T) {
+	f := newFixture(t)
+	if err := f.st.Execution.SetSecret(f.ctx(), execution.WorkspaceSecretOwner(f.ctx()), "WS_TOKEN", "token-value-1"); err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	f.h.Export(w, httptest.NewRequest("GET", "/api/workspaces/1/export?files=0&secrets=1", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("export = %d", w.Code)
+	}
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, _ := mw.CreateFormFile("file", "ws.zip")
+	_, _ = part.Write(w.Body.Bytes())
+	_ = mw.WriteField("name", "С секретами")
+	_ = mw.WriteField("secrets", "1")
+	_ = mw.Close()
+	r := httptest.NewRequest("POST", "/api/workspaces/import", &buf)
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	r = r.WithContext(identity.WithPrincipal(r.Context(), identity.Principal{User: f.user, Via: "session"}))
+	rec := httptest.NewRecorder()
+	f.h.Import(rec, r)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("import = %d %s", rec.Code, rec.Body.String())
+	}
+
+	var wsID int64
+	if err := f.st.DB.QueryRowContext(context.Background(), `SELECT id FROM workspace WHERE name = 'С секретами'`).Scan(&wsID); err != nil {
+		t.Fatal(err)
+	}
+	ctx := wsctx.WithUser(wsctx.With(context.Background(), wsID), f.user.ID)
+	got, err := f.st.Execution.ResolveSecrets(ctx, execution.WorkspaceSecretOwner(ctx))
+	if err != nil || got["WS_TOKEN"] != "token-value-1" {
+		t.Fatalf("the imported workspace's secrets: %v %v", got, err)
+	}
 }

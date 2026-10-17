@@ -24,17 +24,24 @@ var secretOwnerKinds = map[string]string{
 	"notes":      execution.SecretOwnerNote,
 }
 
+// workspaceSegment is the route of the workspace's own secrets (no id: the workspace is the one the request works in).
+const workspaceSegment = "workspace"
+
 var secretOwnerLabels = map[string]string{
 	execution.SecretOwnerQuestline: "Questline",
 	execution.SecretOwnerTemplate:  "Template",
 	execution.SecretOwnerQuest:     "Quest",
 	execution.SecretOwnerStep:      "Step",
 	execution.SecretOwnerNote:      "Note",
+	execution.SecretOwnerWorkspace: "Workspace",
 }
 
 // secretOwner resolves {id} for the route's owner kind and 404s when the
 // owning row does not exist.
 func (h *Handler) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (execution.SecretOwner, bool) {
+	if segment == workspaceSegment {
+		return execution.WorkspaceSecretOwner(r.Context()), true
+	}
 	kind := secretOwnerKinds[segment]
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id < 1 {
@@ -142,6 +149,9 @@ func (h *Handler) deleteSecret(segment string) http.HandlerFunc {
 }
 
 func (h *Handler) registerSecretRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/workspace/secrets", h.listSecrets(workspaceSegment))
+	mux.HandleFunc("PUT /api/workspace/secrets/{key}", h.putSecret(workspaceSegment))
+	mux.HandleFunc("DELETE /api/workspace/secrets/{key}", h.deleteSecret(workspaceSegment))
 	for segment := range secretOwnerKinds {
 		mux.HandleFunc("GET /api/"+segment+"/{id}/secrets", h.listSecrets(segment))
 		mux.HandleFunc("PUT /api/"+segment+"/{id}/secrets/{key}", h.putSecret(segment))

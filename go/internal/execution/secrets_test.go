@@ -8,6 +8,7 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 	"github.com/quests-inc/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 const secretsTestSeed = `
@@ -255,5 +256,88 @@ func TestSealedHealthTellsWhichKeySealed(t *testing.T) {
 	st.Box = other
 	if c := secretRow(); c.Unreadable != 2 || c.Readable != 0 {
 		t.Fatalf("with another key: %+v", c)
+	}
+}
+
+// The workspace is the root of the chain: every owner inherits its secrets, a nearer owner overrides them, and a note,
+// which has no chain to quests, still has the workspace above it.
+func TestWorkspaceSecretsAreInheritedByEveryOwner(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := wsctx.With(context.Background(), 1)
+	ws := WorkspaceSecretOwner(ctx)
+	if _, err := st.DB.Exec(`INSERT INTO note (id, title, description, created_at, updated_at) VALUES (50, 'n', '', now(), now())`); err != nil {
+		t.Fatal(err)
+	}
+	oNote := SecretOwner{SecretOwnerNote, 50}
+
+	mustSet(t, st, ws, "TOKEN", "from-workspace")
+	mustSet(t, st, ws, "SHARED", "from-workspace")
+	mustSet(t, st, oQuest, "SHARED", "from-quest")
+	mustSet(t, st, oNote, "NOTE_ONLY", "from-note")
+
+	for name, o := range map[string]SecretOwner{"questline": oLine, "template": oTmpl, "quest": oQuest, "step": oStep, "note": oNote} {
+		got, err := st.ResolveSecrets(ctx, o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got["TOKEN"] != "from-workspace" {
+			t.Errorf("%s does not inherit the workspace's secret: %v", name, got)
+		}
+	}
+	got, _ := st.ResolveSecrets(ctx, oStep)
+	if got["SHARED"] != "from-quest" {
+		t.Fatalf("a nearer owner must override the workspace: %v", got)
+	}
+	got, _ = st.ResolveSecrets(ctx, oNote)
+	if got["SHARED"] != "from-workspace" || got["NOTE_ONLY"] != "from-note" {
+		t.Fatalf("a note sees the workspace and itself: %v", got)
+	}
+	if got, _ = st.ResolveSecrets(ctx, oLine); got["NOTE_ONLY"] != "" || got["SHARED"] != "from-workspace" {
+		t.Fatalf("a questline sees the workspace, not a note: %v", got)
+	}
+
+	refs, err := st.ListEffectiveSecretKeys(ctx, oStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tokenFrom string
+	for _, r := range refs {
+		if r.Key == "TOKEN" {
+			tokenFrom = r.Owner.Kind
+		}
+	}
+	if tokenFrom != SecretOwnerWorkspace {
+		t.Fatalf("TOKEN must be reported as the workspace's, got %q (%v)", tokenFrom, refs)
+	}
+}
+
+func TestWorkspaceSecretUpsertListDelete(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := wsctx.With(context.Background(), 1)
+	ws := WorkspaceSecretOwner(ctx)
+	mustSet(t, st, ws, "K", "one")
+	mustSet(t, st, ws, "K", "two")
+	keys, err := st.ListSecretKeys(ctx, ws)
+	if err != nil || len(keys) != 1 || keys[0] != "K" {
+		t.Fatalf("keys %v %v", keys, err)
+	}
+	if got, _ := st.ResolveSecrets(ctx, ws); got["K"] != "two" {
+		t.Fatalf("upsert failed: %v", got)
+	}
+	if ok, err := st.SecretOwnerExists(ctx, ws); err != nil || !ok {
+		t.Fatalf("the workspace owner always exists: %v %v", ok, err)
+	}
+	if err := st.DeleteSecret(ctx, ws, "K"); err != nil {
+		t.Fatal(err)
+	}
+	if keys, _ = st.ListSecretKeys(ctx, ws); len(keys) != 0 {
+		t.Fatalf("not deleted: %v", keys)
+	}
+	// A row must have exactly one owner.
+	if _, err := st.DB.Exec(`INSERT INTO secret (key, value, created_at, updated_at) VALUES ('X', 'v', now(), now())`); err == nil {
+		t.Fatal("a secret with no owner must be refused")
+	}
+	if _, err := st.DB.Exec(`INSERT INTO secret (questline_id, workspace_scope, key, value, created_at, updated_at) VALUES (1, 1, 'X', 'v', now(), now())`); err == nil {
+		t.Fatal("a secret with two owners must be refused")
 	}
 }

@@ -108,3 +108,41 @@ func TestSecretsValidationAndMissingOwners(t *testing.T) {
 		t.Errorf("empty value: %d, want 422", code)
 	}
 }
+
+func TestWorkspaceSecretsOverHTTP(t *testing.T) {
+	h, s := secretsServer(t)
+	qid := seedQuest(t, s)
+	var stepID int64
+	if err := s.Store.DB.QueryRow(`SELECT id FROM queststep WHERE quest_id = ?`, qid).Scan(&stepID); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, _ := secretReq(h, http.MethodPut, "/api/workspace/secrets/API_TOKEN", map[string]string{"value": "ws-token-value"}); code != http.StatusNoContent {
+		t.Fatalf("put: %d", code)
+	}
+	if code, _ := secretReq(h, http.MethodPut, "/api/workspace/secrets/bad-key", map[string]string{"value": "v"}); code != http.StatusUnprocessableEntity {
+		t.Errorf("a bad key: %d, want 422", code)
+	}
+	if code, _ := secretReq(h, http.MethodPut, "/api/workspace/secrets/LD_PRELOAD", map[string]string{"value": "v"}); code != http.StatusUnprocessableEntity {
+		t.Errorf("a reserved name: %d, want 422", code)
+	}
+	code, out := secretReq(h, http.MethodGet, "/api/workspace/secrets", nil)
+	if code != http.StatusOK || len(out["keys"].([]any)) != 1 || out["keys"].([]any)[0] != "API_TOKEN" {
+		t.Fatalf("list: %d %v", code, out)
+	}
+	if b, _ := json.Marshal(out); bytes.Contains(b, []byte("ws-token-value")) {
+		t.Fatal("a value must never come back")
+	}
+	// The step inherits it, and says where it comes from.
+	_, out = secretReq(h, http.MethodGet, "/api/steps/"+strconv.FormatInt(stepID, 10)+"/secrets", nil)
+	inh, _ := out["inherited"].([]any)
+	if len(inh) != 1 || inh[0].(map[string]any)["key"] != "API_TOKEN" || inh[0].(map[string]any)["from"] != "workspace" {
+		t.Fatalf("inherited: %v", out)
+	}
+	if code, _ := secretReq(h, http.MethodDelete, "/api/workspace/secrets/API_TOKEN", nil); code != http.StatusNoContent {
+		t.Fatalf("delete: %d", code)
+	}
+	if _, out = secretReq(h, http.MethodGet, "/api/workspace/secrets", nil); len(out["keys"].([]any)) != 0 {
+		t.Fatalf("not deleted: %v", out)
+	}
+}

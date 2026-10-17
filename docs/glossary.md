@@ -14,7 +14,7 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 | Заметка (Note) | note | knowledge | A document in a tree; flags README, PRIVATE, CATEGORY, OUTDATED |
 | Вложение (Attachment) | attachment | knowledge | A file of a quest, questline or note; versions, ClamAV scan, stored on WebDAV |
 | Ссылка (Reference) | ref | knowledge | A mention of an entity in text: `quest=N`, `note=N`, `attachment=N`… |
-| Секрет (Secret) | secret | knowledge | An environment value for a command; inherited step > quest > template > questline |
+| Секрет (Secret) | secret | knowledge | An environment value for a command; inherited step > quest > template > questline > workspace |
 | Шаблон (Template) | template | automation | The rule of a periodic quest (schedule, mode, pool) |
 | Эмит (Emit) | emit | automation | Creating a quest from a template; with `emit_pool_command` a command prints the quest |
 | Проверка (Check) | check | automation | A step's or note's command that determines progress or freshness |

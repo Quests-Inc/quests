@@ -9,12 +9,13 @@ import (
 	"strings"
 
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // Secret owners. A secret is attached to exactly one of these; values are
 // resolved from the most specific owner to the most general one:
 //
-//	step > quest > template > questline
+//	step > quest > template > questline > workspace
 //
 // i.e. a command sees its own secrets, then those of its quest, of the template
 // that emitted the quest, and of the questline the quest sits in. Values are
@@ -25,8 +26,11 @@ const (
 	SecretOwnerTemplate  = "template"
 	SecretOwnerQuest     = "quest"
 	SecretOwnerStep      = "step"
-	// A note's secrets are its own: no chain to a parent (it may refer to things, it does not depend on them).
+	// A note's secrets are its own: no chain to a quest or a questline (it may refer to things, it does not depend on them);
+	// only the workspace above it.
 	SecretOwnerNote = "note"
+	// The workspace itself: the root of the chain. Its secrets are inherited down to everything inside it (ADR-0003).
+	SecretOwnerWorkspace = "workspace"
 )
 
 // SecretOwner identifies what a secret is attached to.
@@ -55,9 +59,32 @@ func (o SecretOwner) column() (string, error) {
 		return "step_id", nil
 	case SecretOwnerNote:
 		return "note_id", nil
+	case SecretOwnerWorkspace:
+		return "workspace_scope", nil
 	}
 	return "", fmt.Errorf("%w: %q", errBadSecretOwner, o.Kind)
 }
+
+// match is the condition selecting the owner's rows, with its arguments. The workspace's rows are the ones flagged
+// workspace_scope (workspace_id is already pinned by row-level security).
+func (o SecretOwner) match() (string, []any, error) {
+	col, err := o.column()
+	if err != nil {
+		return "", nil, err
+	}
+	if o.Kind == SecretOwnerWorkspace {
+		return col + " = 1", nil, nil
+	}
+	return col + " = ?", []any{o.ID}, nil
+}
+
+// workspaceOwner is the owner for the workspace the context works in.
+func workspaceOwner(ctx context.Context) SecretOwner {
+	return SecretOwner{SecretOwnerWorkspace, wsctx.From(ctx)}
+}
+
+// WorkspaceSecretOwner is the owner of the workspace-wide secrets of the context's workspace.
+func WorkspaceSecretOwner(ctx context.Context) SecretOwner { return workspaceOwner(ctx) }
 
 // SecretOwnerExists reports whether the owning row exists.
 func (s *Store) SecretOwnerExists(ctx context.Context, o SecretOwner) (bool, error) {
@@ -73,6 +100,8 @@ func (s *Store) SecretOwnerExists(ctx context.Context, o SecretOwner) (bool, err
 		table = "queststep"
 	case SecretOwnerNote:
 		table = "note"
+	case SecretOwnerWorkspace:
+		return true, nil // the workspace the request works in always exists
 	default:
 		return false, fmt.Errorf("%w: %q", errBadSecretOwner, o.Kind)
 	}
@@ -169,22 +198,28 @@ func (s *Store) SetSecret(ctx context.Context, o SecretOwner, key, value string)
 		return err
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
+	owner, args := "?", []any{o.ID}
+	conflict := fmt.Sprintf("%[1]s, key) WHERE %[1]s IS NOT NULL", col)
+	if o.Kind == SecretOwnerWorkspace {
+		owner, args = "1", nil
+		conflict = "workspace_id, key) WHERE workspace_scope = 1"
+	}
 	_, err = s.DB.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO secret (%[1]s, key, value, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(%[1]s, key) WHERE %[1]s IS NOT NULL
-		DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, col),
-		o.ID, key, value, now, now)
+		VALUES (%[3]s, ?, ?, ?, ?)
+		ON CONFLICT(%[2]s
+		DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, col, conflict, owner),
+		append(args, key, value, now, now)...)
 	return err
 }
 
 // ListSecretKeys returns the names set directly on the owner — never values.
 func (s *Store) ListSecretKeys(ctx context.Context, o SecretOwner) ([]string, error) {
-	col, err := o.column()
+	cond, args, err := o.match()
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.QueryContext(ctx, fmt.Sprintf(`SELECT key FROM secret WHERE %s = ? ORDER BY key`, col), o.ID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT key FROM secret WHERE `+cond+` ORDER BY key`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -202,17 +237,30 @@ func (s *Store) ListSecretKeys(ctx context.Context, o SecretOwner) ([]string, er
 
 // DeleteSecret removes one key; a missing key is not an error.
 func (s *Store) DeleteSecret(ctx context.Context, o SecretOwner, key string) error {
-	col, err := o.column()
+	cond, args, err := o.match()
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, fmt.Sprintf(`DELETE FROM secret WHERE %s = ? AND key = ?`, col), o.ID, key)
+	_, err = s.DB.ExecContext(ctx, `DELETE FROM secret WHERE `+cond+` AND key = ?`, append(args, key)...)
 	return err
 }
 
 // secretChain returns the owners whose secrets apply to o, least specific
 // first (so a later owner overrides an earlier one).
 func (s *Store) secretChain(ctx context.Context, o SecretOwner) ([]SecretOwner, error) {
+	if o.Kind == SecretOwnerWorkspace {
+		return []SecretOwner{o}, nil
+	}
+	below, err := s.secretChainBelow(ctx, o)
+	if err != nil {
+		return nil, err
+	}
+	// The workspace is the root: everything in it inherits its secrets, notes included.
+	return append([]SecretOwner{workspaceOwner(ctx)}, below...), nil
+}
+
+// secretChainBelow is the chain under the workspace: questline → template → quest → step, or a note alone.
+func (s *Store) secretChainBelow(ctx context.Context, o SecretOwner) ([]SecretOwner, error) {
 	var questlineID, templateID, questID sql.NullInt64
 	switch o.Kind {
 	case SecretOwnerQuestline, SecretOwnerNote:
@@ -261,11 +309,11 @@ func (s *Store) secretChain(ctx context.Context, o SecretOwner) ([]SecretOwner, 
 }
 
 func (s *Store) secretValues(ctx context.Context, o SecretOwner) (map[string]string, error) {
-	col, err := o.column()
+	cond, args, err := o.match()
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.QueryContext(ctx, fmt.Sprintf(`SELECT key, value FROM secret WHERE %s = ?`, col), o.ID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT key, value FROM secret WHERE `+cond, args...)
 	if err != nil {
 		return nil, err
 	}

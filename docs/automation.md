@@ -20,8 +20,8 @@ a template's `emit_pool_command`, and (planned, quest=438) event hooks. The deta
    token, which is revocable. A runner takes jobs by its own label only.
 6. **Everything goes through the job queue.** The scheduler (or an event) *enqueues* a job; a runner *claims* it
    under a lease, heartbeats, and *completes* it. The server never calls into a runner.
-7. **Secrets are the command's environment, nothing else.** Owned by questline, template, quest, step or note and
-   inherited downwards (`docs/secrets.md`); only owners set them; names that would bend how a process starts
+7. **Secrets are the command's environment, nothing else.** Owned by the workspace, a questline, template, quest, step or note and
+   inherited downwards (`docs/secrets.md`): workspace > questline > template > quest > step, and workspace > note; only owners set them; names that would bend how a process starts
    (`PATH`, `LD_*`, `BASH_ENV`, `QUESTS_*`…) are refused and never exported; values are sealed at rest (`platform/secretbox`, `docs/secrets.md`).
 8. **A failure is recorded, never hidden.** A note check that errors stores the error text and keeps the previous
    verdict; an emit error is logged as an attempt (`emit_attempts`); a `once` step check that exits non-zero or times

@@ -162,7 +162,7 @@ export interface JobResult {
 /**
  * Secret owners. A secret is attached to exactly one of these; values are
  * resolved from the most specific owner to the most general one:
- * 	step > quest > template > questline
+ * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
  * stored as plaintext (the server is the trust boundary — the commands run on
@@ -172,7 +172,7 @@ export const SecretOwnerQuestline = "questline";
 /**
  * Secret owners. A secret is attached to exactly one of these; values are
  * resolved from the most specific owner to the most general one:
- * 	step > quest > template > questline
+ * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
  * stored as plaintext (the server is the trust boundary — the commands run on
@@ -182,7 +182,7 @@ export const SecretOwnerTemplate = "template";
 /**
  * Secret owners. A secret is attached to exactly one of these; values are
  * resolved from the most specific owner to the most general one:
- * 	step > quest > template > questline
+ * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
  * stored as plaintext (the server is the trust boundary — the commands run on
@@ -192,7 +192,7 @@ export const SecretOwnerQuest = "quest";
 /**
  * Secret owners. A secret is attached to exactly one of these; values are
  * resolved from the most specific owner to the most general one:
- * 	step > quest > template > questline
+ * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
  * stored as plaintext (the server is the trust boundary — the commands run on
@@ -200,9 +200,14 @@ export const SecretOwnerQuest = "quest";
  */
 export const SecretOwnerStep = "step";
 /**
- * A note's secrets are its own: no chain to a parent (it may refer to things, it does not depend on them).
+ * A note's secrets are its own: no chain to a quest or a questline (it may refer to things, it does not depend on them);
+ * only the workspace above it.
  */
 export const SecretOwnerNote = "note";
+/**
+ * The workspace itself: the root of the chain. Its secrets are inherited down to everything inside it (ADR-0003).
+ */
+export const SecretOwnerWorkspace = "workspace";
 /**
  * SecretOwner identifies what a secret is attached to.
  */

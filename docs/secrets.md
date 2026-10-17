@@ -4,10 +4,10 @@ Values (passwords, tokens) for the commands a runner executes: a template's `emi
 
 ## Levels and inheritance
 
-A secret belongs to one of four owners: a **questline**, a **template**, a **quest** or a **step**. A command sees the secrets of its own owner and of everyone above it, from the particular to the general:
+A secret belongs to one of these owners: the **workspace** itself, a **questline**, a **template**, a **quest**, a **step** or a **note**. A command sees the secrets of its own owner and of everyone above it, from the particular to the general:
 
 ```
-step  >  quest  >  template (quest.template_id)  >  questline
+step  >  quest  >  template (quest.template_id)  >  questline  >  workspace
 ```
 
 - A secret with the same name on a more particular owner overrides the general one.
@@ -23,9 +23,9 @@ The «Секреты» (Secrets) menu in the header, and the «Секреты» 
 
 ## API and MCP
 
-`GET|PUT|DELETE /api/{questlines|templates|quests|steps}/{id}/secrets[/{key}]`. The list returns only names: `{"keys": [...own...], "inherited": [{"key", "from", "id"}]}`. Values cannot be read through the API or MCP.
+`GET|PUT|DELETE /api/{questlines|templates|quests|steps|notes}/{id}/secrets[/{key}]` and, for the workspace you work in, `GET|PUT|DELETE /api/workspace/secrets[/{key}]`. The list returns only names: `{"keys": [...own...], "inherited": [{"key", "from", "id"}]}`. Values cannot be read through the API or MCP.
 
-MCP: `list_secrets(owner)`, `set_secret(owner, key, value)`, `delete_secret(owner, key)`, where `owner` is `questline=N`, `template=N`, `quest=N` or `step=N`. The old `*_template_secret` tools work as before.
+MCP: `list_secrets(owner)`, `set_secret(owner, key, value)`, `delete_secret(owner, key)`, where `owner` is `questline=N`, `template=N`, `quest=N`, `step=N`, `note=N` or `workspace` (the active one). The old `*_template_secret` tools work as before.
 
 A secret's name is a valid environment variable name (`[A-Za-z_][A-Za-z0-9_]*`). Names that would bend how a process starts (`PATH`, `LD_*`, `BASH_ENV`, `QUESTS_*`…) are refused.
 
@@ -37,4 +37,4 @@ Everything a command prints (stdout, stderr, traces, the emit attempts' log) pas
 
 Values are sealed in the database with the server key (AES-256-GCM, see [`security.md`](security.md)): a dump or a backup alone does not reveal them. A runner receives them in the environment of the command, on the owner's own device.
 
-Whoever can create or change a step with a command in a questline can print its secrets (only owners of a workspace can write commands). Keep a secret on the narrowest owner that needs it.
+Whoever can create or change a step with a command in a questline can print its secrets (only owners of a workspace can write commands). Keep a secret on the narrowest owner that needs it. A secret of the workspace is seen by every command inside it (notes included), so it is for things the whole workspace may use, not for a single project.
