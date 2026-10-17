@@ -25,6 +25,7 @@
     onSelect,
     pickedIds = new Set<number>(),
     onRowClick,
+    onClearPicked,
     onTogglePin,
     onQuestContextMenu,
     onLineContextMenu,
@@ -60,6 +61,7 @@
     onSelect: (id: number) => void
     pickedIds?: ReadonlySet<number>
     onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean
+    onClearPicked?: () => void
     onTogglePin: (quest: { id: number }, event: Event) => void
     onQuestContextMenu: (event: MouseEvent, quest: { id: number }) => void
     onLineContextMenu: (event: MouseEvent, line: { id: number }) => void
@@ -172,6 +174,7 @@
     {onSelect}
     {pickedIds}
     {onRowClick}
+    {onClearPicked}
     {onTogglePin}
     {onQuestContextMenu}
     {onLineContextMenu}

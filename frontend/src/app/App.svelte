@@ -694,6 +694,7 @@
       onSelect={(id) => selectQuestFromUi(id)}
       pickedIds={desk.multi.picked}
       onRowClick={(e, id, order) => desk.multi.click(e, id, order)}
+      onClearPicked={() => desk.multi.clear()}
       onTogglePin={desk.togglePin}
       onQuestContextMenu={desk.menu.openQuest}
       onLineContextMenu={desk.menu.openLine}

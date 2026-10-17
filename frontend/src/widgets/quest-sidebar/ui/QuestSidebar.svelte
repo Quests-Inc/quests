@@ -37,6 +37,7 @@
     onSelect,
     pickedIds = new Set<number>(),
     onRowClick,
+    onClearPicked,
     onTogglePin,
     onQuestContextMenu,
     onLineContextMenu,
@@ -76,6 +77,7 @@
     pickedIds?: ReadonlySet<number>,
     /** Ctrl/Shift-click goes here first: true = taken into the selection, the row is not opened. */
     onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean,
+    onClearPicked?: () => void,
     onTogglePin: (quest: any, event: Event) => void,
     onQuestContextMenu: (event: MouseEvent, quest: any) => void,
     onLineContextMenu: (event: MouseEvent, line: any) => void,
@@ -182,6 +184,12 @@
       </button>
     </div>
   </div>
+  {#if pickedIds.size > 0}
+    <div class="sidebar__picked" role="status">
+      <span class="sidebar__picked-count">Выбрано: {pickedIds.size}</span>
+      <button type="button" class="sidebar__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}>Снять</button>
+    </div>
+  {/if}
   {#snippet questRow(q: any)}
     {@const rowTimer = questTimer(q, nowMs)}
     {@const frac = quantifiedProgress(q)}
