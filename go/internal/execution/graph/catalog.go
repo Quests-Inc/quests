@@ -6,17 +6,6 @@ import (
 	"sort"
 )
 
-// Kind groups node types by what they do; the validator wants a source and a sink in every graph.
-type Kind string
-
-const (
-	KindSource  Kind = "source"
-	KindCode    Kind = "code"
-	KindParse   Kind = "parse"
-	KindControl Kind = "control"
-	KindSink    Kind = "sink"
-)
-
 // NodeType describes a kind of node. Ports may depend on the node's parameters (a Parse node has a port per schema field).
 type NodeType struct {
 	Name  string
@@ -113,14 +102,6 @@ func oneOf(key string, allowed ...string) func(json.RawMessage) error {
 		}
 		return fmt.Errorf("параметр %q: одно из %v", key, allowed)
 	}
-}
-
-// NodeInfo is what an editor needs to draw a node type.
-type NodeInfo struct {
-	Name    string `json:"name"`
-	Title   string `json:"title"`
-	Kind    Kind   `json:"kind"`
-	Trusted bool   `json:"trusted"`
 }
 
 // Infos lists the node types, in a stable order.

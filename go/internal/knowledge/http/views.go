@@ -42,6 +42,7 @@ type NotePayload struct {
 // NoteCheckView is a note's check as the API shows it.
 type NoteCheckView struct {
 	Command         *string `json:"command"`
+	ScriptID        *int64  `json:"script_id"`
 	IntervalSeconds *int    `json:"interval_seconds"`
 	RunOn           *string `json:"run_on"`
 	LastRunAt       *string `json:"last_run_at"`

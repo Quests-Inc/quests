@@ -26,9 +26,12 @@ function checkDraft(s: {
   wait_previous: any
   run_mode: any
   run_on: any
+  script_id?: any
 }) {
   return {
     check_command: s?.check_command ?? '',
+    // The script a step runs instead of a command ('' = none). It is bound through its own call, not the step's payload.
+    script_id: s?.script_id != null ? String(s.script_id) : '',
     check_interval_seconds: s?.check_interval_seconds != null ? String(s.check_interval_seconds) : '',
     wait_previous: Boolean(s?.wait_previous),
     run_mode: normalizeRunMode(s?.run_mode),
@@ -48,7 +51,7 @@ export function questStepDraft(s: any = null) {
     progress_current: s?.progress_current ?? 0,
     progress_total: s?.progress_total ?? 1,
     ...check,
-    open: Boolean(description.trim() || check.check_command.trim()),
+    open: Boolean(description.trim() || check.check_command.trim() || check.script_id),
   }
 }
 
@@ -79,17 +82,20 @@ export function checkPayload(s: {
   wait_previous?: any
   run_mode?: any
   run_on?: any
+  script_id?: any
 }) {
   const cmd = String(s.check_command || '').trim()
+  // A step that runs a script has no command, but it keeps its schedule and its device.
+  const checked = Boolean(cmd) || Boolean(String(s.script_id ?? '').trim())
   const intervalRaw = String(s.check_interval_seconds ?? '').trim()
   const interval = intervalRaw === '' ? null : Math.max(15, Number(intervalRaw) || 15)
   return {
     check_command: cmd || null,
-    check_interval_seconds: cmd ? interval : null,
-    wait_previous: cmd ? Boolean(s.wait_previous) : false,
-    run_mode: cmd ? normalizeRunMode(s.run_mode) : 'poll',
-    // '' tells the server to clear it; no command, no device.
-    run_on: cmd
+    check_interval_seconds: checked ? interval : null,
+    wait_previous: checked ? Boolean(s.wait_previous) : false,
+    run_mode: checked ? normalizeRunMode(s.run_mode) : 'poll',
+    // '' tells the server to clear it; no command or script, no device.
+    run_on: checked
       ? String(s.run_on || '')
           .trim()
           .toLowerCase()

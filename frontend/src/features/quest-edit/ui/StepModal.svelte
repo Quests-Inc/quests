@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { updateQuestStep } from '@/shared/api/client.ts'
+  import { bindScript, unbindScript, updateQuestStep } from '@/shared/api/client.ts'
   import { checkPayload, questStepDraft, StepAutoCheck } from '@/entities/quest'
   import { MentionTextarea } from '@/entities/template'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
@@ -67,6 +67,12 @@
         onClose()
         return
       }
+      // The script is bound before the rest is saved, so the step keeps its device and schedule; it is detached first for the
+      // same reason in reverse (a command typed over a script replaces it on its own).
+      const was = step.script_id != null ? String(step.script_id) : ''
+      const now = String(draft.script_id || '')
+      if (now && now !== was) await bindScript('step', step.id, Number(now))
+      else if (!now && was && !String(draft.check_command || '').trim()) await unbindScript('step', step.id)
       const saved = await updateQuestStep(questId, step.id, payload)
       onSaved(saved)
       onClose()
@@ -122,6 +128,8 @@
         bind:waitPrevious={draft.wait_previous}
         bind:runMode={draft.run_mode}
         bind:runOn={draft.run_on}
+        bind:scriptId={draft.script_id}
+        allowScript={!onDraft}
       />
     </div>
 

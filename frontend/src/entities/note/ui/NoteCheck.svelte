@@ -2,8 +2,9 @@
   import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import HelpTip from '@/shared/ui/HelpTip.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { getNote, setNoteCheck, runNoteCheck } from '@/shared/api/client.ts'
+  import { bindScript, getNote, runNoteCheck, setNoteCheck, unbindScript } from '@/shared/api/client.ts'
   import { loadRunners, runnersList } from '@/entities/runner/@x/note'
+  import { ScriptPicker } from '@/entities/script/@x/note'
 import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
 
   /**
@@ -16,6 +17,8 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
   let check = $state((null as any | null))
   let open = $state(false)
   let command = $state('')
+  /** the script the note runs instead of a command ('' = none) */
+  let scriptId = $state('')
   let interval = $state('')
   let runOn = $state('')
   let busy = $state(false)
@@ -26,6 +29,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     check = c
     if (!dirty) {
       command = c?.command ?? ''
+      scriptId = c?.script_id != null ? String(c.script_id) : ''
       interval = c?.interval_seconds != null ? String(c.interval_seconds) : ''
       runOn = c?.run_on ?? ''
     }
@@ -56,7 +60,8 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     return () => clearInterval(t)
   })
 
-  const active = $derived(Boolean(check?.command))
+  const scripted = $derived(Boolean(scriptId))
+  const active = $derived(Boolean(check?.command) || check?.script_id != null)
 
   async function run(fn: { (): Promise<void>; (): Promise<void>; (): Promise<void>; (): any }) {
     busy = true
@@ -73,7 +78,11 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
   const save = () =>
     run(async () => {
       const iv = interval === '' ? null : Number(interval)
-      await setNoteCheck(noteId, { command: command.trim() || null, interval_seconds: iv, run_on: runOn || null })
+      // The script is bound first so the schedule below is kept for it; a command typed over a script replaces it on the server.
+      const was = check?.script_id != null ? String(check.script_id) : ''
+      if (scripted && scriptId !== was) await bindScript('note', noteId, Number(scriptId))
+      else if (!scripted && was && !command.trim()) await unbindScript('note', noteId)
+      await setNoteCheck(noteId, { command: scripted ? null : command.trim() || null, interval_seconds: iv, run_on: runOn || null })
       dirty = false
       await load()
       onChanged?.()
@@ -81,9 +90,11 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
 
   const remove = () =>
     run(async () => {
+      if (check?.script_id != null) await unbindScript('note', noteId)
       await setNoteCheck(noteId, { command: null })
       dirty = false
       command = ''
+      scriptId = ''
       await load()
       onChanged?.()
     })
@@ -114,6 +125,8 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
 
   {#if open}
     <div class="nc__body">
+      <ScriptPicker kind="note" bind:value={scriptId} onchange={() => (dirty = true)} />
+      {#if !scripted}
       <textarea
         class="mono nc__cmd"
         rows="3"
@@ -123,6 +136,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
         bind:value={command}
         oninput={() => (dirty = true)}
       ></textarea>
+      {/if}
       <div class="nc__opts">
         <input
           type="number"
@@ -143,7 +157,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
         </HelpTip>
       </div>
       <div class="nc__actions">
-        <button type="button" class="btn btn--primary" disabled={busy || !command.trim()} onclick={save}>Сохранить</button>
+        <button type="button" class="btn btn--primary" disabled={busy || (!command.trim() && !scripted)} onclick={save}>Сохранить</button>
         <button type="button" class="btn" disabled={busy || !active || dirty} onclick={now} title="Запустить на ближайшем такте (до 15 с)">Проверить сейчас</button>
         <button type="button" class="btn" onclick={() => onOpenSecrets?.()}>Секреты</button>
         {#if active}<button type="button" class="btn btn--danger-solid" disabled={busy} onclick={remove}>Убрать проверку</button>{/if}

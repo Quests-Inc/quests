@@ -103,6 +103,15 @@ packages:
       knowledge.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
       knowledge.RevisionRead: "RevisionRead"
+  - path: "github.com/quests-inc/quests/go/internal/execution/graph"
+    output_path: "../frontend/src/shared/api/scriptgraph.gen.ts"
+    include_files:
+      - "graph.go"
+      - "types.go"
+      - "info.go"
+      - "validate.go"
+    type_mappings:
+      json.RawMessage: "unknown"
   - path: "github.com/quests-inc/quests/go/internal/execution/http"
     output_path: "../frontend/src/shared/api/execution_http.gen.ts"
     include_files:

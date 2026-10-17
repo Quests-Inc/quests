@@ -4,6 +4,7 @@
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import { mirrorQuestId as findMirrorQuest } from '../model/steps.ts'
   import { loadRunners, runnersList } from '@/entities/runner/@x/quest'
+  import { ScriptPicker } from '@/entities/script/@x/quest'
 
   /**
    * A step's auto-check: command, poll interval, mode, pipeline gate.
@@ -17,8 +18,20 @@
     waitPrevious = $bindable(false),
     runMode = $bindable('poll'),
     runOn = $bindable(''),
+    scriptId = $bindable(''),
+    allowScript = false,
     text = '',
-  }: { command?: string, interval?: string, waitPrevious?: boolean, runMode?: string, runOn?: string, text?: string } = $props()
+  }: {
+    command?: string
+    interval?: string
+    waitPrevious?: boolean
+    runMode?: string
+    runOn?: string
+    scriptId?: string
+    /** Offer a script in place of a command (only for a step that exists: the script is bound to it). */
+    allowScript?: boolean
+    text?: string
+  } = $props()
 
   const MODES = [
     { id: 'poll', label: 'опрос' },
@@ -26,7 +39,9 @@
     { id: 'once', label: 'разово' },
   ]
 
-  let hasCommand = $derived(Boolean(String(command || '').trim()))
+  let scripted = $derived(allowScript && Boolean(String(scriptId || '').trim()))
+  // The mode, interval and device apply to a command and to a script alike.
+  let hasCommand = $derived(scripted || Boolean(String(command || '').trim()))
 
   // Devices to pick from; a label that is not (or no longer) registered stays selectable so it is not lost silently.
   $effect(() => {
@@ -36,7 +51,7 @@
   })
 
   /** First quest=N in the step's title/description, offered while no command is set. */
-  let mirrorQuestId = $derived(hasCommand ? null : findMirrorQuest(text))
+  let mirrorQuestId = $derived(hasCommand || scripted ? null : findMirrorQuest(text))
 
   function useMirrorCheck() {
     if (mirrorQuestId == null) return
@@ -46,7 +61,13 @@
 </script>
 
 <div class="autocheck">
+  {#if allowScript}
+    <div class="autocheck__script">
+      <ScriptPicker kind="step" bind:value={scriptId} />
+    </div>
+  {/if}
   <div class="autocheck__row">
+    {#if !scripted}
     <textarea
       class="mono autocheck__cmd"
       rows="1"
@@ -55,6 +76,7 @@
       bind:value={command}
       spellcheck="false"
     ></textarea>
+    {/if}
     {#if hasCommand && runMode !== 'once'}
       <input
         type="number"
@@ -68,7 +90,7 @@
       />
     {/if}
   </div>
-  {#if mirrorQuestId != null}
+  {#if mirrorQuestId != null && !scripted}
     <button type="button" class="btn btn--ghost autocheck__suggest" onclick={useMirrorCheck}>
       Следить за quest={mirrorQuestId}: <code>quests progress {mirrorQuestId}</code>
     </button>

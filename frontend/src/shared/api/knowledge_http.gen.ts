@@ -45,6 +45,7 @@ export interface NotePayload extends NoteListItem {
  */
 export interface NoteCheckView {
   command?: string;
+  script_id?: number /* int64 */;
   interval_seconds?: number /* int */;
   run_on?: string;
   last_run_at?: string;

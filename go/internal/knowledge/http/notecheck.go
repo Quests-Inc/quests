@@ -22,7 +22,7 @@ func (h *Handler) RegisterNoteCheck(mux *http.ServeMux) {
 
 func checkView(c knowledge.NoteCheck) NoteCheckView {
 	return NoteCheckView{
-		Command: c.Command, IntervalSeconds: c.IntervalSeconds, RunOn: c.RunOn,
+		Command: c.Command, ScriptID: c.ScriptID, IntervalSeconds: c.IntervalSeconds, RunOn: c.RunOn,
 		LastRunAt: timeutil.ToUTCISO(c.LastRunAt), Outdated: c.Outdated,
 		OutdatedAt: timeutil.ToUTCISO(c.OutdatedAt), Reason: c.Reason, Error: c.Error,
 		ErrorAt: timeutil.ToUTCISO(c.ErrorAt),
