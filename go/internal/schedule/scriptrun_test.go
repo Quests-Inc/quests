@@ -6,6 +6,8 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
+	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/events"
 )
 
 // A note check is a run of a graph: one run and one job per check, the run keeps what each node did, and an open job for
@@ -123,5 +125,84 @@ func TestRunWithADeletedScriptFails(t *testing.T) {
 	run, _ := r.Store.Execution.GetRun(ctx, id)
 	if run.State != execution.RunFailed || !strings.Contains(run.Error, "скрипт удалён") {
 		t.Fatalf("%+v", run)
+	}
+}
+
+func onceRig(t *testing.T, cmd string) (*CheckRunner, journal.Quest) {
+	t.Helper()
+	st := openRunnerChecksDB(t)
+	idle := journal.RunIdle
+	step := remoteStep("once", cmd, testLabel, journal.RunModeOnce)
+	step.RunStatus = &idle
+	q := seedQuest(t, st, []journal.Step{step})
+	return NewCheckRunner(st, events.New()), q
+}
+
+// A one-shot step is a run too: the job carries the run, and the outcome decides between closing the step and failing the
+// quest, with the reason written in the quest log.
+func TestOnceStepOutcomes(t *testing.T) {
+	for _, tc := range []struct {
+		name, cmd string
+		status    journal.QuestStatus
+		run       string
+		comment   string
+	}{
+		{"clean exit closes the step", "true", journal.StatusCompleted, journal.RunSuccess, ""},
+		{"a failing command fails the quest", `echo "boom" >&2; exit 4`, journal.StatusFailed, journal.RunFail, "код 4: boom"},
+	} {
+		r, q := onceRig(t, tc.cmd)
+		ctx := bg()
+		r.Tick(ctx)
+		jobs, _ := r.Store.Execution.ListRunnerJobs(ctx, execution.JobFilter{Label: testLabel})
+		if len(jobs) != 1 || jobs[0].RunID == nil || jobs[0].StepID == nil || jobs[0].Kind != execution.JobKindOnce {
+			t.Fatalf("%s: the job belongs to a run: %+v", tc.name, jobs)
+		}
+		settle(t, r.Store, r)
+		got, _ := r.Store.Journal.GetQuest(ctx, q.ID)
+		if got.Status != tc.status || got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != tc.run {
+			t.Errorf("%s: status %s run %v", tc.name, got.Status, got.Steps[0].RunStatus)
+		}
+		if tc.comment != "" {
+			var found bool
+			rows, _ := r.Store.DB.QueryContext(ctx, `SELECT COALESCE(comment,'') FROM questchangelog WHERE quest_id = ?`, q.ID)
+			for rows.Next() {
+				var c string
+				_ = rows.Scan(&c)
+				found = found || strings.Contains(c, tc.comment)
+			}
+			rows.Close()
+			if !found {
+				t.Errorf("%s: no log comment with %q", tc.name, tc.comment)
+			}
+		}
+		var open int
+		_ = r.Store.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM script_run WHERE state = 'waiting'`).Scan(&open)
+		if open != 0 {
+			t.Errorf("%s: %d runs still wait", tc.name, open)
+		}
+	}
+}
+
+// A cancel by hand stops the step without failing the quest, and a second tick does not start it again.
+func TestOnceStepCancelStopsItWithoutFailingTheQuest(t *testing.T) {
+	r, q := onceRig(t, "sleep 30")
+	ctx := bg()
+	r.Tick(ctx)
+	jobs, _ := r.Store.Execution.ListRunnerJobs(ctx, execution.JobFilter{Label: testLabel})
+	if len(jobs) != 1 {
+		t.Fatalf("%+v", jobs)
+	}
+	if err := r.Store.Execution.CancelRunnerJob(ctx, jobs[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	done, _ := r.Store.Execution.GetRunnerJob(ctx, jobs[0].ID)
+	r.JobFinished(ctx, done)
+	got, _ := r.Store.Journal.GetQuest(ctx, q.ID)
+	if got.Status != journal.StatusActive || got.Steps[0].RunStatus == nil || *got.Steps[0].RunStatus != journal.RunFail {
+		t.Fatalf("stopped, not failed: status %s run %v", got.Status, got.Steps[0].RunStatus)
+	}
+	r.Tick(ctx)
+	if again, _ := r.Store.Execution.ListRunnerJobs(ctx, execution.JobFilter{Label: testLabel}); len(again) != 1 {
+		t.Fatalf("a stopped step must not start again by itself: %d jobs", len(again))
 	}
 }

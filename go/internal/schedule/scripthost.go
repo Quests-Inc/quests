@@ -2,11 +2,13 @@ package schedule
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/quests-inc/quests/go/internal/execution/graph"
+	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
@@ -33,6 +35,13 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 			return nil, err
 		}
 		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": note.Title}, nil
+	case "step":
+		_, st, ok := h.r.stepByID(ctx, h.subj.ID)
+		if !ok {
+			return nil, errors.New("шаг не найден")
+		}
+		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": st.Title, "description": st.Description,
+			"progress": st.ProgressCurrent, "total": st.ProgressTotal, "done": st.Done}, nil
 	}
 	return nil, fmt.Errorf("источник %q ещё не подключён", n.Type)
 }
@@ -43,6 +52,8 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		return h.r.sinkNoteVerdict(ctx, in)
 	case "sink.note_error":
 		return h.r.sinkNoteError(ctx, in)
+	case "sink.step_result":
+		return h.r.sinkStepResult(ctx, n, in)
 	}
 	return fmt.Errorf("приёмник %q ещё не подключён", n.Type)
 }
@@ -102,5 +113,84 @@ func (r *CheckRunner) sinkNoteError(ctx context.Context, in map[string]graph.Tok
 	}
 	msg, _ := in["message"].Value.(string)
 	r.noteError(ctx, n.ID, n.Title, msg)
+	return nil
+}
+
+// stepByID finds a step and its quest; ok is false when either is gone.
+func (r *CheckRunner) stepByID(ctx context.Context, id int64) (journal.Quest, *journal.Step, bool) {
+	qid, err := r.Store.Journal.QuestIDForStep(ctx, id)
+	if err != nil {
+		return journal.Quest{}, nil, false
+	}
+	q, err := r.Store.Journal.GetQuest(ctx, qid)
+	if err != nil {
+		return journal.Quest{}, nil, false
+	}
+	for i := range q.Steps {
+		if q.Steps[i].ID == id {
+			return q, &q.Steps[i], true
+		}
+	}
+	return q, nil, false
+}
+
+// sinkStepResult is what became of a one-shot step's run: done, failed, not started (no device), or stopped by hand. A step
+// that was closed meanwhile is left alone, except that a finished command still closes it.
+func (r *CheckRunner) sinkStepResult(ctx context.Context, n graph.Node, in map[string]graph.Token) error {
+	var p struct {
+		Result string `json:"result"`
+	}
+	if err := json.Unmarshal(n.Params, &p); err != nil {
+		return err
+	}
+	ref, err := refOf(in)
+	if err != nil {
+		return err
+	}
+	q, st, ok := r.stepByID(ctx, ref.ID)
+	if !ok {
+		return nil // deleted meanwhile
+	}
+	why, _ := in["why"].Value.(string)
+	switch p.Result {
+	case "done":
+		now := timeutil.NowUTC()
+		st.CheckLastRunAt = &now
+		r.onceSucceeded(ctx, q, st)
+	case "failed":
+		if st.Done {
+			return nil
+		}
+		if why == "" {
+			why = "запуск не удался"
+		}
+		r.onceFailed(ctx, q, st, "автошаг «"+st.Title+"»: "+why)
+	case "not_started":
+		if st.Done {
+			return nil
+		}
+		idle := journal.RunIdle
+		st.RunStatus = &idle
+		if why != "" {
+			why += " — запущу снова, когда появится"
+		}
+		if _, err := r.Store.Journal.UpdateStepComment(ctx, *st, q, "quest_updated", "устройство недоступно", "автошаг «"+st.Title+"»: "+why); err != nil {
+			return fmt.Errorf("шаг %d: %w", st.ID, err)
+		}
+	case "stopped":
+		if st.Done {
+			return nil
+		}
+		if why == "" {
+			why = "запуск отменён"
+		}
+		fail := journal.RunFail
+		st.RunStatus = &fail
+		if _, err := r.Store.Journal.UpdateStepComment(ctx, *st, q, "quest_updated", "автошаг остановлен", "автошаг «"+st.Title+"»: "+why); err != nil {
+			return fmt.Errorf("шаг %d: %w", st.ID, err)
+		}
+	default:
+		return fmt.Errorf("неизвестный итог %q", p.Result)
+	}
 	return nil
 }

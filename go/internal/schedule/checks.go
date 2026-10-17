@@ -279,39 +279,9 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q journal.Quest, st *journa
 	now := timeutil.NowUTC()
 	st.CheckLastRunAt = &now
 	if exit == 0 && !timedOut {
-		ok := journal.RunSuccess
-		st.RunStatus = &ok
-		st.ProgressCurrent = st.ProgressTotal
-		journal.ClampStep(st)
-		journal.SyncStatusFromSteps(&q, now)
-		q.UpdatedAt = now
-		kind := "step_completed"
-		detail := st.Title
-		if q.Status == journal.StatusCompleted {
-			kind = "quest_completed"
-			detail = "завершено"
-		}
-		updated, err := r.Store.Journal.UpdateStep(ctx, *st, q, kind, detail)
-		if err != nil {
-			log.Printf("checks: once ok step %d: %v", st.ID, err)
-			return
-		}
-		qid := updated.ID
-		r.Hub.Publish(kind, events.PublishOpts{
-			Workspace: wsctx.From(ctx),
-			QuestID:   &qid, Title: updated.Title, Description: updated.Description,
-			Detail: detail, Toast: true, Source: "system",
-			Significance: string(updated.Significance), StepTitle: st.Title,
-			Automated: updated.Automated,
-		})
+		r.onceSucceeded(ctx, q, st)
 		return
 	}
-
-	fail := journal.RunFail
-	st.RunStatus = &fail
-	q.Status = journal.StatusFailed
-	q.UpdatedAt = now
-	q.CompletedAt = nil
 	why := "код " + strconv.Itoa(exit)
 	if timedOut {
 		why = "таймаут"
@@ -320,6 +290,47 @@ func (r *CheckRunner) applyOnce(ctx context.Context, q journal.Quest, st *journa
 	if blob := trimCheckOut(stderr, stdout); blob != "" {
 		comment += "\n" + blob
 	}
+	r.onceFailed(ctx, q, st, comment)
+}
+
+// onceSucceeded closes a one-shot step whose command exited cleanly.
+func (r *CheckRunner) onceSucceeded(ctx context.Context, q journal.Quest, st *journal.Step) {
+	now := timeutil.NowUTC()
+	ok := journal.RunSuccess
+	st.RunStatus = &ok
+	st.ProgressCurrent = st.ProgressTotal
+	journal.ClampStep(st)
+	journal.SyncStatusFromSteps(&q, now)
+	q.UpdatedAt = now
+	kind := "step_completed"
+	detail := st.Title
+	if q.Status == journal.StatusCompleted {
+		kind = "quest_completed"
+		detail = "завершено"
+	}
+	updated, err := r.Store.Journal.UpdateStep(ctx, *st, q, kind, detail)
+	if err != nil {
+		log.Printf("checks: once ok step %d: %v", st.ID, err)
+		return
+	}
+	qid := updated.ID
+	r.Hub.Publish(kind, events.PublishOpts{
+		Workspace: wsctx.From(ctx),
+		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
+		Detail: detail, Toast: true, Source: "system",
+		Significance: string(updated.Significance), StepTitle: st.Title,
+		Automated: updated.Automated,
+	})
+}
+
+// onceFailed fails the quest of a one-shot step whose command did not do its job, with the comment in the quest log.
+func (r *CheckRunner) onceFailed(ctx context.Context, q journal.Quest, st *journal.Step, comment string) {
+	now := timeutil.NowUTC()
+	fail := journal.RunFail
+	st.RunStatus = &fail
+	q.Status = journal.StatusFailed
+	q.UpdatedAt = now
+	q.CompletedAt = nil
 	updated, err := r.Store.Journal.UpdateStepComment(ctx, *st, q, "quest_failed", "провалено", comment)
 	if err != nil {
 		log.Printf("checks: once fail step %d: %v", st.ID, err)
@@ -434,21 +445,28 @@ const (
 // At most one job per step and mode is open at a time, so nothing piles up
 // while the device is away.
 func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.Step, once bool) {
-	kind, valid, timeout := execution.JobKindPoll, pollJobValidFor, pollTimeout
-	if once {
-		kind, valid, timeout = execution.JobKindOnce, onceJobValidFor, onceSafetyTimeout
-	}
 	qid, sid := q.ID, st.ID
+	if once {
+		_, err := r.startRun(ctx, implicitPrefix+"step_once", nil, stepOnceGraph(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
+			Label: *st.RunOn, Kind: execution.JobKindOnce, Title: q.Title + " · " + st.Title,
+			Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindOnce,
+			Timeout: onceSafetyTimeout, ValidFor: onceJobValidFor, QuestID: &qid, StepID: &sid,
+		})
+		if err != nil {
+			log.Printf("checks: start step %d on %q: %v", st.ID, *st.RunOn, err)
+		}
+		return
+	}
 	_, _, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
 		RunnerLabel:    *st.RunOn,
-		Kind:           kind,
+		Kind:           execution.JobKindPoll,
 		QuestID:        &qid,
 		StepID:         &sid,
 		Title:          q.Title + " · " + st.Title,
-		DedupeKey:      "step:" + strconv.FormatInt(st.ID, 10) + ":" + kind,
+		DedupeKey:      "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindPoll,
 		Command:        strings.TrimSpace(*st.CheckCommand),
-		TimeoutSeconds: int(timeout / time.Second),
-		ValidFor:       valid,
+		TimeoutSeconds: int(pollTimeout / time.Second),
+		ValidFor:       pollJobValidFor,
 	})
 	if err != nil {
 		log.Printf("checks: enqueue step %d on %q: %v", st.ID, *st.RunOn, err)

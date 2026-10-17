@@ -282,6 +282,7 @@ type kv = map[string]any
 // implicitGraphs maps a name to the builder of the graph a plain check stands for.
 var implicitGraphs = map[string]func(text string) graph.Graph{
 	"note_check": noteCheckGraph,
+	"step_once":  stepOnceGraph,
 }
 
 // noteCheckGraph: the note is read from its source, the command runs, the answer must be an `outdated` verdict; every way
@@ -301,5 +302,29 @@ func noteCheckGraph(text string) graph.Graph {
 		[4]any{1, "ref", 7, "ref"}, [4]any{2, "timeout", 7, "message"},
 		[4]any{1, "ref", 8, "ref"}, [4]any{2, "unreachable", 8, "message"},
 		[4]any{1, "ref", 9, "ref"}, [4]any{2, "abandoned", 9, "message"},
+	)
+}
+
+// stepOnceGraph: a one-shot step. A clean exit closes the step; a failure, a timeout or a device that vanished mid-run fails
+// the quest with the reason; a device that never showed up puts the step back to wait; a cancel stops it without failing
+// the quest.
+func stepOnceGraph(text string) graph.Graph {
+	return buildGraph([]nodeSpec{
+		{1, "source.step", nil},
+		{2, "code", kv{"text": text}},
+		{3, "sink.step_result", kv{"result": "done"}},
+		{4, "sink.step_result", kv{"result": "failed"}},
+		{5, "sink.step_result", kv{"result": "failed"}},
+		{6, "sink.step_result", kv{"result": "failed"}},
+		{7, "sink.step_result", kv{"result": "not_started"}},
+		{8, "sink.step_result", kv{"result": "stopped"}},
+	},
+		[4]any{1, "secrets", 2, "secrets"},
+		[4]any{1, "ref", 3, "ref"}, [4]any{2, "stdout", 3, "trigger"},
+		[4]any{1, "ref", 4, "ref"}, [4]any{2, "failed", 4, "trigger"}, [4]any{2, "failed", 4, "why"},
+		[4]any{1, "ref", 5, "ref"}, [4]any{2, "timeout", 5, "trigger"}, [4]any{2, "timeout", 5, "why"},
+		[4]any{1, "ref", 6, "ref"}, [4]any{2, "abandoned", 6, "trigger"}, [4]any{2, "abandoned", 6, "why"},
+		[4]any{1, "ref", 7, "ref"}, [4]any{2, "unreachable", 7, "trigger"}, [4]any{2, "unreachable", 7, "why"},
+		[4]any{1, "ref", 8, "ref"}, [4]any{2, "canceled", 8, "trigger"}, [4]any{2, "canceled", 8, "why"},
 	)
 }
