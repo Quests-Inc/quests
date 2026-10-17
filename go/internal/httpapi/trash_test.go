@@ -50,6 +50,19 @@ func TestQuestGoesToTheTrashAndComesBack(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(trash, `"id":`+strconv.FormatInt(id, 10)) || !strings.Contains(trash, `"kind":"quest"`) {
 		t.Fatalf("trash list: %d %s", code, trash)
 	}
+	// Times carry the zone: a bare "2026-10-17 17:38:00" is read as local time by the browser (3 h off in Moscow).
+	var items []struct {
+		DeletedAt string `json:"deleted_at"`
+		PurgeAt   string `json:"purge_at"`
+	}
+	if err := json.Unmarshal([]byte(trash), &items); err != nil || len(items) != 1 {
+		t.Fatalf("trash json: %v %s", err, trash)
+	}
+	for _, v := range []string{items[0].DeletedAt, items[0].PurgeAt} {
+		if _, err := time.Parse(time.RFC3339Nano, v); err != nil || !strings.HasSuffix(v, "Z") {
+			t.Fatalf("a trash time must be RFC 3339 UTC (…Z), got %q (%v)", v, err)
+		}
+	}
 
 	if code, body := apiCall(t, h, http.MethodPost, "/api/trash/quests/"+strconv.FormatInt(id, 10)+"/restore", nil); code != http.StatusOK {
 		t.Fatalf("restore: %d %s", code, body)

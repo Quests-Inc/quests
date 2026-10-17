@@ -37,10 +37,11 @@ func (h *Handler) listTrashNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]trashedNoteJSON, 0, len(list))
 	for _, t := range list {
-		purge := timeutil.ToDBUTC(t.DeletedAt.Add(TrashRetention))
+		purgeAt := t.DeletedAt.Add(TrashRetention)
+		purge := *timeutil.ToUTCISO(&purgeAt)
 		out = append(out, trashedNoteJSON{
 			Kind: "note", ID: t.ID, Title: t.Title, Size: t.Size, Children: t.Children,
-			DeletedAt: timeutil.ToDBUTC(t.DeletedAt), DeletedBy: t.DeletedBy, PurgeAt: &purge,
+			DeletedAt: *timeutil.ToUTCISO(&t.DeletedAt), DeletedBy: t.DeletedBy, PurgeAt: &purge,
 		})
 	}
 	writeJSON(w, 200, out)

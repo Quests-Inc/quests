@@ -39,10 +39,11 @@ func (h *Handler) listTrashQuests(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]trashedQuestJSON, 0, len(list))
 	for _, t := range list {
-		purge := timeutil.ToDBUTC(t.DeletedAt.Add(TrashRetention))
+		purgeAt := t.DeletedAt.Add(TrashRetention)
+		purge := *timeutil.ToUTCISO(&purgeAt)
 		out = append(out, trashedQuestJSON{
 			Kind: "quest", ID: t.ID, Title: t.Title, Status: t.Status, QuestlineID: t.QuestlineID,
-			StepsTotal: t.StepsTotal, StepsDone: t.StepsDone, DeletedAt: timeutil.ToDBUTC(t.DeletedAt), DeletedBy: t.DeletedBy,
+			StepsTotal: t.StepsTotal, StepsDone: t.StepsDone, DeletedAt: *timeutil.ToUTCISO(&t.DeletedAt), DeletedBy: t.DeletedBy,
 			PurgeAt: &purge,
 		})
 	}
