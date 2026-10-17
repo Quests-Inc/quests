@@ -414,6 +414,17 @@
     box-shadow: inset 3px 0 0 var(--color-accent, #c9a227);
   }
 
+  /* Hover must not wipe the pick (the plain hover rule wins on specificity): picked + hover is stronger. */
+  .notes__row--picked:hover,
+  .notes__row--picked:focus-visible,
+  .hit--picked:hover,
+  .hit--picked:focus-visible {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+    box-shadow:
+      inset 3px 0 0 var(--color-accent, #c9a227),
+      inset 0 0 0 1px color-mix(in srgb, var(--color-accent, #c9a227) 45%, transparent);
+  }
+
   .notes__row--on {
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, var(--color-bg-raised, #1a1a1a));
     border-left-color: var(--color-fg, #e8e8e8);
