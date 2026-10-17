@@ -72,6 +72,26 @@ A graph is validated on save (types of ports, required inputs, cycles, one `Code
 the problems per node. Nothing runs a script yet: the evaluator and the attaching of scripts to steps, notes and templates
 are the next stages of quest=440.
 
+
+### Runs (ADR-0003, stage 4)
+
+A graph runs in `execution/graph` (tokens, firing rules, strict `Parse`); `schedule/scriptrun.go` starts a run, queues a job for
+each ready `Code` node and resumes the run when the job comes back (`scriptKind` in `schedule/jobkinds.go`). Between the two
+the run lives in `script_run` as a snapshot, so a server restart loses nothing; the job points at it (`runner_job.run_id`,
+`run_node`) and carries the values that came over links in `runner_job.env` (secrets are not stored: they are resolved when a
+runner claims the job). Finished runs are kept three days as a log.
+
+What a plain `check_command` stands for is an *implicit graph* built in `scriptrun.go`; the old paths are switched to them one by one:
+
+| Check | Graph | State |
+|---|---|---|
+| note freshness | `implicit:note_check` | through the evaluator |
+| one-shot step (`run_mode=once`) | `implicit:step_once` | through the evaluator |
+| polled step | `implicit:step_poll` | opt-in: `QUESTS_POLL_GRAPH=1`. The answer must be JSON (a number or an object); the older reader also took the last integer found in free text, so the real commands are checked first |
+| template emit (`emit_pool_command`) | not yet | older path (pull model with attempts and retries) |
+
+Jobs queued before runs existed have no `run_id` and are served by the older kinds until they finish.
+
 ## Known exceptions (to be removed or kept deliberately)
 
 - **Event hooks** (`internal/platform/hooks`, `data/hooks.json`) still execute `script` hooks on the server's own host

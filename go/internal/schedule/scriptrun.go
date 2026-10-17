@@ -187,8 +187,8 @@ func (r *CheckRunner) resumeRun(ctx context.Context, j execution.RunnerJob) {
 		return
 	}
 	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID}
-	r.beforeResume(ctx, subj, outcome)
 	reqs, advErr := rn.Resume(ctx, r.hostFor(subj), *j.RunNode, outcome)
+	r.afterResume(ctx, subj, outcome, g, rn)
 	if advErr != nil {
 		log.Printf("script run %d: %v", run.ID, advErr)
 	}
@@ -283,6 +283,7 @@ type kv = map[string]any
 var implicitGraphs = map[string]func(text string) graph.Graph{
 	"note_check": noteCheckGraph,
 	"step_once":  stepOnceGraph,
+	"step_poll":  stepPollGraph,
 }
 
 // noteCheckGraph: the note is read from its source, the command runs, the answer must be an `outdated` verdict; every way
@@ -326,5 +327,20 @@ func stepOnceGraph(text string) graph.Graph {
 		[4]any{1, "ref", 6, "ref"}, [4]any{2, "abandoned", 6, "trigger"}, [4]any{2, "abandoned", 6, "why"},
 		[4]any{1, "ref", 7, "ref"}, [4]any{2, "unreachable", 7, "trigger"}, [4]any{2, "unreachable", 7, "why"},
 		[4]any{1, "ref", 8, "ref"}, [4]any{2, "canceled", 8, "trigger"}, [4]any{2, "canceled", 8, "why"},
+	)
+}
+
+// stepPollGraph: a polled step. The answer must be a progress number or an object with progress, total and/or description;
+// whatever it has is written to the step. A command that fails, or an answer that is not one, writes nothing (the engine
+// still notes that the check ran).
+func stepPollGraph(text string) graph.Graph {
+	return buildGraph([]nodeSpec{
+		{1, "source.step", nil},
+		{2, "code", kv{"text": text}},
+		{3, "parse", kv{"schema": []kv{{"name": "progress", "type": "int"}, {"name": "total", "type": "int", "min": 1}, {"name": "description", "type": "str"}}}},
+		{4, "sink.step_progress", nil},
+	},
+		[4]any{1, "secrets", 2, "secrets"}, [4]any{2, "stdout", 3, "in"}, [4]any{1, "ref", 4, "ref"},
+		[4]any{3, "progress", 4, "progress"}, [4]any{3, "total", 4, "total"}, [4]any{3, "description", 4, "description"},
 	)
 }

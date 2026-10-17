@@ -116,6 +116,11 @@ export interface RunnerJob {
   log_tail: string;
   reason: string;
   cancel: boolean;
+  /**
+   * RunID / RunNode: the script run and the Code node this job is for (ADR-0003); nil for a job of the older kinds.
+   */
+  run_id?: number /* int64 */;
+  run_node?: number /* int */;
 }
 /**
  * JobSpec is what the scheduler asks to run on a runner.
@@ -132,6 +137,12 @@ export interface JobSpec {
   Command: string;
   TimeoutSeconds: number /* int */;
   ValidFor: number; // how long the job may wait for its runner
+  /**
+   * RunID / RunNode / Env: a Code node of a script run (ADR-0003) and its link values.
+   */
+  RunID?: number /* int64 */;
+  RunNode?: number /* int */;
+  Env: { [key: string]: string};
 }
 /**
  * JobFilter narrows ListRunnerJobs.
@@ -154,6 +165,49 @@ export interface JobResult {
   Stdout: string;
   Stderr: string;
   TimedOut: boolean;
+}
+
+//////////
+// source: runs.go
+
+/**
+ * States of a script run.
+ */
+export const RunWaiting = "waiting"; // a Code node's job is out
+/**
+ * States of a script run.
+ */
+export const RunDone = "done";
+/**
+ * States of a script run.
+ */
+export const RunFailed = "failed"; // a node failed or the run could not go on
+/**
+ * ScriptRun is one pass of a graph over an entity (ADR-0003). While a Code node's job is out it holds the evaluator's
+ * snapshot; afterwards it is the log of what each node did.
+ */
+export interface ScriptRun {
+  id: number /* int64 */;
+  graph_ref: string;
+  script_id?: number /* int64 */;
+  subject_type: string;
+  subject_id: number /* int64 */;
+  state: string;
+  snapshot: any /* graph.Snapshot */;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+  finished_at?: string;
+}
+/**
+ * NewScriptRun describes a run to store.
+ */
+export interface NewScriptRun {
+  GraphRef: string;
+  ScriptID?: number /* int64 */;
+  SubjectType: string;
+  SubjectID: number /* int64 */;
+  Snapshot: any /* graph.Snapshot */;
 }
 
 //////////

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,6 +32,10 @@ var intToken = regexp.MustCompile(`-?\d+`)
 type CheckRunner struct {
 	Store *store.Store
 	Hub   *events.Hub
+	// PollViaGraph runs polled steps through the graph evaluator (ADR-0003) instead of the older reader, which takes the last
+	// integer found anywhere in the output. The graph reader is strict: the answer must be JSON. Off until the real check
+	// commands have been looked through for outputs that only the lenient reader accepts (QUESTS_POLL_GRAPH=1 turns it on).
+	PollViaGraph bool
 
 	mu       sync.Mutex
 	inFlight map[int64]struct{}
@@ -38,7 +43,7 @@ type CheckRunner struct {
 }
 
 func NewCheckRunner(st *store.Store, hub *events.Hub) *CheckRunner {
-	return &CheckRunner{Store: st, Hub: hub, inFlight: map[int64]struct{}{}}
+	return &CheckRunner{Store: st, Hub: hub, PollViaGraph: os.Getenv("QUESTS_POLL_GRAPH") == "1", inFlight: map[int64]struct{}{}}
 }
 
 func (r *CheckRunner) tryLock(id int64) bool {
@@ -217,133 +222,14 @@ func (r *CheckRunner) apply(ctx context.Context, questID, stepID int64, once boo
 		return
 	}
 	parsed := ParseCheckOutput(stdout)
-	if parsed.Description != nil {
-		st.Description = *parsed.Description
-	}
-	totalChanged := parsed.TotalOK && parsed.Total != st.ProgressTotal
-	if totalChanged {
-		st.ProgressTotal = parsed.Total
-	}
-	if !parsed.ProgressOK && !totalChanged {
-		_, _ = r.Store.Journal.UpdateStep(ctx, *st, q, "step_progress", st.Title)
-		return
-	}
-	n := st.ProgressCurrent // a total-only reading keeps the progress it had
+	var progress, total *int
 	if parsed.ProgressOK {
-		n = parsed.Progress
+		progress = &parsed.Progress
 	}
-	if n < 0 {
-		n = 0
+	if parsed.TotalOK {
+		total = &parsed.Total
 	}
-	if n > st.ProgressTotal {
-		n = st.ProgressTotal
-	}
-	progressSame := n == st.ProgressCurrent
-	descTouched := parsed.Description != nil
-	if progressSame && !descTouched && !totalChanged {
-		_, _ = r.Store.Journal.UpdateStep(ctx, *st, q, "step_progress", st.Title)
-		return
-	}
-	st.ProgressCurrent = n
-	journal.ClampStep(st)
-	journal.SyncStatusFromSteps(&q, now)
-	q.UpdatedAt = now
-	kind := "step_progress"
-	detail := st.Title
-	toast := false
-	if st.Done {
-		kind = "step_completed"
-		toast = true
-	}
-	if q.Status == journal.StatusCompleted {
-		kind = "quest_completed"
-		detail = "завершено"
-		toast = true
-	}
-	updated, err := r.Store.Journal.UpdateStep(ctx, *st, q, kind, detail)
-	if err != nil {
-		log.Printf("checks: poll save step %d: %v", st.ID, err)
-		return
-	}
-	qid := updated.ID
-	r.Hub.Publish(kind, events.PublishOpts{
-		Workspace: wsctx.From(ctx),
-		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
-		Detail: detail, Toast: toast, Source: "system",
-		Significance: string(updated.Significance), StepTitle: st.Title,
-		Automated: updated.Automated,
-	})
-}
-
-func (r *CheckRunner) applyOnce(ctx context.Context, q journal.Quest, st *journal.Step, exit int, stdout, stderr string, timedOut bool) {
-	now := timeutil.NowUTC()
-	st.CheckLastRunAt = &now
-	if exit == 0 && !timedOut {
-		r.onceSucceeded(ctx, q, st)
-		return
-	}
-	why := "код " + strconv.Itoa(exit)
-	if timedOut {
-		why = "таймаут"
-	}
-	comment := "автошаг «" + st.Title + "»: " + why
-	if blob := trimCheckOut(stderr, stdout); blob != "" {
-		comment += "\n" + blob
-	}
-	r.onceFailed(ctx, q, st, comment)
-}
-
-// onceSucceeded closes a one-shot step whose command exited cleanly.
-func (r *CheckRunner) onceSucceeded(ctx context.Context, q journal.Quest, st *journal.Step) {
-	now := timeutil.NowUTC()
-	ok := journal.RunSuccess
-	st.RunStatus = &ok
-	st.ProgressCurrent = st.ProgressTotal
-	journal.ClampStep(st)
-	journal.SyncStatusFromSteps(&q, now)
-	q.UpdatedAt = now
-	kind := "step_completed"
-	detail := st.Title
-	if q.Status == journal.StatusCompleted {
-		kind = "quest_completed"
-		detail = "завершено"
-	}
-	updated, err := r.Store.Journal.UpdateStep(ctx, *st, q, kind, detail)
-	if err != nil {
-		log.Printf("checks: once ok step %d: %v", st.ID, err)
-		return
-	}
-	qid := updated.ID
-	r.Hub.Publish(kind, events.PublishOpts{
-		Workspace: wsctx.From(ctx),
-		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
-		Detail: detail, Toast: true, Source: "system",
-		Significance: string(updated.Significance), StepTitle: st.Title,
-		Automated: updated.Automated,
-	})
-}
-
-// onceFailed fails the quest of a one-shot step whose command did not do its job, with the comment in the quest log.
-func (r *CheckRunner) onceFailed(ctx context.Context, q journal.Quest, st *journal.Step, comment string) {
-	now := timeutil.NowUTC()
-	fail := journal.RunFail
-	st.RunStatus = &fail
-	q.Status = journal.StatusFailed
-	q.UpdatedAt = now
-	q.CompletedAt = nil
-	updated, err := r.Store.Journal.UpdateStepComment(ctx, *st, q, "quest_failed", "провалено", comment)
-	if err != nil {
-		log.Printf("checks: once fail step %d: %v", st.ID, err)
-		return
-	}
-	qid := updated.ID
-	r.Hub.Publish("quest_failed", events.PublishOpts{
-		Workspace: wsctx.From(ctx),
-		QuestID:   &qid, Title: updated.Title, Description: updated.Description,
-		Detail: "провалено", Toast: true, Source: "system",
-		Significance: string(updated.Significance), StepTitle: st.Title,
-		Automated: updated.Automated,
-	})
+	r.applyProgress(ctx, q, st, progress, total, parsed.Description)
 }
 
 func trimCheckOut(stderr, stdout string) string {
@@ -451,6 +337,17 @@ func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.
 			Label: *st.RunOn, Kind: execution.JobKindOnce, Title: q.Title + " · " + st.Title,
 			Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindOnce,
 			Timeout: onceSafetyTimeout, ValidFor: onceJobValidFor, QuestID: &qid, StepID: &sid,
+		})
+		if err != nil {
+			log.Printf("checks: start step %d on %q: %v", st.ID, *st.RunOn, err)
+		}
+		return
+	}
+	if r.PollViaGraph {
+		_, err := r.startRun(ctx, implicitPrefix+"step_poll", nil, stepPollGraph(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
+			Label: *st.RunOn, Kind: execution.JobKindPoll, Title: q.Title + " · " + st.Title,
+			Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindPoll,
+			Timeout: pollTimeout, ValidFor: pollJobValidFor, QuestID: &qid, StepID: &sid,
 		})
 		if err != nil {
 			log.Printf("checks: start step %d on %q: %v", st.ID, *st.RunOn, err)

@@ -54,13 +54,59 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		return h.r.sinkNoteError(ctx, in)
 	case "sink.step_result":
 		return h.r.sinkStepResult(ctx, n, in)
+	case "sink.step_progress":
+		return h.r.sinkStepProgress(ctx, in)
 	}
 	return fmt.Errorf("приёмник %q ещё не подключён", n.Type)
 }
 
-// beforeResume is the bookkeeping of the schedule that belongs to the engine, not to a graph: it runs when a job of the
-// subject has come back, whatever the graph then does with the answer.
-func (r *CheckRunner) beforeResume(context.Context, runSubject, graph.CodeOutcome) {}
+// afterResume is the bookkeeping of the schedule that belongs to the engine, not to a graph: a polled step records that its
+// check ran even when the graph wrote nothing to it (a failed command, an answer that was not one).
+func (r *CheckRunner) afterResume(ctx context.Context, subj runSubject, o graph.CodeOutcome, g graph.Graph, rn *graph.Run) {
+	if subj.Type != "step" || (o.Port != "stdout" && o.Port != "failed" && o.Port != "timeout") {
+		return
+	}
+	for _, n := range g.Nodes {
+		if n.Type == "sink.step_progress" && rn.State(n.ID) == graph.StateRan {
+			return // the sink recorded it
+		}
+		if n.Type == "sink.step_result" {
+			return // a one-shot step is never checked again
+		}
+	}
+	q, st, ok := r.stepByID(ctx, subj.ID)
+	if !ok {
+		return
+	}
+	now := timeutil.NowUTC()
+	st.CheckLastRunAt = &now
+	_, _ = r.Store.Journal.UpdateStep(ctx, *st, q, "step_progress", st.Title)
+}
+
+// sinkStepProgress writes a reading onto a polled step (what apply did after parsing the answer).
+func (r *CheckRunner) sinkStepProgress(ctx context.Context, in map[string]graph.Token) error {
+	ref, err := refOf(in)
+	if err != nil {
+		return err
+	}
+	q, st, ok := r.stepByID(ctx, ref.ID)
+	if !ok {
+		return nil // deleted meanwhile
+	}
+	asInt := func(name string) *int {
+		if v, ok := in[name].Value.(int64); ok {
+			n := int(v)
+			return &n
+		}
+		return nil
+	}
+	var desc *string
+	if d, ok := in["description"].Value.(string); ok {
+		desc = &d
+	}
+	r.applyProgress(ctx, q, st, asInt("progress"), asInt("total"), desc)
+	return nil
+}
 
 func refOf(in map[string]graph.Token) (graph.Ref, error) {
 	ref, ok := in["ref"].Value.(graph.Ref)
