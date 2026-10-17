@@ -83,7 +83,7 @@ func TestNoteJSONShape(t *testing.T) {
 		Check map[string]any `json:"check"`
 	}
 	_ = json.Unmarshal(one, &full)
-	checkKeys := []string{"command", "error", "error_at", "interval_seconds", "last_run_at", "outdated", "outdated_at", "reason", "run_on"}
+	checkKeys := []string{"command", "error", "error_at", "interval_seconds", "last_run_at", "outdated", "outdated_at", "reason", "run_on", "script_id"}
 	got := make([]string, 0, len(full.Check))
 	for k := range full.Check {
 		got = append(got, k)

@@ -271,3 +271,31 @@ func TestTrustedFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestSamplesAndImplicitGraphsAreValid(t *testing.T) {
+	seen := map[string]bool{}
+	for _, s := range Samples() {
+		if seen[s.ID] || s.Title == "" || s.Description == "" {
+			t.Errorf("sample %q: a unique id, a title and a description are needed", s.ID)
+		}
+		seen[s.ID] = true
+		if err := s.Graph.Check(Builtin()); err != nil {
+			t.Errorf("sample %q: %v", s.ID, err)
+		}
+		if got := s.Graph.Subjects(); len(got) != 1 || got[0] != s.Subject {
+			t.Errorf("sample %q: reads %v, says %s", s.ID, got, s.Subject)
+		}
+		if s.Graph.RunsOnRunner() != s.NeedsRunner {
+			t.Errorf("sample %q: needs_runner says %v", s.ID, s.NeedsRunner)
+		}
+	}
+	for _, name := range []string{"note_check", "step_once", "step_poll"} {
+		g, ok := Implicit(name, "true")
+		if !ok || g.Check(Builtin()) != nil {
+			t.Errorf("implicit graph %q: ok=%v %v", name, ok, g.Check(Builtin()))
+		}
+	}
+	if _, ok := Implicit("nope", "x"); ok {
+		t.Error("an unknown implicit graph must be refused")
+	}
+}

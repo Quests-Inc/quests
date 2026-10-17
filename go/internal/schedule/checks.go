@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/execution"
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -340,7 +341,7 @@ const (
 func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.Step, once bool) {
 	qid, sid := q.ID, st.ID
 	if once {
-		_, err := r.startRun(ctx, implicitPrefix+"step_once", nil, stepOnceGraph(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
+		_, err := r.startRun(ctx, implicitPrefix+"step_once", nil, graph.StepOnce(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
 			Label: *st.RunOn, Kind: execution.JobKindOnce, Title: q.Title + " · " + st.Title,
 			Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindOnce,
 			Timeout: onceSafetyTimeout, ValidFor: onceJobValidFor, QuestID: &qid, StepID: &sid,
@@ -350,7 +351,7 @@ func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.
 		}
 		return
 	}
-	_, err := r.startRun(ctx, implicitPrefix+"step_poll", nil, stepPollGraph(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
+	_, err := r.startRun(ctx, implicitPrefix+"step_poll", nil, graph.StepPoll(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
 		Label: *st.RunOn, Kind: execution.JobKindPoll, Title: q.Title + " · " + st.Title,
 		Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindPoll,
 		Timeout: pollTimeout, ValidFor: pollJobValidFor, QuestID: &qid, StepID: &sid,

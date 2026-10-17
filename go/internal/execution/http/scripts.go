@@ -23,6 +23,7 @@ func (h *Handler) registerScripts(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/scripts/{id}/versions/{version}", h.getScriptVersion)
 	mux.HandleFunc("GET /api/script-nodes", h.listScriptNodes)
 	mux.HandleFunc("POST /api/script-nodes/ports", h.scriptNodePorts)
+	mux.HandleFunc("GET /api/script-samples", h.listScriptSamples)
 	h.registerBindings(mux)
 }
 
@@ -283,4 +284,9 @@ func (h *Handler) scriptUses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, uses)
+}
+
+// listScriptSamples are the examples to start a script from (copied into the workspace by creating a script from one).
+func (h *Handler) listScriptSamples(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, graph.Samples())
 }

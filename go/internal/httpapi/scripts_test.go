@@ -95,6 +95,18 @@ func TestScriptValidateAndNodeCatalog(t *testing.T) {
 		t.Fatalf("validate a malformed graph: %d %v", code, out)
 	}
 
+	// The samples are valid scripts: creating one as it is must work.
+	code, samples := secretReqList(t, h, "/api/script-samples")
+	if code != http.StatusOK || len(samples) == 0 {
+		t.Fatalf("samples: %d %v", code, samples)
+	}
+	for _, sm := range samples {
+		body, _ := json.Marshal(map[string]any{"title": sm["title"], "graph": sm["graph"]})
+		if code, out := secretReq(h, http.MethodPost, "/api/scripts", json.RawMessage(body)); code != http.StatusCreated {
+			t.Errorf("sample %v does not create: %d %v", sm["id"], code, out)
+		}
+	}
+
 	code, nodes := secretReqList(t, h, "/api/script-nodes")
 	if code != http.StatusOK || len(nodes) != 16 || nodes[0]["kind"] != "source" {
 		t.Fatalf("catalog: %d (%d types) %v", code, len(nodes), nodes)

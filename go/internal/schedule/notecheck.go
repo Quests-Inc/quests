@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/execution"
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/events"
@@ -133,7 +134,7 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now ti
 
 func (r *CheckRunner) dispatchNote(ctx context.Context, d knowledge.DueNote) {
 	nid := d.ID
-	_, err := r.startRun(ctx, implicitPrefix+"note_check", nil, noteCheckGraph(d.Command), runSubject{Type: "note", ID: d.ID}, runBinding{
+	_, err := r.startRun(ctx, implicitPrefix+"note_check", nil, graph.NoteCheck(d.Command), runSubject{Type: "note", ID: d.ID}, runBinding{
 		Label:    *d.RunOn,
 		Kind:     execution.JobKindPoll,
 		Title:    "Заметка · " + d.Title,
