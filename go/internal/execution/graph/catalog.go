@@ -1,0 +1,115 @@
+package graph
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// Kind groups node types by what they do; the validator wants a source and a sink in every graph.
+type Kind string
+
+const (
+	KindSource  Kind = "source"
+	KindCode    Kind = "code"
+	KindParse   Kind = "parse"
+	KindControl Kind = "control"
+	KindSink    Kind = "sink"
+)
+
+// NodeType describes a kind of node. Ports may depend on the node's parameters (a Parse node has a port per schema field).
+type NodeType struct {
+	Name  string
+	Title string
+	Kind  Kind
+	// Trusted: the node is our own code and runs on the server. Everything built in is trusted but Code, which is a
+	// user's text that only a runner may execute. Letting an admin trust more is later (ADR-0003).
+	Trusted bool
+	// Ports returns the inputs and outputs for the given parameters, or says they are wrong.
+	Ports func(params json.RawMessage) (in, out []Port, err error)
+}
+
+// Registry maps a node type name to its description.
+type Registry map[string]NodeType
+
+func fixed(in, out []Port) func(json.RawMessage) ([]Port, []Port, error) {
+	return func(json.RawMessage) ([]Port, []Port, error) { return in, out, nil }
+}
+
+func req(name string, t PortType) Port { return Port{Name: name, Type: t} }
+func opt(name string, t PortType) Port { return Port{Name: name, Type: t, Optional: true} }
+func grp(name string, t PortType) Port {
+	return Port{Name: name, Type: t, Optional: true, Group: "data"}
+}
+
+// Builtin is the set of nodes of v1 (ADR-0003, section 5). A fresh map, so a test may extend it.
+func Builtin() Registry {
+	r := Registry{}
+	add := func(t NodeType) { r[t.Name] = t }
+
+	// Sources: the reference to the entity, its secrets and its fields; a run started by an event also has the event.
+	source := func(entity string, ref PortType, fields ...Port) {
+		out := append([]Port{req("ref", ref), req("secrets", TSecret)}, fields...)
+		out = append(out, req("event", TDoc))
+		add(NodeType{Name: "source." + entity, Title: "Источник: " + entity, Kind: KindSource, Trusted: true, Ports: fixed(nil, out)})
+	}
+	source("step", TRefStep, req("title", TStr), req("description", TStr), req("progress", TInt), req("total", TInt), req("done", TBool))
+	source("note", TRefNote, req("title", TStr))
+	source("template", TRefTemplate, req("title", TStr), req("period", TStr))
+	source("quest", TRefQuest, req("title", TStr), req("status", TStr), req("description", TStr))
+	source("workspace", TRefWorkspace, req("name", TStr))
+
+	add(NodeType{Name: codeType, Title: "Код (раннер)", Kind: KindCode, Trusted: false, Ports: codePorts})
+	add(NodeType{Name: "parse", Title: "Разбор", Kind: KindParse, Trusted: true, Ports: parsePorts})
+	add(NodeType{Name: "compare", Title: "Сравнить", Kind: KindControl, Trusted: true, Ports: comparePorts})
+	add(NodeType{Name: "any_of", Title: "Любой из", Kind: KindControl, Trusted: true, Ports: anyOfPorts})
+	add(NodeType{Name: "all_of", Title: "Каждый из", Kind: KindControl, Trusted: true, Ports: allOfPorts})
+
+	sink := func(name, title string, params func(json.RawMessage) error, in ...Port) {
+		ports := func(p json.RawMessage) ([]Port, []Port, error) {
+			if params != nil {
+				if err := params(p); err != nil {
+					return nil, nil, err
+				}
+			}
+			return in, nil, nil
+		}
+		add(NodeType{Name: name, Title: title, Kind: KindSink, Trusted: true, Ports: ports})
+	}
+	sink("sink.step_progress", "Шаг: задать прогресс", nil,
+		req("ref", TRefStep), grp("progress", TInt), grp("total", TInt), grp("description", TStr))
+	sink("sink.step_result", "Шаг: итог запуска", oneOf("result", "done", "not_started", "stopped", "failed"),
+		req("ref", TRefStep), req("trigger", TAny), opt("why", TStr))
+	sink("sink.note_verdict", "Заметка: вердикт", nil,
+		req("ref", TRefNote), req("outdated", TBool), opt("reason", TStr))
+	sink("sink.note_error", "Заметка: ошибка проверки", nil,
+		req("ref", TRefNote), req("message", TStr))
+	sink("sink.template_create", "Шаблон: создать квест", nil,
+		req("ref", TRefTemplate), req("doc", TDoc))
+	sink("sink.template_error", "Шаблон: ошибка попытки", oneOf("kind", "error", "timeout", "bad_json"),
+		req("ref", TRefTemplate), req("message", TStr))
+	return r
+}
+
+// oneOf checks that a string parameter has one of the listed values.
+func oneOf(key string, allowed ...string) func(json.RawMessage) error {
+	return func(raw json.RawMessage) error {
+		var m map[string]json.RawMessage
+		if len(raw) > 0 {
+			if err := json.Unmarshal(raw, &m); err != nil {
+				return fmt.Errorf("параметры: %w", err)
+			}
+		}
+		var v string
+		if b, ok := m[key]; ok {
+			if err := json.Unmarshal(b, &v); err != nil {
+				return fmt.Errorf("параметр %q: нужна строка", key)
+			}
+		}
+		for _, a := range allowed {
+			if v == a {
+				return nil
+			}
+		}
+		return fmt.Errorf("параметр %q: одно из %v", key, allowed)
+	}
+}

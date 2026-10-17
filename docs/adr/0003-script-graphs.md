@@ -195,3 +195,8 @@ outputs that worked.
 `workspace` secret owner. 4. Evaluator, the stored run and the job format; implicit graphs for today's checks; the old paths switch to it one
 by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → `QUESTS_SUBJECT_*` spans two releases). 5. The scripts tab and picking a script in a step, a note, a template. 6. Samples. 7. The graph editor. 8. Hooks
 (quest=438) as one more trigger and two more sinks.
+
+## Progress
+
+- Step 2 (model, registry, validator): done in `go/internal/execution/graph` (pure Go: `Graph`, `Builtin()` registry of the 17 node
+  types, `Validate` / `Check`, `Decode`, `EnvName`). The four checks that exist today are tests: each is a valid graph.
