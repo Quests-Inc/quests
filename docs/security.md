@@ -14,7 +14,8 @@ Who can do what, what is enforced where, and how to re-check it.
 **The server executes no user commands.** Check and emit commands run on runners (`quests-runner` on any device, the
 server's own host included): a runner sits where its owner put it, with the rights of the user it runs as. There is no
 "trusted workspace" and no operator role in the web interface; what is left of the host's own authority lives in the
-admin CLI and in the event hooks.
+admin CLI and in the event hooks. The full rule set for running user code (owner-only authoring, runners only, the job
+queue, secrets) is in [`automation.md`](automation.md).
 
 ## Where each rule lives
 
