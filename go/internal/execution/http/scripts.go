@@ -216,10 +216,10 @@ func (h *Handler) scriptNodePorts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"inputs": inputs, "outputs": outputs})
 }
 
-// Binding a script to a step or a note. The runner, interval and mode stay on the step or the note (they are edited there as
+// Binding a script to a step, a note or a template's emit. The runner, interval and mode stay on the step or the note (they are edited there as
 // ever); choosing a script is what takes the command's place, so the command is cleared in the same request.
 func (h *Handler) registerBindings(mux *http.ServeMux) {
-	for _, seg := range []struct{ path, kind string }{{"steps", execution.SubjectStep}, {"notes", execution.SubjectNote}} {
+	for _, seg := range []struct{ path, kind string }{{"steps", execution.SubjectStep}, {"notes", execution.SubjectNote}, {"templates", execution.SubjectTemplate}} {
 		mux.HandleFunc("PUT /api/"+seg.path+"/{id}/script", h.bindScript(seg.kind))
 		mux.HandleFunc("DELETE /api/"+seg.path+"/{id}/script", h.unbindScript(seg.kind))
 	}

@@ -129,7 +129,14 @@ func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodK
 	var out emitOutput
 	var info execInfo
 	var execErr error
-	if tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "" {
+	if b, berr := emitScript(ctx, st, tmpl.ID); berr == nil && b != nil && (!b.NeedsRunner || (tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "")) {
+		// A script: its graph runs, the code in it on the runner the template names.
+		var ready bool
+		out, info, execErr, ready = execEmitScript(ctx, st, tmpl, periodKey, *b)
+		if !ready {
+			return emitResult{RollID: id}, nil
+		}
+	} else if tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "" {
 		// The command runs on a runner device: queue it, collect the result on a later tick.
 		var ready bool
 		out, info, execErr, ready = execEmitRemote(ctx, st, tmpl, periodKey)

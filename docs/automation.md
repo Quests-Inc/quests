@@ -72,7 +72,7 @@ are in `internal/execution/graph`; the store is `internal/execution/scripts.go`;
 on the map's own field (its gestures and minimap; `frontend/src/pages/scripts`). Nodes are dragged, linked from an output to an
 input, their parameters are edited on the right, the validator answers while you draw, and a save that only moves nodes
 rewrites the current version instead of adding one. A step or a note picks a script in its auto-check form
-(`PUT|DELETE /api/steps|notes/{id}/script`); the script then takes the place of the command, and the device, mode and interval
+(`PUT|DELETE /api/steps|notes|templates/{id}/script`; a template step carries `script_id` in its own column and the quest made from it is bound to the same script, and a step created with a quest or on its own may name one in `script_id`); the script then takes the place of the command, and the device, mode and interval
 stay the step's own.
 
 A graph is validated on save (types of ports, required inputs, cycles, one `Code` node per path); a bad one is a 422 listing
@@ -96,6 +96,7 @@ What a plain `check_command` stands for is an *implicit graph* built in `scriptr
 | one-shot step (`run_mode=once`) | `implicit:step_once` | through the evaluator |
 | polled step | `implicit:step_poll` | through the evaluator. The answer must be JSON (a number or an object, as the whole output or its last line); the older reader also took the last integer found in free text. The live steps were looked through before the switch: none relied on it |
 | template emit (`emit_pool_command`) | not yet | older path (pull model with attempts and retries) |
+| template emit by a script (`script_binding`, subject `template`) | `TemplateEmit` sample | the emit tick still drives the period (rolls, retries, limits); the answer comes from a run found by its key `emit:<template>\|<period>\|<script>.<version>`, whose sinks leave the quest document (or the attempt error) in `script_run.result`; the tick takes it once and deletes the run (`schedule/emit_script.go`) |
 
 Jobs queued before runs existed have no `run_id` and are served by the older kinds until they finish.
 

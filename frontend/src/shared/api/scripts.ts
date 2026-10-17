@@ -2,7 +2,7 @@ import type { Script, ScriptUse } from './execution.gen'
 import { request } from './http.ts'
 import type { Graph, NodeInfo, Port, Problem, Sample } from './scriptgraph.gen'
 
-export type ScriptSubject = 'step' | 'note'
+export type ScriptSubject = 'step' | 'note' | 'template'
 
 /** A script with its graph (a list carries none). */
 export type ScriptFull = Script & { graph: Graph }
@@ -68,7 +68,7 @@ export function getNodePorts(type: string, params?: unknown) {
   })
 }
 
-const subjectPath = (kind: ScriptSubject) => (kind === 'step' ? 'steps' : 'notes')
+const subjectPath = (kind: ScriptSubject) => ({ step: 'steps', note: 'notes', template: 'templates' })[kind]
 
 export function bindScript(kind: ScriptSubject, id: number, scriptId: number) {
   return request(`/api/${subjectPath(kind)}/${id}/script`, {

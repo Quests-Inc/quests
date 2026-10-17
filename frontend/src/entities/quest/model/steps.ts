@@ -30,7 +30,7 @@ function checkDraft(s: {
 }) {
   return {
     check_command: s?.check_command ?? '',
-    // The script a step runs instead of a command ('' = none). It is bound through its own call, not the step's payload.
+    // The script a step runs instead of a command ('' = none).
     script_id: s?.script_id != null ? String(s.script_id) : '',
     check_interval_seconds: s?.check_interval_seconds != null ? String(s.check_interval_seconds) : '',
     wait_previous: Boolean(s?.wait_previous),
@@ -65,7 +65,7 @@ export function templateStepDraft(s: any = null) {
       ? formatProgressRange(s.progress_min ?? s.progress_total, s.progress_max ?? s.progress_total)
       : '1',
     ...check,
-    open: Boolean(check.check_command.trim()),
+    open: Boolean(check.check_command.trim() || check.script_id),
   }
 }
 
@@ -89,8 +89,12 @@ export function checkPayload(s: {
   const checked = Boolean(cmd) || Boolean(String(s.script_id ?? '').trim())
   const intervalRaw = String(s.check_interval_seconds ?? '').trim()
   const interval = intervalRaw === '' ? null : Math.max(15, Number(intervalRaw) || 15)
+  const scriptId = Number(String(s.script_id ?? '').trim())
   return {
     check_command: cmd || null,
+    // The script a step runs instead of a command: a new step is bound to it when it is created; a step that exists is
+    // bound through its own call (the quest and step forms take this field out before they update it).
+    script_id: scriptId > 0 ? scriptId : null,
     check_interval_seconds: checked ? interval : null,
     wait_previous: checked ? Boolean(s.wait_previous) : false,
     run_mode: checked ? normalizeRunMode(s.run_mode) : 'poll',

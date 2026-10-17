@@ -96,12 +96,18 @@ func (h *Handler) addStep(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if body.ScriptID != nil {
+		if err := h.Store.GuardScript(r.Context()); err != nil {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
+	}
 	cmd, iv := journal.NormalizeCheck(body.CheckCommand, body.CheckIntervalSeconds)
 	st := journal.Step{
 		QuestID: qid, Title: strings.TrimSpace(body.Title), Description: body.Description,
 		ProgressCurrent: body.ProgressCurrent, ProgressTotal: body.ProgressTotal,
 		SortOrder: ord, CheckCommand: cmd, CheckIntervalSeconds: iv,
-		RunOn: kernel.NormalizeRunOn(body.RunOn),
+		RunOn: kernel.NormalizeRunOn(body.RunOn), ScriptID: body.ScriptID,
 	}
 	if !kernel.ValidRunOn(st.RunOn) {
 		writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunOn.Error())

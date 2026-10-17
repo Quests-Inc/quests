@@ -27,6 +27,7 @@ test('диапазон прогресса: разбор «5», «5..10», «5-10
 test('checkPayload: без команды проверка выключена целиком; интервал не меньше 15 с', () => {
   expect(checkPayload({ check_command: '  ', wait_previous: true, run_mode: 'watch', run_on: ' Home ' })).toEqual({
     check_command: null,
+    script_id: null,
     check_interval_seconds: null,
     wait_previous: false,
     run_mode: 'poll',
@@ -42,6 +43,7 @@ test('checkPayload: без команды проверка выключена ц
     })
   ).toEqual({
     check_command: 'ls',
+    script_id: null,
     check_interval_seconds: 15,
     wait_previous: true,
     run_mode: 'watch',
@@ -147,4 +149,15 @@ test('предложения: ближайшие по тексту голосу�
   )
   expect(suggestTags(index, { title: 'Оплатить воду', description: 'квитанция' })[0].tag.slug).toBe('money')
   expect(nearestVote(buildSuggestIndex([]), { title: 'x' }, 'questline')).toBeNull()
+})
+
+test('checkPayload: шаг со скриптом сохраняет расписание и устройство, а id скрипта уходит числом', () => {
+  expect(checkPayload({ script_id: '7', check_interval_seconds: '60', run_mode: 'once', run_on: 'Home' })).toEqual({
+    check_command: null,
+    script_id: 7,
+    check_interval_seconds: 60,
+    wait_previous: false,
+    run_mode: 'once',
+    run_on: 'home',
+  })
 })

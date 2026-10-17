@@ -63,6 +63,10 @@ export interface TemplateRead {
   emit_window_end?: string;
   emit_pool_command?: string;
   emit_run_on?: string;
+  /**
+   * ScriptID is the script that makes the quest instead of emit_pool_command (ADR-0003), read from its binding.
+   */
+  script_id?: number /* int64 */;
   category_id?: number /* int64 */;
   questline_id?: number /* int64 */;
   category_slug?: string;
@@ -98,4 +102,8 @@ export interface TemplateStepRead {
   wait_previous: boolean;
   run_mode: string;
   run_on?: string;
+  /**
+   * ScriptID is the script the quest's step runs instead of a command (ADR-0003).
+   */
+  script_id?: number /* int64 */;
 }

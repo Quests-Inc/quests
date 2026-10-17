@@ -316,7 +316,7 @@ func (s *Store) createQuest(ctx context.Context, q Quest, changeKind, changeDeta
 		if err := s.guardCommand(ctx, st.CheckCommand, nil, st.RunOn); err != nil {
 			return Quest{}, err
 		}
-		_, err := tx.ExecContext(ctx, `
+		res, err := tx.ExecContext(ctx, `
 			INSERT INTO queststep (
 				quest_id, title, description, progress_current, progress_total, sort_order,
 				check_command, check_interval_seconds, check_last_run_at,
@@ -328,6 +328,15 @@ func (s *Store) createQuest(ctx context.Context, q Quest, changeKind, changeDeta
 		)
 		if err != nil {
 			return Quest{}, err
+		}
+		if st.ScriptID != nil {
+			stepID, err := res.LastInsertId()
+			if err != nil {
+				return Quest{}, err
+			}
+			if err := s.bindStepScript(ctx, tx, stepID, *st.ScriptID); err != nil {
+				return Quest{}, err
+			}
 		}
 	}
 	if err := stageChange(tx, ctx, changeKind, &qid, q.Title, changeDetail, string(q.Significance)); err != nil {

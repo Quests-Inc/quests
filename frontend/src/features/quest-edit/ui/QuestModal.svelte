@@ -12,6 +12,8 @@
     listCategories,
     listQuestlines,
     listTags,
+    bindScript,
+    unbindScript,
   } from '@/shared/api/client.ts'
   import {
     defaultLocalDeadlineParts,
@@ -236,7 +238,12 @@
     let saved = null
     for (const s of desired) {
       if (s.id == null) continue
-      const { id, ...body } = s
+      const { id, script_id, ...body } = s
+      // The script of a step that exists is bound through its own call, before the rest is saved (so the step keeps its device
+      // and schedule); a command typed over it replaces it on the server.
+      const was = (existing || []).find((o: { id: number }) => Number(o.id) === Number(id))?.script_id ?? null
+      if (script_id && script_id !== was) await bindScript('step', id, script_id)
+      else if (!script_id && was && !body.check_command) await unbindScript('step', id)
       saved = await updateQuestStep(questId, id, body)
     }
     for (const s of desired) {

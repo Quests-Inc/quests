@@ -122,7 +122,7 @@ type Step struct {
 	// RunOn names the runner (device) that executes the check; nil = this server.
 	RunOn *string `json:"run_on"`
 	Done  bool    `json:"done"`
-	// ScriptID is the script this step runs instead of a command (ADR-0003); it is read from the binding, never written here.
+	// ScriptID is the script this step runs instead of a command (ADR-0003); it is read from the binding; a step created with one gets it bound (a step that exists changes it through execution).
 	ScriptID *int64 `json:"script_id"`
 }
 
@@ -175,6 +175,8 @@ type StepCreate struct {
 	WaitPrevious         *bool   `json:"wait_previous"`
 	RunMode              *string `json:"run_mode"`
 	RunOn                *string `json:"run_on"`
+	// ScriptID is the script the new step runs instead of a command; it is bound when the step is created.
+	ScriptID *int64 `json:"script_id"`
 }
 
 type StepUpdate struct {

@@ -19,7 +19,6 @@
     runMode = $bindable('poll'),
     runOn = $bindable(''),
     scriptId = $bindable(''),
-    allowScript = false,
     text = '',
   }: {
     command?: string
@@ -28,8 +27,6 @@
     runMode?: string
     runOn?: string
     scriptId?: string
-    /** Offer a script in place of a command (only for a step that exists: the script is bound to it). */
-    allowScript?: boolean
     text?: string
   } = $props()
 
@@ -39,7 +36,7 @@
     { id: 'once', label: 'разово' },
   ]
 
-  let scripted = $derived(allowScript && Boolean(String(scriptId || '').trim()))
+  let scripted = $derived(Boolean(String(scriptId || '').trim()))
   // The mode, interval and device apply to a command and to a script alike.
   let hasCommand = $derived(scripted || Boolean(String(command || '').trim()))
 
@@ -61,22 +58,10 @@
 </script>
 
 <div class="autocheck formscope">
-  {#if allowScript}
-    <div class="autocheck__script">
-      <ScriptPicker kind="step" bind:value={scriptId} legacy={command} onClearLegacy={() => (command = '')} />
-    </div>
-  {/if}
+  <div class="autocheck__script">
+    <ScriptPicker kind="step" bind:value={scriptId} legacy={command} onClearLegacy={() => (command = '')} />
+  </div>
   <div class="autocheck__row">
-    {#if !allowScript}
-    <textarea
-      class="mono autocheck__cmd"
-      rows="1"
-      placeholder={'команда автопроверки (необязательно); можно несколько строк или скрипт: #!/usr/bin/env python3 …'}
-      aria-label="Команда автопроверки"
-      bind:value={command}
-      spellcheck="false"
-    ></textarea>
-    {/if}
     {#if hasCommand && runMode !== 'once'}
       <input
         type="number"
@@ -127,15 +112,6 @@
   .autocheck__row {
     display: flex;
     gap: 0.4rem;
-  }
-
-  /* Two classes deep to outrank the shared .modal input rule. */
-  .autocheck__row .autocheck__cmd {
-    flex: 1 1 auto;
-    font-size: var(--text-xs, 0.75rem);
-    resize: vertical;
-    min-height: 2.1rem;
-    line-height: 1.4;
   }
 
   .autocheck__row .autocheck__interval {

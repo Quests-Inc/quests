@@ -58,7 +58,7 @@ func TestTemplateJSONShapeAndCopy(t *testing.T) {
 		"deadline_time", "description", "duration_seconds", "emit_chance", "emit_limits", "emit_mode", "emit_pool_command",
 		"emit_pool_last_outcome", "emit_run_on", "emit_window_end", "emit_window_start", "enabled", "freq", "id",
 		"overlay_hidden", "pinned", "questline_color", "questline_icon", "questline_icon_url", "questline_id",
-		"questline_title", "significance", "sort_order", "steps", "tags", "timezone", "title", "updated_at", "weekdays"}
+		"questline_title", "script_id", "significance", "sort_order", "steps", "tags", "timezone", "title", "updated_at", "weekdays"}
 	if got := keys(raw); !slices.Equal(got, want) {
 		t.Errorf("template keys = %v\nwant %v", got, want)
 	}
@@ -68,7 +68,7 @@ func TestTemplateJSONShapeAndCopy(t *testing.T) {
 	}
 	_ = json.Unmarshal(do("GET", "/api/templates/"+strconv.FormatInt(created.ID, 10), nil), &got)
 	stepKeys := []string{"check_command", "check_interval_seconds", "description", "id", "progress_max", "progress_min",
-		"run_mode", "run_on", "sort_order", "template_id", "title", "wait_previous"}
+		"run_mode", "run_on", "script_id", "sort_order", "template_id", "title", "wait_previous"}
 	if len(got.Steps) != 2 {
 		t.Fatalf("steps = %d", len(got.Steps))
 	}

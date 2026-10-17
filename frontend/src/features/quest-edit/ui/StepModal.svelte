@@ -73,7 +73,8 @@
       const now = String(draft.script_id || '')
       if (now && now !== was) await bindScript('step', step.id, Number(now))
       else if (!now && was && !String(draft.check_command || '').trim()) await unbindScript('step', step.id)
-      const saved = await updateQuestStep(questId, step.id, payload)
+      const { script_id: _script, ...body } = payload
+      const saved = await updateQuestStep(questId, step.id, body)
       onSaved(saved)
       onClose()
     } catch (e) {
@@ -129,7 +130,6 @@
         bind:runMode={draft.run_mode}
         bind:runOn={draft.run_on}
         bind:scriptId={draft.script_id}
-        allowScript={!onDraft}
       />
     </div>
 

@@ -14,6 +14,8 @@ import (
 const (
 	SubjectStep = "step"
 	SubjectNote = "note"
+	// SubjectTemplate: a template's emit script (it replaces emit_pool_command).
+	SubjectTemplate = "template"
 )
 
 // Binding is the script a subject runs, at its current version.
@@ -37,13 +39,15 @@ func (e *ScriptInUse) Error() string {
 	return fmt.Sprintf("скрипт используется (%d): сначала отвяжите его", len(e.Uses))
 }
 
-func validSubject(kind string) bool { return kind == SubjectStep || kind == SubjectNote }
+func validSubject(kind string) bool {
+	return kind == SubjectStep || kind == SubjectNote || kind == SubjectTemplate
+}
 
 // BindScript makes a subject run a script. The script must read only that kind of entity (a script built on a note does not
 // fit a step), so a mismatch is caught here and not in a run.
 func (s *Store) BindScript(ctx context.Context, subjectType string, subjectID, scriptID int64) error {
 	if !validSubject(subjectType) {
-		return errBad("скрипт можно привязать к шагу или заметке")
+		return errBad("скрипт можно привязать к шагу, заметке или шаблону")
 	}
 	sc, err := s.GetScript(ctx, scriptID)
 	if err != nil {
@@ -110,8 +114,12 @@ func (s *Store) ScriptUses(ctx context.Context, scriptID int64) ([]ScriptUse, er
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT b.subject_type, b.subject_id,
 		       COALESCE((SELECT title FROM queststep WHERE id = b.subject_id AND b.subject_type = 'step'),
-		                (SELECT title FROM note WHERE id = b.subject_id AND b.subject_type = 'note'), '')
-		FROM script_binding b WHERE b.script_id = ? ORDER BY b.subject_type, b.subject_id`, scriptID)
+		                (SELECT title FROM note WHERE id = b.subject_id AND b.subject_type = 'note'),
+		                (SELECT title FROM questtemplate WHERE id = b.subject_id AND b.subject_type = 'template'), '')
+		FROM script_binding b WHERE b.script_id = ?
+		UNION ALL
+		SELECT 'template_step', id, title FROM questtemplatestep WHERE script_id = ?
+		ORDER BY 1, 2`, scriptID, scriptID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +139,8 @@ func (s *Store) ScriptUses(ctx context.Context, scriptID int64) ([]ScriptUse, er
 func (s *Store) PurgeOrphanBindings(ctx context.Context) (int64, error) {
 	res, err := s.DB.ExecContext(ctx, `DELETE FROM script_binding
 		WHERE (subject_type = 'step' AND NOT EXISTS (SELECT 1 FROM queststep WHERE id = script_binding.subject_id))
-		   OR (subject_type = 'note' AND NOT EXISTS (SELECT 1 FROM note WHERE id = script_binding.subject_id))`)
+		   OR (subject_type = 'note' AND NOT EXISTS (SELECT 1 FROM note WHERE id = script_binding.subject_id))
+		   OR (subject_type = 'template' AND NOT EXISTS (SELECT 1 FROM questtemplate WHERE id = script_binding.subject_id))`)
 	if err != nil {
 		return 0, err
 	}

@@ -30,6 +30,9 @@ const httpProgressScript = `#!/bin/sh
 # Ответ сервиса вида {"done": 3, "all": 10} превращается в {"progress": 3, "total": 10}.
 curl -fsS "$URL" | jq -c '{progress: .done, total: .all}'`
 
+const templateEmitScript = `# напечатайте один квест JSON-документом; {} — квеста сейчас нет
+echo '{"title": "Квест из скрипта", "steps": [{"title": "Шаг"}]}'`
+
 // Samples returns the library's examples.
 func Samples() []Sample {
 	followProgress := buildGraph([]nodeSpec{
@@ -59,6 +62,11 @@ func Samples() []Sample {
 			ID: "step-self-close", Title: "Шаг: закрыться при прогрессе от 1", Subject: "step", NeedsRunner: false,
 			Description: "Без команды и без раннера: сервер сам проверяет прогресс шага и закрывает его, когда он дошёл до порога. Порог — в ноде «Сравнить».",
 			Graph:       followProgress,
+		},
+		{
+			ID: "template-emit", Title: "Шаблон: квест из команды", Subject: "template", NeedsRunner: true,
+			Description: "Команда печатает один квест JSON-документом ({} — квеста сейчас нет). Сбой команды и неверный ответ — ошибка попытки: выпуск повторится.",
+			Graph:       TemplateEmit(templateEmitScript),
 		},
 		{
 			ID: "note-freshness", Title: "Заметка: актуальность по коммиту", Subject: "note", NeedsRunner: true,

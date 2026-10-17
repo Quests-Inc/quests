@@ -32,6 +32,10 @@ type ScriptRun struct {
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	FinishedAt  *time.Time     `json:"finished_at,omitempty"`
+	// Key names a run that someone waits for by name (a template's emit: template, period, script version); Result is what its
+	// sink handed back.
+	Key    string `json:"key,omitempty"`
+	Result string `json:"result,omitempty"`
 }
 
 // NewScriptRun describes a run to store.
@@ -41,9 +45,10 @@ type NewScriptRun struct {
 	SubjectType string
 	SubjectID   int64
 	Snapshot    graph.Snapshot
+	Key         string
 }
 
-const runCols = `id, graph_ref, script_id, subject_type, subject_id, state, snapshot, error, created_at, updated_at, finished_at`
+const runCols = `id, graph_ref, script_id, subject_type, subject_id, state, snapshot, error, created_at, updated_at, finished_at, COALESCE(run_key, ''), COALESCE(result, '')`
 
 // CreateRun stores a run, waiting.
 func (s *Store) CreateRun(ctx context.Context, in NewScriptRun) (int64, error) {
@@ -52,8 +57,12 @@ func (s *Store) CreateRun(ctx context.Context, in NewScriptRun) (int64, error) {
 		return 0, err
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO script_run (graph_ref, script_id, subject_type, subject_id, state, snapshot, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, in.GraphRef, in.ScriptID, in.SubjectType, in.SubjectID, RunWaiting, string(snap), now, now)
+	var key any
+	if in.Key != "" {
+		key = in.Key
+	}
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO script_run (graph_ref, script_id, subject_type, subject_id, state, snapshot, created_at, updated_at, run_key)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, in.GraphRef, in.ScriptID, in.SubjectType, in.SubjectID, RunWaiting, string(snap), now, now, key)
 	if err != nil {
 		return 0, err
 	}
@@ -91,7 +100,7 @@ func (s *Store) GetRun(ctx context.Context, id int64) (ScriptRun, error) {
 		finished               sql.NullString
 	)
 	err := s.DB.QueryRowContext(ctx, `SELECT `+runCols+` FROM script_run WHERE id = ?`, id).Scan(
-		&r.ID, &r.GraphRef, &script, &r.SubjectType, &r.SubjectID, &r.State, &snap, &r.Error, &created, &updated, &finished)
+		&r.ID, &r.GraphRef, &script, &r.SubjectType, &r.SubjectID, &r.State, &snap, &r.Error, &created, &updated, &finished, &r.Key, &r.Result)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ScriptRun{}, ErrNotFound
 	}
@@ -109,6 +118,26 @@ func (s *Store) GetRun(ctx context.Context, id int64) (ScriptRun, error) {
 	r.UpdatedAt, _ = timeutil.ParseFlexible(updated)
 	r.FinishedAt = parseNullTime(finished)
 	return r, nil
+}
+
+// RunByKey returns the newest run with this key.
+func (s *Store) RunByKey(ctx context.Context, key string) (ScriptRun, bool, error) {
+	var id int64
+	err := s.DB.QueryRowContext(ctx, `SELECT id FROM script_run WHERE run_key = ? ORDER BY id DESC LIMIT 1`, key).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ScriptRun{}, false, nil
+	}
+	if err != nil {
+		return ScriptRun{}, false, err
+	}
+	r, err := s.GetRun(ctx, id)
+	return r, err == nil, err
+}
+
+// SetRunResult records what a run's sink produced (a template's quest document, or why there is none).
+func (s *Store) SetRunResult(ctx context.Context, id int64, result string) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE script_run SET result = ? WHERE id = ?`, trimTo(result, 256<<10), id)
+	return err
 }
 
 // DeleteRun removes a run and, by cascade, its jobs.

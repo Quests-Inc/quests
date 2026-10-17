@@ -103,7 +103,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			deadline, duration = fixedDeadline(tmpl, localNow, loc)
 		}
 
-		usePool := tmpl.EmitPoolCommand.Valid && strings.TrimSpace(tmpl.EmitPoolCommand.String) != ""
+		usePool := emitUsesPool(ctx, st, tmpl)
 
 		// A fixed-mode pool template with deadline_time set describes its own
 		// "check window": duration_seconds before deadline_time, defaulting to
@@ -295,9 +295,16 @@ func loadTemplateSteps(ctx context.Context, st *store.Store, tmpl templateRow, r
 		if st.SortOrder == 0 && i > 0 {
 			st.SortOrder = i
 		}
-		if s.CheckCommand.Valid && strings.TrimSpace(s.CheckCommand.String) != "" {
-			c := s.CheckCommand.String
-			st.CheckCommand = &c
+		hasCommand := s.CheckCommand.Valid && strings.TrimSpace(s.CheckCommand.String) != ""
+		if s.ScriptID.Valid {
+			id := s.ScriptID.Int64
+			st.ScriptID = &id // the script takes the command's place; the mode, interval and device below stay the step's
+		}
+		if hasCommand || st.ScriptID != nil {
+			if hasCommand {
+				c := s.CheckCommand.String
+				st.CheckCommand = &c
+			}
 			st.WaitPrevious = s.WaitPrevious
 			st.RunMode = s.RunMode
 			if s.RunOn.Valid {
@@ -379,7 +386,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		deadline, duration = fixedDeadline(tmpl, localNow, loc)
 	}
 
-	usePool := tmpl.EmitPoolCommand.Valid && strings.TrimSpace(tmpl.EmitPoolCommand.String) != ""
+	usePool := emitUsesPool(ctx, st, tmpl)
 	var poolRollID int64
 	var spec *resolvedSpec
 	if usePool {

@@ -74,3 +74,10 @@ func (c Commands) Check(ctx context.Context, command, old, runOn *string) error 
 	}
 	return commandExec(command, runOn)
 }
+
+// AuthorScript refuses choosing a script for a check or an emit to someone who is not an owner: a script runs code like a
+// command does, so attaching one is the same right.
+func (c Commands) AuthorScript(ctx context.Context) error {
+	marker := "script"
+	return commandAuthor(ctx, c.Roles, &marker, nil)
+}

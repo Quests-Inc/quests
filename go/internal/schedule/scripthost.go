@@ -35,6 +35,12 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 			return nil, err
 		}
 		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": note.Title}, nil
+	case "template":
+		t, err := h.r.Store.Automation.TemplateRowByID(ctx, h.subj.ID)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": t.Title, "period": h.subj.Period}, nil
 	case "step":
 		_, st, ok := h.r.stepByID(ctx, h.subj.ID)
 		if !ok {
@@ -56,6 +62,8 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		return h.r.sinkStepResult(ctx, n, in)
 	case "sink.step_progress":
 		return h.r.sinkStepProgress(ctx, in)
+	case "sink.template_create", "sink.template_error":
+		return h.r.sinkTemplate(ctx, h.subj, n, in)
 	}
 	return fmt.Errorf("приёмник %q ещё не подключён", n.Type)
 }

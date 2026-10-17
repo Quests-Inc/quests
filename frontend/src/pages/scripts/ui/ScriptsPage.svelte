@@ -22,6 +22,8 @@
    */
   let { active = true, sidebarCollapsed = false }: { active?: boolean; sidebarCollapsed?: boolean } = $props()
 
+  const USE_KINDS: Record<string, string> = { step: 'шаг', note: 'заметка', template: 'шаблон', template_step: 'шаг шаблона' }
+
   const ed = createScriptEditor()
   const cv = createCanvas(ed)
 
@@ -213,7 +215,7 @@
       </div>
       {#if uses.length}
         <p class="scripts__uses">
-          Используется: {uses.map((u) => `${u.subject_type === 'step' ? 'шаг' : 'заметка'} «${u.title}»`).join(', ')}
+          Используется: {uses.map((u) => `${USE_KINDS[u.subject_type] ?? u.subject_type} «${u.title}»`).join(', ')}
         </p>
       {/if}
     {/if}

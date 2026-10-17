@@ -49,6 +49,26 @@ func NoteCheck(text string) Graph {
 	)
 }
 
+// TemplateEmit: a template makes a quest from what the command prints. The answer is one JSON document (the quest, shaped as
+// the emit's limits allow: `{}` or `null` means no quest this time). A command that fails, or an answer that is not JSON, ends
+// as an attempt error of the template, which the emit retries.
+func TemplateEmit(text string) Graph {
+	return buildGraph([]nodeSpec{
+		{1, "source.template", nil},
+		{2, "code", kv{"text": text}},
+		{3, "parse", kv{"schema": []kv{{"name": "quest", "type": "doc", "required": true}}, "whole": true}},
+		{4, "sink.template_create", nil},
+		{5, "parse", kv{"schema": []kv{{"name": "message", "type": "str", "required": true}}}},
+		{6, "sink.template_error", kv{"kind": "error"}},
+		{7, "sink.template_error", kv{"kind": "bad_json"}},
+	},
+		[4]any{1, "secrets", 2, "secrets"}, [4]any{2, "stdout", 3, "in"},
+		[4]any{1, "ref", 4, "ref"}, [4]any{3, "quest", 4, "doc"},
+		[4]any{2, "failed", 5, "in"}, [4]any{1, "ref", 6, "ref"}, [4]any{5, "message", 6, "message"},
+		[4]any{1, "ref", 7, "ref"}, [4]any{3, "bad_output", 7, "message"},
+	)
+}
+
 // StepOnce: a one-shot step. A clean exit closes the step. Whatever else happens leaves by `failed`, and its `kind` decides: a
 // device that never showed up puts the step back to wait; a cancel by hand stops it without failing the quest; anything else
 // (an error exit, a timeout, a device that vanished mid-run) fails the quest with the message.

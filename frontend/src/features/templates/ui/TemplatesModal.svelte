@@ -13,7 +13,10 @@
     listTags,
     listTemplates,
     updateTemplate,
+    bindScript,
+    unbindScript,
   } from '@/shared/api/client.ts'
+  import { ScriptPicker } from '@/entities/script'
   import { rowMeta, templateMenuItems } from '../model/rowInfo.ts'
   import { createTemplateActions } from '../model/templateActions.ts'
   import { defaultLocalDeadlineParts, localTimeZone } from '@/shared/lib/time.ts'
@@ -98,6 +101,8 @@
   /** Shell command run per roll; stdout must be a JSON array of
    * {title, description?, weight?, ref?}. Empty = no pool (normal template). */
   let emitPoolCommand = $state('')
+  let emitScript = $state('') // the script that makes the quest instead of a command ('' = none)
+  let emitScriptWas = $state('') // what the template had when the form opened
   /** JSON text of the emit limits (empty = defaults) */
   let emitLimitsText = $state('')
   let emitRunOn = $state('')
@@ -134,7 +139,7 @@
 
   let isSurprise = $derived(emitMode === 'surprise')
   let hasDeadline = $derived(!isSurprise && Boolean(deadlineHour))
-  let hasPool = $derived(Boolean(emitPoolCommand.trim()))
+  let hasPool = $derived(Boolean(emitPoolCommand.trim()) || Boolean(emitScript))
   $effect(() => {
     if (hasPool) {
       void loadRunners()
@@ -184,7 +189,7 @@
       .join(' · '),
   )
 
-  let poolSummary = $derived(!hasPool ? 'без команды' : (emitRunOn.trim() ? `команда на «${emitRunOn.trim()}»` : 'команда') + (emitLimitsText.trim() ? ' · свои лимиты' : ''))
+  let poolSummary = $derived(!hasPool ? 'без скрипта' : (emitRunOn.trim() ? `скрипт на «${emitRunOn.trim()}»` : 'скрипт') + (emitLimitsText.trim() ? ' · свои лимиты' : ''))
 
   let stepsSummary = $derived.by(() => {
     const n = steps.filter((s) => s.title.trim()).length
@@ -215,6 +220,7 @@
     catTouched = false
     emitChancePct = t ? Math.round(Math.max(0, Math.min(1, Number(t.emit_chance) || 1)) * 100) : 100
     emitPoolCommand = t?.emit_pool_command ?? ''
+    emitScript = emitScriptWas = t?.script_id != null ? String(t.script_id) : ''
     emitLimitsText = t?.emit_limits ? JSON.stringify(t.emit_limits) : ''
     emitRunOn = t?.emit_run_on ?? ''
     const ws = parseClock(t?.emit_window_start, '09', '00')
@@ -341,9 +347,10 @@
       freq,
       weekdays: [...weekdays].sort((a, b) => a - b).join(','),
       timezone: timezone.trim() || LOCAL_TZ,
-      emit_pool_command: emitPoolCommand.trim() || null,
+      // A script takes the command's place; the command that was typed before scripts stays only while no script is chosen.
+      emit_pool_command: emitScript ? null : emitPoolCommand.trim() || null,
       emit_limits: emitLimitsText.trim() ? parseLimits(emitLimitsText) : null,
-      emit_run_on: emitPoolCommand.trim() ? emitRunOn.trim().toLowerCase() || null : null,
+      emit_run_on: hasPool ? emitRunOn.trim().toLowerCase() || null : null,
       category_id: categoryId === '' ? null : Number(categoryId),
       questline_id: questlineId === '' ? null : Number(questlineId),
       tag_ids: selectedTags.map((t) => t.id),
@@ -396,8 +403,15 @@
     saving = true
     formError = ''
     try {
-      if (view === 'create') await createTemplate(payload)
-      else await updateTemplate(editing.id, payload)
+      if (view === 'create') {
+        const made = await createTemplate(payload)
+        if (emitScript) await bindScript('template', made.id, Number(emitScript))
+      } else {
+        // Bound before the rest is saved (the device stays), detached first for the same reason.
+        if (emitScript && emitScript !== emitScriptWas) await bindScript('template', editing.id, Number(emitScript))
+        else if (!emitScript && emitScriptWas && !emitPoolCommand.trim()) await unbindScript('template', editing.id)
+        await updateTemplate(editing.id, payload)
+      }
       onChanged()
       await refresh()
       backToList()
@@ -673,20 +687,19 @@
       <FormSection title="Контент" summary={poolSummary} bind:open={secPool}>
         <div class="field">
           <span class="label">
-            Команда или скрипт пула
-            <HelpTip label="Как работает команда">
-              <p>Запускается при каждом появлении. stdout — один квест в JSON: <code>{'{title?, description?, significance?, questline?, tags?, deadline_at?, steps: [{title, check_command?, …}]}'}</code>. Заданное в нём перекрывает поля шаблона, остальное берётся из шаблона. Пустой вывод, <code>null</code> или <code>{'{}'}</code> — квеста в этот день нет.</p>
-              <p>Повторы команда не отслеживает: пока письмо не прочитано, квест про него будет появляться снова.</p>
-              <p>Текст с <code>#!</code> в первой строке — целый скрипт, запускается своим интерпретатором. Секреты — в меню «Секреты», в скрипт приходят переменными окружения.</p>
+            Скрипт пула
+            <HelpTip label="Как работает скрипт">
+              <p>Запускается при каждом появлении. Нода кода печатает один квест в JSON: <code>{'{title?, description?, significance?, questline?, tags?, deadline_at?, steps: [{title, …}]}'}</code>. Заданное в нём перекрывает поля шаблона, остальное берётся из шаблона. <code>{'{}'}</code> — квеста в этот день нет. Сбой команды и ответ не в JSON — ошибка попытки, выпуск повторится.</p>
+              <p>Повторы скрипт не отслеживает: пока письмо не прочитано, квест про него будет появляться снова.</p>
+              <p>Секреты — в меню «Секреты», в код они приходят переменными окружения. Схему можно поправить во вкладке «Скрипты».</p>
             </HelpTip>
           </span>
-          <textarea
-            class="mono pool-command"
-            rows="4"
-            placeholder={'find ~/reading -name "*.md"\nили скрипт: #!/usr/bin/env python3 …'}
-            bind:value={emitPoolCommand}
-            spellcheck="false"
-          ></textarea>
+          <ScriptPicker
+            kind="template"
+            bind:value={emitScript}
+            legacy={emitPoolCommand}
+            onClearLegacy={() => (emitPoolCommand = '')}
+          />
         </div>
         {#if hasPool}
           <div class="field">
@@ -774,11 +787,6 @@
 />
 
 <style>
-
-  .field .pool-command {
-    font-size: var(--text-xs, 0.75rem);
-    resize: vertical;
-  }
 
   .tz-line {
     gap: 0.35rem;

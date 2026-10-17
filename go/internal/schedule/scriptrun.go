@@ -24,6 +24,9 @@ var builtinNodes = graph.Builtin()
 type runSubject struct {
 	Type string
 	ID   int64
+	// RunID is the run itself, known to the nodes that hand a result back through it; Period is the period of a template's emit.
+	RunID  int64
+	Period string
 }
 
 // runBinding is how the script is attached to its subject: which runner, how long, and what the job is called.
@@ -38,6 +41,8 @@ type runBinding struct {
 	StepID     *int64
 	TemplateID *int64
 	NoteID     *int64
+	// Key names the run for whoever waits for its result by name (a template's emit).
+	Key string
 }
 
 // A run's graph is named by a reference: "script:<id>:<version>" (a stored script version) or "implicit:<name>" (the graph a
@@ -51,6 +56,16 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	if err != nil {
 		return false, err
 	}
+	// The run is stored before it advances: its sinks may hand a result back through it.
+	initial, err := run.Snapshot()
+	if err != nil {
+		return false, err
+	}
+	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: initial, Key: b.Key})
+	if err != nil {
+		return false, err
+	}
+	subj.RunID = id
 	reqs, advErr := run.Advance(ctx, r.hostFor(subj))
 	if advErr != nil {
 		log.Printf("script run (%s): %v", ref, advErr)
@@ -60,12 +75,11 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 		return false, err
 	}
 	state, errText := runState(run, advErr)
-	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: snap})
-	if err != nil {
+	if err := r.Store.Execution.SaveRun(ctx, id, state, snap, errText); err != nil {
 		return false, err
 	}
 	if len(reqs) == 0 {
-		return true, r.Store.Execution.SaveRun(ctx, id, state, snap, errText)
+		return true, nil
 	}
 	for i, req := range reqs {
 		created, err := r.enqueueCode(ctx, id, req, b, len(reqs) > 1, i)
@@ -189,7 +203,10 @@ func (r *CheckRunner) resumeRun(ctx context.Context, j execution.RunnerJob) {
 		log.Printf("script run %d: %v", run.ID, err)
 		return
 	}
-	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID}
+	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID}
+	if parts := strings.SplitN(run.Key, "|", 3); len(parts) == 3 {
+		subj.Period = parts[1] // a template's emit: emit:<template>|<period>|<script version>
+	}
 	reqs, advErr := rn.Resume(ctx, r.hostFor(subj), *j.RunNode, outcome)
 	r.afterResume(ctx, subj, outcome, g, rn)
 	if advErr != nil {

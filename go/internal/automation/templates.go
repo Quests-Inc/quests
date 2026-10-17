@@ -8,41 +8,45 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // TemplateRead is a quest template as the API sends it.
 type TemplateRead struct {
-	ID               int64          `json:"id"`
-	Title            string         `json:"title"`
-	Description      string         `json:"description"`
-	Pinned           bool           `json:"pinned"`
-	OverlayHidden    bool           `json:"overlay_hidden"`
-	SortOrder        int            `json:"sort_order"`
-	Freq             string         `json:"freq"`
-	Weekdays         string         `json:"weekdays"`
-	Enabled          bool           `json:"enabled"`
-	Timezone         string         `json:"timezone"`
-	Significance     string         `json:"significance"`
-	EmitMode         string         `json:"emit_mode"`
-	EmitChance       float64        `json:"emit_chance"`
-	EmitLimits       map[string]any `json:"emit_limits"`
-	DurationSecs     *int           `json:"duration_seconds"`
-	DeadlineTime     *string        `json:"deadline_time"`
-	EmitWindowFrom   *string        `json:"emit_window_start"`
-	EmitWindowTo     *string        `json:"emit_window_end"`
-	EmitPoolCmd      *string        `json:"emit_pool_command"`
-	EmitRunOn        *string        `json:"emit_run_on"`
-	CategoryID       *int64         `json:"category_id"`
-	QuestlineID      *int64         `json:"questline_id"`
-	CategorySlug     *string        `json:"category_slug"`
-	CategoryLabel    *string        `json:"category_label"`
-	CategoryColor    *string        `json:"category_color"`
-	QuestlineTitle   *string        `json:"questline_title"`
-	QuestlineColor   *string        `json:"questline_color"`
-	QuestlineIcon    *string        `json:"questline_icon"`
-	QuestlineIconURL *string        `json:"questline_icon_url"`
-	Automated        bool           `json:"automated"`
+	ID             int64          `json:"id"`
+	Title          string         `json:"title"`
+	Description    string         `json:"description"`
+	Pinned         bool           `json:"pinned"`
+	OverlayHidden  bool           `json:"overlay_hidden"`
+	SortOrder      int            `json:"sort_order"`
+	Freq           string         `json:"freq"`
+	Weekdays       string         `json:"weekdays"`
+	Enabled        bool           `json:"enabled"`
+	Timezone       string         `json:"timezone"`
+	Significance   string         `json:"significance"`
+	EmitMode       string         `json:"emit_mode"`
+	EmitChance     float64        `json:"emit_chance"`
+	EmitLimits     map[string]any `json:"emit_limits"`
+	DurationSecs   *int           `json:"duration_seconds"`
+	DeadlineTime   *string        `json:"deadline_time"`
+	EmitWindowFrom *string        `json:"emit_window_start"`
+	EmitWindowTo   *string        `json:"emit_window_end"`
+	EmitPoolCmd    *string        `json:"emit_pool_command"`
+	EmitRunOn      *string        `json:"emit_run_on"`
+	// ScriptID is the script that makes the quest instead of emit_pool_command (ADR-0003), read from its binding.
+	ScriptID         *int64  `json:"script_id"`
+	CategoryID       *int64  `json:"category_id"`
+	QuestlineID      *int64  `json:"questline_id"`
+	CategorySlug     *string `json:"category_slug"`
+	CategoryLabel    *string `json:"category_label"`
+	CategoryColor    *string `json:"category_color"`
+	QuestlineTitle   *string `json:"questline_title"`
+	QuestlineColor   *string `json:"questline_color"`
+	QuestlineIcon    *string `json:"questline_icon"`
+	QuestlineIconURL *string `json:"questline_icon_url"`
+	Automated        bool    `json:"automated"`
 	// EmitPoolLastOutcome is the outcome of the latest emit_pool roll, once there was one.
 	EmitPoolLastOutcome *string            `json:"emit_pool_last_outcome"`
 	CreatedAt           *string            `json:"created_at"`
@@ -65,6 +69,8 @@ type TemplateStepRead struct {
 	WaitPrevious         bool    `json:"wait_previous"`
 	RunMode              string  `json:"run_mode"`
 	RunOn                *string `json:"run_on"`
+	// ScriptID is the script the quest's step runs instead of a command (ADR-0003).
+	ScriptID *int64 `json:"script_id"`
 }
 
 // body is the template in the shape a create/update request has, so that a read can be merged with
@@ -123,7 +129,10 @@ func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRea
 			return nil, err
 		}
 		out[i].Steps = steps
-		if out[i].EmitPoolCmd != nil {
+		if out[i].ScriptID, err = s.templateScript(ctx, id); err != nil {
+			return nil, err
+		}
+		if out[i].EmitPoolCmd != nil || out[i].ScriptID != nil {
 			outcome, err := s.latestEmitRollOutcome(ctx, id)
 			if err != nil {
 				return nil, err
@@ -193,7 +202,10 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 		return TemplateRead{}, err
 	}
 	tr.Steps = steps
-	if tr.EmitPoolCmd != nil {
+	if tr.ScriptID, err = s.templateScript(ctx, id); err != nil {
+		return TemplateRead{}, err
+	}
+	if tr.EmitPoolCmd != nil || tr.ScriptID != nil {
 		outcome, err := s.latestEmitRollOutcome(ctx, id)
 		if err != nil {
 			return TemplateRead{}, err
@@ -336,6 +348,12 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	if err != nil {
 		return TemplateRead{}, err
 	}
+	if c := asStringPtr(merged["emit_pool_command"]); c != nil && strings.TrimSpace(*c) != "" {
+		// A template makes its quest by a command or by a script, not both: a command written on top of a script replaces it.
+		if _, err := s.DB.ExecContext(ctx, `DELETE FROM script_binding WHERE subject_type = 'template' AND subject_id = ?`, id); err != nil {
+			return TemplateRead{}, err
+		}
+	}
 	if _, ok := body["steps"]; ok {
 		if err := s.replaceTemplateSteps(ctx, id, body["steps"]); err != nil {
 			return TemplateRead{}, err
@@ -419,15 +437,22 @@ func (s *Store) applyTemplateTagIDs(ctx context.Context, templateID int64, body 
 // template being edited (0 = new): commands it already has stay allowed for anyone.
 func (s *Store) guardTemplateSteps(ctx context.Context, tid int64, steps []any) error {
 	existing := map[string]bool{}
+	scripts := map[int64]bool{}
 	if tid > 0 {
-		rows, err := s.DB.QueryContext(ctx, `SELECT check_command FROM questtemplatestep WHERE template_id = ? AND check_command IS NOT NULL`, tid)
+		rows, err := s.DB.QueryContext(ctx, `SELECT COALESCE(check_command, ''), script_id FROM questtemplatestep WHERE template_id = ?`, tid)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var c string
-			if err := rows.Scan(&c); err == nil {
-				existing[strings.TrimSpace(c)] = true
+			var sid sql.NullInt64
+			if err := rows.Scan(&c, &sid); err == nil {
+				if strings.TrimSpace(c) != "" {
+					existing[strings.TrimSpace(c)] = true
+				}
+				if sid.Valid {
+					scripts[sid.Int64] = true
+				}
 			}
 		}
 		rows.Close()
@@ -445,6 +470,19 @@ func (s *Store) guardTemplateSteps(ctx context.Context, tid int64, steps []any) 
 		}
 		if err := s.guardCommand(ctx, cmd, old, NormalizeRunOn(asStringPtr(m["run_on"]))); err != nil {
 			return err
+		}
+		// A script is chosen by an owner like a command; one the template already had stays allowed for anyone.
+		if sid := asI64Ptr(m["script_id"]); sid != nil && !scripts[*sid] {
+			if err := (kernel.Commands{Roles: s.Identity}).AuthorScript(ctx); err != nil {
+				return err
+			}
+			var n int
+			if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM script WHERE id = ? AND subjects = 'step'`, *sid).Scan(&n); err != nil {
+				return err
+			}
+			if n == 0 {
+				return apperr.Bad("скрипт не найден или не читает шаги")
+			}
 		}
 	}
 	return nil
@@ -494,12 +532,12 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 		_, err := s.DB.ExecContext(ctx, `
 			INSERT INTO questtemplatestep (
 				template_id, title, description, sort_order, progress_min, progress_max,
-				check_command, check_interval_seconds, wait_previous, run_mode, run_on
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				check_command, check_interval_seconds, wait_previous, run_mode, run_on, script_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tid, title, asStringDef(m["description"], ""), ord, pmin, pmax,
 			nullStr(asStringPtr(m["check_command"])), nullInt(asIntPtr(m["check_interval_seconds"])),
 			boolInt(asBool(m["wait_previous"], false)), journal.NullRunMode(asStringDef(m["run_mode"], journal.RunModePoll)),
-			nullStr(NormalizeRunOn(asStringPtr(m["run_on"]))),
+			nullStr(NormalizeRunOn(asStringPtr(m["run_on"]))), scriptIDArg(asI64Ptr(m["script_id"])),
 		)
 		if err != nil {
 			return err
@@ -511,7 +549,7 @@ func (s *Store) replaceTemplateSteps(ctx context.Context, tid int64, raw any) er
 func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]TemplateStepRead, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, template_id, title, description, sort_order, progress_min, progress_max,
-			check_command, check_interval_seconds, wait_previous, run_mode, run_on
+			check_command, check_interval_seconds, wait_previous, run_mode, run_on, script_id
 		FROM questtemplatestep WHERE template_id=? ORDER BY sort_order, id`, tid)
 	if err != nil {
 		return nil, err
@@ -524,8 +562,13 @@ func (s *Store) loadTemplateStepsRead(ctx context.Context, tid int64) ([]Templat
 		var iv sql.NullInt64
 		var waitPrev int
 		var runMode, runOn sql.NullString
-		if err := rows.Scan(&m.ID, &m.TemplateID, &m.Title, &m.Description, &m.SortOrder, &m.ProgressMin, &m.ProgressMax, &cmd, &iv, &waitPrev, &runMode, &runOn); err != nil {
+		var scriptID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.TemplateID, &m.Title, &m.Description, &m.SortOrder, &m.ProgressMin, &m.ProgressMax, &cmd, &iv, &waitPrev, &runMode, &runOn, &scriptID); err != nil {
 			return nil, err
+		}
+		if scriptID.Valid {
+			v := scriptID.Int64
+			m.ScriptID = &v
 		}
 		m.WaitPrevious = waitPrev != 0
 		m.RunMode = journal.RunModePoll

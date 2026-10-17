@@ -49,6 +49,7 @@ type TemplateStepRow struct {
 	WaitPrevious         bool
 	RunMode              string
 	RunOn                sql.NullString
+	ScriptID             sql.NullInt64
 }
 
 const templateRowColumns = `id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
@@ -106,7 +107,7 @@ func (s *Store) TemplateRowByID(ctx context.Context, id int64) (TemplateRow, err
 func (s *Store) TemplateStepRows(ctx context.Context, templateID int64) ([]TemplateStepRow, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT title, description, sort_order, progress_min, progress_max, check_command, check_interval_seconds,
-			wait_previous, run_mode, run_on
+			wait_previous, run_mode, run_on, script_id
 		FROM questtemplatestep WHERE template_id = ? ORDER BY sort_order, id`, templateID)
 	if err != nil {
 		return nil, err
@@ -117,7 +118,7 @@ func (s *Store) TemplateStepRows(ctx context.Context, templateID int64) ([]Templ
 		var st TemplateStepRow
 		var waitPrev int
 		var runMode sql.NullString
-		if err := rows.Scan(&st.Title, &st.Description, &st.SortOrder, &st.ProgressMin, &st.ProgressMax, &st.CheckCommand, &st.CheckIntervalSeconds, &waitPrev, &runMode, &st.RunOn); err != nil {
+		if err := rows.Scan(&st.Title, &st.Description, &st.SortOrder, &st.ProgressMin, &st.ProgressMax, &st.CheckCommand, &st.CheckIntervalSeconds, &waitPrev, &runMode, &st.RunOn, &st.ScriptID); err != nil {
 			return nil, err
 		}
 		st.WaitPrevious = waitPrev != 0

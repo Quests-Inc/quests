@@ -51,8 +51,8 @@
 
   /** quest=N in a folded step's title/description with no check yet: offer it
    * right on the row — the check field itself sits inside the ⚙ details. */
-  function foldedMirrorId(s: { open: any; check_command: any; title: string; description: string }) {
-    if (s.open || String(s.check_command || '').trim()) return null
+  function foldedMirrorId(s: { open: any; check_command: any; script_id?: any; title: string; description: string }) {
+    if (s.open || String(s.check_command || '').trim() || String(s.script_id || '')) return null
     return mirrorQuestId(s.title, s.description)
   }
 
@@ -62,8 +62,8 @@
     s.open = true
   }
 
-  function hasDetails(s: { check_command: any; description: any }) {
-    return Boolean(String(s.check_command || '').trim() || String(s.description || '').trim())
+  function hasDetails(s: { check_command: any; description: any; script_id?: any }) {
+    return Boolean(String(s.check_command || '').trim() || String(s.description || '').trim() || String(s.script_id || ''))
   }
 </script>
 
@@ -145,6 +145,7 @@
             bind:waitPrevious={s.wait_previous}
             bind:runMode={s.run_mode}
             bind:runOn={s.run_on}
+            bind:scriptId={s.script_id}
           />
         </div>
       {/if}

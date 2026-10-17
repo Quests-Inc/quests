@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
@@ -89,7 +92,7 @@ func (s *Store) AddStep(ctx context.Context, questID int64, st Step, q Quest) (Q
 	if err := s.guardCommand(ctx, st.CheckCommand, nil, st.RunOn); err != nil {
 		return Quest{}, err
 	}
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		INSERT INTO queststep (
 			quest_id, title, description, progress_current, progress_total, sort_order,
 			check_command, check_interval_seconds, check_last_run_at,
@@ -101,6 +104,15 @@ func (s *Store) AddStep(ctx context.Context, questID int64, st Step, q Quest) (Q
 	)
 	if err != nil {
 		return Quest{}, err
+	}
+	if st.ScriptID != nil {
+		stepID, err := res.LastInsertId()
+		if err != nil {
+			return Quest{}, err
+		}
+		if err := s.bindStepScript(ctx, tx, stepID, *st.ScriptID); err != nil {
+			return Quest{}, err
+		}
 	}
 	if err := persistQuestRow(tx, ctx, q); err != nil {
 		return Quest{}, err
@@ -334,4 +346,24 @@ func (s *Store) UpdateStepComment(ctx context.Context, st Step, q Quest, kind, d
 func (s *Store) ClearStepCommand(ctx context.Context, stepID int64) error {
 	_, err := s.DB.ExecContext(ctx, `UPDATE queststep SET check_command = NULL WHERE id = ?`, stepID)
 	return err
+}
+
+// GuardScript refuses choosing a script for a step to someone who is not an owner (the request path asks it; a template that
+// was written by an owner is materialized for anyone).
+func (s *Store) GuardScript(ctx context.Context) error {
+	return kernel.Commands{Roles: &identity.Store{DB: s.DB}}.AuthorScript(ctx)
+}
+
+// bindStepScript attaches the script a new step was created with. The script must read steps: the same rule as attaching one
+// to a step that exists (execution.BindScript), checked here because a quest is created in one transaction.
+func (s *Store) bindStepScript(ctx context.Context, tx *sql.Tx, stepID, scriptID int64) error {
+	res, err := tx.ExecContext(ctx, `INSERT INTO script_binding (subject_type, subject_id, script_id, created_at)
+		SELECT 'step', ?, id, ? FROM script WHERE id = ? AND subjects = 'step'`, stepID, timeutil.ToDBUTC(timeutil.NowUTC()), scriptID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return apperr.Bad("скрипт не найден или не читает шаги")
+	}
+	return nil
 }

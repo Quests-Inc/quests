@@ -106,7 +106,7 @@ export interface Step {
   run_on?: string;
   done: boolean;
   /**
-   * ScriptID is the script this step runs instead of a command (ADR-0003); it is read from the binding, never written here.
+   * ScriptID is the script this step runs instead of a command (ADR-0003); it is read from the binding; a step created with one gets it bound (a step that exists changes it through execution).
    */
   script_id?: number /* int64 */;
 }
@@ -160,6 +160,10 @@ export interface StepCreate {
   wait_previous?: boolean;
   run_mode?: string;
   run_on?: string;
+  /**
+   * ScriptID is the script the new step runs instead of a command; it is bound when the step is created.
+   */
+  script_id?: number /* int64 */;
 }
 export interface StepUpdate {
   title?: string;

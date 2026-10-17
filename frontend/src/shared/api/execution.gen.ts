@@ -12,6 +12,10 @@ export const SubjectStep = "step";
  */
 export const SubjectNote = "note";
 /**
+ * SubjectTemplate: a template's emit script (it replaces emit_pool_command).
+ */
+export const SubjectTemplate = "template";
+/**
  * Binding is the script a subject runs, at its current version.
  */
 export interface Binding {
@@ -232,6 +236,12 @@ export interface ScriptRun {
   created_at: string;
   updated_at: string;
   finished_at?: string;
+  /**
+   * Key names a run that someone waits for by name (a template's emit: template, period, script version); Result is what its
+   * sink handed back.
+   */
+  key?: string;
+  result?: string;
 }
 /**
  * NewScriptRun describes a run to store.
@@ -242,6 +252,7 @@ export interface NewScriptRun {
   SubjectType: string;
   SubjectID: number /* int64 */;
   Snapshot: any /* graph.Snapshot */;
+  Key: string;
 }
 
 //////////

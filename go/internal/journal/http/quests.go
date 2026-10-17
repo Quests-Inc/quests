@@ -187,12 +187,18 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 			if sc.SortOrder != nil {
 				ord = *sc.SortOrder
 			}
+			if sc.ScriptID != nil {
+				if err := h.Store.GuardScript(r.Context()); err != nil {
+					writeErr(w, http.StatusForbidden, err.Error())
+					return
+				}
+			}
 			cmd, iv := journal.NormalizeCheck(sc.CheckCommand, sc.CheckIntervalSeconds)
 			st := journal.Step{
 				Title: sc.Title, Description: sc.Description,
 				ProgressCurrent: sc.ProgressCurrent, ProgressTotal: sc.ProgressTotal,
 				SortOrder: ord, CheckCommand: cmd, CheckIntervalSeconds: iv,
-				RunOn: kernel.NormalizeRunOn(sc.RunOn),
+				RunOn: kernel.NormalizeRunOn(sc.RunOn), ScriptID: sc.ScriptID,
 			}
 			if !kernel.ValidRunOn(st.RunOn) {
 				writeErr(w, http.StatusUnprocessableEntity, "run_on: "+kernel.ErrBadRunOn.Error())

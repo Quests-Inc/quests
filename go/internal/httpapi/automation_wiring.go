@@ -45,12 +45,18 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 				case execution.SubjectNote:
 					_, err := s.Store.Knowledge.GetNote(ctx, id)
 					return err == nil, nil
+				case execution.SubjectTemplate:
+					_, err := s.Store.Automation.TemplateRowByID(ctx, id)
+					return err == nil, nil
 				}
 				return false, nil
 			},
 			ClearCommand: func(ctx context.Context, kind string, id int64) error {
-				if kind == execution.SubjectStep {
+				switch kind {
+				case execution.SubjectStep:
 					return s.Store.Journal.ClearStepCommand(ctx, id)
+				case execution.SubjectTemplate:
+					return s.Store.Automation.ClearEmitCommand(ctx, id)
 				}
 				return s.Store.Knowledge.ClearNoteCommand(ctx, id)
 			},
