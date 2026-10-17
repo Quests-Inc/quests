@@ -203,6 +203,7 @@ func (s *Store) ListAllAttachments(ctx context.Context) ([]Attachment, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT `+attachmentCols+`
 		FROM attachment
+		WHERE owner_type NOT IN ('quest', 'note') OR owner_id IN (SELECT id FROM quest WHERE owner_type = 'quest' UNION ALL SELECT id FROM note WHERE owner_type = 'note') -- the files of a trashed quest or note are hidden
 		ORDER BY owner_type, owner_id, uploaded_at, id`)
 	if err != nil {
 		return nil, err

@@ -254,6 +254,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 	var steps []stepRow
 	if err := scan(`SELECT id, quest_id, title, progress_current, progress_total, wait_previous,
 			COALESCE(run_mode,''), COALESCE(check_command,''), description FROM queststep
+			WHERE quest_id IN (SELECT id FROM quest) -- not the steps of a quest in the trash
 			ORDER BY quest_id, sort_order, id`, func(r interface{ Scan(...any) error }) error {
 		var sr stepRow
 		var title, desc string
