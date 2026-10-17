@@ -55,6 +55,23 @@ kind have their own validity window and timeout.
 | Secrets for a command | `internal/execution/secrets.go` |
 | The executor | `cmd/quests-runner` (`agent.go`, `exec*.go`) |
 
+## Scripts (ADR-0003)
+
+A script is a graph of typed nodes stored per workspace (`script`, one row per script; `script_version`, one row per saved
+graph: a job that waits for its runner runs the version it was queued with). The model, the node catalog and the validator
+are in `internal/execution/graph`; the store is `internal/execution/scripts.go`; the API (`internal/execution/http/scripts.go`):
+
+| Route | |
+|---|---|
+| `GET /api/scripts`, `GET /api/scripts/{id}`, `GET /api/scripts/{id}/versions/{n}` | read (any member) |
+| `POST /api/scripts`, `PUT /api/scripts/{id}` (`version` = the one the editor read, else 409), `DELETE /api/scripts/{id}` | write (owners only) |
+| `POST /api/scripts/validate` | check a graph without saving it |
+| `GET /api/script-nodes`, `POST /api/script-nodes/ports` | the node catalog and the ports a node gets from its parameters (for the editor) |
+
+A graph is validated on save (types of ports, required inputs, cycles, one `Code` node per path); a bad one is a 422 listing
+the problems per node. Nothing runs a script yet: the evaluator and the attaching of scripts to steps, notes and templates
+are the next stages of quest=440.
+
 ## Known exceptions (to be removed or kept deliberately)
 
 - **Event hooks** (`internal/platform/hooks`, `data/hooks.json`) still execute `script` hooks on the server's own host

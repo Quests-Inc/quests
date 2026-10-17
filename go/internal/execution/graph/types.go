@@ -26,14 +26,14 @@ const (
 
 // Port is one input or output of a node.
 type Port struct {
-	Name string
-	Type PortType
+	Name string   `json:"name"`
+	Type PortType `json:"type"`
 	// Optional: the input may stay unwired, and a node fires without a value on it.
-	Optional bool
+	Optional bool `json:"optional,omitempty"`
 	// Group: of the inputs sharing a non-empty group at least one must be wired (and hold a value to fire).
-	Group string
+	Group string `json:"group,omitempty"`
 	// Multi: the input takes any number of links (Code's values, the inputs of Any of / All of).
-	Multi bool
+	Multi bool `json:"multi,omitempty"`
 }
 
 // scalar reports the types a Compare, a Parse field or a value over a link may have.

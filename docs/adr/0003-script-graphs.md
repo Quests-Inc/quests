@@ -198,5 +198,8 @@ by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → 
 
 ## Progress
 
-- Step 2 (model, registry, validator): done in `go/internal/execution/graph` (pure Go: `Graph`, `Builtin()` registry of the 17 node
+- Step 2 (model, registry, validator): done in `go/internal/execution/graph` (pure Go: `Graph`, `Builtin()` registry of the 16 node
   types, `Validate` / `Check`, `Decode`, `EnvName`). The four checks that exist today are tests: each is a valid graph.
+- Step 3 (storage, API, `workspace` secret owner): done. `script` / `script_version` (migration 0017) with versions and an
+  optimistic check, `/api/scripts*` and `/api/script-nodes*`, scripts in the workspace export/import; the `workspace` owner of
+  secrets (migration 0016) with `GET|PUT|DELETE /api/workspace/secrets`, inherited down to everything including notes.

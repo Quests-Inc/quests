@@ -157,6 +157,48 @@ export interface JobResult {
 }
 
 //////////
+// source: scripts.go
+
+/**
+ * Limits of a script's text fields.
+ */
+export const MaxScriptTitle = 200;
+/**
+ * Limits of a script's text fields.
+ */
+export const MaxScriptDescription = 4000;
+/**
+ * GraphError carries every problem found in a graph, so an editor can mark the nodes.
+ */
+export interface GraphError {
+  Problems: any /* graph.Problem */[];
+}
+/**
+ * Script is a stored script as the API shows it. Graph is set when one script is read, not in a list.
+ */
+export interface Script {
+  id: number /* int64 */;
+  title: string;
+  description: string;
+  version: number /* int */;
+  subjects: string[];
+  needs_runner: boolean;
+  created_at: string;
+  updated_at: string;
+  graph?: any /* json.RawMessage */;
+}
+/**
+ * ScriptUpdate is a change to a script. Graph nil leaves the graph as it is; ExpectedVersion is the version the editor
+ * read, so two editors cannot overwrite each other.
+ */
+export interface ScriptUpdate {
+  Title?: string;
+  Description?: string;
+  Graph: string /* []byte */;
+  ExpectedVersion: number /* int */;
+}
+
+//////////
 // source: secrets.go
 
 /**

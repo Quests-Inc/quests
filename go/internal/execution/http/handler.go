@@ -1,5 +1,5 @@
-// Package executionhttp is the HTTP face of the execution context (ADR-0002): runners, their protocol and jobs, and the
-// secrets a command runs with. What lives in other contexts comes in as plain functions that the root (httpapi) supplies.
+// Package executionhttp is the HTTP face of the execution context (ADR-0002): runners, their protocol and jobs, the
+// secrets a command runs with, and the scripts (ADR-0003). What lives in other contexts comes in as plain functions that the root (httpapi) supplies.
 package executionhttp
 
 import (
@@ -25,6 +25,7 @@ type Handler struct {
 func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerSecretRoutes(mux)
 	h.registerRunner(mux)
+	h.registerScripts(mux)
 }
 
 var writeJSON = httpx.WriteJSON

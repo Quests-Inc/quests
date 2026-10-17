@@ -261,3 +261,38 @@ func TestWorkspaceSecretSurvivesExportAndImport(t *testing.T) {
 		t.Fatalf("the imported workspace's secrets: %v %v", got, err)
 	}
 }
+
+// Scripts and their versions travel with the workspace.
+func TestScriptsSurviveExportAndImport(t *testing.T) {
+	f := newFixture(t)
+	g := []byte(`{"nodes":[{"id":1,"type":"source.note"},{"id":2,"type":"sink.note_error"},{"id":3,"type":"code","params":{"text":"echo 1"}}],
+		"edges":[{"from":{"node":1,"port":"ref"},"to":{"node":2,"port":"ref"}},{"from":{"node":3,"port":"failed"},"to":{"node":2,"port":"message"}}]}`)
+	sc, err := f.st.Execution.CreateScript(f.ctx(), "Из архива", "", g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g2 := bytes.Replace(g, []byte("echo 1"), []byte("echo 2"), 1)
+	if _, err := f.st.Execution.UpdateScript(f.ctx(), sc.ID, execution.ScriptUpdate{Graph: g2, ExpectedVersion: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	w := f.export(t)
+	rec := httptest.NewRecorder()
+	f.h.Import(rec, upload(t, "ws.zip", w.Body.Bytes(), f.user))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("import = %d %s", rec.Code, rec.Body.String())
+	}
+	var wsID int64
+	if err := f.st.DB.QueryRowContext(context.Background(), `SELECT id FROM workspace WHERE name = 'Импортированное'`).Scan(&wsID); err != nil {
+		t.Fatal(err)
+	}
+	ctx := wsctx.WithUser(wsctx.With(context.Background(), wsID), f.user.ID)
+	list, err := f.st.Execution.ListScripts(ctx)
+	if err != nil || len(list) != 1 || list[0].Title != "Из архива" || list[0].Version != 2 {
+		t.Fatalf("imported scripts: %+v %v", list, err)
+	}
+	v1, err := f.st.Execution.ScriptGraph(ctx, list[0].ID, 1)
+	if err != nil || !strings.Contains(string(v1), "echo 1") {
+		t.Fatalf("version 1 of the imported script: %s %v", v1, err)
+	}
+}

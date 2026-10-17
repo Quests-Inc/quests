@@ -3,6 +3,7 @@ package graph
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 // Kind groups node types by what they do; the validator wants a source and a sink in every graph.
@@ -112,4 +113,38 @@ func oneOf(key string, allowed ...string) func(json.RawMessage) error {
 		}
 		return fmt.Errorf("параметр %q: одно из %v", key, allowed)
 	}
+}
+
+// NodeInfo is what an editor needs to draw a node type.
+type NodeInfo struct {
+	Name    string `json:"name"`
+	Title   string `json:"title"`
+	Kind    Kind   `json:"kind"`
+	Trusted bool   `json:"trusted"`
+}
+
+// Infos lists the node types, in a stable order.
+func (r Registry) Infos() []NodeInfo {
+	out := make([]NodeInfo, 0, len(r))
+	for _, t := range r {
+		out = append(out, NodeInfo{Name: t.Name, Title: t.Title, Kind: t.Kind, Trusted: t.Trusted})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Kind != out[j].Kind {
+			return kindOrder[out[i].Kind] < kindOrder[out[j].Kind]
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
+}
+
+var kindOrder = map[Kind]int{KindSource: 0, KindCode: 1, KindParse: 2, KindControl: 3, KindSink: 4}
+
+// Ports returns the inputs and outputs a node of the type would have with the parameters, or why the parameters are wrong.
+func (r Registry) Ports(typ string, params json.RawMessage) (in, out []Port, err error) {
+	t, ok := r[typ]
+	if !ok {
+		return nil, nil, fmt.Errorf("неизвестный тип %q", typ)
+	}
+	return t.Ports(params)
 }

@@ -35,7 +35,10 @@ var (
 	ErrBadRunOn       = kernel.ErrBadRunOn
 	NormalizeRunOn    = kernel.NormalizeRunOn
 
+	errBad        = apperr.Bad
 	boolInt       = dbx.BoolInt
 	parseNullTime = dbx.ParseNullTime
 	trimTo        = dbx.TrimTo
 )
+
+type rowScanner = dbx.Scanner
