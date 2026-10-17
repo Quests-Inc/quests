@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RASTER, type GraphNoteEditing } from '@/entities/graph'
+  import { GraphMinimap, GraphTools, RASTER, type GraphNoteEditing } from '@/entities/graph'
   import type { Snippet } from 'svelte'
   import { createClusterFolds } from '../model/folds.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
@@ -9,8 +9,6 @@
   import GraphEdges from './GraphEdges.svelte'
   import GraphFoot from './GraphFoot.svelte'
   import GraphGroups from './GraphGroups.svelte'
-  import GraphMinimap from './GraphMinimap.svelte'
-  import GraphTools from './GraphTools.svelte'
 
   type Stage = ReturnType<typeof createGraphStage>
   type Gest = ReturnType<typeof createGraphGestures>

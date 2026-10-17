@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TYPES } from '@/entities/graph'
+  import { TYPES } from '../model/constants.ts'
 
   /** Миникарта: все узлы мелкими прямоугольниками и рамка видимой области; клик и перетаскивание двигают вид. */
   let {

@@ -30,6 +30,7 @@
   import pin from '@/assets/icons/pin.svg?raw'
   import pinFilled from '@/assets/icons/pin-filled.svg?raw'
   import pinOff from '@/assets/icons/pin-off.svg?raw'
+  import redo from '@/assets/icons/redo.svg?raw'
   import renew from '@/assets/icons/renew.svg?raw'
   import repeat from '@/assets/icons/repeat.svg?raw'
   import save from '@/assets/icons/save.svg?raw'
@@ -86,6 +87,7 @@
     pin,
     'pin-filled': pinFilled,
     'pin-off': pinOff,
+    redo,
     renew,
     repeat,
     save,

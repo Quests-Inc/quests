@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
+  import Icon from '@/shared/ui/Icon.svelte'
   import { loadScripts, scriptsList } from '@/entities/script'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { createScript, deleteScript, getScript, getScriptSamples, getScriptUses } from '@/shared/api/client.ts'
@@ -18,7 +19,7 @@
    * outputs to inputs, the parameters of a node on the right, what the validator finds below. The field is the map's own
    * (its gestures, its minimap); only the cards and the wires are the editor's.
    */
-  let { active = true }: { active?: boolean } = $props()
+  let { active = true, sidebarCollapsed = false }: { active?: boolean; sidebarCollapsed?: boolean } = $props()
 
   const ed = createScriptEditor()
   const cv = createCanvas(ed)
@@ -93,6 +94,12 @@
     }
   }
 
+  /** «нода 3 «Разбор»»: how a problem names its node. */
+  function nodeLabel(id: number): string {
+    const n = ed.graph.nodes.find((x) => x.id === id)
+    return n ? `Нода ${id} «${ed.meta(n.type).title}»:` : `Нода ${id}:`
+  }
+
   function onKey(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && selectedId != null) {
       e.preventDefault()
@@ -103,24 +110,26 @@
 
 <svelte:window onkeydown={active ? onKey : undefined} />
 
-<div class="scripts">
+<div class="scripts" class:scripts--collapsed={sidebarCollapsed}>
   <aside class="scripts__list" aria-label="Скрипты">
-    <div class="scripts__new">
-      <button type="button" class="btn btn--primary" aria-expanded={menu} onclick={() => (menu = !menu)}>+ Новый скрипт</button>
-      {#if menu}
-        <ul class="scripts__samples">
-          {#each samples as s (s.id)}
-            <li>
-              <button type="button" onclick={() => void createFrom(s)}>
-                <b>{s.title}</b>
-                <small>{s.description}</small>
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+    <div class="scripts__tools">
+      <button type="button" class="btn scripts__new" aria-expanded={menu} onclick={() => (menu = !menu)}>
+        <Icon name="add" /> Новый скрипт
+      </button>
     </div>
-    <ul>
+    {#if menu}
+      <ul class="scripts__samples">
+        {#each samples as s (s.id)}
+          <li>
+            <button type="button" onclick={() => void createFrom(s)}>
+              <b>{s.title}</b>
+              <small>{s.description}</small>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <ul class="scripts__items">
       {#each scriptsList.items as s (s.id)}
         <li>
           <button type="button" class="scripts__item" class:scripts__item--on={s.id === selectedId} onclick={() => pick(s.id)}>
@@ -134,11 +143,11 @@
     </ul>
   </aside>
 
-  <section class="scripts__main">
+  <section class="scripts__main formscope">
     {#if selectedId == null}
       <div class="scripts__empty">
         <h2>Скрипты</h2>
-        <p>
+        <p class="explain">
           Скрипт — это схема из нод: источник читает шаг или заметку, нода кода выполняется на раннере, разбор проверяет ответ,
           приёмник записывает результат. Выберите скрипт слева или начните с образца.
         </p>
@@ -153,21 +162,34 @@
       </div>
     {:else}
       <div class="scripts__bar">
-        <input class="scripts__title" bind:value={ed.title} aria-label="Название скрипта" />
+        <input type="text" class="scripts__title" bind:value={ed.title} aria-label="Название скрипта" />
         <span class="scripts__ver">v{ed.version}{ed.dirty ? ' · не сохранён' : ''}</span>
-        <button type="button" class="btn btn--primary" disabled={!ed.dirty || ed.saving || busy} onclick={() => void save()}>
-          {ed.saving ? 'Сохранение…' : 'Сохранить'}
-        </button>
-        <button type="button" class="btn btn--danger-solid" onclick={() => (ask = { kind: 'delete' })}>Удалить</button>
+        <div class="detail__actions">
+          <button
+            type="button"
+            class="btn btn--icon"
+            disabled={!ed.dirty || ed.saving || busy}
+            title={ed.saving ? 'Сохранение…' : 'Сохранить (Ctrl+S)'}
+            aria-label="Сохранить"
+            onclick={() => void save()}
+          >
+            {#if ed.saving}…{:else}<Icon name="save" />{/if}
+          </button>
+          <button type="button" class="btn btn--icon btn--danger" title="Удалить" aria-label="Удалить" onclick={() => (ask = { kind: 'delete' })}>
+            <Icon name="delete" />
+          </button>
+        </div>
       </div>
-      <input class="scripts__desc" bind:value={ed.description} placeholder="Описание (необязательно)" aria-label="Описание" />
+      <input type="text" class="scripts__desc" bind:value={ed.description} placeholder="Описание (необязательно)" aria-label="Описание" />
       {#if ed.error}<p class="scripts__err">{ed.error}</p>{/if}
       <div class="scripts__work">
         <Palette {ed} {cv} />
-        <ScriptCanvas {ed} {cv} />
+        <div class="scripts__center">
+          <ProblemList problems={ed.problems} label={nodeLabel} onPick={(n) => ed.select(n)} />
+          <ScriptCanvas {ed} {cv} />
+        </div>
         <Inspector {ed} />
       </div>
-      <ProblemList problems={ed.problems} checking={ed.checking} onPick={(n) => ed.select(n)} />
       {#if uses.length}
         <p class="scripts__uses">
           Используется: {uses.map((u) => `${u.subject_type === 'step' ? 'шаг' : 'заметка'} «${u.title}»`).join(', ')}
@@ -198,31 +220,51 @@
 />
 
 <style>
+  /* The same frame as the journal and the notes: a raised list on the left (it folds from the header), the work on the right. */
   .scripts {
     flex: 1 1 auto;
     min-height: 0;
-    display: flex;
-    gap: 1rem;
-    padding: 1rem 1.25rem 1.25rem;
+    display: grid;
+    grid-template-columns: minmax(14rem, var(--sidebar-width, 16.5rem)) 1fr;
     overflow: hidden;
   }
+  .scripts--collapsed {
+    grid-template-columns: 0 1fr;
+  }
+  .scripts--collapsed .scripts__list {
+    border-right: 0;
+  }
   .scripts__list {
-    flex: 0 0 13rem;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-    overflow: auto;
-    display: grid;
-    align-content: start;
-    gap: 0.6rem;
+    overflow: hidden;
+    border-right: 1px solid var(--color-border, #333);
+    background: var(--color-bg-raised, #1a1a1a);
+  }
+  .scripts__tools {
+    flex: none;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--color-border, #333);
+  }
+  .scripts__new {
+    width: 100%;
   }
   .scripts__list ul {
     margin: 0;
     padding: 0;
     list-style: none;
-    display: grid;
-    gap: 0.3rem;
+  }
+  .scripts__items {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
   .scripts__samples {
-    margin-top: 0.4rem !important;
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.5rem 0.6rem !important;
+    border-bottom: 1px solid var(--color-border, #333);
   }
   .scripts__samples button,
   .scripts__card {
@@ -230,9 +272,10 @@
     display: grid;
     gap: 0.15rem;
     padding: 0.5rem 0.7rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 10px;
-    background: var(--pill-bg, #151515);
+    border: 0;
+    border-radius: var(--pill-radius, 12px);
+    background: var(--pill-bg, #0f0f0f);
+    box-shadow: var(--pill-shadow, none);
     color: inherit;
     font: inherit;
     text-align: left;
@@ -240,7 +283,7 @@
   }
   .scripts__samples button:hover,
   .scripts__card:hover {
-    border-color: var(--color-accent, #c9a227);
+    background: var(--color-bg-hover, #2a2a2a);
   }
   small {
     color: var(--color-fg-muted, #9a9a9a);
@@ -250,39 +293,45 @@
     width: 100%;
     display: grid;
     gap: 0.1rem;
-    padding: 0.45rem 0.7rem;
-    border: 1px solid transparent;
-    border-radius: 10px;
+    padding: 0.4rem 0.6rem 0.4rem 0.55rem;
+    border: 0;
+    border-left: 2px solid transparent;
     background: transparent;
     color: inherit;
-    font: inherit;
+    font-family: var(--font-body, Georgia, serif);
+    font-size: var(--text-sm, 0.875rem);
     text-align: left;
     cursor: pointer;
   }
   .scripts__item:hover {
-    background: var(--pill-bg, #151515);
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
   }
-  .scripts__item--on {
-    border-color: var(--color-accent, #c9a227);
-    background: var(--pill-bg, #151515);
+  .scripts__item--on,
+  .scripts__item--on:hover {
+    border-left-color: var(--color-accent, #c9a227);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-raised, #1a1a1a));
   }
   .scripts__none {
+    padding: 1rem;
     color: var(--color-fg-muted, #9a9a9a);
     font-size: var(--text-sm, 0.875rem);
   }
   .scripts__main {
-    flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
+    padding: 1rem 1.25rem 1.25rem;
+    overflow: hidden;
   }
   .scripts__empty {
     max-width: 52rem;
+    display: grid;
+    gap: 0.8rem;
   }
-  .scripts__empty p {
-    color: var(--color-fg-muted, #9a9a9a);
+  .scripts__empty h2 {
+    margin: 0;
   }
   .scripts__cards {
     display: grid;
@@ -293,7 +342,6 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    flex-wrap: wrap;
   }
   .scripts__title {
     flex: 1 1 14rem;
@@ -301,11 +349,9 @@
     font-weight: 600;
   }
   .scripts__ver {
+    flex: none;
     color: var(--color-fg-muted, #9a9a9a);
     font-size: var(--text-xs, 0.78rem);
-  }
-  .scripts__desc {
-    width: 100%;
   }
   .scripts__err {
     margin: 0;
@@ -318,21 +364,32 @@
     display: flex;
     gap: 0.7rem;
   }
+  .scripts__center {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
   .scripts__uses {
     margin: 0;
     font-size: var(--text-xs, 0.78rem);
     color: var(--color-fg-muted, #9a9a9a);
   }
   @media (max-width: 960px) {
-    .scripts {
-      flex-direction: column;
+    .scripts__main {
       overflow: auto;
-    }
-    .scripts__list {
-      flex-basis: auto;
     }
     .scripts__work {
       flex-direction: column;
+    }
+  }
+  @media (max-width: 720px) {
+    .scripts {
+      grid-template-columns: minmax(7rem, 30%) 1fr;
+    }
+    .scripts--collapsed {
+      grid-template-columns: 0 1fr;
     }
   }
 </style>

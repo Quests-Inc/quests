@@ -35,8 +35,8 @@
     onOpenAssistant: () => void,
   } = $props()
 
-  /** Only 'journal' and 'notes' have a collapsible sidebar. */
-  let showSidebarToggle = $derived(view === 'journal' || view === 'notes')
+  /** Only 'journal', 'notes' and 'scripts' have a collapsible sidebar. */
+  let showSidebarToggle = $derived(view === 'journal' || view === 'notes' || view === 'scripts')
 
   /** Map WS states onto the same chip palette as API/HUD/Bot. */
   let liveChip = $derived.by(() => {

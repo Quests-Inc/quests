@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GraphMinimap } from '@/widgets/graph-canvas'
+  import { GraphMinimap, GraphTools } from '@/entities/graph'
   import { anchorOf, portColor, type ScriptNodeView, wirePath } from '@/entities/script'
   import type { End } from '@/shared/api/scriptgraph.gen.ts'
   import type { Canvas } from '../model/canvas.svelte.ts'
@@ -58,6 +58,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="scv"
+  class:scv--full={cv.full}
   role="application"
   aria-label="Поле скрипта"
   tabindex="-1"
@@ -123,19 +124,17 @@
     <GraphMinimap mini={cv.mini} onGo={cv.miniGo} />
   {/if}
 
-  <div
-    class="scv__tools"
-    role="toolbar"
-    tabindex="-1"
-    aria-label="Поле"
-    onpointerdown={(e) => e.stopPropagation()}
-    onwheel={(e) => e.stopPropagation()}
-  >
-    <button type="button" class="scv__tool" class:scv__tool--on={cv.selectMode} aria-pressed={cv.selectMode} title="Режим выделения: рамкой по полю, выделенные двигаются вместе" onclick={cv.toggleSelect}>▢</button>
-    <button type="button" class="scv__tool" title="Вписать всё в поле" onclick={cv.fit}>⤢</button>
-    <button type="button" class="scv__tool" title="Отменить (Ctrl+Z)" disabled={!ed.canUndo} onclick={ed.undo}>↶</button>
-    <button type="button" class="scv__tool" title="Повторить (Ctrl+Shift+Z)" disabled={!ed.canRedo} onclick={ed.redo}>↷</button>
-  </div>
+  <GraphTools
+    selectMode={cv.selectMode}
+    full={cv.full}
+    onToggleSelect={cv.toggleSelect}
+    onFit={cv.fit}
+    onToggleFull={cv.toggleFull}
+    onUndo={ed.undo}
+    onRedo={ed.redo}
+    canUndo={ed.canUndo}
+    canRedo={ed.canRedo}
+  />
 </div>
 
 <style>
@@ -212,31 +211,12 @@
     pointer-events: none;
   }
 
-  .scv__tools {
-    position: absolute;
-    z-index: 5;
-    top: 0.5rem;
-    right: 0.5rem;
-    display: flex;
-    gap: 0.25rem;
-  }
-
-  .scv__tool {
-    width: 1.9rem;
-    height: 1.9rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: 8px;
-    background: var(--color-bg-raised, #1a1a1a);
-    color: var(--color-fg, #ddd);
-    cursor: pointer;
-  }
-
-  .scv__tool:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  .scv__tool--on {
-    border-color: var(--color-accent, #c9a227);
+  .scv--full {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
   }
 </style>

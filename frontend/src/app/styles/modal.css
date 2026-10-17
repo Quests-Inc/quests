@@ -111,7 +111,7 @@
 
 /* --- fields --------------------------------------------------------------- */
 
-.modal .field {
+:is(.modal, .formscope) .field {
   display: grid;
   align-content: start;
   gap: var(--space-1, 0.25rem);
@@ -119,13 +119,13 @@
 }
 
 /* Two short fields side by side when there's room (questline + section). */
-.modal .field-row {
+:is(.modal, .formscope) .field-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: var(--space-3, 0.75rem);
 }
 
-.modal .label {
+:is(.modal, .formscope) .label {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -136,7 +136,7 @@
   color: var(--color-fg-muted, #9a9a9a);
 }
 
-.modal
+:is(.modal, .formscope)
   :is(
     input[type='text'],
     input[type='number'],
@@ -159,17 +159,17 @@
   font-size: var(--text-sm, 0.875rem);
 }
 
-.modal input[type='date'] {
+:is(.modal, .formscope) input[type='date'] {
   color-scheme: dark;
 }
 
-.modal :is(input, textarea, select):focus-visible {
+:is(.modal, .formscope) :is(input, textarea, select):focus-visible {
   outline: 1px solid var(--color-accent, #c9a227);
   outline-offset: 1px;
 }
 
 /* TagField: one border on .tag-field__chips only — inner input is borderless. */
-.modal .tag-field__chips :is(input, textarea, select) {
+:is(.modal, .formscope) .tag-field__chips :is(input, textarea, select) {
   width: auto;
   padding: 0;
   border: 0;
@@ -177,38 +177,54 @@
   background: transparent;
 }
 
-.modal .tag-field__input:focus-visible {
+:is(.modal, .formscope) .tag-field__input:focus-visible {
   outline: none;
 }
 
 /* TagsModal row editors: don't let the shared width:100% rule stretch color.
  * Also kill the UA min-width on text inputs so flex can shrink the label. */
-.modal .tag-row :is(input[type='text'], input[type='search']) {
+:is(.modal, .formscope) .tag-row :is(input[type='text'], input[type='search']) {
   width: auto;
   min-width: 0;
 }
 
-.modal :is(input, textarea, select):disabled {
+:is(.modal, .formscope) :is(input, textarea, select):disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.modal .mono {
+:is(.modal, .formscope) .mono {
   font-family: var(--font-mono, monospace);
 }
 
-.modal .hint {
+:is(.modal, .formscope) .hint {
   margin: 0;
   font-size: var(--text-xs, 0.75rem);
   line-height: 1.4;
   color: var(--color-fg-subtle, #6e6e6e);
 }
 
-.modal .hint code {
+:is(.modal, .formscope) .hint code {
   font-family: var(--font-mono, monospace);
 }
 
-.modal .check {
+/* A paragraph that explains a form: the look of a description. */
+:is(.modal, .formscope) .explain {
+  margin: 0;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--pill-radius, 12px);
+  background: var(--pill-bg, #0f0f0f);
+  box-shadow: var(--pill-shadow, none);
+  font-size: var(--text-xs, 0.75rem);
+  line-height: 1.45;
+  color: var(--color-fg-muted, #9a9a9a);
+}
+
+:is(.modal, .formscope) .explain code {
+  font-family: var(--font-mono, monospace);
+}
+
+:is(.modal, .formscope) .check {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
@@ -217,14 +233,14 @@
   cursor: pointer;
 }
 
-.modal .check input {
+:is(.modal, .formscope) .check input {
   margin: 0;
   accent-color: var(--color-accent, #c9a227);
 }
 
 /* A line of words and inline controls, read as a sentence:
    "с шансом [15] % между [18:00] и [21:00]". */
-.modal .inline-line {
+:is(.modal, .formscope) .inline-line {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -233,13 +249,13 @@
   color: var(--color-fg-muted, #9a9a9a);
 }
 
-.modal .inline-line input[type='number'] {
+:is(.modal, .formscope) .inline-line input[type='number'] {
   width: 4.25rem;
 }
 
 /* --- buttons (sizes on top of the page-wide .btn) ------------------------ */
 
-.modal .btn {
+:is(.modal, .formscope) .btn {
   height: 2rem;
   padding: 0 0.75rem;
   gap: 0.4rem;
@@ -247,50 +263,50 @@
   font-size: var(--text-sm, 0.875rem);
 }
 
-.modal .btn:disabled {
+:is(.modal, .formscope) .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.modal .btn--ghost {
+:is(.modal, .formscope) .btn--ghost {
   border-color: transparent;
   background: transparent;
   color: var(--color-fg-muted, #9a9a9a);
 }
 
-.modal .btn--ghost:hover:not(:disabled) {
+:is(.modal, .formscope) .btn--ghost:hover:not(:disabled) {
   color: var(--color-fg, #e8e8e8);
   background: var(--color-bg-hover, #2a2a2a);
 }
 
-.modal .btn--icon {
+:is(.modal, .formscope) .btn--icon {
   width: 2rem;
   padding: 0;
   justify-content: center;
 }
 
-.modal .btn--danger {
+:is(.modal, .formscope) .btn--danger {
   border-color: transparent;
   background: transparent;
   color: color-mix(in srgb, var(--color-danger, #b54a3a) 78%, var(--color-fg, #e8e8e8));
 }
 
-.modal .btn--danger:hover:not(:disabled) {
+:is(.modal, .formscope) .btn--danger:hover:not(:disabled) {
   color: var(--color-danger, #b54a3a);
   background: color-mix(in srgb, var(--color-danger, #b54a3a) 10%, transparent);
 }
 
-.modal .btn--danger-solid {
+:is(.modal, .formscope) .btn--danger-solid {
   border-color: color-mix(in srgb, var(--color-danger, #b54a3a) 55%, var(--color-border, #333));
   background: color-mix(in srgb, var(--color-danger, #b54a3a) 18%, var(--color-bg-muted, #242424));
   color: var(--color-danger, #b54a3a);
 }
 
-.modal .btn--danger-solid:hover:not(:disabled) {
+:is(.modal, .formscope) .btn--danger-solid:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-danger, #b54a3a) 28%, var(--color-bg-muted, #242424));
 }
 
-.modal .btn--link {
+:is(.modal, .formscope) .btn--link {
   height: auto;
   padding: 0;
   border: 0;

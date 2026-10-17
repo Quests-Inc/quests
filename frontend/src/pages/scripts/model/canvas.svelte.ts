@@ -15,6 +15,7 @@ export function createCanvas(ed: ScriptEditor) {
   let el = $state<HTMLElement | null>(null)
   let views = $state<ScriptNodeView[]>([])
   let selectMode = $state(false)
+  let full = $state(false)
   let pending = $state<Pending | null>(null)
   let size = $state({ w: 0, h: 0 })
   let fitted: number | null = null
@@ -161,6 +162,7 @@ export function createCanvas(ed: ScriptEditor) {
     } else if (e.key === 'Escape') {
       pending = null
       selectMode = false
+      full = false
     } else if (mod && e.key.toLowerCase() === 'z') {
       e.preventDefault()
       if (e.shiftKey) ed.redo()
@@ -213,8 +215,14 @@ export function createCanvas(ed: ScriptEditor) {
     get mini() {
       return mini
     },
+    get full() {
+      return full
+    },
     toggleSelect: () => {
       selectMode = !selectMode
+    },
+    toggleFull: () => {
+      full = !full
     },
     view,
     sync,

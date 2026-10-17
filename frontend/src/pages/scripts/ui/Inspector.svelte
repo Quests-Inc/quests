@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from '@/shared/ui/Icon.svelte'
   import { EnvName } from '../model/env.ts'
   import type { ScriptEditor } from '../model/editor.svelte.ts'
   import ChoiceParams from './params/ChoiceParams.svelte'
@@ -33,11 +34,16 @@
   }
 </script>
 
-<aside class="insp" aria-label="Свойства">
+<aside class="insp formscope" aria-label="Свойства">
   {#if node}
     {@const meta = ed.meta(node.type)}
-    <h2>{meta.title} <small>№{node.id}</small></h2>
-    <p class="insp__type">{node.type}{meta.trusted ? '' : ' · исполняется только на раннере'}</p>
+    <div class="insp__head">
+      <h2>{meta.title} <small>№{node.id}</small></h2>
+      <div class="detail__actions">
+        <button type="button" class="btn btn--icon btn--danger" title="Удалить ноду" aria-label="Удалить ноду" onclick={() => void ed.remove()}><Icon name="delete" /></button>
+      </div>
+    </div>
+    <p class="explain">{node.type}{meta.trusted ? '' : ' · исполняется только на раннере'}</p>
     {#if ed.portsOf(node.id)?.error}<p class="insp__err">{ed.portsOf(node.id)?.error}</p>{/if}
     {#key node.id}
       {#if node.type === 'code'}
@@ -53,19 +59,24 @@
       {:else if node.type === 'sink.template_error'}
         <ChoiceParams params={node.params as never} field="kind" options={KINDS} label="Вид ошибки" onChange={set} />
       {:else}
-        <p class="insp__none">Параметров нет.</p>
+        <p class="explain">Параметров нет.</p>
       {/if}
     {/key}
     {#each ed.problemNodes.get(node.id) ?? [] as m, i (i)}<p class="insp__err">{m}</p>{/each}
-    <button type="button" class="btn btn--danger-solid" onclick={() => void ed.remove()}>Удалить ноду</button>
   {:else if edge && ed.selectedEdge != null}
-    <h2>Связь</h2>
-    <p class="insp__type">№{edge.from.node}.{edge.from.port} → №{edge.to.node}.{edge.to.port}</p>
+    <div class="insp__head">
+      <h2>Связь</h2>
+      <div class="detail__actions">
+        <button type="button" class="btn btn--icon btn--danger" title="Удалить связь" aria-label="Удалить связь" onclick={() => void ed.remove()}><Icon name="delete" /></button>
+      </div>
+    </div>
+    <p class="explain">№{edge.from.node}.{edge.from.port} → №{edge.to.node}.{edge.to.port}</p>
     {#if intoCode}
       {@const index = ed.selectedEdge}
       <label class="field">
         <span class="label">Псевдоним переменной</span>
         <input
+          type="text"
           value={edge.alias ?? ''}
           placeholder="например NAME"
           aria-label="Псевдоним"
@@ -76,12 +87,11 @@
         <input type="checkbox" checked={edge.optional ?? false} onchange={(e) => void ed.edge(index, { optional: e.currentTarget.checked })} />
         необязательное значение (код запустится и без него)
       </label>
-      <p class="insp__type">В окружении: <code>{EnvName(edge)}</code></p>
+      <p class="explain">В окружении: <code>{EnvName(edge)}</code></p>
     {/if}
-    <button type="button" class="btn btn--danger-solid" onclick={() => void ed.remove()}>Удалить связь</button>
   {:else}
-    <h2>Скрипт</h2>
-    <p class="insp__none">
+    <div class="insp__head"><h2>Скрипт</h2></div>
+    <p class="explain">
       Выберите ноду или связь. Тяните от выхода (справа) ко входу (слева), чтобы связать. Колесо — масштаб, фон тянется,
       <kbd>V</kbd> — выделение рамкой, <kbd>Del</kbd> — удалить, <kbd>Ctrl+Z</kbd> — отменить.
     </p>
@@ -91,12 +101,18 @@
 
 <style>
   .insp {
-    flex: 0 0 17rem;
+    flex: 0 0 18rem;
     overflow: auto;
     display: grid;
     align-content: start;
+    gap: 0.6rem;
+    padding: 0 0.3rem 0.3rem;
+  }
+  .insp__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    padding-left: 0.3rem;
   }
   h2 {
     margin: 0;
@@ -105,12 +121,6 @@
   small {
     color: var(--color-fg-muted, #9a9a9a);
     font-weight: 400;
-  }
-  .insp__type,
-  .insp__none {
-    margin: 0;
-    font-size: var(--text-xs, 0.78rem);
-    color: var(--color-fg-muted, #9a9a9a);
   }
   .insp__err {
     margin: 0;

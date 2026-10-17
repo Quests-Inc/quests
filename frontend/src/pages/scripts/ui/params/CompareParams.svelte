@@ -43,17 +43,9 @@
   {#if type === 'bool'}
     <input type="checkbox" checked={Boolean(operand)} onchange={(e) => { operand = e.currentTarget.checked; commit() }} aria-label="Операнд" />
   {:else if type === 'str'}
-    <input bind:value={operand} onchange={commit} aria-label="Операнд" placeholder={op === 'matches' ? 'RE2: ^Ш.г$' : 'текст'} />
+    <input type="text" bind:value={operand} onchange={commit} aria-label="Операнд" placeholder={op === 'matches' ? 'RE2: ^Ш.г$' : 'текст'} />
   {:else}
     <input type="number" step={type === 'int' ? 1 : 'any'} bind:value={operand} onchange={commit} aria-label="Операнд" />
   {/if}
 </label>
-<p class="note">Значение уходит на выход «yes», если условие верно, иначе на «no»; другой выход получает сигнал выхода, и его ветка не выполняется.</p>
-
-<style>
-  .note {
-    margin: 0.4rem 0 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-</style>
+<p class="explain">Значение уходит на выход «yes», если условие верно, иначе на «no»; другой выход получает сигнал выхода, и его ветка не выполняется.</p>

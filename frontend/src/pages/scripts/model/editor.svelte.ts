@@ -143,6 +143,7 @@ export function createScriptEditor() {
     error = ''
     await Promise.all([ensureInfos(), ensurePorts(s.graph)])
     if (mine !== openSeq) return
+    graph = s.graph // portsOf looks nodes up in the current graph, so it must hold this one before it is laid out
     graph = layout(s.graph, portsOf)
     savedKey = stamp(graph, s.title, s.description)
     void checkNow()

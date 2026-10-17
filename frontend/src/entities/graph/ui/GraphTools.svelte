@@ -1,12 +1,15 @@
 <script lang="ts">
   import Icon from '@/shared/ui/Icon.svelte'
 
-  /** Кнопки поля карты: режим выделения, вписать, распутать, во весь экран, очистить. */
+  /**
+   * Кнопки поля: режим выделения, вписать, во весь экран; у карты ещё распутать и очистить, у редактора скриптов — отмена и повтор.
+   * Всё, чего у поля нет, просто не передаётся, и кнопки нет.
+   */
   let {
     selectMode,
-    pickedCount,
+    pickedCount = 0,
     full,
-    canClear,
+    canClear = false,
     onHidePicked,
     onClearPicked,
     onToggleSelect,
@@ -14,18 +17,26 @@
     onRelayout,
     onToggleFull,
     onClear,
+    onUndo,
+    onRedo,
+    canUndo = false,
+    canRedo = false,
   }: {
     selectMode: boolean
-    pickedCount: number
+    pickedCount?: number
     full: boolean
-    canClear: boolean
-    onHidePicked: () => void
-    onClearPicked: () => void
+    canClear?: boolean
+    onHidePicked?: () => void
+    onClearPicked?: () => void
     onToggleSelect: () => void
     onFit: () => void
-    onRelayout: () => void
+    onRelayout?: () => void
     onToggleFull: () => void
-    onClear: () => void
+    onClear?: () => void
+    onUndo?: () => void
+    onRedo?: () => void
+    canUndo?: boolean
+    canRedo?: boolean
   } = $props()
 </script>
 
@@ -39,7 +50,7 @@
       e.stopPropagation()
     }}
   >
-    {#if selectMode && pickedCount}
+    {#if selectMode && pickedCount && onHidePicked && onClearPicked}
       <span class="gtools__count">Выделено: {pickedCount}</span>
       <button type="button" class="gtool" title="Убрать выделенное с карты" aria-label="Убрать выделенное с карты" onclick={onHidePicked}>
         <Icon name="eye-off" size={16} />
@@ -63,9 +74,11 @@
     <button type="button" class="gtool" title="Вписать карту в окно (F)" aria-label="Вписать карту в окно" onclick={onFit}>
       <Icon name="fit" size={16} />
     </button>
-    <button type="button" class="gtool" title="Распутать: пересчитать раскладку (R)" aria-label="Распутать" onclick={onRelayout}>
-      <Icon name="arrange" size={16} />
-    </button>
+    {#if onRelayout}
+      <button type="button" class="gtool" title="Распутать: пересчитать раскладку (R)" aria-label="Распутать" onclick={onRelayout}>
+        <Icon name="arrange" size={16} />
+      </button>
+    {/if}
     <button
       type="button"
       class="gtool"
@@ -77,6 +90,7 @@
     >
       <Icon name={full ? 'fullscreen-exit' : 'fullscreen'} size={16} />
     </button>
+    {#if onClear}
     <button
       type="button"
       class="gtool"
@@ -87,6 +101,16 @@
     >
       <Icon name="clear" size={16} />
     </button>
+    {/if}
+    {#if onUndo && onRedo}
+      <span class="gtools__sep" aria-hidden="true"></span>
+      <button type="button" class="gtool" disabled={!canUndo} title="Отменить (Ctrl+Z)" aria-label="Отменить" onclick={onUndo}>
+        <Icon name="undo" size={16} />
+      </button>
+      <button type="button" class="gtool" disabled={!canRedo} title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить" onclick={onRedo}>
+        <Icon name="redo" size={16} />
+      </button>
+    {/if}
   </div>
 
 <style>

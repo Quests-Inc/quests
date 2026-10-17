@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from '@/shared/ui/Icon.svelte'
   /** The schema a Parse node reads its input by: a row per field. A single value stands for the first field. */
   type Field = { name: string; type: string; required?: boolean; min?: number }
   let { params, onChange }: { params: { schema?: Field[]; whole?: boolean } | undefined; onChange: (p: unknown) => void } = $props()
@@ -28,54 +29,71 @@
 
 <div class="rows">
   {#each schema as f, i (i)}
-    <div class="row">
-      <input class="name" bind:value={f.name} onchange={commit} aria-label="Имя поля" placeholder="имя" />
-      <select bind:value={f.type} onchange={commit} aria-label="Тип поля">
-        {#each TYPES as t (t)}<option value={t}>{t}</option>{/each}
-      </select>
-      {#if f.type === 'int' || f.type === 'float'}
-        <input class="min" type="number" bind:value={f.min} onchange={commit} aria-label="Минимум" placeholder="мин" />
-      {/if}
-      <label class="check" title="Обязательное: без него ответ отвергается"><input type="checkbox" bind:checked={f.required} onchange={commit} />обяз.</label>
-      <button type="button" class="btn btn--ghost" onclick={() => drop(i)} aria-label="Убрать поле">×</button>
+    <div class="pfield">
+      <div class="pfield__top">
+        <input type="text" class="name" bind:value={f.name} onchange={commit} aria-label="Имя поля" placeholder="имя" />
+        <button type="button" class="btn btn--icon btn--ghost" onclick={() => drop(i)} title="Убрать поле" aria-label="Убрать поле">
+          <Icon name="close" />
+        </button>
+      </div>
+      <div class="pfield__opts">
+        <select bind:value={f.type} onchange={commit} aria-label="Тип поля">
+          {#each TYPES as t (t)}<option value={t}>{t}</option>{/each}
+        </select>
+        {#if f.type === 'int' || f.type === 'float'}
+          <input class="min" type="number" bind:value={f.min} onchange={commit} aria-label="Минимум" placeholder="мин" />
+        {/if}
+        <label class="check" title="Обязательное: без него ответ отвергается">
+          <input type="checkbox" bind:checked={f.required} onchange={commit} />обязательное
+        </label>
+      </div>
     </div>
   {/each}
 </div>
-<button type="button" class="btn" onclick={add}>+ поле</button>
+<button type="button" class="btn btn--ghost add" onclick={add}><Icon name="add" /> поле</button>
 {#if schema.length === 1}
-  <label class="check whole" title="Весь ответ — значение этого поля (так читается документ, который сам и есть ответ)">
+  <label class="check" title="Весь ответ — значение этого поля (так читается документ, который сам и есть ответ)">
     <input type="checkbox" bind:checked={whole} onchange={commit} />
     весь ответ — значение поля
   </label>
 {/if}
-<p class="note">Ответ — JSON: весь вывод или его последняя строка. Одиночное значение попадает в первое поле. Необязательное поле с неверным значением считается отсутствующим.</p>
+<p class="explain">Ответ — JSON: весь вывод или его последняя строка. Одиночное значение попадает в первое поле. Необязательное поле с неверным значением считается отсутствующим.</p>
 
 <style>
   .rows {
     display: grid;
-    gap: 0.3rem;
-    margin-bottom: 0.4rem;
+    gap: 0.5rem;
   }
-  .row {
+  .pfield {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border-radius: var(--pill-radius, 12px);
+    background: var(--pill-bg, #0f0f0f);
+    box-shadow: var(--pill-shadow, none);
+  }
+  .pfield__top,
+  .pfield__opts {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.3rem;
-  }
-  .name {
-    flex: 1 1 6rem;
+    gap: 0.4rem;
     min-width: 0;
   }
-  .min {
-    width: 4rem;
+  .pfield__top .name {
+    flex: 1 1 auto;
   }
-  .whole {
-    display: block;
-    margin-top: 0.4rem;
+  .pfield__opts select {
+    flex: 1 1 5rem;
+    width: auto;
   }
-  .note {
-    margin: 0.4rem 0 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
+  .pfield__opts .min {
+    flex: 0 0 4.5rem;
+    width: 4.5rem;
+  }
+  .pfield__opts .check {
+    flex: none;
+  }
+  .add {
+    justify-self: start;
   }
 </style>

@@ -90,9 +90,9 @@
   function loadSidebarCollapsed() {
     try {
       const raw = JSON.parse(localStorage.getItem('quests.sidebarCollapsed') || '{}')
-      return { journal: !!raw.journal, notes: !!raw.notes }
+      return { journal: !!raw.journal, notes: !!raw.notes, scripts: !!raw.scripts }
     } catch {
-      return { journal: false, notes: false }
+      return { journal: false, notes: false, scripts: false }
     }
   }
 
@@ -603,8 +603,8 @@
     view={nav.view}
     {liveStatus}
     {health}
-    sidebarCollapsed={nav.view === 'notes' ? sidebarCollapsed.notes : sidebarCollapsed.journal}
-    onToggleSidebar={() => toggleSidebar(nav.view === 'notes' ? 'notes' : 'journal')}
+    sidebarCollapsed={sidebarCollapsed[nav.view === 'notes' || nav.view === 'scripts' ? nav.view : 'journal']}
+    onToggleSidebar={() => toggleSidebar(nav.view === 'notes' || nav.view === 'scripts' ? nav.view : 'journal')}
     onViewChange={(v) => setView(v)}
     onOpenSettings={openSettings}
     onOpenTemplates={openTemplates}
@@ -657,7 +657,7 @@
       <RunnersPage active={nav.view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
   {:else if nav.view === 'scripts'}
-    <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} /></div>
+    <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} sidebarCollapsed={sidebarCollapsed.scripts} /></div>
   {:else if nav.view === 'history'}
     <div class="journal__history">
       <HistoryPage
