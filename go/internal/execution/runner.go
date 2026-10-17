@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -80,6 +81,11 @@ type RunnerJob struct {
 	LogTail         string     `json:"log_tail"`
 	Reason          string     `json:"reason"`
 	Cancel          bool       `json:"cancel"`
+	// RunID / RunNode: the script run and the Code node this job is for (ADR-0003); nil for a job of the older kinds.
+	RunID   *int64 `json:"run_id,omitempty"`
+	RunNode *int   `json:"run_node,omitempty"`
+	// Env is the values that came over links into the Code node. It goes to the runner with the secrets, not to the API.
+	Env map[string]string `json:"-"`
 }
 
 // Open reports whether the job has not reached a final state.
@@ -233,27 +239,43 @@ type JobSpec struct {
 	Command        string
 	TimeoutSeconds int
 	ValidFor       time.Duration // how long the job may wait for its runner
+	// RunID / RunNode / Env: a Code node of a script run (ADR-0003) and its link values.
+	RunID   *int64
+	RunNode *int
+	Env     map[string]string
 }
 
 const jobCols = `id, runner_label, kind, quest_id, step_id, template_id, title, COALESCE(dedupe_key,''), command, state, attempt_no,
 	timeout_seconds, COALESCE(lease_id,''), lease_until, valid_until, created_at, assigned_at, started_at, finished_at,
-	exit_code, timed_out, stdout, stderr, progress_current, progress_total, log_tail, reason, cancel, note_id`
+	exit_code, timed_out, stdout, stderr, progress_current, progress_total, log_tail, reason, cancel, note_id, run_id, run_node, env`
 
 func (s *Store) scanJob(sc interface{ Scan(...any) error }) (RunnerJob, error) {
 	var j RunnerJob
-	var note sql.NullInt64
+	var note, runID, runNode sql.NullInt64
+	var envJSON sql.NullString
 	var quest, step, tmpl, exit, pc, pt sql.NullInt64
 	var lease, assigned, started, finished sql.NullString
 	var valid, created string
 	dest := []any{&j.ID, &j.RunnerLabel, &j.Kind, &quest, &step, &tmpl, &j.Title, &j.DedupeKey, &j.Command, &j.State, &j.AttemptNo,
 		&j.TimeoutSeconds, &j.LeaseID, &lease, &valid, &created, &assigned, &started, &finished,
-		&exit, &j.TimedOut, &j.Stdout, &j.Stderr, &pc, &pt, &j.LogTail, &j.Reason, &j.Cancel, &note}
+		&exit, &j.TimedOut, &j.Stdout, &j.Stderr, &pc, &pt, &j.LogTail, &j.Reason, &j.Cancel, &note, &runID, &runNode, &envJSON}
 	if err := sc.Scan(dest...); err != nil {
 		return RunnerJob{}, err
 	}
 	if note.Valid {
 		v := note.Int64
 		j.NoteID = &v
+	}
+	if runID.Valid {
+		v := runID.Int64
+		j.RunID = &v
+	}
+	if runNode.Valid {
+		v := int(runNode.Int64)
+		j.RunNode = &v
+	}
+	if envJSON.Valid && envJSON.String != "" {
+		_ = json.Unmarshal([]byte(envJSON.String), &j.Env)
 	}
 	if quest.Valid {
 		v := quest.Int64
@@ -312,11 +334,17 @@ func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, crea
 		all = strings.Join(labels, ",")
 	}
 	label := s.firstOnline(ctx, labels, now)
+	var envJSON any
+	if len(sp.Env) > 0 {
+		b, _ := json.Marshal(sp.Env)
+		envJSON = string(b)
+	}
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO runner_job
-		(runner_label, runner_labels, kind, quest_id, step_id, template_id, title, dedupe_key, command, state, attempt_no, timeout_seconds, valid_until, created_at, note_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
+		(runner_label, runner_labels, kind, quest_id, step_id, template_id, title, dedupe_key, command, state, attempt_no, timeout_seconds, valid_until, created_at, note_id, run_id, run_node, env)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)`,
 		label, all, sp.Kind, sp.QuestID, sp.StepID, sp.TemplateID, trimTo(sp.Title, 200), dk, sp.Command,
-		s.nextAttempt(ctx, sp.DedupeKey), sp.TimeoutSeconds, timeutil.ToDBUTC(now.Add(sp.ValidFor)), timeutil.ToDBUTC(now), sp.NoteID)
+		s.nextAttempt(ctx, sp.DedupeKey), sp.TimeoutSeconds, timeutil.ToDBUTC(now.Add(sp.ValidFor)), timeutil.ToDBUTC(now), sp.NoteID,
+		sp.RunID, sp.RunNode, envJSON)
 	if err != nil {
 		if sp.DedupeKey != "" && db.IsUniqueViolation(err) {
 			j, gerr := s.OpenJobByKey(ctx, sp.DedupeKey)

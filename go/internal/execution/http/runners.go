@@ -104,6 +104,22 @@ type jobPayload struct {
 	Env            map[string]string `json:"env"`
 }
 
+// jobEnv is the environment a runner gets: the secrets, and the values that came over links into a script's Code node
+// (their names are QUESTS_IN_…, which a secret may not take, so the two never clash).
+func jobEnv(secrets, links map[string]string) map[string]string {
+	if len(links) == 0 {
+		return secrets
+	}
+	env := make(map[string]string, len(secrets)+len(links))
+	for k, v := range secrets {
+		env[k] = v
+	}
+	for k, v := range links {
+		env[k] = v
+	}
+	return env
+}
+
 // jobSecrets resolves the secrets of what the job belongs to (step, else template).
 func (h *Handler) jobSecrets(ctx context.Context, j execution.RunnerJob) map[string]string {
 	var owner execution.SecretOwner
@@ -148,7 +164,7 @@ func (h *Handler) runnerPoll(w http.ResponseWriter, r *http.Request) {
 				ID: job.ID, LeaseID: job.LeaseID, LeaseSeconds: int(runnerLease / time.Second),
 				Kind: job.Kind, Title: job.Title, Command: job.Command, TimeoutSeconds: job.TimeoutSeconds,
 				AttemptNo: job.AttemptNo, QuestID: job.QuestID, StepID: job.StepID, TemplateID: job.TemplateID, NoteID: job.NoteID,
-				Env: h.jobSecrets(r.Context(), *job),
+				Env: jobEnv(h.jobSecrets(r.Context(), *job), job.Env),
 			})
 			return
 		}

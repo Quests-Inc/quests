@@ -121,18 +121,17 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now ti
 
 func (r *CheckRunner) dispatchNote(ctx context.Context, d knowledge.DueNote) {
 	nid := d.ID
-	_, _, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
-		RunnerLabel:    *d.RunOn,
-		Kind:           execution.JobKindPoll,
-		NoteID:         &nid,
-		Title:          "Заметка · " + d.Title,
-		DedupeKey:      "note:" + strconv.FormatInt(d.ID, 10) + ":poll",
-		Command:        d.Command,
-		TimeoutSeconds: int(pollTimeout / time.Second),
-		ValidFor:       noteJobValidFor,
+	_, err := r.startRun(ctx, implicitPrefix+"note_check", nil, noteCheckGraph(d.Command), runSubject{Type: "note", ID: d.ID}, runBinding{
+		Label:    *d.RunOn,
+		Kind:     execution.JobKindPoll,
+		Title:    "Заметка · " + d.Title,
+		Dedupe:   "note:" + strconv.FormatInt(d.ID, 10) + ":poll",
+		Timeout:  pollTimeout,
+		ValidFor: noteJobValidFor,
+		NoteID:   &nid,
 	})
 	if err != nil {
-		log.Printf("checks: enqueue note %d on %q: %v", d.ID, *d.RunOn, err)
+		log.Printf("checks: start note %d check on %q: %v", d.ID, *d.RunOn, err)
 	}
 }
 

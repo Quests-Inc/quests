@@ -554,4 +554,8 @@ func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
 	if _, err := r.Store.Execution.PurgeRunnerJobs(ctx, timeutil.NowUTC().Add(-14*24*time.Hour)); err != nil {
 		log.Printf("checks: purge runner jobs: %v", err)
 	}
+	// Runs of scripts are a log, not an archive: the finished ones go after three days (a waiting run is never touched).
+	if _, err := r.Store.Execution.PurgeRuns(ctx, timeutil.NowUTC().Add(-3*24*time.Hour)); err != nil {
+		log.Printf("checks: purge script runs: %v", err)
+	}
 }

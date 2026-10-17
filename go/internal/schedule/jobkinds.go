@@ -9,7 +9,7 @@ import (
 // Kinds are the sources of user code the scheduler queues jobs for (ADR-0002). Each queues through
 // execution.Store.EnqueueJob and gets its finished jobs back here; the order is the order they are asked in.
 func (r *CheckRunner) Kinds() execution.Kinds {
-	return execution.Kinds{noteKind{r}, stepKind{r}, emitKind{}}
+	return execution.Kinds{scriptKind{r}, noteKind{r}, stepKind{r}, emitKind{}}
 }
 
 // noteKind: a note's freshness check.
