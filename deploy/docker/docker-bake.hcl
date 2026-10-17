@@ -1,10 +1,10 @@
-# Bake definition for Quests images (Go API + Python bot + STT sidecar).
+# Bake definition for Quests images (Go API + Python bot).
 #
 # Local:
 #   docker buildx bake -f deploy/docker/docker-bake.hcl api
-#   docker buildx bake -f deploy/docker/docker-bake.hcl api bot stt
+#   docker buildx bake -f deploy/docker/docker-bake.hcl api bot
 #
-# CI sets API_IMAGE / BOT_IMAGE / STT_IMAGE / TAG / VERSION through the environment (release.yml).
+# CI sets API_IMAGE / BOT_IMAGE / TAG / VERSION through the environment (release.yml).
 
 variable "API_IMAGE" {
   default = "quests-api"
@@ -12,10 +12,6 @@ variable "API_IMAGE" {
 
 variable "BOT_IMAGE" {
   default = "quests-bot"
-}
-
-variable "STT_IMAGE" {
-  default = "quests-stt"
 }
 
 # The image tag: the release version in CI (1.4.0), "local" on a workstation.
@@ -49,12 +45,6 @@ target "bot" {
   tags     = ["${BOT_IMAGE}:${TAG}"]
 }
 
-target "stt" {
-  inherits = ["_common"]
-  target   = "stt"
-  tags     = ["${STT_IMAGE}:${TAG}"]
-}
-
 group "default" {
-  targets = ["api", "bot", "stt"]
+  targets = ["api", "bot"]
 }

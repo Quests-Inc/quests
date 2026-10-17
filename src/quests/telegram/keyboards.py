@@ -71,24 +71,6 @@ def llm_confirm_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def stt_confirm_keyboard() -> InlineKeyboardMarkup:
-    """Confirm Whisper transcript before spending an LLM call."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✓ В LLM",
-                    callback_data="stt:ok",
-                ),
-                InlineKeyboardButton(
-                    text="✖ Отмена",
-                    callback_data="stt:no",
-                ),
-            ]
-        ]
-    )
-
-
 # Статусы, у которых по умолчанию только «Редактировать» (без шагов/статусов).
 _CLOSED_STATUSES = frozenset({"completed", "failed", "archived"})
 

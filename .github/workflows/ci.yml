@@ -35,7 +35,7 @@ jobs:
         with:
           source: .
           files: deploy/docker/docker-bake.hcl
-          targets: api,bot,stt
+          targets: api,bot
           push: false
           set: |
             *.cache-from=type=gha,scope=quests

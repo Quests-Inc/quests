@@ -6,7 +6,7 @@
 
 ```
  gh release create v1.4.0   (или `just release 1.4.0`)
-   └─ Release workflow: проверки → образы ghcr.io/quests-inc/quests-{api,bot,stt}:1.4.0
+   └─ Release workflow: проверки → образы ghcr.io/quests-inc/quests-{api,bot}:1.4.0
    └─ pull request в quests-deploy: «Release v1.4.0» (version.env)
         └─ вы его вливаете ──► main ◄── doco-cd на сервере поллит раз в минуту ──► docker compose up -d
 ```

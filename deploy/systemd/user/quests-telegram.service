@@ -6,9 +6,6 @@ Wants=network-online.target
 # Same-host API (uncomment if quests-server runs under this user):
 # After=network-online.target quests-server.service
 # Wants=quests-server.service
-# Same-host STT sidecar — needed for voice messages, not for text:
-# After=network-online.target quests-stt.service
-# Wants=quests-stt.service
 
 [Service]
 Type=simple

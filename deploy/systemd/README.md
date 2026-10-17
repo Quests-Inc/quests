@@ -41,8 +41,7 @@ QUESTS_PORT=8765
 # QUESTS_CORS_ORIGINS=…
 ```
 
-Бот читает `.env` сам (`QUESTS_TG_TOKEN`, `QUESTS_TG_USER_IDS`, `QUESTS_TG_PROXY`, `QUESTS_API`,
-`QUESTS_WHISPER_MODEL=small|medium|large`).
+Бот читает `.env` сам (`QUESTS_TG_TOKEN`, `QUESTS_TG_USER_IDS`, `QUESTS_TG_PROXY`, `QUESTS_API`).
 
 ## Удалённый HUD
 
