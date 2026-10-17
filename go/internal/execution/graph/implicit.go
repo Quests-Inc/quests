@@ -50,22 +50,35 @@ func NoteCheck(text string) Graph {
 }
 
 // TemplateEmit: a template makes a quest from what the command prints. The answer is one JSON document (the quest, shaped as
-// the emit's limits allow: `{}` or `null` means no quest this time). A command that fails, or an answer that is not JSON, ends
-// as an attempt error of the template, which the emit retries.
+// the emit's limits allow: nothing printed, `{}` or `null` means no quest this time). A command that fails, or an answer
+// that is not JSON, ends as an attempt error of the template, which the emit retries. A device that never showed up, and a
+// cancel by hand, close the period instead: no attempt is logged and nothing is queued again.
 func TemplateEmit(text string) Graph {
 	return buildGraph([]nodeSpec{
 		{1, "source.template", nil},
 		{2, "code", kv{"text": text}},
 		{3, "parse", kv{"schema": []kv{{"name": "quest", "type": "doc", "required": true}}, "whole": true}},
 		{4, "sink.template_create", nil},
-		{5, "parse", kv{"schema": []kv{{"name": "message", "type": "str", "required": true}}}},
-		{6, "sink.template_error", kv{"kind": "error"}},
-		{7, "sink.template_error", kv{"kind": "bad_json"}},
+		{5, "parse", kv{"schema": []kv{{"name": "kind", "type": "str", "required": true}, {"name": "message", "type": "str", "required": true}}}},
+		{6, "compare", kv{"type": "str", "op": "eq", "operand": FailUnreachable}},
+		{7, "sink.template_error", kv{"kind": "closed", "gate": true}},
+		{8, "compare", kv{"type": "str", "op": "eq", "operand": FailCanceled}},
+		{9, "sink.template_error", kv{"kind": "closed", "gate": true}},
+		{10, "compare", kv{"type": "str", "op": "eq", "operand": FailTimeout}},
+		{11, "sink.template_error", kv{"kind": "timeout", "gate": true}},
+		{12, "sink.template_error", kv{"kind": "error", "gate": true}},
+		{13, "sink.template_error", kv{"kind": "bad_json"}},
 	},
 		[4]any{1, "secrets", 2, "secrets"}, [4]any{2, "stdout", 3, "in"},
 		[4]any{1, "ref", 4, "ref"}, [4]any{3, "quest", 4, "doc"},
-		[4]any{2, "failed", 5, "in"}, [4]any{1, "ref", 6, "ref"}, [4]any{5, "message", 6, "message"},
-		[4]any{1, "ref", 7, "ref"}, [4]any{3, "bad_output", 7, "message"},
+		[4]any{2, "failed", 5, "in"}, [4]any{5, "kind", 6, "in"},
+		[4]any{1, "ref", 7, "ref"}, [4]any{6, "yes", 7, "trigger"}, [4]any{5, "message", 7, "message"},
+		[4]any{6, "no", 8, "in"},
+		[4]any{1, "ref", 9, "ref"}, [4]any{8, "yes", 9, "trigger"}, [4]any{5, "message", 9, "message"},
+		[4]any{8, "no", 10, "in"},
+		[4]any{1, "ref", 11, "ref"}, [4]any{10, "yes", 11, "trigger"}, [4]any{5, "message", 11, "message"},
+		[4]any{1, "ref", 12, "ref"}, [4]any{10, "no", 12, "trigger"}, [4]any{5, "message", 12, "message"},
+		[4]any{1, "ref", 13, "ref"}, [4]any{3, "bad_output", 13, "message"},
 	)
 }
 
@@ -119,6 +132,8 @@ func Implicit(name, text string) (Graph, bool) {
 		return StepOnce(text), true
 	case "step_poll":
 		return StepPoll(text), true
+	case "template_emit":
+		return TemplateEmit(text), true
 	}
 	return Graph{}, false
 }

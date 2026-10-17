@@ -17,49 +17,17 @@ import (
 // emitJobValidFor is how long an emit_pool_command may wait for its device.
 const emitJobValidFor = 24 * time.Hour
 
-// execEmitRemote runs a template's emit_pool_command on a runner. It is
-// asynchronous like poolRunner: the first call queues a job and answers
-// "not ready"; a later tick finds the finished job, takes its result (once —
-// the job is deleted) and the usual validation / retry logic takes over.
-//
-// A device that never shows up leaves the job `skipped`: that is kept as a
-// marker for the period, so nothing is re-queued and the template is not
-// marked as failing. A device that vanishes mid-run counts as a failed attempt.
-func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string) (out emitOutput, info execInfo, err error, ready bool) {
+// takeLegacyEmit reads a template job that was queued before emit went through a graph (no run). The tick still pulls it:
+// a device that never shows up leaves the job skipped, as the marker for the period, and a finished job is taken once.
+func takeLegacyEmit(ctx context.Context, st *store.Store, tmpl templateRow, job execution.RunnerJob) (out emitOutput, info execInfo, err error, ready bool) {
 	label := strings.ToLower(strings.TrimSpace(tmpl.EmitRunOn.String))
-	command := tmpl.EmitPoolCommand.String
-	key := "emit:" + poolJobKey(tmpl.ID, periodKey, command)
 	info.Status = "error"
-
-	job, found, lerr := st.Execution.LatestJobByKey(ctx, key)
-	if lerr != nil {
-		return emitOutput{}, info, lerr, true
-	}
-	if !found {
-		tid := tmpl.ID
-		if _, _, qerr := st.Execution.EnqueueJob(ctx, execution.JobSpec{
-			RunnerLabel:    label,
-			Kind:           execution.JobKindEmitPool,
-			TemplateID:     &tid,
-			Title:          "шаблон: " + tmpl.Title,
-			DedupeKey:      key,
-			Command:        command,
-			TimeoutSeconds: int(emitPoolTimeout / time.Second),
-			ValidFor:       emitJobValidFor,
-		}); qerr != nil {
-			log.Printf("emit remote: enqueue template %d: %v", tmpl.ID, qerr)
-		}
-		return emitOutput{}, info, nil, false
-	}
-
 	switch job.State {
 	case execution.JobQueued, execution.JobAssigned, execution.JobRunning, execution.JobLost:
 		return emitOutput{}, info, nil, false // still waiting for the device (or a late result)
 	case execution.JobSkipped, execution.JobCanceled:
 		return emitOutput{}, info, nil, false // the period passes without it; no retry storm
 	}
-
-	// A result (or a vanished device): take it, once.
 	if derr := st.Execution.DeleteRunnerJob(ctx, job.ID); derr != nil {
 		log.Printf("emit remote: delete job %d: %v", job.ID, derr)
 	}

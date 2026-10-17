@@ -212,6 +212,28 @@ func TestTemplateDocumentIsTheWholeOutput(t *testing.T) {
 	if len(h.sinks) != 1 || h.last(t).typ != "sink.template_error" || h.last(t).in["message"] != "таймаут" {
 		t.Fatalf("a failed run: %+v", h.sinks)
 	}
+	// Nothing printed is a document too: null, so the create sink can record "no quest this period".
+	_, h, _ = runGraph(t, g, stdout(""))
+	if h.last(t).typ != "sink.template_create" || string(h.last(t).in["doc"].(json.RawMessage)) != "null" {
+		t.Fatalf("empty output: %+v", h.sinks)
+	}
+}
+
+// Unreachable and canceled close the period: the retry sink does not run. An error exit still does.
+func TestTemplateEmitClosesWithoutRetry(t *testing.T) {
+	g := TemplateEmit("echo 1")
+	for _, f := range []Failure{{Kind: FailUnreachable, Message: "нет устройства"}, {Kind: FailCanceled, Message: "запуск отменён"}} {
+		o := f.Outcome()
+		r, h, _ := runGraph(t, g, &o)
+		if len(h.sinks) != 1 || h.last(t).typ != "sink.template_error" || r.State(12) == StateRan {
+			t.Fatalf("%s: state %v sinks %+v", f.Kind, r.State(12), h.sinks)
+		}
+	}
+	o := Failure{Kind: FailExit, Message: "код 2"}.Outcome()
+	r, h, _ := runGraph(t, g, &o)
+	if r.State(12) != StateRan || h.last(t).in["message"] != "код 2" {
+		t.Fatalf("an error exit must stay a retry: state %v %+v", r.State(12), h.sinks)
+	}
 }
 
 // A graph with no Code node runs to the end at once: a step that follows a quest (quest=298).

@@ -206,12 +206,14 @@ by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → 
 - Step 3 (storage, API, `workspace` secret owner): done. `script` / `script_version` (migration 0017) with versions and an
   optimistic check, `/api/scripts*` and `/api/script-nodes*`, scripts in the workspace export/import; the `workspace` owner of
   secrets (migration 0016) with `GET|PUT|DELETE /api/workspace/secrets`, inherited down to everything including notes.
-- Step 4 (evaluator, stored runs, job format): done for the note check, the one-shot step and the polled step
-  (`implicit:note_check`, `implicit:step_once`, `implicit:step_poll`). The polled step reads its answer strictly; the live check
-  commands were looked through first and none relied on the lenient reader. Template emit stays on its older path: its pull
-  model (attempts, retries, the period marker) is a separate change. Jobs keep the four entity columns for now; `subject_*`
-  and the retirement of `kind` come with the removal of the older kinds (the release after this one).
+- Step 4 (evaluator, stored runs, job format): done for the note check, the one-shot step, the polled step and template emit
+  (`implicit:note_check`, `implicit:step_once`, `implicit:step_poll`, `implicit:template_emit`). The polled step reads its answer
+  strictly; the live check commands were looked through first and none relied on the lenient reader. Emit's sinks decode the
+  quest, validate it and record the attempt and the retry; the tick still owns the period, and materialize still creates the
+  quest. Nothing printed is no quest this period. A device that never came, and a cancel, close the period without a retry.
+  Jobs keep the four entity columns and `kind` for one more release: a job queued before runs has no `run_id`, and the older
+  kinds still serve it. `QUESTS_SUBJECT_TYPE` and `QUESTS_SUBJECT_ID` are set next to `QUESTS_STEP_ID` and `QUESTS_NOTE_ID`.
 
-- Steps 5–7 (UI): done. Scripts bind to steps and notes (`script_binding`, migration 0019); the «Скрипты» tab has the list, the
-  samples (`graph/samples.go`) and the graph editor, which runs on the map's gestures, minimap and camera fit. Templates are not
-  bound yet: emit is still on its older path.
+- Steps 5–7 (UI): done. Scripts bind to steps, notes and templates (`script_binding`, migration 0019); the «Скрипты» tab has the
+  list, the samples (`graph/samples.go`) and the graph editor, which runs on the map's gestures, minimap and camera fit. A
+  template picks its emit script in the template form.

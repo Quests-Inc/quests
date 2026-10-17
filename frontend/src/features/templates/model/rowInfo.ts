@@ -18,6 +18,7 @@ export function rowMeta(t: TemplateRead, streak?: Streak): string {
   return [
     days,
     mode,
+    t.script_id && 'скрипт',
     t.emit_pool_command && 'команда',
     t.questline_title,
     t.category_label,

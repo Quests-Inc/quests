@@ -32,8 +32,8 @@ func (k stepKind) Finished(ctx context.Context, j execution.RunnerJob) {
 	k.r.stepJobFinished(ctx, j)
 }
 
-// emitKind: a template's emit command. Its result is not pushed here: the emit tick finds the finished job by its
-// key and takes it (execEmitRemote), so a finished job needs no action.
+// emitKind: a template job queued before emit ran as a graph (no run). The tick still pulls it (takeLegacyEmit). A job
+// of a run is owned by scriptKind, which leaves template jobs for the tick as well.
 type emitKind struct{}
 
 func (emitKind) Name() string                                  { return "emit" }

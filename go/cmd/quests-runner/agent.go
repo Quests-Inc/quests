@@ -102,11 +102,22 @@ func (a *agent) execute(ctx context.Context, j *job) {
 	}
 	env["QUESTS_JOB_ID"] = fmt.Sprint(j.ID)
 	env["QUESTS_JOB_KIND"] = j.Kind
+	// QUESTS_STEP_ID and QUESTS_NOTE_ID stay for one release next to QUESTS_SUBJECT_* (ADR-0003).
 	if j.StepID != nil {
 		env["QUESTS_STEP_ID"] = fmt.Sprint(*j.StepID)
+		env["QUESTS_SUBJECT_TYPE"] = "step"
+		env["QUESTS_SUBJECT_ID"] = fmt.Sprint(*j.StepID)
 	}
 	if j.NoteID != nil {
 		env["QUESTS_NOTE_ID"] = fmt.Sprint(*j.NoteID)
+		if j.StepID == nil {
+			env["QUESTS_SUBJECT_TYPE"] = "note"
+			env["QUESTS_SUBJECT_ID"] = fmt.Sprint(*j.NoteID)
+		}
+	}
+	if j.TemplateID != nil && j.StepID == nil && j.NoteID == nil {
+		env["QUESTS_SUBJECT_TYPE"] = "template"
+		env["QUESTS_SUBJECT_ID"] = fmt.Sprint(*j.TemplateID)
 	}
 	if a.cfg.Server != "" {
 		env["QUESTS_API"] = a.cfg.Server

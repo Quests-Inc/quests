@@ -75,9 +75,33 @@ func Builtin() Registry {
 		req("ref", TRefNote), req("message", TStr))
 	sink("sink.template_create", "Шаблон: создать квест", nil,
 		req("ref", TRefTemplate), req("doc", TDoc))
-	sink("sink.template_error", "Шаблон: ошибка попытки", oneOf("kind", "error", "timeout", "bad_json"),
-		req("ref", TRefTemplate), req("message", TStr))
+	add(NodeType{Name: "sink.template_error", Title: "Шаблон: ошибка попытки", Kind: KindSink, Trusted: true, Ports: templateErrorPorts})
 	return r
+}
+
+// templateErrorPorts: kind is which attempt this is (error, timeout, bad JSON) or "closed" (the period ends and nothing
+// is retried: the device never came, or somebody cancelled). gate adds a trigger, so the sink runs only on the compare
+// branch that picked it; without gate the message alone fires it, which is what a graph saved before gating still does.
+func templateErrorPorts(raw json.RawMessage) ([]Port, []Port, error) {
+	var p struct {
+		Kind string `json:"kind"`
+		Gate bool   `json:"gate"`
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return nil, nil, fmt.Errorf("параметры: %w", err)
+		}
+	}
+	switch p.Kind {
+	case "error", "timeout", "bad_json", "closed":
+	default:
+		return nil, nil, fmt.Errorf("параметр %q: одно из error, timeout, bad_json, closed", "kind")
+	}
+	in := []Port{req("ref", TRefTemplate), req("message", TStr)}
+	if p.Gate {
+		in = append(in, req("trigger", TAny))
+	}
+	return in, nil, nil
 }
 
 // oneOf checks that a string parameter has one of the listed values.

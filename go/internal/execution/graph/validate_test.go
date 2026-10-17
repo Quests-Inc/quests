@@ -22,7 +22,6 @@ const (
 	codeEcho   = `{"text":"echo 1"}`
 	stepSchema = `{"schema":[{"name":"progress","type":"int"},{"name":"total","type":"int","min":1},{"name":"description","type":"str"}]}`
 	noteSchema = `{"schema":[{"name":"outdated","type":"bool","required":true},{"name":"reason","type":"str"}]}`
-	docSchema  = `{"schema":[{"name":"doc","type":"doc","required":true}],"whole":true}`
 )
 
 // The checks that exist today, wired as ADR-0003 section 9 says: they have to be valid graphs.
@@ -32,18 +31,9 @@ func legacyGraphs() map[string]Graph {
 		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "in"), link(3, "progress", 4, "progress"),
 			link(3, "total", 4, "total"), link(3, "description", 4, "description"), link(1, "ref", 4, "ref")},
 	}
-	// A template's emit: the document is the whole answer; a failed run is recorded as an attempt that failed. (Telling an
-	// unreachable device from an error, which emit treats differently, is the template migration's to design.)
-	tmpl := Graph{
-		Nodes: []Node{node(1, "source.template", ""), node(2, "code", codeEcho), node(3, "parse", docSchema), node(4, "sink.template_create", ""),
-			node(5, "sink.template_error", `{"kind":"bad_json"}`), node(6, "parse", `{"schema":[{"name":"message","type":"str","required":true}]}`),
-			node(7, "sink.template_error", `{"kind":"error"}`)},
-		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "in"),
-			link(1, "ref", 4, "ref"), link(3, "doc", 4, "doc"),
-			link(1, "ref", 5, "ref"), link(3, "bad_output", 5, "message"),
-			link(2, "failed", 6, "in"), link(1, "ref", 7, "ref"), link(6, "message", 7, "message")},
-	}
-	return map[string]Graph{"step poll": stepPoll, "step once": StepOnce("echo 1"), "note": NoteCheck("echo 1"), "template": tmpl}
+	// A template's emit: the document is the whole answer. A failed run is an attempt that is retried, except a device that
+	// never came and a cancel, which close the period.
+	return map[string]Graph{"step poll": stepPoll, "step once": StepOnce("echo 1"), "note": NoteCheck("echo 1"), "template": TemplateEmit("echo 1")}
 }
 
 func TestTodaysChecksAreValidGraphs(t *testing.T) {

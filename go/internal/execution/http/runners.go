@@ -104,6 +104,31 @@ type jobPayload struct {
 	Env            map[string]string `json:"env"`
 }
 
+// subjectEnv adds QUESTS_SUBJECT_TYPE and QUESTS_SUBJECT_ID. The runner also sets them, and still sets
+// QUESTS_STEP_ID / QUESTS_NOTE_ID for one release (ADR-0003); putting them in the payload means a runner from the
+// previous release, which copies Env through, already has the new names.
+func subjectEnv(j execution.RunnerJob, env map[string]string) map[string]string {
+	kind, id := "", int64(0)
+	switch {
+	case j.StepID != nil:
+		kind, id = "step", *j.StepID
+	case j.NoteID != nil:
+		kind, id = "note", *j.NoteID
+	case j.TemplateID != nil:
+		kind, id = "template", *j.TemplateID
+	}
+	if kind == "" {
+		return env
+	}
+	out := make(map[string]string, len(env)+2)
+	for k, v := range env {
+		out[k] = v
+	}
+	out["QUESTS_SUBJECT_TYPE"] = kind
+	out["QUESTS_SUBJECT_ID"] = strconv.FormatInt(id, 10)
+	return out
+}
+
 // jobEnv is the environment a runner gets: the secrets, and the values that came over links into a script's Code node
 // (their names are QUESTS_IN_…, which a secret may not take, so the two never clash).
 func jobEnv(secrets, links map[string]string) map[string]string {
@@ -164,7 +189,7 @@ func (h *Handler) runnerPoll(w http.ResponseWriter, r *http.Request) {
 				ID: job.ID, LeaseID: job.LeaseID, LeaseSeconds: int(runnerLease / time.Second),
 				Kind: job.Kind, Title: job.Title, Command: job.Command, TimeoutSeconds: job.TimeoutSeconds,
 				AttemptNo: job.AttemptNo, QuestID: job.QuestID, StepID: job.StepID, TemplateID: job.TemplateID, NoteID: job.NoteID,
-				Env: jobEnv(h.jobSecrets(r.Context(), *job), job.Env),
+				Env: subjectEnv(*job, jobEnv(h.jobSecrets(r.Context(), *job), job.Env)),
 			})
 			return
 		}

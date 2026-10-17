@@ -30,7 +30,7 @@ temp file and executed as is (on the runner), like a template's pool command.
 ## Where it runs
 
 Like a step's check: on a runner (the command needs a runner label). The interval has the same
-minimum as for steps. Environment: `QUESTS_NOTE_ID`, `QUESTS_API`, `QUESTS_API_TOKEN` and, in a non-default
+minimum as for steps. Environment: `QUESTS_NOTE_ID` (and, from this release, `QUESTS_SUBJECT_TYPE=note` and `QUESTS_SUBJECT_ID`), `QUESTS_API`, `QUESTS_API_TOKEN` and, in a non-default
 workspace, `QUESTS_WORKSPACE`.
 
 `run_on` may list several runners, comma-separated (`main-pc,laptop-n95`; at most 8). The job goes to the first one that is

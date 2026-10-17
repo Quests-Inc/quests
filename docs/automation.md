@@ -76,8 +76,7 @@ rewrites the current version instead of adding one. A step or a note picks a scr
 stay the step's own.
 
 A graph is validated on save (types of ports, required inputs, cycles, one `Code` node per path); a bad one is a 422 listing
-the problems per node. Nothing runs a script yet: the evaluator and the attaching of scripts to steps, notes and templates
-are the next stages of quest=440.
+the problems per node. Steps, notes and template emit run through the evaluator (see Runs below).
 
 
 ### Runs (ADR-0003, stage 4)
@@ -95,8 +94,8 @@ What a plain `check_command` stands for is an *implicit graph* built in `scriptr
 | note freshness | `implicit:note_check` | through the evaluator |
 | one-shot step (`run_mode=once`) | `implicit:step_once` | through the evaluator |
 | polled step | `implicit:step_poll` | through the evaluator. The answer must be JSON (a number or an object, as the whole output or its last line); the older reader also took the last integer found in free text. The live steps were looked through before the switch: none relied on it |
-| template emit (`emit_pool_command`) | not yet | older path (pull model with attempts and retries) |
-| template emit by a script (`script_binding`, subject `template`) | `TemplateEmit` sample | the emit tick still drives the period (rolls, retries, limits); the answer comes from a run found by its key `emit:<template>\|<period>\|<script>.<version>`, whose sinks leave the quest document (or the attempt error) in `script_run.result`; the tick takes it once and deletes the run (`schedule/emit_script.go`) |
+| template emit (`emit_pool_command`) | `implicit:template_emit` | through the evaluator. The tick still owns the period. Nothing printed, `{}` or `null` is no quest this period. A device that never came, and a cancel, close the period with no attempt and no retry; any other failure is an attempt that is retried. A job queued before this (no run) is still pulled the old way until it finishes |
+| template emit by a script (`script_binding`, subject `template`) | the bound graph (`TemplateEmit` is the sample) | the same tick and the same sinks. The run's key is `emit:<template>\|<period>\|<script>.<version>` |
 
 Jobs queued before runs existed have no `run_id` and are served by the older kinds until they finish.
 

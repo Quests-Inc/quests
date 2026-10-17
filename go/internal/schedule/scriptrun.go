@@ -27,6 +27,10 @@ type runSubject struct {
 	// RunID is the run itself, known to the nodes that hand a result back through it; Period is the period of a template's emit.
 	RunID  int64
 	Period string
+	// Now, Took and Stderr are what an emit sink records on the attempt: the tick's clock, how long the job ran, and its stderr.
+	Now    time.Time
+	Took   time.Duration
+	Stderr string
 }
 
 // runBinding is how the script is attached to its subject: which runner, how long, and what the job is called.
@@ -174,6 +178,11 @@ func outcomeOf(j execution.RunnerJob) (graph.CodeOutcome, bool) {
 
 // resumeRun delivers a finished job to its run and goes on with the graph.
 func (r *CheckRunner) resumeRun(ctx context.Context, j execution.RunnerJob) {
+	r.finishRun(ctx, j, time.Time{})
+}
+
+// finishRun is resumeRun at the emit tick's clock, so a retry is scheduled from that instant.
+func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now time.Time) {
 	if j.RunID == nil || j.RunNode == nil {
 		return
 	}
@@ -203,9 +212,12 @@ func (r *CheckRunner) resumeRun(ctx context.Context, j execution.RunnerJob) {
 		log.Printf("script run %d: %v", run.ID, err)
 		return
 	}
-	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID}
+	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID, Now: now, Stderr: truncate(j.Stderr, 4000)}
+	if j.StartedAt != nil && j.FinishedAt != nil {
+		subj.Took = j.FinishedAt.Sub(*j.StartedAt)
+	}
 	if parts := strings.SplitN(run.Key, "|", 3); len(parts) == 3 {
-		subj.Period = parts[1] // a template's emit: emit:<template>|<period>|<script version>
+		subj.Period = parts[1] // a template's emit: emit:<template>|<period>|<script version or command hash>
 	}
 	reqs, advErr := rn.Resume(ctx, r.hostFor(subj), *j.RunNode, outcome)
 	r.afterResume(ctx, subj, outcome, g, rn)
@@ -269,6 +281,11 @@ type scriptKind struct{ r *CheckRunner }
 func (scriptKind) Name() string                    { return "script" }
 func (scriptKind) Owns(j execution.RunnerJob) bool { return j.RunID != nil }
 func (k scriptKind) Finished(ctx context.Context, j execution.RunnerJob) {
+	// A template's emit is pulled by the tick (driveEmit). Resuming it here would record the attempt before the tick
+	// can hand the quest back, and a retry pause would swallow the call that has to report it.
+	if j.TemplateID != nil {
+		return
+	}
 	k.r.resumeRun(ctx, j)
 }
 

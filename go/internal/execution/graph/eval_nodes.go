@@ -175,7 +175,15 @@ func runParse(rs *resolved, in Token) (map[string]Token, error) {
 	reject := func(msg string) (map[string]Token, error) {
 		return map[string]Token{"bad_output": {Type: TStr, Value: msg}}, nil
 	}
-	raw, err := readJSONText(text)
+	// A document that is the whole answer (a template's emit) treats nothing printed as JSON null: that is "no quest
+	// this period", the same as an explicit null. Any other empty text is not an answer.
+	var raw json.RawMessage
+	var err error
+	if p.Whole && strings.TrimSpace(text) == "" {
+		raw = json.RawMessage("null")
+	} else {
+		raw, err = readJSONText(text)
+	}
 	if err != nil {
 		return reject(err.Error())
 	}

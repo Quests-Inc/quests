@@ -104,50 +104,74 @@ type poolOpts struct {
 	ignorePause bool
 }
 
-// resolveEmit drives one template's emit_pool_command for the current period:
-// runs it (retrying with pauses on failure, up to emitPoolMaxAttempts),
-// validates the quest it printed against the template's limits and persists the
-// outcome in templateemitroll so repeated ticks don't re-run or re-create.
+// resolveEmit drives one template's emit for the current period. A script or a plain command both run as a graph;
+// the sinks record the attempt and the retry, and this returns the quest they accepted. A job queued before graphs
+// (no run) is still pulled the old way. A command with no runner is an error attempt, as before.
 func resolveEmit(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string, now time.Time, opts poolOpts) (emitResult, error) {
 	roll, found, qerr := st.Automation.EmitRollFor(ctx, tmpl.ID, periodKey)
 	if qerr != nil {
 		return emitResult{}, qerr
 	}
-	id, outcome, attempts, retryAt := roll.ID, roll.Outcome, roll.Attempts, roll.RetryAt
-	isNew := !found
-	if !isNew && (outcome == "materialized" || outcome == "error" || outcome == "miss") {
+	id, outcome, retryAt := roll.ID, roll.Outcome, roll.RetryAt
+	if found && (outcome == "materialized" || outcome == "error" || outcome == "miss") {
 		return emitResult{RollID: id}, nil
 	}
 	// A failed run scheduled its own retry: until then the tick leaves it alone.
-	if !isNew && retryAt.Valid && !opts.ignorePause {
+	if found && retryAt.Valid && !opts.ignorePause {
 		if at, perr := timeutil.ParseFlexible(retryAt.String); perr == nil && now.Before(at) {
 			return emitResult{RollID: id}, nil
 		}
 	}
 
-	attemptNo := attempts + 1
-	var out emitOutput
-	var info execInfo
-	var execErr error
 	if b, berr := emitScript(ctx, st, tmpl.ID); berr == nil && b != nil && (!b.NeedsRunner || (tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "")) {
-		// A script: its graph runs, the code in it on the runner the template names.
-		var ready bool
-		out, info, execErr, ready = execEmitScript(ctx, st, tmpl, periodKey, *b)
-		if !ready {
+		res, ready, err := driveScriptEmit(ctx, st, tmpl, periodKey, now, *b)
+		if err != nil || !ready {
+			if err != nil {
+				return emitResult{}, err
+			}
 			return emitResult{RollID: id}, nil
 		}
-	} else if tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "" {
-		// The command runs on a runner device: queue it, collect the result on a later tick.
-		var ready bool
-		out, info, execErr, ready = execEmitRemote(ctx, st, tmpl, periodKey)
-		if !ready {
-			return emitResult{RollID: id}, nil
-		}
-	} else {
-		// Commands run on runners only (see store.ErrNoRunner).
-		info.Status = "error"
-		execErr = store.ErrNoRunner
+		return res, nil
 	}
+	if tmpl.EmitRunOn.Valid && strings.TrimSpace(tmpl.EmitRunOn.String) != "" {
+		key := "emit:" + poolJobKey(tmpl.ID, periodKey, tmpl.EmitPoolCommand.String)
+		job, foundJob, lerr := st.Execution.LatestJobByKey(ctx, key)
+		if lerr != nil {
+			return emitResult{}, lerr
+		}
+		if foundJob && job.RunID == nil {
+			out, info, execErr, ready := takeLegacyEmit(ctx, st, tmpl, job)
+			if !ready {
+				return emitResult{RollID: id}, nil
+			}
+			return settleEmitAttempt(ctx, st, tmpl, periodKey, now, out, info, execErr)
+		}
+		res, ready, err := driveCommandEmit(ctx, st, tmpl, periodKey, now)
+		if err != nil || !ready {
+			if err != nil {
+				return emitResult{}, err
+			}
+			return emitResult{RollID: id}, nil
+		}
+		return res, nil
+	}
+	// Commands run on runners only (see store.ErrNoRunner).
+	return settleEmitAttempt(ctx, st, tmpl, periodKey, now, emitOutput{}, execInfo{Status: "error"}, store.ErrNoRunner)
+}
+
+// settleEmitAttempt records one run of a template's emit and how the period continues: a retry, a miss, the quest to
+// create, or attempts exhausted.
+func settleEmitAttempt(ctx context.Context, st *store.Store, tmpl templateRow, periodKey string, now time.Time, out emitOutput, info execInfo, execErr error) (emitResult, error) {
+	roll, found, qerr := st.Automation.EmitRollFor(ctx, tmpl.ID, periodKey)
+	if qerr != nil {
+		return emitResult{}, qerr
+	}
+	id, attempts := roll.ID, roll.Attempts
+	isNew := !found
+	if now.IsZero() {
+		now = timeutil.NowUTC()
+	}
+	attemptNo := attempts + 1
 	rec := automation.EmitAttempt{
 		TemplateID: tmpl.ID, PeriodKey: periodKey, At: now, Attempt: attemptNo,
 		Status: info.Status, DurationMS: info.Duration.Milliseconds(),
