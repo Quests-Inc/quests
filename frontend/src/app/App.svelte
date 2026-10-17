@@ -4,6 +4,7 @@
   import { HistoryPage } from '@/pages/history'
   import { JournalOverlays, JournalPage, createJournalDesk } from '@/pages/journal'
   import { RunnersPage } from '@/pages/runners'
+  import { ScriptsPage } from '@/pages/scripts'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
@@ -655,6 +656,8 @@
     <div class="journal__runners">
       <RunnersPage active={nav.view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
+  {:else if nav.view === 'scripts'}
+    <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} /></div>
   {:else if nav.view === 'history'}
     <div class="journal__history">
       <HistoryPage

@@ -1,2 +1,6 @@
 export * from './model/scriptsList.svelte.ts'
+export * from './model/portTypes.ts'
+export * from './model/nodeMeta.ts'
+export * from './model/graphEdit.ts'
+export * from './model/graphGeometry.ts'
 export { default as ScriptPicker } from './ui/ScriptPicker.svelte'

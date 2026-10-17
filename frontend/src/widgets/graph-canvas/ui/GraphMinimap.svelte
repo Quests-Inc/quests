@@ -6,7 +6,7 @@
     mini,
     onGo,
   }: {
-    mini: { w: number; h: number; x0: number; y0: number; sc: number; nodes: { key: string; type: string; x: number; y: number; w: number; h: number; draft?: boolean }[]; view: { x: number; y: number; w: number; h: number } }
+    mini: { w: number; h: number; x0: number; y0: number; sc: number; nodes: { key: string; type: string; x: number; y: number; w: number; h: number; draft?: boolean; color?: string }[]; view: { x: number; y: number; w: number; h: number } }
     onGo: (e: { currentTarget: HTMLElement; clientX: number; clientY: number }) => void
   } = $props()
 
@@ -42,7 +42,7 @@
             width={Math.max(2, n.w * mini.sc)}
             height={Math.max(2, n.h * mini.sc)}
             rx="1"
-            fill={TYPES[n.type]?.color ?? '#888'}
+            fill={n.color ?? TYPES[n.type]?.color ?? '#888'}
             opacity={n.draft ? 1 : 0.7}
           />
         {/each}

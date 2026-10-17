@@ -19,12 +19,12 @@
     onOpenCreateQuest,
     onOpenAssistant,
   }: {
-    view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners',
+    view: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts',
     liveStatus: string,
     health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
     sidebarCollapsed?: boolean,
     onToggleSidebar?: (() => void) | null,
-    onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners') => void,
+    onViewChange: (v: 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts') => void,
     onOpenSettings: () => void,
     onOpenTemplates: () => void,
     onOpenSecrets: () => void,
@@ -549,6 +549,18 @@
     >
       <Icon name="layers" size={15} />
       <span class="view-tab__label">Раннеры</span>
+    </button>
+    <button
+      type="button"
+      class="view-tab"
+      class:view-tab--on={view === 'scripts'}
+      role="tab"
+      aria-selected={view === 'scripts'}
+      title="Скрипты: схемы проверок из нод"
+      onclick={() => onViewChange('scripts')}
+    >
+      <Icon name="edit" size={15} />
+      <span class="view-tab__label">Скрипты</span>
     </button>
   </div>
   {#snippet fullActions()}

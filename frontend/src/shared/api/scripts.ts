@@ -1,6 +1,6 @@
 import type { Script, ScriptUse } from './execution.gen'
 import { request } from './http.ts'
-import type { Graph, NodeInfo, Port, Problem } from './scriptgraph.gen'
+import type { Graph, NodeInfo, Port, Problem, Sample } from './scriptgraph.gen'
 
 export type ScriptSubject = 'step' | 'note'
 
@@ -49,6 +49,11 @@ export function getScriptUses(id: number) {
 
 export function validateScript(graph: Graph) {
   return request<ScriptCheck>('/api/scripts/validate', { method: 'POST', body: JSON.stringify({ graph }) })
+}
+
+/** The library's examples to start a script from. */
+export function getScriptSamples() {
+  return request<Sample[]>('/api/script-samples')
 }
 
 export function getScriptNodes() {

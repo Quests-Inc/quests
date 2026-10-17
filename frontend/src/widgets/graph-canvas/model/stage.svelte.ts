@@ -9,6 +9,7 @@ import {
   borderMarks,
   childKeysOf,
   drawableEdges,
+  fitCamera,
   hiddenNeighbors,
   minimapModel,
   outgoingRefKeys,
@@ -124,19 +125,8 @@ export function createGraphStage(deps: {
     const node = el
     if (!view || !node) return
     const r = node.getBoundingClientRect()
-    if (!r.width || !view.nodes.length) return
-    let x0 = Infinity
-    let y0 = Infinity
-    let x1 = -Infinity
-    let y1 = -Infinity
-    for (const n of view.nodes) {
-      x0 = Math.min(x0, n.x - n.w / 2)
-      x1 = Math.max(x1, n.x + n.w / 2)
-      y0 = Math.min(y0, n.y - n.h / 2)
-      y1 = Math.max(y1, n.y + n.h / 2)
-    }
-    const k = Math.min(1, (r.width - 40) / Math.max(1, x1 - x0), (r.height - 40) / Math.max(1, y1 - y0))
-    deps.setCam({ k, x: r.width / 2 - ((x0 + x1) / 2) * k, y: r.height / 2 - ((y0 + y1) / 2) * k })
+    const cam = fitCamera(view.nodes, { w: r.width, h: r.height })
+    if (cam) deps.setCam(cam)
   }
 
   /** Спрятать карточки, измерить, разложить, показать. Камера вписывается только при новом центре или глубине. */

@@ -109,6 +109,7 @@ packages:
       - "graph.go"
       - "types.go"
       - "info.go"
+      - "samples.go"
       - "validate.go"
     type_mappings:
       json.RawMessage: "unknown"

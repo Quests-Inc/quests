@@ -1,4 +1,5 @@
 export { default as GraphCanvas } from './ui/GraphCanvas.svelte'
+export { default as GraphMinimap } from './ui/GraphMinimap.svelte'
 export { createClusterFolds } from './model/folds.svelte.ts'
 export { createGraphGestures } from './model/gestures.svelte.ts'
 export { createLinkMode } from './model/linking.svelte.ts'

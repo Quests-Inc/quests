@@ -74,6 +74,25 @@ export interface NodeInfo {
 }
 
 //////////
+// source: samples.go
+
+/**
+ * Sample is a ready script to start from: the library's examples (ADR-0003). It is data, not code that runs by itself: using
+ * one copies its graph into the workspace, where the owner edits it. Anything that runs is the owner's text on a runner.
+ */
+export interface Sample {
+  id: string;
+  title: string;
+  description: string;
+  /**
+   * Subject is the kind of entity the script reads (`step` or `note`).
+   */
+  subject: string;
+  needs_runner: boolean;
+  graph: Graph;
+}
+
+//////////
 // source: types.go
 /*
 Package graph is the model of a script (ADR-0003): a directed acyclic graph of typed nodes, one `Code` node at most on

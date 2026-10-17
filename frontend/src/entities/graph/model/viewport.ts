@@ -98,3 +98,26 @@ export function minimapModel({
   const sc = Math.min(MINI_W / (x1 - x0), MINI_H / (y1 - y0))
   return { x0, y0, sc, w: (x1 - x0) * sc, h: (y1 - y0) * sc, nodes, view: { x: vx, y: vy, w: vw, h: vh } }
 }
+
+/**
+ * The camera that shows every node in a stage of the given size (centered, never zoomed in past 1:1), or null when there is
+ * nothing to fit. Nodes are given by their centre and size, as the map keeps them.
+ */
+export function fitCamera(
+  nodes: { x: number; y: number; w: number; h: number }[],
+  stage: { w: number; h: number }
+): { k: number; x: number; y: number } | null {
+  if (!stage.w || !nodes.length) return null
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const n of nodes) {
+    x0 = Math.min(x0, n.x - n.w / 2)
+    x1 = Math.max(x1, n.x + n.w / 2)
+    y0 = Math.min(y0, n.y - n.h / 2)
+    y1 = Math.max(y1, n.y + n.h / 2)
+  }
+  const k = Math.min(1, (stage.w - 40) / Math.max(1, x1 - x0), (stage.h - 40) / Math.max(1, y1 - y0))
+  return { k, x: stage.w / 2 - ((x0 + x1) / 2) * k, y: stage.h / 2 - ((y0 + y1) / 2) * k }
+}
