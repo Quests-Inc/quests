@@ -58,7 +58,7 @@ func TestMCPAgainstRealAPI(t *testing.T) {
 
 	// a quest with steps, then the compact list and the detail
 	created, text, isErr := m.call("create_quest", map[string]any{
-		"title": "MCP e2e", "description": strings.Repeat("d", 6000), "significance": "epic",
+		"title": "MCP e2e", "questline": "none", "description": strings.Repeat("d", 6000), "significance": "epic",
 		"steps": []map[string]any{{"title": "first", "description": "step body"}, {"title": "second"}},
 	})
 	if isErr {

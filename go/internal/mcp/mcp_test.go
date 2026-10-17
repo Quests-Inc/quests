@@ -443,3 +443,34 @@ func TestOldServerGetsAHint(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateQuestNeedsAnExplicitQuestline(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{
+		"POST /api/quests":    `{"id":9,"status":"active","progress_label":"0 / 0"}`,
+		"GET /api/questlines": `[{"id":3,"title":"Quests"}]`,
+		"GET /api/categories": `[{"id":5,"slug":"fun","label":"Развлечения"}]`,
+	}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "create_quest", `{"title":"a"}`),
+		call(2, "create_quest", `{"title":"b","questline":"  "}`),
+		call(3, "create_quest", `{"title":"c","questline":"none"}`),
+		call(4, "create_quest", `{"title":"d","questline":"Quests","tag_ids":[1]}`),
+		call(5, "create_quest", `{"title":"e","questline":"none","category":"fun","tag_ids":[1]}`),
+	)
+	for i := 0; i < 2; i++ {
+		if text, isErr := result(t, resps[i]); !isErr || !strings.Contains(text, "questline is required") {
+			t.Fatalf("call %d should be refused: %s", i+1, text)
+		}
+	}
+	text, isErr := result(t, resps[2])
+	if isErr || !strings.Contains(text, "unsorted") || !strings.Contains(text, "no tags") {
+		t.Fatalf("standalone, no category, no tags → both hints: %s", text)
+	}
+	if text, isErr := result(t, resps[3]); isErr || strings.Contains(text, `"hint"`) {
+		t.Fatalf("questline + tags → no hint: %s", text)
+	}
+	if text, isErr := result(t, resps[4]); isErr || strings.Contains(text, `"hint"`) {
+		t.Fatalf("category + tags → no hint: %s", text)
+	}
+}

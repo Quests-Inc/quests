@@ -200,13 +200,16 @@ func questTools(c *Client) []Tool {
 		DeadlineAt      *string  `json:"deadline_at,omitempty" desc:"ISO UTC, e.g. 2026-08-20T10:20:00Z"`
 		DurationSeconds *int     `json:"duration_seconds,omitempty" desc:"reminder window that opens this long before deadline_at"`
 		Category        string   `json:"category,omitempty" desc:"id or name; ignored when questline is given (it inherits)"`
-		Questline       string   `json:"questline,omitempty" desc:"id or name"`
+		Questline       string   `json:"questline" desc:"REQUIRED: id or name of the project this quest belongs to (list_questlines), or \"none\" to deliberately leave it standalone"`
 		Steps           []stepIn `json:"steps,omitempty"`
-		TagIDs          []int64  `json:"tag_ids,omitempty" desc:"existing tags, max 5"`
+		TagIDs          []int64  `json:"tag_ids,omitempty" desc:"pick from list_tags, max 5; a quest without tags is usually a miss"`
 		Quiet           *bool    `json:"quiet,omitempty" desc:"default true: no overlay toast"`
 	}
 	create := Typed("create_quest", "Create a quest (optionally with steps). Returns {id, ok, workspace, status, progress_label}.",
 		func(ctx context.Context, a createArgs) (any, error) {
+			if strings.TrimSpace(a.Questline) == "" {
+				return nil, &Err{422, `questline is required: pass the id or name of the project (see list_questlines) or "none" to leave the quest standalone on purpose`}
+			}
 			body := map[string]any{"title": a.Title}
 			if a.Description != nil {
 				body["description"] = *a.Description
@@ -260,7 +263,18 @@ func questTools(c *Client) []Tool {
 			if err := c.Do(ctx, http.MethodPost, "/api/quests", mutationQuery(a.Quiet), body, &q); err != nil {
 				return nil, err
 			}
-			return q.result(ctx, c, false), nil
+			res := q.result(ctx, c, false)
+			var hints []string
+			if ql == nil && body["category_id"] == nil {
+				hints = append(hints, "no questline and no category: the quest is unsorted; set a category with update_quest (category_id) or move it into a questline (questline_id)")
+			}
+			if len(a.TagIDs) == 0 {
+				hints = append(hints, "no tags: pick from list_tags and set them with set_tags (owner quest=N)")
+			}
+			if len(hints) > 0 {
+				res["hint"] = strings.Join(hints, "; ")
+			}
+			return res, nil
 		})
 
 	type updateArgs struct {
