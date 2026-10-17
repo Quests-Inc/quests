@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -32,10 +31,6 @@ var intToken = regexp.MustCompile(`-?\d+`)
 type CheckRunner struct {
 	Store *store.Store
 	Hub   *events.Hub
-	// PollViaGraph runs polled steps through the graph evaluator (ADR-0003) instead of the older reader, which takes the last
-	// integer found anywhere in the output. The graph reader is strict: the answer must be JSON. Off until the real check
-	// commands have been looked through for outputs that only the lenient reader accepts (QUESTS_POLL_GRAPH=1 turns it on).
-	PollViaGraph bool
 
 	mu       sync.Mutex
 	inFlight map[int64]struct{}
@@ -43,7 +38,7 @@ type CheckRunner struct {
 }
 
 func NewCheckRunner(st *store.Store, hub *events.Hub) *CheckRunner {
-	return &CheckRunner{Store: st, Hub: hub, PollViaGraph: os.Getenv("QUESTS_POLL_GRAPH") == "1", inFlight: map[int64]struct{}{}}
+	return &CheckRunner{Store: st, Hub: hub, inFlight: map[int64]struct{}{}}
 }
 
 func (r *CheckRunner) tryLock(id int64) bool {
@@ -343,30 +338,13 @@ func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.
 		}
 		return
 	}
-	if r.PollViaGraph {
-		_, err := r.startRun(ctx, implicitPrefix+"step_poll", nil, stepPollGraph(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
-			Label: *st.RunOn, Kind: execution.JobKindPoll, Title: q.Title + " · " + st.Title,
-			Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindPoll,
-			Timeout: pollTimeout, ValidFor: pollJobValidFor, QuestID: &qid, StepID: &sid,
-		})
-		if err != nil {
-			log.Printf("checks: start step %d on %q: %v", st.ID, *st.RunOn, err)
-		}
-		return
-	}
-	_, _, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
-		RunnerLabel:    *st.RunOn,
-		Kind:           execution.JobKindPoll,
-		QuestID:        &qid,
-		StepID:         &sid,
-		Title:          q.Title + " · " + st.Title,
-		DedupeKey:      "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindPoll,
-		Command:        strings.TrimSpace(*st.CheckCommand),
-		TimeoutSeconds: int(pollTimeout / time.Second),
-		ValidFor:       pollJobValidFor,
+	_, err := r.startRun(ctx, implicitPrefix+"step_poll", nil, stepPollGraph(strings.TrimSpace(*st.CheckCommand)), runSubject{Type: "step", ID: st.ID}, runBinding{
+		Label: *st.RunOn, Kind: execution.JobKindPoll, Title: q.Title + " · " + st.Title,
+		Dedupe:  "step:" + strconv.FormatInt(st.ID, 10) + ":" + execution.JobKindPoll,
+		Timeout: pollTimeout, ValidFor: pollJobValidFor, QuestID: &qid, StepID: &sid,
 	})
 	if err != nil {
-		log.Printf("checks: enqueue step %d on %q: %v", st.ID, *st.RunOn, err)
+		log.Printf("checks: start step %d on %q: %v", st.ID, *st.RunOn, err)
 	}
 }
 

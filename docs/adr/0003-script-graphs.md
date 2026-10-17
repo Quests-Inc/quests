@@ -203,8 +203,8 @@ by one (the service variables migration `QUESTS_STEP_ID` / `QUESTS_NOTE_ID` → 
 - Step 3 (storage, API, `workspace` secret owner): done. `script` / `script_version` (migration 0017) with versions and an
   optimistic check, `/api/scripts*` and `/api/script-nodes*`, scripts in the workspace export/import; the `workspace` owner of
   secrets (migration 0016) with `GET|PUT|DELETE /api/workspace/secrets`, inherited down to everything including notes.
-- Step 4 (evaluator, stored runs, job format): done for the note check and the one-shot step (`implicit:note_check`,
-  `implicit:step_once`); the polled step is built (`implicit:step_poll`) and behind `QUESTS_POLL_GRAPH=1` until the real check
-  commands are looked through for outputs only the lenient reader accepts. Template emit stays on its older path: its pull model
-  (attempts, retries, the period marker) is a separate change. Jobs keep the four entity columns for now; `subject_*` and the
-  retirement of `kind` come with the removal of the older kinds (the release after this one).
+- Step 4 (evaluator, stored runs, job format): done for the note check, the one-shot step and the polled step
+  (`implicit:note_check`, `implicit:step_once`, `implicit:step_poll`). The polled step reads its answer strictly; the live check
+  commands were looked through first and none relied on the lenient reader. Template emit stays on its older path: its pull
+  model (attempts, retries, the period marker) is a separate change. Jobs keep the four entity columns for now; `subject_*`
+  and the retirement of `kind` come with the removal of the older kinds (the release after this one).

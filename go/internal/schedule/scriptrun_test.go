@@ -207,18 +207,16 @@ func TestOnceStepCancelStopsItWithoutFailingTheQuest(t *testing.T) {
 	}
 }
 
-func pollRig(t *testing.T, cmd string, viaGraph bool) (*CheckRunner, journal.Quest) {
+func pollRig(t *testing.T, cmd string) (*CheckRunner, journal.Quest) {
 	t.Helper()
 	st := openRunnerChecksDB(t)
 	q := seedQuest(t, st, []journal.Step{remoteStep("poll", cmd, testLabel, journal.RunModePoll)})
-	r := NewCheckRunner(st, events.New())
-	r.PollViaGraph = viaGraph
-	return r, q
+	return NewCheckRunner(st, events.New()), q
 }
 
-// The graph reader of a polled step must agree with the older reader on every answer the strict format allows: the same
-// progress, total and description land on the step, and the check is recorded as run either way.
-func TestPollViaGraphMatchesTheOlderReader(t *testing.T) {
+// A polled step is a run of a graph: whatever the answer carries lands on the step, and the check is recorded as run either
+// way, also when the command failed or the answer was not one.
+func TestPolledStepReadsItsAnswer(t *testing.T) {
 	for _, tc := range []struct {
 		name, cmd string
 		progress  int
@@ -232,46 +230,26 @@ func TestPollViaGraphMatchesTheOlderReader(t *testing.T) {
 		{"only a total", `echo '{"total": 9}'`, 0, 9, ""},
 		{"a failing command changes nothing", `echo 7; exit 2`, 0, 5, ""},
 		{"a total below one is ignored", `echo '{"progress": 1, "total": 0}'`, 1, 5, ""},
+		{"free text is not an answer", `echo "готово: 5"`, 0, 5, ""},
+		{"an empty answer", `true`, 0, 5, ""},
 	} {
-		for _, viaGraph := range []bool{false, true} {
-			r, q := pollRig(t, tc.cmd, viaGraph)
-			ctx := bg()
-			r.Tick(ctx)
-			settle(t, r.Store, r)
-			got, _ := r.Store.Journal.GetQuest(ctx, q.ID)
-			st := got.Steps[0]
-			if st.CheckLastRunAt == nil {
-				t.Errorf("%s (graph=%v): the check must be recorded as run", tc.name, viaGraph)
-			}
-			if st.ProgressCurrent != tc.progress || st.ProgressTotal != tc.total || st.Description != tc.desc {
-				t.Errorf("%s (graph=%v): progress %d total %d desc %q, want %d %d %q", tc.name, viaGraph,
-					st.ProgressCurrent, st.ProgressTotal, st.Description, tc.progress, tc.total, tc.desc)
-			}
-		}
-	}
-}
-
-// What the strict reader does not take: the older reader finds a number in free text, the graph reader writes nothing.
-// This is the difference the audit of the real commands is for.
-func TestPollViaGraphIsStrictAboutFreeText(t *testing.T) {
-	for _, viaGraph := range []bool{false, true} {
-		r, q := pollRig(t, `echo "готово: 5"`, viaGraph)
+		r, q := pollRig(t, tc.cmd)
 		ctx := bg()
 		r.Tick(ctx)
 		settle(t, r.Store, r)
 		got, _ := r.Store.Journal.GetQuest(ctx, q.ID)
-		want := 5
-		if viaGraph {
-			want = 0
+		st := got.Steps[0]
+		if st.CheckLastRunAt == nil {
+			t.Errorf("%s: the check must be recorded as run", tc.name)
 		}
-		if got.Steps[0].ProgressCurrent != want || got.Steps[0].CheckLastRunAt == nil {
-			t.Errorf("graph=%v: progress %d, want %d (and the check recorded)", viaGraph, got.Steps[0].ProgressCurrent, want)
+		if st.ProgressCurrent != tc.progress || st.ProgressTotal != tc.total || st.Description != tc.desc {
+			t.Errorf("%s: progress %d total %d desc %q, want %d %d %q", tc.name, st.ProgressCurrent, st.ProgressTotal, st.Description, tc.progress, tc.total, tc.desc)
 		}
 	}
 }
 
-func TestPollViaGraphQueuesOneRunAtATime(t *testing.T) {
-	r, _ := pollRig(t, `echo 1`, true)
+func TestPolledStepQueuesOneRunAtATime(t *testing.T) {
+	r, _ := pollRig(t, `echo 1`)
 	ctx := bg()
 	r.Tick(ctx)
 	if _, err := r.Store.DB.Exec(`UPDATE queststep SET check_last_run_at = NULL`); err != nil {

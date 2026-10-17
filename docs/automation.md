@@ -87,7 +87,7 @@ What a plain `check_command` stands for is an *implicit graph* built in `scriptr
 |---|---|---|
 | note freshness | `implicit:note_check` | through the evaluator |
 | one-shot step (`run_mode=once`) | `implicit:step_once` | through the evaluator |
-| polled step | `implicit:step_poll` | opt-in: `QUESTS_POLL_GRAPH=1`. The answer must be JSON (a number or an object); the older reader also took the last integer found in free text, so the real commands are checked first |
+| polled step | `implicit:step_poll` | through the evaluator. The answer must be JSON (a number or an object, as the whole output or its last line); the older reader also took the last integer found in free text. The live steps were looked through before the switch: none relied on it |
 | template emit (`emit_pool_command`) | not yet | older path (pull model with attempts and retries) |
 
 Jobs queued before runs existed have no `run_id` and are served by the older kinds until they finish.
