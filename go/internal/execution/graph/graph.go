@@ -102,3 +102,14 @@ func (g Graph) Subjects() []string {
 	sort.Strings(out)
 	return out
 }
+
+// WithoutLayout is the graph with the editor's positions removed: what is left is what the script does, so two graphs that
+// differ only in where their nodes sit compare equal.
+func (g Graph) WithoutLayout() Graph {
+	nodes := make([]Node, len(g.Nodes))
+	for i, n := range g.Nodes {
+		n.X, n.Y = 0, 0
+		nodes[i] = n
+	}
+	return Graph{Nodes: nodes, Edges: g.Edges}
+}

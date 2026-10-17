@@ -1,5 +1,7 @@
 // Поле редактора: камера и жесты берём у карты (createGraphGestures), здесь — то, чего у карты нет:
 // ноды скрипта как карточки, связь протягиванием от выхода ко входу, клавиши, миникарта и «вписать».
+import { untrack } from 'svelte'
+
 import { fitCamera, minimapModel } from '@/entities/graph'
 import { NODE_W, type ScriptNodeView, viewNodes } from '@/entities/script'
 import type { End } from '@/shared/api/scriptgraph.gen.ts'
@@ -16,6 +18,8 @@ export function createCanvas(ed: ScriptEditor) {
   let pending = $state<Pending | null>(null)
   let size = $state({ w: 0, h: 0 })
   let fitted: number | null = null
+  // The camera follows the stage's size until the user takes it over (pan, zoom, or the fit button hands it back).
+  let manual = false
   let bgDown: { x: number; y: number } | null = null
   let added = 0
 
@@ -44,31 +48,47 @@ export function createCanvas(ed: ScriptEditor) {
     select: (n) => ed.select((n as unknown as ScriptNodeView).id),
   })
 
-  /** Rebuild the node views from the graph (call from an effect: it reads the graph and the ports). */
+  /**
+   * Rebuild the node views from the graph (call from an effect: it depends on the graph, the ports and the stage size).
+   * What it writes is read without being tracked, or the effect would re-run on its own result.
+   */
   function sync() {
-    views = viewNodes(ed.graph, ed.portsOf, ed.meta)
-    if (el && ed.scriptId !== fitted && views.length && size.w) {
-      fitted = ed.scriptId
-      fit()
-    }
+    const next = viewNodes(ed.graph, ed.portsOf, ed.meta)
+    const sized = size.w > 0
+    untrack(() => {
+      views = next
+      if (el && sized && next.length && ed.scriptId !== fitted) {
+        fitted = ed.scriptId
+        manual = false
+        fit()
+      }
+    })
   }
 
+  /** Follow the field's size (call from an effect: only `el` is tracked, what the observer writes is not). */
   function watchSize() {
     const node = el
     if (!node) return
-    const read = () => {
-      size = { w: node.clientWidth, h: node.clientHeight }
-    }
-    read()
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(read)
-    ro.observe(node)
-    return () => ro.disconnect()
+    return untrack(() => {
+      const read = () => {
+        size = { w: node.clientWidth, h: node.clientHeight }
+        if (!manual && views.length) fit()
+      }
+      read()
+      if (typeof ResizeObserver === 'undefined') return
+      const ro = new ResizeObserver(read)
+      ro.observe(node)
+      return () => ro.disconnect()
+    })
   }
 
   function fit() {
     const cam = fitCamera(views, size)
     if (cam) gest.cam = cam
+  }
+  const refit = () => {
+    manual = false
+    fit()
   }
 
   const view = (id: number) => views.find((n) => n.id === id)
@@ -86,7 +106,13 @@ export function createCanvas(ed: ScriptEditor) {
     if (p) await ed.link(p.from, to)
   }
 
+  function onWheel(e: WheelEvent) {
+    manual = true
+    gest.onWheel(e)
+  }
+
   function onBgDown(e: PointerEvent) {
+    manual = true
     bgDown = (e.target as Element).closest('[data-gkey]') ? null : { x: e.clientX, y: e.clientY }
     gest.onBgDown(e)
   }
@@ -193,10 +219,11 @@ export function createCanvas(ed: ScriptEditor) {
     view,
     sync,
     watchSize,
-    fit,
+    fit: refit,
     startLink,
     finishLink,
     onBgDown,
+    onWheel,
     onMove,
     onUp,
     onKey,

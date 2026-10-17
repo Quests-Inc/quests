@@ -299,3 +299,16 @@ func TestSamplesAndImplicitGraphsAreValid(t *testing.T) {
 		t.Error("an unknown implicit graph must be refused")
 	}
 }
+
+func TestWithoutLayoutIgnoresPositions(t *testing.T) {
+	a := Graph{Nodes: []Node{{ID: 1, Type: "source.step", X: 10, Y: 20}}}
+	b := Graph{Nodes: []Node{{ID: 1, Type: "source.step", X: 500, Y: 90}}}
+	ja, _ := json.Marshal(a.WithoutLayout())
+	jb, _ := json.Marshal(b.WithoutLayout())
+	if string(ja) != string(jb) {
+		t.Fatalf("graphs that differ only in positions must compare equal: %s %s", ja, jb)
+	}
+	if a.Nodes[0].X != 10 {
+		t.Fatal("the original must keep its positions")
+	}
+}

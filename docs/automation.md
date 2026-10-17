@@ -68,6 +68,13 @@ are in `internal/execution/graph`; the store is `internal/execution/scripts.go`;
 | `POST /api/scripts/validate` | check a graph without saving it |
 | `GET /api/script-nodes`, `POST /api/script-nodes/ports` | the node catalog and the ports a node gets from its parameters (for the editor) |
 
+**In the UI** the scripts live in the «Скрипты» tab: a list, samples to start from (`GET /api/script-samples`) and an editor
+on the map's own field (its gestures and minimap; `frontend/src/pages/scripts`). Nodes are dragged, linked from an output to an
+input, their parameters are edited on the right, the validator answers while you draw, and a save that only moves nodes
+rewrites the current version instead of adding one. A step or a note picks a script in its auto-check form
+(`PUT|DELETE /api/steps|notes/{id}/script`); the script then takes the place of the command, and the device, mode and interval
+stay the step's own.
+
 A graph is validated on save (types of ports, required inputs, cycles, one `Code` node per path); a bad one is a 422 listing
 the problems per node. Nothing runs a script yet: the evaluator and the attaching of scripts to steps, notes and templates
 are the next stages of quest=440.

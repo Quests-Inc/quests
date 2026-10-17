@@ -29,7 +29,7 @@
 
 <style>
   .pal {
-    flex: 0 0 12.5rem;
+    flex: 0 0 11rem;
     overflow: auto;
     padding-right: 0.3rem;
   }

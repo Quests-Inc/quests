@@ -58,7 +58,9 @@ type ScriptUpdate struct {
 
 // prepared is a graph that passed the checks, in its canonical form and with what the list needs.
 type prepared struct {
-	json        []byte
+	json []byte
+	// logic is the graph without the editor's positions: a change that leaves it as it was is a move, not a new version.
+	logic       []byte
 	subjects    string
 	needsRunner bool
 }
@@ -75,7 +77,21 @@ func prepareGraph(raw []byte) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	return prepared{json: canon, subjects: strings.Join(g.Subjects(), ","), needsRunner: g.RunsOnRunner()}, nil
+	logic, err := json.Marshal(g.WithoutLayout())
+	if err != nil {
+		return prepared{}, err
+	}
+	return prepared{json: canon, logic: logic, subjects: strings.Join(g.Subjects(), ","), needsRunner: g.RunsOnRunner()}, nil
+}
+
+// sameLogic reports whether a stored graph does what the prepared one does, wherever its nodes sit.
+func sameLogic(stored []byte, p prepared) bool {
+	g, err := graph.Decode(stored)
+	if err != nil {
+		return false
+	}
+	logic, err := json.Marshal(g.WithoutLayout())
+	return err == nil && bytes.Equal(logic, p.logic)
 }
 
 func checkScriptText(title, description string) (string, error) {
@@ -215,12 +231,19 @@ func (s *Store) UpdateScript(ctx context.Context, id int64, in ScriptUpdate) (Sc
 
 	version, subjects, needs := cur.Version, strings.Join(cur.Subjects, ","), cur.NeedsRunner
 	var newGraph []byte
+	var moveOnly bool
 	if in.Graph != nil {
 		p, err := prepareGraph(in.Graph)
 		if err != nil {
 			return Script{}, err
 		}
-		if !bytes.Equal(p.json, cur.Graph) {
+		switch {
+		case bytes.Equal(p.json, cur.Graph):
+		case sameLogic(cur.Graph, p):
+			// Only the positions changed: the current version is rewritten in place, so moving nodes about does not pile up
+			// versions (a queued job runs the same logic whichever it reads).
+			newGraph, moveOnly = p.json, true
+		default:
 			version++
 			subjects, needs, newGraph = p.subjects, p.needsRunner, p.json
 		}
@@ -240,7 +263,11 @@ func (s *Store) UpdateScript(ctx context.Context, id int64, in ScriptUpdate) (Sc
 	if n, _ := res.RowsAffected(); n == 0 {
 		return Script{}, ErrScriptVersion // saved by someone else between the read and the write
 	}
-	if newGraph != nil {
+	if newGraph != nil && moveOnly {
+		if _, err := tx.ExecContext(ctx, `UPDATE script_version SET graph = ? WHERE script_id = ? AND version = ?`, string(newGraph), id, version); err != nil {
+			return Script{}, err
+		}
+	} else if newGraph != nil {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO script_version (script_id, version, graph, created_at) VALUES (?, ?, ?, ?)`,
 			id, version, string(newGraph), now); err != nil {
 			return Script{}, err

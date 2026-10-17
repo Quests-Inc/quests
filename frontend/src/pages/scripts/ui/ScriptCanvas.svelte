@@ -67,7 +67,7 @@
   onpointermove={cv.onMove}
   onpointerup={cv.onUp}
   onpointercancel={cv.onUp}
-  onwheel={cv.gest.onWheel}
+  onwheel={cv.onWheel}
   onkeydown={cv.onKey}
 >
   {#if hint}<p class="scv__hint">{hint}</p>{/if}

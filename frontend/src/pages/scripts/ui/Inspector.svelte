@@ -91,7 +91,7 @@
 
 <style>
   .insp {
-    flex: 0 0 19rem;
+    flex: 0 0 17rem;
     overflow: auto;
     display: grid;
     align-content: start;

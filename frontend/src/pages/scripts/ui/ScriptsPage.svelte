@@ -207,7 +207,7 @@
     overflow: hidden;
   }
   .scripts__list {
-    flex: 0 0 15rem;
+    flex: 0 0 13rem;
     min-height: 0;
     overflow: auto;
     display: grid;

@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -48,6 +49,12 @@ func TestScriptLifecycleAndVersions(t *testing.T) {
 	// The same graph again is not a new version either.
 	if sc2, err = st.UpdateScript(ctx, sc.ID, ScriptUpdate{Graph: scriptGraph("echo 1"), ExpectedVersion: 1}); err != nil || sc2.Version != 1 {
 		t.Fatalf("an unchanged graph must keep the version: %+v %v", sc2, err)
+	}
+	// Moving nodes about is not a new version: the current one is rewritten with the new positions.
+	moved := bytes.Replace(scriptGraph("echo 1"), []byte(`{"id":1,"type":"source.step"}`), []byte(`{"id":1,"type":"source.step","x":300,"y":40}`), 1)
+	sc2, err = st.UpdateScript(ctx, sc.ID, ScriptUpdate{Graph: moved, ExpectedVersion: 1})
+	if err != nil || sc2.Version != 1 || !strings.Contains(string(sc2.Graph), `"x":300`) {
+		t.Fatalf("a move must keep the version and store the position: %+v %v", sc2, err)
 	}
 	// A different graph is version 2, and version 1 stays readable.
 	sc3, err := st.UpdateScript(ctx, sc.ID, ScriptUpdate{Graph: scriptGraph("echo 2"), ExpectedVersion: 1})

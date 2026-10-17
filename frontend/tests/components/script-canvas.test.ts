@@ -166,3 +166,32 @@ test('нода из палитры ложится ближе к середине
   cv.sync()
   expect(cv.views).toHaveLength(4)
 })
+
+// The field as the page mounts it: its effects must settle (a loop would throw "effect_update_depth_exceeded"), draw every
+// node with its ports and a wire per link, and fit the camera once the field has a size.
+test('поле смонтировано: ноды и связи нарисованы, эффекты не зацикливаются', async () => {
+  const { mount, flushSync, unmount } = await import('svelte')
+  const { default: ScriptCanvas } = await import('@/pages/scripts/ui/ScriptCanvas.svelte')
+  const { ed, cv } = await rig()
+  cv.el = null
+  // A field that has a size, as in a browser: that is what lets the camera fit (and what a feedback loop would feed on).
+  const proto = HTMLElement.prototype
+  const had = Object.getOwnPropertyDescriptor(proto, 'clientWidth')
+  Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => 1000 })
+  Object.defineProperty(proto, 'clientHeight', { configurable: true, get: () => 600 })
+  const target = document.createElement('div')
+  document.body.appendChild(target)
+  const app = mount(ScriptCanvas, { target, props: { ed, cv } })
+  flushSync()
+  for (let i = 0; i < 5; i++) await Promise.resolve()
+  flushSync()
+
+  expect(target.querySelectorAll('.snode')).toHaveLength(3)
+  expect(target.querySelectorAll('.snode__dot').length).toBeGreaterThan(0)
+  expect(target.querySelectorAll('svg.scv__wires path[stroke-width="2"]')).toHaveLength(1) // одна связь графа
+  expect(cv.gest.cam).not.toEqual({ x: 0, y: 0, k: 1 }) // и камера вписала ноды
+  unmount(app)
+  target.remove()
+  if (had) Object.defineProperty(proto, 'clientWidth', had)
+  else delete (proto as unknown as Record<string, unknown>).clientWidth
+})
