@@ -60,14 +60,14 @@
   }
 </script>
 
-<div class="autocheck">
+<div class="autocheck formscope">
   {#if allowScript}
     <div class="autocheck__script">
-      <ScriptPicker kind="step" bind:value={scriptId} />
+      <ScriptPicker kind="step" bind:value={scriptId} legacy={command} onClearLegacy={() => (command = '')} />
     </div>
   {/if}
   <div class="autocheck__row">
-    {#if !scripted}
+    {#if !allowScript}
     <textarea
       class="mono autocheck__cmd"
       rows="1"

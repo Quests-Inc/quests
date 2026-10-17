@@ -109,7 +109,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
   const when = (iso: string|number|Date) => (iso ? new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '—')
 </script>
 
-<div class="nc">
+<div class="nc formscope">
   <button type="button" class="nc__head" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="nc__title">Проверка актуальности</span>
     <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
@@ -125,18 +125,16 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
 
   {#if open}
     <div class="nc__body">
-      <ScriptPicker kind="note" bind:value={scriptId} onchange={() => (dirty = true)} />
-      {#if !scripted}
-      <textarea
-        class="mono nc__cmd"
-        rows="3"
-        placeholder={'команда: напечатает 0 или 1 (1 — устарела) либо JSON {"outdated": 1, "reason": "…"}\nможно несколько строк или скрипт: #!/usr/bin/env python3 …'}
-        aria-label="Команда проверки актуальности"
-        spellcheck="false"
-        bind:value={command}
-        oninput={() => (dirty = true)}
-      ></textarea>
-      {/if}
+      <ScriptPicker
+        kind="note"
+        bind:value={scriptId}
+        legacy={command}
+        onClearLegacy={() => {
+          command = ''
+          dirty = true
+        }}
+        onchange={() => (dirty = true)}
+      />
       <div class="nc__opts">
         <input
           type="number"
@@ -157,10 +155,10 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
         </HelpTip>
       </div>
       <div class="nc__actions">
-        <button type="button" class="btn btn--primary" disabled={busy || (!command.trim() && !scripted)} onclick={save}>Сохранить</button>
+        <button type="button" class="btn btn--primary" disabled={busy || !dirty || (!command.trim() && !scripted)} onclick={save}>Сохранить</button>
         <button type="button" class="btn" disabled={busy || !active || dirty} onclick={now} title="Запустить на ближайшем такте (до 15 с)">Проверить сейчас</button>
         <button type="button" class="btn" onclick={() => onOpenSecrets?.()}>Секреты</button>
-        {#if active}<button type="button" class="btn btn--danger-solid" disabled={busy} onclick={remove}>Убрать проверку</button>{/if}
+        {#if active}<button type="button" class="btn btn--danger" disabled={busy} onclick={remove}>Убрать проверку</button>{/if}
       </div>
       {#if check?.reason}<p class="nc__line">Причина: {check.reason}</p>{/if}
       {#if active}<p class="nc__line nc__muted">Последний запуск: {when(check?.last_run_at)}</p>{/if}
@@ -223,26 +221,9 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     display: grid;
     gap: 0.5rem;
   }
-  .nc__cmd,
-  .nc__interval {
-    box-sizing: border-box;
-    padding: 0.4rem 0.55rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    background: var(--color-bg, #121212);
-    color: var(--color-fg, #e8e8e8);
-    font-size: var(--text-sm, 0.875rem);
-  }
   .nc__runon {
-    display: inline-block;
-    min-width: 12rem;
-  }
-  .nc__cmd {
-    width: 100%;
-    font-size: var(--text-xs, 0.75rem);
-    resize: vertical;
-    min-height: 3.2rem;
-    line-height: 1.4;
+    flex: 1 1 12rem;
+    min-width: 0;
   }
   .nc__opts {
     display: flex;
@@ -250,7 +231,8 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     align-items: center;
     gap: 0.5rem;
   }
-  .nc__interval {
+  .nc__opts .nc__interval {
+    flex: 0 0 5rem;
     width: 5rem;
   }
   .nc__actions {
