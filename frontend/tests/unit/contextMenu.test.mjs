@@ -40,3 +40,12 @@ test('контекстное меню шага: прогресс — тольк�
   expect(ids(multi)).toContain('progress')
   expect(contextMenuItems({ kind: 'none', lineId: null, questId: null, stepId: null })).toEqual([])
 })
+
+test('контекстное меню группы квестов: ссылки со счётчиком, статус, отсрочка, значимость; без «Редактировать» и «Удалить»', () => {
+  const items = contextMenuItems({ kind: 'quests', lineId: null, questId: 3, stepId: null, count: 4 })
+  expect(items[0]).toMatchObject({ id: 'copy-ids', label: 'Копировать ссылки (4)' })
+  expect(ids(items)).toEqual(expect.arrayContaining(['status', 'delay', 'sig']))
+  expect(ids(items)).not.toContain('edit')
+  expect(ids(items)).not.toContain('delete')
+  expect(items.find((i) => i.id === 'status').children.some((c) => c.checked)).toBe(false)
+})

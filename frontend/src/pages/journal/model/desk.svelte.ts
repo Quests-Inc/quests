@@ -1,5 +1,7 @@
 // Действия журнала: меню, модалки квеста и квестлайна, удаление, прогресс шага, закрепление.
 // Оболочка только создаёт стол и открывает его с шапки; вкладка журнала и оверлеи читают его.
+import { untrack } from 'svelte'
+
 import { replaceQuest } from '@/entities/quest'
 import {
   ackQuestFailure,
@@ -14,6 +16,7 @@ import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 import { createDeletions } from './deletions.svelte.ts'
 import { createJournalMenu } from './journalMenu.svelte.ts'
+import { createMultiSelect } from './multiSelect.svelte.ts'
 import { createQuestActions } from './questActions.svelte.ts'
 import { createStepProgress, questIdOfStep, stepRef } from './stepProgress.svelte.ts'
 
@@ -128,6 +131,28 @@ export function createJournalDesk(deps: {
     }
   }
 
+  /** Ссылки на несколько сущностей разом: по одной на строку. */
+  async function copyMany(kind: string, ids: number[]) {
+    if (!ids.length) return
+    try {
+      await copyText(ids.map((id) => `${kind}=${id}`).join('\n'))
+      toast(`Скопировано ссылок: ${ids.length}`, { kind: 'success', ttl: 1600 })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      deps.setError(message)
+      toast(message, { kind: 'error' })
+    }
+  }
+
+  const multi = createMultiSelect({ current: () => deps.getSelectedId() })
+  // Перезагрузка списка или удаление не оставляют в выделении квесты, которых уже нет.
+  $effect.root(() => {
+    $effect(() => {
+      const ids = new Set(deps.getQuests().map((q) => q.id))
+      untrack(() => multi.prune((id) => ids.has(id)))
+    })
+  })
+
   function applyQuest(quest: { id: number }, { select = true } = {}) {
     if (!replaceQuest(quest)) deps.reload()
     if (select) deps.setSelectedId(quest.id)
@@ -181,6 +206,9 @@ export function createJournalDesk(deps: {
 
   const menu = createJournalMenu({
     quests: () => deps.getQuests(),
+    picked: (id) => multi.targets(id),
+    clearPicked: () => multi.clear(),
+    copyMany: (kind, ids) => void copyMany(kind, ids),
     questlines: () => deps.getQuestlines(),
     findStep: (stepId) => stepRef(deps.getQuests(), stepId),
     selectQuest: (id) => deps.setSelectedId(id),
@@ -307,6 +335,7 @@ export function createJournalDesk(deps: {
       steps.editValue = v
     },
     menu,
+    multi,
     del,
     noteRemote,
     consumeRemoteEdit,

@@ -35,6 +35,8 @@
     lineOpen,
     nowMs,
     onSelect,
+    pickedIds = new Set<number>(),
+    onRowClick,
     onTogglePin,
     onQuestContextMenu,
     onLineContextMenu,
@@ -70,6 +72,10 @@
     lineOpen: Record<string, boolean>,
     nowMs: number,
     onSelect: (id: number) => void,
+    /** Quests picked with Ctrl/Shift-click. */
+    pickedIds?: ReadonlySet<number>,
+    /** Ctrl/Shift-click goes here first: true = taken into the selection, the row is not opened. */
+    onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean,
     onTogglePin: (quest: any, event: Event) => void,
     onQuestContextMenu: (event: MouseEvent, quest: any) => void,
     onLineContextMenu: (event: MouseEvent, line: any) => void,
@@ -94,6 +100,12 @@
   }
 
   let rootEl: HTMLElement | null = $state(null)
+
+  /** Quest ids in the order the rows are on screen now (folded groups are not there). */
+  function visibleOrder() {
+    const ids = [...(rootEl?.querySelectorAll<HTMLElement>('.quest-row[data-qid]') ?? [])].map((el) => Number(el.dataset.qid))
+    return [...new Set(ids)]
+  }
 
   /** The nearest ancestor that actually scrolls. */
   function scrollParent(el: HTMLElement) {
@@ -178,10 +190,15 @@
       data-nav
       class="quest-row"
       class:quest-row--active={q.id === selectedId}
+      class:quest-row--picked={pickedIds.has(q.id)}
+      data-qid={q.id}
       class:quest-row--pinned={q.pinned}
       class:quest-row--inactive={isQuestInactive(q) && q.status !== 'frozen' && !(q.status === 'failed' && q.failure_inbox)}
       style:--tag-n={q.tags?.length || 0}
-      onclick={() => onSelect(q.id)}
+      onclick={(e) => {
+        if (onRowClick?.(e, q.id, visibleOrder())) return
+        onSelect(q.id)
+      }}
       oncontextmenu={(e) => onQuestContextMenu(e, q)}
     >
       <span class="quest-row__top">

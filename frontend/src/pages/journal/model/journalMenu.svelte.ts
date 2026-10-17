@@ -2,7 +2,7 @@
 // Сами действия (правка, удаление, статус…) приходят снаружи — здесь только разбор пункта меню.
 import { contextMenuItems } from './contextMenu.ts'
 
-type Kind = 'line' | 'quest' | 'step'
+type Kind = 'line' | 'quest' | 'quests' | 'step'
 type Pt = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }
 type Quest = { id: number; status?: string; failure_inbox?: boolean }
 type Step = { id: number; title?: string; progress_total?: number }
@@ -10,6 +10,10 @@ type Line = { id: number; category_id?: number | null }
 
 export function createJournalMenu(deps: {
   quests: () => Quest[]
+  /** Какие квесты выделены (Ctrl/Shift-клик) и сбросить выделение; без них меню только для одного квеста. */
+  picked?: (questId: number) => number[]
+  clearPicked?: () => void
+  copyMany?: (kind: string, ids: number[]) => unknown
   questlines: () => Line[]
   findStep: (stepId: number) => { step: Step; questId: number } | null
   selectQuest: (id: number) => void
@@ -29,6 +33,9 @@ export function createJournalMenu(deps: {
     patchSignificance: (q: Quest, value: string) => unknown
     exportQuest: (q: Quest, mode: 'md' | 'rich' | 'simple') => unknown
     ackFailure?: (q: Quest) => unknown
+    postponeMany?: (qs: Quest[], minutes: number) => unknown
+    patchStatusMany?: (qs: Quest[], status: string) => unknown
+    patchSignificanceMany?: (qs: Quest[], value: string) => unknown
   }
   step: {
     bump: (s: Step, delta: number, questId: number) => unknown
@@ -42,6 +49,7 @@ export function createJournalMenu(deps: {
   let lineId = $state<number | null>(null)
   let questId = $state<number | null>(null)
   let stepId = $state<number | null>(null)
+  let groupIds = $state<number[]>([])
 
   const items = $derived(
     contextMenuItems({
@@ -50,6 +58,7 @@ export function createJournalMenu(deps: {
       quest: deps.quests().find((q) => q.id === questId),
       questId,
       stepId,
+      count: groupIds.length,
       step: stepId != null ? deps.findStep(stepId)?.step : undefined,
     })
   )
@@ -69,6 +78,19 @@ export function createJournalMenu(deps: {
     show(e)
   }
   function openQuest(e: Pt, quest: { id: number }) {
+    const group = deps.picked?.(quest.id) ?? [quest.id]
+    if (group.length > 1) {
+      // Правый клик по выделенному — меню для всей группы, открытый квест не меняется.
+      kind = 'quests'
+      groupIds = group
+      questId = quest.id
+      lineId = null
+      stepId = null
+      show(e)
+      return
+    }
+    deps.clearPicked?.()
+    groupIds = []
     kind = 'quest'
     questId = quest.id
     lineId = null
@@ -86,6 +108,7 @@ export function createJournalMenu(deps: {
   function close() {
     open = false
     kind = null
+    groupIds = []
   }
 
   function selectLine(action: string) {
@@ -133,8 +156,24 @@ export function createJournalMenu(deps: {
       deps.askDeleteStep({ questId: qid, stepId: step.id, title: step.title || `step=${step.id}` })
   }
 
+  function selectGroup(action: string): void {
+    const list = deps.quests().filter((q) => groupIds.includes(q.id))
+    if (!list.length) return
+    if (action === 'copy-ids')
+      return void deps.copyMany?.(
+        'quest',
+        list.map((q) => q.id)
+      )
+    if (action.startsWith('delay-')) {
+      const minutes = Number(action.slice('delay-'.length))
+      if (minutes > 0) deps.quest.postponeMany?.(list, minutes)
+    } else if (action.startsWith('status:')) deps.quest.patchStatusMany?.(list, action.slice('status:'.length))
+    else if (action.startsWith('sig:')) deps.quest.patchSignificanceMany?.(list, action.slice('sig:'.length))
+  }
+
   async function select(action: string) {
-    if (kind === 'line') selectLine(action)
+    if (kind === 'quests') selectGroup(action)
+    else if (kind === 'line') selectLine(action)
     else if (kind === 'quest') selectQuestAction(action)
     else if (kind === 'step') await selectStep(action)
   }

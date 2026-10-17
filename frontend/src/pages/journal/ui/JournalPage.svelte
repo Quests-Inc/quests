@@ -23,6 +23,8 @@
     stepEditId = null,
     stepEditValue = '',
     onSelect,
+    pickedIds = new Set<number>(),
+    onRowClick,
     onTogglePin,
     onQuestContextMenu,
     onLineContextMenu,
@@ -56,6 +58,8 @@
     stepEditId?: number | null
     stepEditValue?: string
     onSelect: (id: number) => void
+    pickedIds?: ReadonlySet<number>
+    onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean
     onTogglePin: (quest: { id: number }, event: Event) => void
     onQuestContextMenu: (event: MouseEvent, quest: { id: number }) => void
     onLineContextMenu: (event: MouseEvent, line: { id: number }) => void
@@ -166,6 +170,8 @@
     {lineOpen}
     {nowMs}
     {onSelect}
+    {pickedIds}
+    {onRowClick}
     {onTogglePin}
     {onQuestContextMenu}
     {onLineContextMenu}

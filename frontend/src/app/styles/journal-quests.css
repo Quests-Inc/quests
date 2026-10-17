@@ -440,3 +440,9 @@
   display: grid;
   place-items: center;
 }
+
+/* Quests picked with Ctrl/Shift-click: a tinted row and an accent bar on the left. */
+.quest-row--picked {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-raised, #1a1a1a));
+  box-shadow: inset 3px 0 0 var(--color-accent, #c9a227);
+}

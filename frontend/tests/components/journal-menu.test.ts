@@ -4,8 +4,9 @@ import { createJournalMenu } from '@/pages/journal/model/journalMenu.svelte.ts'
 
 import { inRoot } from './root.svelte.ts'
 
-function make() {
+function make(picked: number[] = []) {
   const log: any[] = []
+  const cleared: number[] = []
   const quests = [
     { id: 1, status: 'active' },
     { id: 2, status: 'frozen' },
@@ -17,6 +18,9 @@ function make() {
   const stop = inRoot(() => {
     menu = createJournalMenu({
       quests: () => quests,
+      picked: (id) => (picked.length > 1 && picked.includes(id) ? picked : [id]),
+      clearPicked: () => void cleared.push(1),
+      copyMany: (k, ids) => log.push(['copyMany', k, ids]),
       questlines: () => [{ id: 7, category_id: 3 }],
       findStep: (id) => (id === 10 ? { step, questId: 1 } : null),
       selectQuest: (id) => (selected = id),
@@ -36,6 +40,9 @@ function make() {
         patchSignificance: (q, v) => log.push(['sig', q.id, v]),
         exportQuest: (q, m) => log.push(['export', q.id, m]),
         ackFailure: (q) => log.push(['ack', q.id]),
+        postponeMany: (qs, m) => log.push(['postponeMany', qs.map((q) => q.id), m]),
+        patchStatusMany: (qs, s) => log.push(['statusMany', qs.map((q) => q.id), s]),
+        patchSignificanceMany: (qs, v) => log.push(['sigMany', qs.map((q) => q.id), v]),
       },
       step: {
         bump: (s, d, q) => log.push(['bump', s.id, d, q]),
@@ -44,7 +51,7 @@ function make() {
     })
   })
   const ev = { preventDefault() {}, stopPropagation() {}, clientX: 5, clientY: 6 }
-  return { menu, log, ev, stop, selected: () => selected }
+  return { menu, log, cleared, ev, stop, selected: () => selected }
 }
 
 test('открытие по квесту выбирает его и запоминает точку; close закрывает', () => {
@@ -115,5 +122,29 @@ test('пункты квестлайна: «добавить» переносит
   t.menu.openLine(t.ev, { id: 99 })
   await t.menu.select('edit')
   expect(t.log).toHaveLength(2)
+  t.stop()
+})
+
+test('меню на выделенной группе: действия идут на всех, открытый квест не меняется, ПКМ мимо группы — один квест и сброс', async () => {
+  const t = make([1, 2, 3])
+  t.menu.openQuest(t.ev, { id: 2 })
+  expect(t.selected()).toBeNull()
+  expect(t.menu.items[0].label).toBe('Копировать ссылки (3)')
+  await t.menu.select('copy-ids')
+  await t.menu.select('status:completed')
+  await t.menu.select('delay-15')
+  await t.menu.select('sig:epic')
+  expect(t.log).toEqual([
+    ['copyMany', 'quest', [1, 2, 3]],
+    ['statusMany', [1, 2, 3], 'completed'],
+    ['postponeMany', [1, 2, 3], 15],
+    ['sigMany', [1, 2, 3], 'epic'],
+  ])
+  t.menu.close()
+  t.log.length = 0
+  t.menu.openQuest(t.ev, { id: 9 })
+  expect(t.cleared).toHaveLength(1)
+  expect(t.log).toEqual([])
+  expect(t.selected()).toBe(9)
   t.stop()
 })
