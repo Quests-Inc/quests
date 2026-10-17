@@ -441,8 +441,23 @@
   place-items: center;
 }
 
-/* Quests picked with Ctrl/Shift-click: a tinted row and an accent bar on the left. */
+/* Quests picked with Ctrl/Shift-click: a tinted row and an accent bar on the left. Hover is deliberately
+   stronger than the plain row hover (which would otherwise win on specificity and wipe the tint), so a picked
+   row under the cursor still reads as picked — and as "this is the one you are about to act on". */
 .quest-row--picked {
   background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-raised, #1a1a1a));
   box-shadow: inset 3px 0 0 var(--color-accent, #c9a227);
+}
+
+.quest-row--picked:hover,
+.quest-row--picked:focus-visible {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+  box-shadow:
+    inset 3px 0 0 var(--color-accent, #c9a227),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent, #c9a227) 45%, transparent);
+}
+
+/* The quest that is open in the detail pane and also picked: the right edge keeps the "open" mark. */
+.quest-row--picked.quest-row--active {
+  border-right-color: color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
 }

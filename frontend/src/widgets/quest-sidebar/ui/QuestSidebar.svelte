@@ -187,7 +187,7 @@
   {#if pickedIds.size > 0}
     <div class="sidebar__picked" role="status">
       <span class="sidebar__picked-count">Выбрано: {pickedIds.size}</span>
-      <button type="button" class="sidebar__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}>Снять</button>
+      <button type="button" class="sidebar__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}><Icon name="close" size={14} /></button>
     </div>
   {/if}
   {#snippet questRow(q: any)}
