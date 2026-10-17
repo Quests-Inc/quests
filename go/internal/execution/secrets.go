@@ -1,4 +1,4 @@
-package automation
+package execution
 
 import (
 	"context"
@@ -366,11 +366,11 @@ func (s *Store) ResolveTemplateSecrets(ctx context.Context, templateID int64) (m
 	return s.ResolveSecrets(ctx, SecretOwner{SecretOwnerTemplate, templateID})
 }
 
-// copyTemplateSecretsToLiveQuests keeps the check commands of quests a template
+// CopyTemplateSecretsToLiveQuests keeps the check commands of quests a template
 // emitted working after the template is deleted: quest.template_id is nulled,
 // so the inherited secrets are copied onto the quests that are still open and
 // have an auto-check. Called inside DeleteTemplate's transaction.
-func copyTemplateSecretsToLiveQuests(ctx context.Context, tx *sql.Tx, templateID int64) error {
+func CopyTemplateSecretsToLiveQuests(ctx context.Context, tx *sql.Tx, templateID int64) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO secret (quest_id, key, value, created_at, updated_at)
 		SELECT q.id, s.key, s.value, s.created_at, s.updated_at

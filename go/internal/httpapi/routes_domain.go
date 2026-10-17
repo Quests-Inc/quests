@@ -16,6 +16,7 @@ import (
 func (s *Server) registerDomainRoutes(mux *http.ServeMux) {
 
 	s.automationHTTP().Register(mux)
+	s.executionHTTP().Register(mux)
 	mux.HandleFunc("GET /api/graph", s.getGraph)
 	mux.HandleFunc("GET /api/context", s.getContext)
 }

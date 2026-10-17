@@ -41,6 +41,8 @@ linters:
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "листовой пакет: прикладных зависимостей быть не должно (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -112,6 +114,8 @@ linters:
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "platform не зависит от контекстов, httpapi и cli (ADR-0001, правило 1)"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -146,6 +150,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "db зависит только от wsctx (ADR-0001)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "db зависит только от wsctx (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "db зависит только от wsctx (ADR-0001)"
@@ -214,6 +220,8 @@ linters:
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "journal зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -242,6 +250,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "dbx зависит только от timeutil"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "dbx зависит только от timeutil"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "dbx зависит только от timeutil"
@@ -312,6 +322,8 @@ linters:
               desc: "pgtest зависит только от db"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "pgtest зависит только от db"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "pgtest зависит только от db"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "pgtest зависит только от db"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -381,6 +393,8 @@ linters:
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "metrics получает данные приложения через интерфейс StatsSource, а не из store"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -445,6 +459,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "identity зависит только от платформы (ADR-0001: идентичность не знает других контекстов)"
@@ -575,6 +591,8 @@ linters:
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -589,6 +607,35 @@ linters:
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
             - pkg: github.com/quests-inc/quests/go/internal/assistant
               desc: "knowledge зависит от identity, kernel, refs и платформы (ADR-0001)"
+        execution:
+          files:
+            - "**/internal/execution/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/quests-inc/quests/go/internal/httpapi
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/store
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/schedule
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/journal
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/knowledge
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/cli
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/llmassist
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/pdfdoc
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/wsarchive
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/graphdraft
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
+            - pkg: github.com/quests-inc/quests/go/internal/assistant
+              desc: "execution зависит от identity, kernel, refs и платформы (ADR-0002)"
         automation:
           files:
             - "**/internal/automation/**"
@@ -627,6 +674,8 @@ linters:
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "kernel зависит только от identity и платформы (ADR-0001: общее ядро контекстов)"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -653,6 +702,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/schedule
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "wsarchive читает контексты через store; не зависит от httpapi, cli, schedule"
@@ -709,6 +760,8 @@ linters:
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/automation
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
+              desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "graphdraft читает контексты через store; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/llmassist
@@ -757,6 +810,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "assistant: настройки ИИ-ассистента и пакеты действий; не зависит от httpapi, cli, schedule"
@@ -816,6 +871,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "cli это клиент HTTP API: только hooks и apiclient, никаких store и db"
@@ -883,6 +940,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "llmassist ходит в API только через platform/apiclient"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "llmassist ходит в API только через platform/apiclient"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "llmassist ходит в API только через platform/apiclient"
@@ -952,6 +1011,8 @@ linters:
             - pkg: github.com/quests-inc/quests/go/internal/knowledge
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/quests-inc/quests/go/internal/automation
+              desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
+            - pkg: github.com/quests-inc/quests/go/internal/execution
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"
             - pkg: github.com/quests-inc/quests/go/internal/cli
               desc: "раннер общается с сервером только по HTTP и не импортирует внутренние пакеты"

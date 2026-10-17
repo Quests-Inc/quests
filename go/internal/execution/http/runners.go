@@ -1,4 +1,4 @@
-package automationhttp
+package executionhttp
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/kernel"
 	"github.com/quests-inc/quests/go/internal/platform/httpx"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -48,11 +48,11 @@ func (h *Handler) registerRunner(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/runner-jobs/{id}/cancel", h.cancelRunnerJob)
 }
 
-func (h *Handler) runnerFrom(w http.ResponseWriter, r *http.Request) (automation.Runner, bool) {
+func (h *Handler) runnerFrom(w http.ResponseWriter, r *http.Request) (execution.Runner, bool) {
 	run, err := h.Store.AuthRunner(r.Context(), httpx.BearerToken(r))
 	if err != nil {
 		writeErr(w, http.StatusUnauthorized, "invalid runner token")
-		return automation.Runner{}, false
+		return execution.Runner{}, false
 	}
 	return run, true
 }
@@ -76,7 +76,7 @@ func (h *Handler) runnerRegister(w http.ResponseWriter, r *http.Request) {
 	ctx = wsctx.With(ctx, ws)
 
 	token, run, err := h.Store.RegisterRunner(ctx, strings.TrimSpace(in.Token), in.Hostname, in.Version)
-	if errors.Is(err, automation.ErrRunnerToken) {
+	if errors.Is(err, execution.ErrRunnerToken) {
 		writeErr(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -105,15 +105,15 @@ type jobPayload struct {
 }
 
 // jobSecrets resolves the secrets of what the job belongs to (step, else template).
-func (h *Handler) jobSecrets(ctx context.Context, j automation.RunnerJob) map[string]string {
-	var owner automation.SecretOwner
+func (h *Handler) jobSecrets(ctx context.Context, j execution.RunnerJob) map[string]string {
+	var owner execution.SecretOwner
 	switch {
 	case j.StepID != nil:
-		owner = automation.SecretOwner{Kind: automation.SecretOwnerStep, ID: *j.StepID}
+		owner = execution.SecretOwner{Kind: execution.SecretOwnerStep, ID: *j.StepID}
 	case j.TemplateID != nil:
-		owner = automation.SecretOwner{Kind: automation.SecretOwnerTemplate, ID: *j.TemplateID}
+		owner = execution.SecretOwner{Kind: execution.SecretOwnerTemplate, ID: *j.TemplateID}
 	case j.NoteID != nil:
-		owner = automation.SecretOwner{Kind: automation.SecretOwnerNote, ID: *j.NoteID}
+		owner = execution.SecretOwner{Kind: execution.SecretOwnerNote, ID: *j.NoteID}
 	default:
 		return map[string]string{}
 	}
@@ -191,10 +191,10 @@ func (h *Handler) runnerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	job, gerr := h.Store.GetRunnerJob(r.Context(), id)
 	tail := in.LogTail
 	if gerr == nil {
-		tail = automation.MaskSecrets(tail, h.jobSecrets(r.Context(), job))
+		tail = execution.MaskSecrets(tail, h.jobSecrets(r.Context(), job))
 	}
 	cancel, err := h.Store.JobHeartbeat(r.Context(), id, in.LeaseID, prog, tail, runnerLease)
-	if errors.Is(err, automation.ErrLeaseLost) {
+	if errors.Is(err, execution.ErrLeaseLost) {
 		writeErr(w, http.StatusConflict, "lease lost")
 		return
 	}
@@ -227,13 +227,13 @@ func (h *Handler) runnerComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	secrets := h.jobSecrets(r.Context(), cur)
-	job, done, err := h.Store.CompleteJob(r.Context(), id, in.LeaseID, automation.JobResult{
+	job, done, err := h.Store.CompleteJob(r.Context(), id, in.LeaseID, execution.JobResult{
 		Exit:     in.Exit,
-		Stdout:   automation.MaskSecrets(in.Stdout, secrets),
-		Stderr:   automation.MaskSecrets(in.Stderr, secrets),
+		Stdout:   execution.MaskSecrets(in.Stdout, secrets),
+		Stderr:   execution.MaskSecrets(in.Stderr, secrets),
 		TimedOut: in.TimedOut,
 	})
-	if errors.Is(err, automation.ErrLeaseLost) {
+	if errors.Is(err, execution.ErrLeaseLost) {
 		writeErr(w, http.StatusConflict, "lease lost")
 		return
 	}
@@ -255,16 +255,16 @@ func (h *Handler) listRunners(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	jobs, _ := h.Store.ListRunnerJobs(r.Context(), automation.JobFilter{States: []string{automation.JobQueued, automation.JobAssigned, automation.JobRunning}, Limit: 500})
+	jobs, _ := h.Store.ListRunnerJobs(r.Context(), execution.JobFilter{States: []string{execution.JobQueued, execution.JobAssigned, execution.JobRunning}, Limit: 500})
 	now := timeutil.NowUTC()
 	out := make([]RunnerView, 0, len(runners))
 	for _, run := range runners {
-		v := RunnerView{Runner: run, Online: automation.RunnerOnline(run, now)}
+		v := RunnerView{Runner: run, Online: execution.RunnerOnline(run, now)}
 		for _, j := range jobs {
 			if j.RunnerLabel != run.Label {
 				continue
 			}
-			if j.State == automation.JobQueued {
+			if j.State == execution.JobQueued {
 				v.Queued++
 			} else {
 				v.Running++
@@ -291,12 +291,12 @@ func (h *Handler) createRunner(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, kernel.ErrBadRunnerLabel):
 		writeErr(w, 422, err.Error())
-	case errors.Is(err, automation.ErrRunnerExists):
+	case errors.Is(err, execution.ErrRunnerExists):
 		writeErr(w, 409, err.Error())
 	case err != nil:
 		writeErr(w, 500, err.Error())
 	default:
-		writeJSON(w, 201, map[string]any{"label": strings.TrimSpace(in.Label), "registration_token": token, "valid_hours": int(automation.RegistrationTTL / time.Hour)})
+		writeJSON(w, 201, map[string]any{"label": strings.TrimSpace(in.Label), "registration_token": token, "valid_hours": int(execution.RegistrationTTL / time.Hour)})
 	}
 }
 
@@ -305,7 +305,7 @@ func (h *Handler) deleteRunner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := h.Store.RevokeRunner(r.Context(), r.PathValue("label"))
-	if errors.Is(err, automation.ErrNotFound) {
+	if errors.Is(err, execution.ErrNotFound) {
 		writeErr(w, 404, "runner not found")
 		return
 	}
@@ -318,7 +318,7 @@ func (h *Handler) deleteRunner(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) listRunnerJobs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := automation.JobFilter{Label: q.Get("label")}
+	f := execution.JobFilter{Label: q.Get("label")}
 	if v := q.Get("state"); v != "" {
 		f.States = strings.Split(v, ",")
 	}
@@ -339,7 +339,7 @@ func (h *Handler) listRunnerJobs(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) cancelRunnerJob(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	err := h.Store.CancelRunnerJob(r.Context(), id)
-	if errors.Is(err, automation.ErrNotFound) {
+	if errors.Is(err, execution.ErrNotFound) {
 		writeErr(w, 404, "no such unfinished job")
 		return
 	}

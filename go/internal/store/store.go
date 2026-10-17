@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/identity"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
@@ -28,6 +29,7 @@ type Store struct {
 	Knowledge  *knowledge.Store
 	Journal    *journal.Store
 	Automation *automation.Store
+	Execution  *execution.Store
 }
 
 // New builds the store and the context stores over db.
@@ -35,6 +37,6 @@ func New(db *sql.DB, databaseURL string, box *secretbox.Box) *Store {
 	return &Store{
 		DB: db, DatabaseURL: databaseURL, Box: box,
 		Identity: &identity.Store{DB: db}, Knowledge: &knowledge.Store{DB: db}, Journal: &journal.Store{DB: db},
-		Automation: automation.New(db, box),
+		Automation: automation.New(db, box), Execution: execution.New(db, box),
 	}
 }

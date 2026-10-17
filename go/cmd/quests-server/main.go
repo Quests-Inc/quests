@@ -112,12 +112,12 @@ func main() {
 	// User hooks (data/hooks.json) listen to events; events itself does not know about them.
 	hub.OnPublish(func(p events.Payload) { hooks.Dispatch(p) })
 	st := store.New(sqlDB, cfg.DatabaseURL, secrets)
-	if n, err := st.Automation.SealLegacySecrets(context.Background()); err != nil {
+	if n, err := st.Execution.SealLegacySecrets(context.Background()); err != nil {
 		log.Printf("secrets: sealing existing values: %v", err)
 	} else if n > 0 {
 		log.Printf("secrets: sealed %d stored value(s)", n)
 	}
-	if counts, err := st.Automation.SealedHealth(context.Background()); err != nil {
+	if counts, err := st.Execution.SealedHealth(context.Background()); err != nil {
 		log.Printf("secrets: checking sealed values: %v", err)
 	} else {
 		for _, c := range counts {

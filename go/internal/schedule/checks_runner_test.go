@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/store"
@@ -37,8 +37,8 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 
 	r.Tick(ctx)
 	r.Wait()
-	jobs, _ := st.Automation.ListRunnerJobs(ctx, automation.JobFilter{Label: "home"})
-	if len(jobs) != 1 || jobs[0].State != automation.JobQueued || jobs[0].Command != "echo 3" {
+	jobs, _ := st.Execution.ListRunnerJobs(ctx, execution.JobFilter{Label: "home"})
+	if len(jobs) != 1 || jobs[0].State != execution.JobQueued || jobs[0].Command != "echo 3" {
 		t.Fatalf("jobs after the first tick: %+v", jobs)
 	}
 	got, _ := st.Journal.GetQuest(ctx, q.ID)
@@ -52,16 +52,16 @@ func TestRemotePollQueuesOneJobAndAppliesTheResult(t *testing.T) {
 	}
 	r.Tick(ctx)
 	r.Wait()
-	if jobs, _ = st.Automation.ListRunnerJobs(ctx, automation.JobFilter{Label: "home"}); len(jobs) != 1 {
+	if jobs, _ = st.Execution.ListRunnerJobs(ctx, execution.JobFilter{Label: "home"}); len(jobs) != 1 {
 		t.Fatalf("jobs piled up while offline: %d", len(jobs))
 	}
 
 	// The runner comes back, runs it, and the result lands on the step.
-	job, err := st.Automation.ClaimJob(ctx, "home", time.Minute)
+	job, err := st.Execution.ClaimJob(ctx, "home", time.Minute)
 	if err != nil || job == nil {
 		t.Fatalf("claim: %v %v", job, err)
 	}
-	done, _, err := st.Automation.CompleteJob(ctx, job.ID, job.LeaseID, automation.JobResult{Exit: 0, Stdout: "3\n"})
+	done, _, err := st.Execution.CompleteJob(ctx, job.ID, job.LeaseID, execution.JobResult{Exit: 0, Stdout: "3\n"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestRemoteOnceLostMidRunFailsClearly(t *testing.T) {
 	r.Tick(ctx)
 	r.Wait()
 
-	job, _ := st.Automation.ClaimJob(ctx, "laptop", time.Minute)
+	job, _ := st.Execution.ClaimJob(ctx, "laptop", time.Minute)
 	if job == nil {
 		t.Fatal("no job")
 	}
@@ -162,7 +162,7 @@ func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
 	r := NewCheckRunner(st, events.New())
 	r.Tick(ctx)
 	r.Wait()
-	if job, _ := st.Automation.ClaimJob(ctx, "home", time.Minute); job == nil {
+	if job, _ := st.Execution.ClaimJob(ctx, "home", time.Minute); job == nil {
 		t.Fatal("no running job")
 	}
 
@@ -171,14 +171,14 @@ func TestDeletedQuestCancelsItsRunnerJobs(t *testing.T) {
 	}
 	r.ExpireRunnerJobs(ctx)
 
-	jobs, _ := st.Automation.ListRunnerJobs(ctx, automation.JobFilter{})
+	jobs, _ := st.Execution.ListRunnerJobs(ctx, execution.JobFilter{})
 	if len(jobs) != 2 {
 		t.Fatalf("jobs: %+v", jobs)
 	}
 	for _, j := range jobs {
 		switch j.RunnerLabel {
 		case "ghost":
-			if j.State != automation.JobCanceled {
+			if j.State != execution.JobCanceled {
 				t.Fatalf("waiting job of a deleted quest: %s", j.State)
 			}
 		case "home":

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 )
 
@@ -69,12 +69,12 @@ func TestRunnerJobLifecycle(t *testing.T) {
 		t.Fatalf("empty poll = %d", code)
 	}
 
-	job, created, err := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "home", Kind: automation.JobKindOnce, Command: "echo hi", DedupeKey: "step:1:p", Title: "шаг"})
+	job, created, err := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "home", Kind: execution.JobKindOnce, Command: "echo hi", DedupeKey: "step:1:p", Title: "шаг"})
 	if err != nil || !created {
 		t.Fatalf("enqueue: %v %v", created, err)
 	}
 	// Same key while unfinished: the same job, not a new one.
-	again, created2, _ := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "home", Kind: automation.JobKindOnce, Command: "echo hi", DedupeKey: "step:1:p"})
+	again, created2, _ := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "home", Kind: execution.JobKindOnce, Command: "echo hi", DedupeKey: "step:1:p"})
 	if created2 || again.ID != job.ID {
 		t.Fatalf("dedupe: created=%v id %d vs %d", created2, again.ID, job.ID)
 	}
@@ -98,13 +98,13 @@ func TestRunnerJobLifecycle(t *testing.T) {
 	if code != 200 || out["cancel"] != false {
 		t.Fatalf("heartbeat = %d %v", code, out)
 	}
-	cur, _ := s.Store.Automation.GetRunnerJob(ctx, id)
-	if cur.State != automation.JobRunning || cur.ProgressCurrent == nil || *cur.ProgressCurrent != 3 || cur.LogTail != "working" {
+	cur, _ := s.Store.Execution.GetRunnerJob(ctx, id)
+	if cur.State != execution.JobRunning || cur.ProgressCurrent == nil || *cur.ProgressCurrent != 3 || cur.LogTail != "working" {
 		t.Fatalf("after heartbeat: %+v", cur)
 	}
 
-	var done []automation.RunnerJob
-	s.RunnerDone = func(_ context.Context, j automation.RunnerJob) { done = append(done, j) }
+	var done []execution.RunnerJob
+	s.RunnerDone = func(_ context.Context, j execution.RunnerJob) { done = append(done, j) }
 	cp := fmt.Sprintf("/api/runner/jobs/%d/complete", id)
 	code, out = rr(t, h, "POST", cp, token, map[string]any{"lease_id": lease, "exit": 0, "stdout": "42\n"})
 	if code != 200 || out["accepted"] != true {
@@ -115,11 +115,11 @@ func TestRunnerJobLifecycle(t *testing.T) {
 	if code != 200 || out["accepted"] != false {
 		t.Fatalf("repeat complete = %d %v", code, out)
 	}
-	if len(done) != 1 || done[0].State != automation.JobSuccess {
+	if len(done) != 1 || done[0].State != execution.JobSuccess {
 		t.Fatalf("RunnerDone calls: %+v", done)
 	}
 	// Finished: a new job with the same key may be queued (attempt 2).
-	next, created3, _ := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "home", Kind: automation.JobKindOnce, Command: "echo hi", DedupeKey: "step:1:p"})
+	next, created3, _ := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "home", Kind: execution.JobKindOnce, Command: "echo hi", DedupeKey: "step:1:p"})
 	if !created3 || next.AttemptNo != 2 {
 		t.Fatalf("second attempt: created=%v attempt=%d", created3, next.AttemptNo)
 	}
@@ -128,7 +128,7 @@ func TestRunnerJobLifecycle(t *testing.T) {
 func TestRunnerExpiryAndLateResult(t *testing.T) {
 	s, h, token := newRunnerEnv(t, "home")
 	ctx := t.Context()
-	j, _, _ := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "home", Kind: automation.JobKindOnce, Command: "sleep 1", DedupeKey: "k1"})
+	j, _, _ := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "home", Kind: execution.JobKindOnce, Command: "sleep 1", DedupeKey: "k1"})
 	_, got := rr(t, h, "GET", "/api/runner/jobs?wait=0", token, nil)
 	lease := got["lease_id"].(string)
 
@@ -137,8 +137,8 @@ func TestRunnerExpiryAndLateResult(t *testing.T) {
 	if _, err := s.Store.DB.Exec(`UPDATE runner_job SET lease_until = ? WHERE id = ?`, past, j.ID); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := s.Store.Automation.ExpireJobs(ctx)
-	if err != nil || len(changed) != 1 || changed[0].State != automation.JobLost {
+	changed, err := s.Store.Execution.ExpireJobs(ctx)
+	if err != nil || len(changed) != 1 || changed[0].State != execution.JobLost {
 		t.Fatalf("expire: %v %+v", err, changed)
 	}
 	// It comes back online with the result it finished meanwhile: accepted while still valid.
@@ -146,17 +146,17 @@ func TestRunnerExpiryAndLateResult(t *testing.T) {
 	if code != 200 || out["accepted"] != true {
 		t.Fatalf("late complete = %d %v", code, out)
 	}
-	if cur, _ := s.Store.Automation.GetRunnerJob(ctx, j.ID); cur.State != automation.JobSuccess {
+	if cur, _ := s.Store.Execution.GetRunnerJob(ctx, j.ID); cur.State != execution.JobSuccess {
 		t.Fatalf("state after late result: %s", cur.State)
 	}
 
 	// A job nobody picked up in time is skipped, not failed.
-	q, _, _ := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "away", Kind: automation.JobKindOnce, Command: "true", DedupeKey: "k2"})
+	q, _, _ := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "away", Kind: execution.JobKindOnce, Command: "true", DedupeKey: "k2"})
 	if _, err := s.Store.DB.Exec(`UPDATE runner_job SET valid_until = ? WHERE id = ?`, past, q.ID); err != nil {
 		t.Fatal(err)
 	}
-	changed, _ = s.Store.Automation.ExpireJobs(ctx)
-	if len(changed) != 1 || changed[0].State != automation.JobSkipped {
+	changed, _ = s.Store.Execution.ExpireJobs(ctx)
+	if len(changed) != 1 || changed[0].State != execution.JobSkipped {
 		t.Fatalf("overdue queued: %+v", changed)
 	}
 }
@@ -164,8 +164,8 @@ func TestRunnerExpiryAndLateResult(t *testing.T) {
 func TestRunnerCancelRevokeAndOrder(t *testing.T) {
 	s, h, token := newRunnerEnv(t, "home")
 	ctx := t.Context()
-	poll, _, _ := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "home", Kind: automation.JobKindPoll, Command: "echo 1", DedupeKey: "p"})
-	once, _, _ := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{RunnerLabel: "home", Kind: automation.JobKindOnce, Command: "echo 2", DedupeKey: "o"})
+	poll, _, _ := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "home", Kind: execution.JobKindPoll, Command: "echo 1", DedupeKey: "p"})
+	once, _, _ := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{RunnerLabel: "home", Kind: execution.JobKindOnce, Command: "echo 2", DedupeKey: "o"})
 	// A one-shot goes before an older poll.
 	_, got := rr(t, h, "GET", "/api/runner/jobs?wait=0", token, nil)
 	if int64(got["id"].(float64)) != once.ID {
@@ -174,7 +174,7 @@ func TestRunnerCancelRevokeAndOrder(t *testing.T) {
 	lease := got["lease_id"].(string)
 
 	// Cancelling a running job is heard in the next heartbeat.
-	if err := s.Store.Automation.CancelRunnerJob(ctx, once.ID); err != nil {
+	if err := s.Store.Execution.CancelRunnerJob(ctx, once.ID); err != nil {
 		t.Fatal(err)
 	}
 	_, out := rr(t, h, "POST", fmt.Sprintf("/api/runner/jobs/%d/heartbeat", once.ID), token, map[string]any{"lease_id": lease})
@@ -182,10 +182,10 @@ func TestRunnerCancelRevokeAndOrder(t *testing.T) {
 		t.Fatalf("cancel not delivered: %v", out)
 	}
 	// A waiting job is dropped at once.
-	if err := s.Store.Automation.CancelRunnerJob(ctx, poll.ID); err != nil {
+	if err := s.Store.Execution.CancelRunnerJob(ctx, poll.ID); err != nil {
 		t.Fatal(err)
 	}
-	if cur, _ := s.Store.Automation.GetRunnerJob(ctx, poll.ID); cur.State != automation.JobCanceled {
+	if cur, _ := s.Store.Execution.GetRunnerJob(ctx, poll.ID); cur.State != execution.JobCanceled {
 		t.Fatalf("waiting job after cancel: %s", cur.State)
 	}
 
@@ -206,19 +206,19 @@ func TestRunnerReceivesOwnersSecretsAndOutputIsMasked(t *testing.T) {
 	ctx := t.Context()
 
 	tmplID := pgtest.SeedTemplate(t, s.Store.DB, "почта")
-	if err := s.Store.Automation.SetTemplateSecret(ctx, tmplID, "MAIL_PASSWORD", "s3cr3t-pw"); err != nil {
+	if err := s.Store.Execution.SetTemplateSecret(ctx, tmplID, "MAIL_PASSWORD", "s3cr3t-pw"); err != nil {
 		t.Fatal(err)
 	}
 	pgtest.Seed(t, s.Store.DB, `INSERT INTO note (id, title, created_at, updated_at) VALUES (77, 'заметка', now(), now())`)
-	if err := s.Store.Automation.SetSecret(ctx, automation.SecretOwner{Kind: automation.SecretOwnerNote, ID: 77}, "NOTE_TOKEN", "note-secret"); err != nil {
+	if err := s.Store.Execution.SetSecret(ctx, execution.SecretOwner{Kind: execution.SecretOwnerNote, ID: 77}, "NOTE_TOKEN", "note-secret"); err != nil {
 		t.Fatal(err)
 	}
 	noteID := int64(77)
-	for _, spec := range []automation.JobSpec{
-		{RunnerLabel: "home", Kind: automation.JobKindEmitPool, TemplateID: &tmplID, Command: "echo $MAIL_PASSWORD", DedupeKey: "emit:t"},
-		{RunnerLabel: "home", Kind: automation.JobKindPoll, NoteID: &noteID, Command: "echo $NOTE_TOKEN", DedupeKey: "note:77:poll"},
+	for _, spec := range []execution.JobSpec{
+		{RunnerLabel: "home", Kind: execution.JobKindEmitPool, TemplateID: &tmplID, Command: "echo $MAIL_PASSWORD", DedupeKey: "emit:t"},
+		{RunnerLabel: "home", Kind: execution.JobKindPoll, NoteID: &noteID, Command: "echo $NOTE_TOKEN", DedupeKey: "note:77:poll"},
 	} {
-		if _, _, err := s.Store.Automation.EnqueueJob(ctx, spec); err != nil {
+		if _, _, err := s.Store.Execution.EnqueueJob(ctx, spec); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -249,7 +249,7 @@ func TestRunnerReceivesOwnersSecretsAndOutputIsMasked(t *testing.T) {
 		if code, out := rr(t, h, "POST", cp, token, map[string]any{"lease_id": got["lease_id"], "exit": 1, "stdout": "got " + value, "stderr": "bad " + value}); code != 200 {
 			t.Fatalf("complete = %d %v", code, out)
 		}
-		stored, _ := s.Store.Automation.GetRunnerJob(ctx, id)
+		stored, _ := s.Store.Execution.GetRunnerJob(ctx, id)
 		if strings.Contains(stored.Stdout+stored.Stderr, value) || !strings.Contains(stored.Stdout, "***") {
 			t.Fatalf("the secret reached the stored output: %q / %q", stored.Stdout, stored.Stderr)
 		}

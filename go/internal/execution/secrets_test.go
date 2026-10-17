@@ -1,4 +1,4 @@
-package automation
+package execution
 
 import (
 	"context"
@@ -148,7 +148,7 @@ func TestTemplateSecretsCopiedToLiveQuestsWithChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := copyTemplateSecretsToLiveQuests(ctx, tx, 10); err != nil {
+	if err := CopyTemplateSecretsToLiveQuests(ctx, tx, 10); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {

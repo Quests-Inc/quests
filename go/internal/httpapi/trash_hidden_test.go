@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
@@ -24,7 +24,7 @@ func TestTrashedQuestIsHiddenEverywhereAndComesBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, _, err := s.Store.Automation.EnqueueJob(ctx, automation.JobSpec{
+	job, _, err := s.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
 		RunnerLabel: "r", Kind: "step", QuestID: &qid, StepID: &stepID, Title: "j", Command: "true",
 	})
 	if err != nil {
@@ -55,7 +55,7 @@ func TestTrashedQuestIsHiddenEverywhereAndComesBack(t *testing.T) {
 		return false
 	}
 	jobState := func() string {
-		jobs, err := s.Store.Automation.ListRunnerJobs(ctx, automation.JobFilter{StepID: stepID})
+		jobs, err := s.Store.Execution.ListRunnerJobs(ctx, execution.JobFilter{StepID: stepID})
 		if err != nil || len(jobs) != 1 {
 			t.Fatalf("jobs: %+v %v", jobs, err)
 		}
@@ -75,7 +75,7 @@ func TestTrashedQuestIsHiddenEverywhereAndComesBack(t *testing.T) {
 	if stepInCorpus() {
 		t.Fatal("the steps of a trashed quest must not be link labels")
 	}
-	if _, err := s.Store.Automation.CancelOrphanJobs(ctx); err != nil {
+	if _, err := s.Store.Execution.CancelOrphanJobs(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if got := jobState(); got != "canceled" {

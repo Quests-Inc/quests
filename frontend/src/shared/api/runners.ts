@@ -1,5 +1,5 @@
-import type { RunnerJob } from './automation.gen'
-import type { RunnerView } from './automation_http.gen'
+import type { RunnerJob } from './execution.gen'
+import type { RunnerView } from './execution_http.gen'
 import { request } from './http.ts'
 
 export function getRunners() {

@@ -1,4 +1,4 @@
-package automationhttp
+package executionhttp
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 )
 
 // secretKeyPattern matches a valid env var name — secrets are injected into a
@@ -17,31 +17,31 @@ var secretKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // secretOwnerKinds maps the URL segment to the owner kind:
 // /api/{questlines|templates|quests|steps}/{id}/secrets[/{key}].
 var secretOwnerKinds = map[string]string{
-	"questlines": automation.SecretOwnerQuestline,
-	"templates":  automation.SecretOwnerTemplate,
-	"quests":     automation.SecretOwnerQuest,
-	"steps":      automation.SecretOwnerStep,
-	"notes":      automation.SecretOwnerNote,
+	"questlines": execution.SecretOwnerQuestline,
+	"templates":  execution.SecretOwnerTemplate,
+	"quests":     execution.SecretOwnerQuest,
+	"steps":      execution.SecretOwnerStep,
+	"notes":      execution.SecretOwnerNote,
 }
 
 var secretOwnerLabels = map[string]string{
-	automation.SecretOwnerQuestline: "Questline",
-	automation.SecretOwnerTemplate:  "Template",
-	automation.SecretOwnerQuest:     "Quest",
-	automation.SecretOwnerStep:      "Step",
-	automation.SecretOwnerNote:      "Note",
+	execution.SecretOwnerQuestline: "Questline",
+	execution.SecretOwnerTemplate:  "Template",
+	execution.SecretOwnerQuest:     "Quest",
+	execution.SecretOwnerStep:      "Step",
+	execution.SecretOwnerNote:      "Note",
 }
 
 // secretOwner resolves {id} for the route's owner kind and 404s when the
 // owning row does not exist.
-func (h *Handler) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (automation.SecretOwner, bool) {
+func (h *Handler) secretOwner(w http.ResponseWriter, r *http.Request, segment string) (execution.SecretOwner, bool) {
 	kind := secretOwnerKinds[segment]
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id < 1 {
 		writeErr(w, http.StatusBadRequest, "invalid id")
-		return automation.SecretOwner{}, false
+		return execution.SecretOwner{}, false
 	}
-	o := automation.SecretOwner{Kind: kind, ID: id}
+	o := execution.SecretOwner{Kind: kind, ID: id}
 	ok, err := h.Store.SecretOwnerExists(r.Context(), o)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -97,7 +97,7 @@ func (h *Handler) putSecret(segment string) http.HandlerFunc {
 			writeErr(w, 422, "key must look like an env var name: [A-Za-z_][A-Za-z0-9_]*")
 			return
 		}
-		if automation.ReservedSecretName(key) {
+		if execution.ReservedSecretName(key) {
 			writeErr(w, 422, "this name is reserved: it would change how commands start, not carry a credential")
 			return
 		}

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -27,7 +27,7 @@ func seedRunner(t *testing.T, st *store.Store, label string, ago *time.Duration)
 
 func jobLabel(t *testing.T, st *store.Store) string {
 	t.Helper()
-	jobs, err := st.Automation.ListRunnerJobs(bg(), automation.JobFilter{})
+	jobs, err := st.Execution.ListRunnerJobs(bg(), execution.JobFilter{})
 	if err != nil || len(jobs) != 1 {
 		t.Fatalf("jobs: %v %+v", err, jobs)
 	}
@@ -65,13 +65,13 @@ func TestMultiRunnerReroutesQueuedJob(t *testing.T) {
 	if _, err := st.DB.Exec(`UPDATE runner SET last_seen_at = ? WHERE label = 'laptop'`, timeutil.ToDBUTC(timeutil.NowUTC())); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.Automation.ExpireJobs(bg()); err != nil {
+	if _, err := st.Execution.ExpireJobs(bg()); err != nil {
 		t.Fatal(err)
 	}
 	if got := jobLabel(t, st); got != "laptop" {
 		t.Fatalf("after laptop came online job on %q, want laptop", got)
 	}
-	job, err := st.Automation.ClaimJob(bg(), "laptop", time.Minute)
+	job, err := st.Execution.ClaimJob(bg(), "laptop", time.Minute)
 	if err != nil || job == nil {
 		t.Fatalf("laptop must be able to claim it: %v %v", job, err)
 	}
@@ -84,7 +84,7 @@ func TestSingleRunnerStaysPut(t *testing.T) {
 	seedRunner(t, st, "home", &away)
 	seedQuest(t, st, []journal.Step{remoteStep("poll", "echo 1", "home", journal.RunModePoll)})
 	NewCheckRunner(st, events.New()).Tick(bg())
-	if _, err := st.Automation.ExpireJobs(bg()); err != nil {
+	if _, err := st.Execution.ExpireJobs(bg()); err != nil {
 		t.Fatal(err)
 	}
 	if got := jobLabel(t, st); got != "home" {

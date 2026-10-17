@@ -1,5 +1,4 @@
-// Package automationhttp is the HTTP face of the automation context (ADR-0001): templates, runners and their jobs,
-// secrets and emit attempts. What lives in other contexts or in the scheduler comes in as plain functions that the
+// Package automationhttp is the HTTP face of the automation context (ADR-0001): templates and emit attempts. What lives in other contexts or in the scheduler comes in as plain functions that the
 // root (httpapi) supplies.
 package automationhttp
 
@@ -31,8 +30,6 @@ type Handler struct {
 	EmitTemplate func(ctx context.Context, id int64, now time.Time) (questID int64, err error)
 	// ErrTemplateNotFound is what EmitTemplate returns when the template is gone.
 	ErrTemplateNotFound error
-	// RunnerDone is called when a runner reports a job finished (the root reacts to its result).
-	RunnerDone func(ctx context.Context, job automation.RunnerJob)
 }
 
 // Register mounts every route of the context.
@@ -46,8 +43,6 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/templates/{id}/emit", h.emitTemplate)
 	mux.HandleFunc("GET /api/templates/{id}/emit-attempts", h.listEmitAttempts)
 	mux.HandleFunc("GET /api/templates/{id}/streak", h.getTemplateStreak)
-	h.registerSecretRoutes(mux)
-	h.registerRunner(mux)
 }
 
 var writeJSON = httpx.WriteJSON

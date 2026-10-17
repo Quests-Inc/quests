@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
 	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
+	"github.com/quests-inc/quests/go/internal/execution"
+	executionhttp "github.com/quests-inc/quests/go/internal/execution/http"
 	"github.com/quests-inc/quests/go/internal/schedule"
 )
 
@@ -25,12 +26,23 @@ func (s *Server) automationHTTP() *automationhttp.Handler {
 				return schedule.MaterializeTemplateManual(ctx, s.Store, s.Hub, id, now, nil)
 			},
 			ErrTemplateNotFound: schedule.ErrTemplateNotFound,
-			RunnerDone: func(ctx context.Context, j automation.RunnerJob) {
+		}
+	})
+	return s.ah
+}
+
+// executionHTTP is the execution context's HTTP face: runners, their protocol and the secrets of commands.
+func (s *Server) executionHTTP() *executionhttp.Handler {
+	s.executionOnce.Do(func() {
+		s.eh = &executionhttp.Handler{
+			Store:        s.Store.Execution,
+			RequireOwner: s.identityHTTP().RequireOwner,
+			RunnerDone: func(ctx context.Context, j execution.RunnerJob) {
 				if s.RunnerDone != nil {
 					s.RunnerDone(ctx, j)
 				}
 			},
 		}
 	})
-	return s.ah
+	return s.eh
 }

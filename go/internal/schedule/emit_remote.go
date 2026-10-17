@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/store"
 )
 
@@ -31,15 +31,15 @@ func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, peri
 	key := "emit:" + poolJobKey(tmpl.ID, periodKey, command)
 	info.Status = "error"
 
-	job, found, lerr := st.Automation.LatestJobByKey(ctx, key)
+	job, found, lerr := st.Execution.LatestJobByKey(ctx, key)
 	if lerr != nil {
 		return emitOutput{}, info, lerr, true
 	}
 	if !found {
 		tid := tmpl.ID
-		if _, _, qerr := st.Automation.EnqueueJob(ctx, automation.JobSpec{
+		if _, _, qerr := st.Execution.EnqueueJob(ctx, execution.JobSpec{
 			RunnerLabel:    label,
-			Kind:           automation.JobKindEmitPool,
+			Kind:           execution.JobKindEmitPool,
 			TemplateID:     &tid,
 			Title:          "шаблон: " + tmpl.Title,
 			DedupeKey:      key,
@@ -53,14 +53,14 @@ func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, peri
 	}
 
 	switch job.State {
-	case automation.JobQueued, automation.JobAssigned, automation.JobRunning, automation.JobLost:
+	case execution.JobQueued, execution.JobAssigned, execution.JobRunning, execution.JobLost:
 		return emitOutput{}, info, nil, false // still waiting for the device (or a late result)
-	case automation.JobSkipped, automation.JobCanceled:
+	case execution.JobSkipped, execution.JobCanceled:
 		return emitOutput{}, info, nil, false // the period passes without it; no retry storm
 	}
 
 	// A result (or a vanished device): take it, once.
-	if derr := st.Automation.DeleteRunnerJob(ctx, job.ID); derr != nil {
+	if derr := st.Execution.DeleteRunnerJob(ctx, job.ID); derr != nil {
 		log.Printf("emit remote: delete job %d: %v", job.ID, derr)
 	}
 	if job.StartedAt != nil && job.FinishedAt != nil {
@@ -68,9 +68,9 @@ func execEmitRemote(ctx context.Context, st *store.Store, tmpl templateRow, peri
 	}
 	info.Stderr = truncate(job.Stderr, 4000)
 	switch {
-	case job.State == automation.JobAbandoned:
+	case job.State == execution.JobAbandoned:
 		return emitOutput{}, info, fmt.Errorf("устройство «%s» пропало во время выполнения, результат неизвестен", label), true
-	case job.State == automation.JobTimeout || job.TimedOut:
+	case job.State == execution.JobTimeout || job.TimedOut:
 		info.Status = "timeout"
 		return emitOutput{}, info, fmt.Errorf("timeout on %q\nstderr:\n%s", label, info.Stderr), true
 	case job.ExitCode != nil && *job.ExitCode != 0:

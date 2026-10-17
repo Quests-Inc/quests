@@ -2,9 +2,11 @@
   "total": 55.6,
   "packages": {
     "assistant": 47.4,
-    "automation": 64.6,
-    "automation/http": 49.4,
+    "automation": 53.4,
+    "automation/http": 30.7,
     "cli": 3.7,
+    "execution": 81.0,
+    "execution/http": 62.1,
     "graphdraft": 72.3,
     "httpapi": 51.2,
     "identity": 52.8,

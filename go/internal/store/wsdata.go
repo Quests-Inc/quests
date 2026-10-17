@@ -119,7 +119,7 @@ func (s *Store) ReadTable(ctx context.Context, spec TableSpec, fn func(row map[s
 			if spec.Name == "secret" && c == "value" {
 				// Archives carry the value itself (sealed values would only open on this server).
 				if str, ok := vals[i].(string); ok {
-					plain, okOpen := s.Automation.OpenSecret(str)
+					plain, okOpen := s.Execution.OpenSecret(str)
 					if !okOpen {
 						skip = true // not readable under this key: leave the row out
 						break
@@ -372,7 +372,7 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 
 			if spec.Name == "secret" {
 				if str, ok := vals["value"].(string); ok {
-					sealed, err := s.Automation.SealSecret(str)
+					sealed, err := s.Execution.SealSecret(str)
 					if err != nil {
 						return err
 					}

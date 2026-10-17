@@ -46,13 +46,11 @@ var (
 	ValidRunOn        = kernel.ValidRunOn
 	NormalizeRunOn    = kernel.NormalizeRunOn
 
-	errBad        = apperr.Bad
-	boolInt       = dbx.BoolInt
-	nullStr       = dbx.NullStr
-	nullInt       = dbx.NullInt
-	nullI64       = dbx.NullI64
-	parseNullTime = dbx.ParseNullTime
-	trimTo        = dbx.TrimTo
+	errBad  = apperr.Bad
+	boolInt = dbx.BoolInt
+	nullStr = dbx.NullStr
+	nullInt = dbx.NullInt
+	nullI64 = dbx.NullI64
 )
 
 type rowScanner = dbx.Scanner

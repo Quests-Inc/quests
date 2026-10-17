@@ -70,6 +70,14 @@ packages:
       journal.Tag: "Tag"
     frontmatter: |
       import type { Tag } from "./journal.gen";
+  - path: "github.com/quests-inc/quests/go/internal/execution"
+    output_path: "../frontend/src/shared/api/execution.gen.ts"
+    exclude_files:
+      - "store.go"
+      - "durations.go"
+    type_mappings:
+      time.Time: "string"
+      time.Duration: "number"
   - path: "github.com/quests-inc/quests/go/internal/store"
     output_path: "../frontend/src/shared/api/store.gen.ts"
     exclude_files:
@@ -95,17 +103,17 @@ packages:
       knowledge.AttachmentRead: "AttachmentRead"
       store.DraftOp: "DraftOp"
       knowledge.RevisionRead: "RevisionRead"
-  - path: "github.com/quests-inc/quests/go/internal/automation/http"
-    output_path: "../frontend/src/shared/api/automation_http.gen.ts"
+  - path: "github.com/quests-inc/quests/go/internal/execution/http"
+    output_path: "../frontend/src/shared/api/execution_http.gen.ts"
     include_files:
       - "views.go"
     frontmatter: |
-      import type { Runner } from "./automation.gen";
+      import type { Runner } from "./execution.gen";
     type_mappings:
       time.Time: "string"
       time.Duration: "number"
       json.RawMessage: "unknown"
-      automation.Runner: "Runner"
+      execution.Runner: "Runner"
   - path: "github.com/quests-inc/quests/go/internal/graphdraft"
     output_path: "../frontend/src/shared/api/graphdraft.gen.ts"
     include_files:

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/events"
@@ -121,9 +121,9 @@ func (r *CheckRunner) spawnNote(ctx context.Context, d knowledge.DueNote, now ti
 
 func (r *CheckRunner) dispatchNote(ctx context.Context, d knowledge.DueNote) {
 	nid := d.ID
-	_, _, err := r.Store.Automation.EnqueueJob(ctx, automation.JobSpec{
+	_, _, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
 		RunnerLabel:    *d.RunOn,
-		Kind:           automation.JobKindPoll,
+		Kind:           execution.JobKindPoll,
 		NoteID:         &nid,
 		Title:          "Заметка · " + d.Title,
 		DedupeKey:      "note:" + strconv.FormatInt(d.ID, 10) + ":poll",
@@ -204,23 +204,23 @@ func (r *CheckRunner) noteChanged(ctx context.Context, id int64, title, detail s
 }
 
 // noteJobFinished applies a runner's result to the note that asked for it.
-func (r *CheckRunner) noteJobFinished(ctx context.Context, j automation.RunnerJob) {
+func (r *CheckRunner) noteJobFinished(ctx context.Context, j execution.RunnerJob) {
 	switch j.State {
-	case automation.JobSuccess, automation.JobFail, automation.JobTimeout:
+	case execution.JobSuccess, execution.JobFail, execution.JobTimeout:
 		exit := -1
 		if j.ExitCode != nil {
 			exit = *j.ExitCode
 		}
-		r.applyNote(ctx, *j.NoteID, exit, j.Stdout, j.Stderr, j.TimedOut || j.State == automation.JobTimeout)
-	case automation.JobSkipped:
+		r.applyNote(ctx, *j.NoteID, exit, j.Stdout, j.Stderr, j.TimedOut || j.State == execution.JobTimeout)
+	case execution.JobSkipped:
 		r.noteJobError(ctx, j, "устройство «"+j.RunnerLabel+"» не вышло на связь")
-	case automation.JobAbandoned:
+	case execution.JobAbandoned:
 		r.noteJobError(ctx, j, "устройство «"+j.RunnerLabel+"» пропало во время проверки, результат неизвестен")
 	}
 	// canceled / lost: nothing to say — the next interval asks again.
 }
 
-func (r *CheckRunner) noteJobError(ctx context.Context, j automation.RunnerJob, msg string) {
+func (r *CheckRunner) noteJobError(ctx context.Context, j execution.RunnerJob, msg string) {
 	if n, err := r.Store.Knowledge.GetNote(ctx, *j.NoteID); err == nil {
 		r.noteError(ctx, n.ID, n.Title, msg)
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
@@ -365,7 +366,7 @@ func (s *Store) DeleteTemplate(ctx context.Context, id int64) error {
 	// showing up once emit_pool made a fresh template materialize a quest
 	// immediately on create, so a same-session delete-right-after-testing
 	// now always hits it).
-	if err := copyTemplateSecretsToLiveQuests(ctx, tx, id); err != nil {
+	if err := execution.CopyTemplateSecretsToLiveQuests(ctx, tx, id); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE quest SET template_id=NULL WHERE template_id=?`, id); err != nil {

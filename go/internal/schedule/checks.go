@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/quests-inc/quests/go/internal/automation"
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -434,12 +434,12 @@ const (
 // At most one job per step and mode is open at a time, so nothing piles up
 // while the device is away.
 func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.Step, once bool) {
-	kind, valid, timeout := automation.JobKindPoll, pollJobValidFor, pollTimeout
+	kind, valid, timeout := execution.JobKindPoll, pollJobValidFor, pollTimeout
 	if once {
-		kind, valid, timeout = automation.JobKindOnce, onceJobValidFor, onceSafetyTimeout
+		kind, valid, timeout = execution.JobKindOnce, onceJobValidFor, onceSafetyTimeout
 	}
 	qid, sid := q.ID, st.ID
-	_, _, err := r.Store.Automation.EnqueueJob(ctx, automation.JobSpec{
+	_, _, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
 		RunnerLabel:    *st.RunOn,
 		Kind:           kind,
 		QuestID:        &qid,
@@ -458,7 +458,7 @@ func (r *CheckRunner) dispatch(ctx context.Context, q journal.Quest, st journal.
 // JobFinished applies the outcome of a runner job to its step. It is the
 // remote counterpart of exec+apply: a delivered result goes through the same
 // apply/applyOnce; an unreachable device is not a failed command.
-func (r *CheckRunner) JobFinished(ctx context.Context, j automation.RunnerJob) {
+func (r *CheckRunner) JobFinished(ctx context.Context, j execution.RunnerJob) {
 	if j.NoteID != nil {
 		r.noteJobFinished(ctx, j)
 		return
@@ -466,24 +466,24 @@ func (r *CheckRunner) JobFinished(ctx context.Context, j automation.RunnerJob) {
 	if j.StepID == nil || j.QuestID == nil {
 		return
 	}
-	once := j.Kind == automation.JobKindOnce
+	once := j.Kind == execution.JobKindOnce
 	switch j.State {
-	case automation.JobSuccess, automation.JobFail, automation.JobTimeout:
+	case execution.JobSuccess, execution.JobFail, execution.JobTimeout:
 		exit := -1
 		if j.ExitCode != nil {
 			exit = *j.ExitCode
 		}
-		r.apply(ctx, *j.QuestID, *j.StepID, once, exit, j.Stdout, j.Stderr, j.TimedOut || j.State == automation.JobTimeout)
-	case automation.JobSkipped:
+		r.apply(ctx, *j.QuestID, *j.StepID, once, exit, j.Stdout, j.Stderr, j.TimedOut || j.State == execution.JobTimeout)
+	case execution.JobSkipped:
 		if once {
 			r.releaseOnce(ctx, j, "устройство «"+j.RunnerLabel+"» не вышло на связь за сутки — запущу снова, когда появится")
 		}
-	case automation.JobCanceled:
+	case execution.JobCanceled:
 		if once {
 			// Cancelled by hand: do not queue it again by itself.
 			r.stopOnce(ctx, j, "запуск отменён")
 		}
-	case automation.JobAbandoned:
+	case execution.JobAbandoned:
 		if once {
 			// It may have run, so running it again is not safe: report it.
 			r.failOnce(ctx, j, "устройство «"+j.RunnerLabel+"» пропало во время выполнения, результат неизвестен")
@@ -492,7 +492,7 @@ func (r *CheckRunner) JobFinished(ctx context.Context, j automation.RunnerJob) {
 	// lost / poll skips: nothing to do — the lease lapse is reported by the jobs list, and a poll tries again.
 }
 
-func (r *CheckRunner) stepOf(ctx context.Context, j automation.RunnerJob) (journal.Quest, *journal.Step, bool) {
+func (r *CheckRunner) stepOf(ctx context.Context, j execution.RunnerJob) (journal.Quest, *journal.Step, bool) {
 	q, err := r.Store.Journal.GetQuest(ctx, *j.QuestID)
 	if err != nil {
 		return q, nil, false
@@ -506,7 +506,7 @@ func (r *CheckRunner) stepOf(ctx context.Context, j automation.RunnerJob) (journ
 }
 
 // releaseOnce takes a one-shot back to idle (not started), with a note in the quest log.
-func (r *CheckRunner) releaseOnce(ctx context.Context, j automation.RunnerJob, why string) {
+func (r *CheckRunner) releaseOnce(ctx context.Context, j execution.RunnerJob, why string) {
 	q, st, ok := r.stepOf(ctx, j)
 	if !ok || st.Done {
 		return
@@ -519,7 +519,7 @@ func (r *CheckRunner) releaseOnce(ctx context.Context, j automation.RunnerJob, w
 }
 
 // stopOnce parks a one-shot as failed-to-run without failing its quest.
-func (r *CheckRunner) stopOnce(ctx context.Context, j automation.RunnerJob, why string) {
+func (r *CheckRunner) stopOnce(ctx context.Context, j execution.RunnerJob, why string) {
 	q, st, ok := r.stepOf(ctx, j)
 	if !ok || st.Done {
 		return
@@ -532,7 +532,7 @@ func (r *CheckRunner) stopOnce(ctx context.Context, j automation.RunnerJob, why 
 }
 
 // failOnce marks a one-shot failed because its outcome cannot be known.
-func (r *CheckRunner) failOnce(ctx context.Context, j automation.RunnerJob, why string) {
+func (r *CheckRunner) failOnce(ctx context.Context, j execution.RunnerJob, why string) {
 	q, st, ok := r.stepOf(ctx, j)
 	if !ok || st.Done {
 		return
@@ -543,17 +543,17 @@ func (r *CheckRunner) failOnce(ctx context.Context, j automation.RunnerJob, why 
 // ExpireRunnerJobs settles jobs whose lease or deadline passed and tells their steps.
 func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
 	// Jobs of deleted quests / steps do not hang around waiting for a device.
-	if _, err := r.Store.Automation.CancelOrphanJobs(ctx); err != nil {
+	if _, err := r.Store.Execution.CancelOrphanJobs(ctx); err != nil {
 		log.Printf("checks: cancel orphan runner jobs: %v", err)
 	}
-	changed, err := r.Store.Automation.ExpireJobs(ctx)
+	changed, err := r.Store.Execution.ExpireJobs(ctx)
 	if err != nil {
 		log.Printf("checks: expire runner jobs: %v", err)
 	}
 	for _, j := range changed {
 		r.JobFinished(ctx, j)
 	}
-	if _, err := r.Store.Automation.PurgeRunnerJobs(ctx, timeutil.NowUTC().Add(-14*24*time.Hour)); err != nil {
+	if _, err := r.Store.Execution.PurgeRunnerJobs(ctx, timeutil.NowUTC().Add(-14*24*time.Hour)); err != nil {
 		log.Printf("checks: purge runner jobs: %v", err)
 	}
 }

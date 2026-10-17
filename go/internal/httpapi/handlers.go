@@ -7,8 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/quests-inc/quests/go/internal/automation"
 	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
+	"github.com/quests-inc/quests/go/internal/execution"
+	executionhttp "github.com/quests-inc/quests/go/internal/execution/http"
 	"github.com/quests-inc/quests/go/internal/graphdraft"
 	"github.com/quests-inc/quests/go/internal/identity"
 	identityhttp "github.com/quests-inc/quests/go/internal/identity/http"
@@ -55,9 +56,11 @@ type Server struct {
 	journalOnce      sync.Once
 	jh               *journalhttp.Handler
 	automationOnce   sync.Once
+	executionOnce    sync.Once
 	graphdraftOnce   sync.Once
 	gdh              *graphdraft.Handler
 	ah               *automationhttp.Handler
+	eh               *executionhttp.Handler
 	kh               *knowledgehttp.Handler
 	idh              *identityhttp.Handler
 	loginLimiter     *ratelimit.Limiter
@@ -70,7 +73,7 @@ type Server struct {
 	SelfBase string
 	// RunnerDone is called once for every runner job that reaches a final state
 	// (result delivered, lease lost, never picked up): the scheduler applies it to the step.
-	RunnerDone func(ctx context.Context, j automation.RunnerJob)
+	RunnerDone func(ctx context.Context, j execution.RunnerJob)
 	// WebDAV stores attachment bytes. Nil/unconfigured disables uploads.
 	WebDAV *webdav.Client
 	// ClamAV scans uploads. Unconfigured refuses uploads rather than storing
