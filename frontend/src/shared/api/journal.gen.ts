@@ -383,3 +383,20 @@ export interface TagCreate {
   Label: string;
   Color: string;
 }
+
+//////////
+// source: trash.go
+
+/**
+ * TrashedQuest is a row of the trash list.
+ */
+export interface TrashedQuest {
+  ID: number /* int64 */;
+  Title: string;
+  Status: string;
+  QuestlineID?: number /* int64 */;
+  StepsTotal: number /* int */;
+  StepsDone: number /* int */;
+  DeletedAt: string;
+  DeletedBy?: number /* int64 */;
+}
