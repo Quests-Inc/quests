@@ -75,6 +75,11 @@ rewrites the current version instead of adding one. A step or a note picks a scr
 (`PUT|DELETE /api/steps|notes|templates/{id}/script`; a template step carries `script_id` in its own column and the quest made from it is bound to the same script, and a step created with a quest or on its own may name one in `script_id`); the script then takes the place of the command, and the device, mode and interval
 stay the step's own.
 
+**MCP:** one tool `script` with actions `list` / `get` / `create` (graph or `sample`) / `update` / `delete` / `validate` /
+`nodes` / `samples` / `bind` / `unbind` (`subject` = step|note|template). A new step may take `script_id` on
+`add_step` / `create_quest`; attaching a script to an existing step or note is `script` bind. Graph format:
+[`adr/0003-script-graphs.md`](adr/0003-script-graphs.md).
+
 A graph is validated on save (types of ports, required inputs, cycles, one `Code` node per path); a bad one is a 422 listing
 the problems per node. Steps, notes and template emit run through the evaluator (see Runs below).
 

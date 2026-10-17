@@ -141,12 +141,12 @@ func TestToolsListShape(t *testing.T) {
 		size += len(b)
 	}
 	for _, n := range []string{"list_quests", "get_quest", "get_step", "update_steps", "set_note_flag", "list_workspaces", "switch_workspace",
-		"icon", "get_attachment", "set_tags", "list_secrets", "dry_run_emit_pool"} {
+		"icon", "get_attachment", "set_tags", "list_secrets", "dry_run_emit_pool", "script"} {
 		if byName[n] == nil {
 			t.Errorf("missing tool %s", n)
 		}
 	}
-	for _, gone := range []string{"get_active_context", "get_inactive_context", "get_base_context", "set_note_outdated", "set_quest_tags"} {
+	for _, gone := range []string{"get_active_context", "get_inactive_context", "get_base_context", "set_note_outdated", "set_quest_tags", "list_emit_attempts"} {
 		if byName[gone] != nil {
 			t.Errorf("%s must be replaced", gone)
 		}
@@ -477,13 +477,56 @@ func TestCreateQuestNeedsAnExplicitQuestline(t *testing.T) {
 
 func TestInstructionsTellToLayOutWork(t *testing.T) {
 	got := Instructions()
-	for _, want := range []string{"list_questlines", "list_tags", `"none"`} {
+	for _, want := range []string{"list_questlines", "list_tags", `"none"`, "0003-script-graphs", "automation.md"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("instructions miss %q:\n%s", want, got)
 		}
 	}
 	if strings.Contains(got, "guide") {
 		t.Fatalf("no pointer to a vault note: a note may not exist, the instructions stand on their own:\n%s", got)
+	}
+}
+
+func TestScriptToolListsCreatesAndBinds(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{
+		"GET /api/scripts":           `[{"id":3,"title":"счёт","version":1,"subjects":["step"],"needs_runner":true}]`,
+		"GET /api/scripts/3":         `{"id":3,"title":"счёт","version":1,"graph":{"nodes":[],"edges":[]}}`,
+		"GET /api/script-samples":    `[{"id":"step-once","title":"once","subject":"step","graph":{"nodes":[{"id":1}],"edges":[]}}]`,
+		"POST /api/scripts":          `{"id":9,"version":1,"subjects":["step"],"needs_runner":true}`,
+		"POST /api/scripts/validate": `{"ok":true,"problems":[],"needs_runner":true,"subjects":["step"]}`,
+		"PUT /api/steps/11/script":   ``,
+		"DELETE /api/notes/7/script": ``,
+	}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "script", `{"action":"list"}`),
+		call(2, "script", `{"action":"get","id":3}`),
+		call(3, "script", `{"action":"create","title":"из образца","sample":"step-once"}`),
+		call(4, "script", `{"action":"validate","graph":{"nodes":[],"edges":[]}}`),
+		call(5, "script", `{"action":"bind","subject":"step","id":11,"script_id":9}`),
+		call(6, "script", `{"action":"unbind","subject":"note","id":7}`),
+		call(7, "script", `{"action":"create","title":"x"}`),
+	)
+	if text, isErr := result(t, resps[0]); isErr || !strings.Contains(text, `"id":3`) || !strings.Contains(text, `"total":1`) {
+		t.Fatalf("list: %s", text)
+	}
+	if text, isErr := result(t, resps[1]); isErr || !strings.Contains(text, `"graph"`) {
+		t.Fatalf("get: %s", text)
+	}
+	if text, isErr := result(t, resps[2]); isErr || !strings.Contains(text, `"id":9`) {
+		t.Fatalf("create from sample: %s", text)
+	}
+	if text, isErr := result(t, resps[3]); isErr || !strings.Contains(text, `"ok":true`) {
+		t.Fatalf("validate: %s", text)
+	}
+	if text, isErr := result(t, resps[4]); isErr || !strings.Contains(text, `"bound":true`) {
+		t.Fatalf("bind: %s", text)
+	}
+	if text, isErr := result(t, resps[5]); isErr || !strings.Contains(text, `"unbound":true`) {
+		t.Fatalf("unbind: %s", text)
+	}
+	if text, isErr := result(t, resps[6]); !isErr || !strings.Contains(text, "graph or sample") {
+		t.Fatalf("create without graph must be refused: %s", text)
 	}
 }
 

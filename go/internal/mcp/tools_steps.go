@@ -22,6 +22,7 @@ type stepOpts struct {
 	WaitPrevious         *bool   `json:"wait_previous,omitempty"`
 	RunMode              *string `json:"run_mode,omitempty" enum:"poll,once,watch"`
 	RunOn                *string `json:"run_on,omitempty" desc:"runner label, or a,b = first online"`
+	ScriptID             *int64  `json:"script_id,omitempty" desc:"on add: library script instead of check_command; on an existing step use script bind"`
 }
 
 func (p stepPatch) body() map[string]any {
@@ -39,7 +40,7 @@ func (p stepPatch) body() map[string]any {
 		b["progress_total"] = max(1, *p.ProgressTotal)
 	}
 	stepIn{SortOrder: p.SortOrder, CheckCommand: p.CheckCommand, CheckIntervalSeconds: p.CheckIntervalSeconds,
-		WaitPrevious: p.WaitPrevious, RunMode: p.RunMode, RunOn: p.RunOn}.patchInto(b)
+		WaitPrevious: p.WaitPrevious, RunMode: p.RunMode, RunOn: p.RunOn, ScriptID: p.ScriptID}.patchInto(b)
 	return b
 }
 

@@ -22,6 +22,7 @@ type stepIn struct {
 	WaitPrevious         *bool   `json:"wait_previous,omitempty"`
 	RunMode              *string `json:"run_mode,omitempty" enum:"poll,once,watch"`
 	RunOn                *string `json:"run_on,omitempty" desc:"runner label, or a,b = first online"`
+	ScriptID             *int64  `json:"script_id,omitempty" desc:"library script instead of check_command (create/add); change an existing step with script bind"`
 }
 
 func (s stepIn) body() map[string]any {
@@ -52,6 +53,7 @@ func (s stepIn) patchInto(b map[string]any) {
 	set("wait_previous", deref(s.WaitPrevious), s.WaitPrevious != nil)
 	set("run_mode", deref(s.RunMode), s.RunMode != nil)
 	set("run_on", deref(s.RunOn), s.RunOn != nil)
+	set("script_id", deref(s.ScriptID), s.ScriptID != nil)
 }
 
 func deref[T any](p *T) T {

@@ -42,7 +42,7 @@ By default `max_steps` is 30, `max_title` 200, `max_description` 20,000 and `max
 
 ## Errors and retries
 
-A command that fails, a timeout (20 s), invalid JSON or an invalid quest (limits, an unknown questline/tag, a bad significance) is a failed attempt. The pauses between attempts are 1/5/15 minutes, 4 attempts in all; after that the next emit creates a quest with the status `failed`, whose description holds the trace of the last attempt (secret values masked). Every attempt is logged: `GET /api/templates/{id}/emit-attempts`, MCP `list_emit_attempts`.
+A command that fails, a timeout (20 s), invalid JSON or an invalid quest (limits, an unknown questline/tag, a bad significance) is a failed attempt. The pauses between attempts are 1/5/15 minutes, 4 attempts in all; after that the next emit creates a quest with the status `failed`, whose description holds the trace of the last attempt (secret values masked). Every attempt is logged: `GET /api/templates/{id}/emit-attempts`, MCP `get_template(include=["emit_attempts"])`.
 
 A runner that never shows up is not a failed attempt: the job stays `skipped` as a marker for the period, nothing is re-queued and the template is not marked as failing.
 

@@ -98,10 +98,12 @@ func templateTools(c *Client) []Tool {
 		})
 
 	type getArgs struct {
-		ID       int64 `json:"id"`
-		MaxChars int   `json:"max_chars,omitempty" desc:"cut for description and emit_pool_command, default 4000"`
+		ID       int64    `json:"id"`
+		MaxChars int      `json:"max_chars,omitempty" desc:"cut for description and emit_pool_command, default 4000"`
+		Include  []string `json:"include,omitempty" desc:"any of: emit_attempts (recent emit runs: status, duration, message)"`
+		Limit    int      `json:"limit,omitempty" desc:"emit_attempts page size, default 10"`
 	}
-	get := Typed("get_template", "One template with its steps; long description and emit_pool_command are cut at max_chars.",
+	get := Typed("get_template", "One template with its steps; long description and emit_pool_command are cut at max_chars. include=emit_attempts adds recent emit runs (why it did or did not emit).",
 		func(ctx context.Context, a getArgs) (any, error) {
 			var t map[string]any
 			if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/templates/%d", a.ID), nil, nil, &t); err != nil {
@@ -111,6 +113,14 @@ func templateTools(c *Client) []Tool {
 				if s, ok := t[k].(string); ok {
 					withText(t, k, s, a.MaxChars, 0)
 				}
+			}
+			inc := includeSet(a.Include)
+			if inc["emit_attempts"] {
+				var res map[string]any
+				if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/templates/%d/emit-attempts", a.ID), values("limit", fmt.Sprint(clampLimit(a.Limit, 10))), nil, &res); err != nil {
+					return nil, err
+				}
+				t["emit_attempts"] = res
 			}
 			t["workspace"] = c.Workspace(ctx)
 			return t, nil
@@ -178,20 +188,6 @@ func templateTools(c *Client) []Tool {
 		return ok(ctx, c, a.ID, map[string]any{"deleted": true}), nil
 	})
 
-	type attemptsArgs struct {
-		TemplateID int64 `json:"template_id"`
-		Limit      int   `json:"limit,omitempty" desc:"default 10"`
-	}
-	attempts := Typed("list_emit_attempts", "Recent emit_pool_command runs of a template (status, duration, message): why a template did or did not emit.",
-		func(ctx context.Context, a attemptsArgs) (any, error) {
-			var res map[string]any
-			if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/templates/%d/emit-attempts", a.TemplateID), values("limit", fmt.Sprint(clampLimit(a.Limit, 10))), nil, &res); err != nil {
-				return nil, err
-			}
-			res["workspace"] = c.Workspace(ctx)
-			return res, nil
-		})
-
 	type dryArgs struct {
 		Command    *string `json:"command,omitempty" desc:"text to try"`
 		TemplateID *int64  `json:"template_id,omitempty" desc:"or: use this template's stored command"`
@@ -217,7 +213,7 @@ func templateTools(c *Client) []Tool {
 			return runEmitPool(ctx, cmd), nil
 		})
 
-	return []Tool{list, get, create, upd, del, attempts, dry}
+	return []Tool{list, get, create, upd, del, dry}
 }
 
 const emitPoolTimeout = 20 * time.Second
