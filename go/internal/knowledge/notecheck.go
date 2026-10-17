@@ -120,10 +120,7 @@ func (s *Store) SetNoteCheck(ctx context.Context, id int64, command *string, int
 	if len(cmd) > 8000 {
 		return NoteCheck{}, errBad("команда длиннее 8000 символов")
 	}
-	if err := s.guardAuthor(ctx, &cmd, cur.Command); err != nil {
-		return NoteCheck{}, err
-	}
-	if err := s.guardExec(ctx, &cmd, runOn); err != nil {
+	if err := s.guardCommand(ctx, &cmd, cur.Command, runOn); err != nil {
 		return NoteCheck{}, err
 	}
 	iv := DefaultNoteCheckInterval

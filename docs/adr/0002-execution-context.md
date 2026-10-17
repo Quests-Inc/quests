@@ -1,6 +1,6 @@
 # ADR-0002. A context for running user code (runners, the job queue, the rules)
 
-- Status: **proposed** (nothing is moved yet; the decision is the owner's)
+- Status: **accepted** (2026-10-17, the owner; the open questions are answered below)
 - Date: 2026-10-17
 - Related: quest=439 (this), quest=438 (hooks in the web UI), quest=440 (script library), ADR-0001, `docs/automation.md`
 
@@ -51,12 +51,17 @@ same context.
 The exec gate (`archtest/exec_test.go`) is already in place and stays; `platform/hooks` is the only server-side entry on its
 allow-list and leaves it with step 5.
 
-## Open questions for the owner
+## Answers to the open questions (2026-10-17)
 
-- Are `runners` and `execution` the same context or should registration/auth of runners stay apart from job kinds?
-- Should the policy also decide *who may pick an existing script* (quest=440's open question: members choosing an
-  owner-published script), so that it is one function and not a new wrapper per store?
-- Is the amendment about secrets acceptable, or should they stay in `automation` and be handed to `execution` at enqueue time?
+- `runners` and `execution` are **one** context: registration/auth of runners and job kinds share the queue, the tokens and
+  the policy, and splitting them would only add an interface between things that change together.
+- The policy decides **who may pick an existing script** too (quest=440): one function in `execution`, not a wrapper per store.
+- Secrets move to `execution` (amends ADR-0001 once more): they exist only as the environment of a job.
+
+## Progress
+
+- Step 2 (one policy): done. `kernel.Commands.Check` replaces the `guardAuthor` / `guardExec` pairs; each store keeps a single
+  `guardCommand` wrapper that supplies its role lookup.
 
 ## Consequences
 

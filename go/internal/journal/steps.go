@@ -80,10 +80,7 @@ func (s *Store) AddStep(ctx context.Context, questID int64, st Step, q Quest) (Q
 	defer func() { _ = tx.Rollback() }()
 	NormalizeStepCheck(&st)
 	ClampStep(&st)
-	if err := s.guardAuthor(ctx, st.CheckCommand, nil); err != nil {
-		return Quest{}, err
-	}
-	if err := s.guardExec(ctx, st.CheckCommand, st.RunOn); err != nil {
+	if err := s.guardCommand(ctx, st.CheckCommand, nil, st.RunOn); err != nil {
 		return Quest{}, err
 	}
 	_, err = tx.ExecContext(ctx, `
@@ -125,10 +122,7 @@ func (s *Store) UpdateStep(ctx context.Context, st Step, q Quest, kind, detail s
 	if oldCmd.Valid {
 		oldPtr = &oldCmd.String
 	}
-	if err := s.guardAuthor(ctx, st.CheckCommand, oldPtr); err != nil {
-		return Quest{}, err
-	}
-	if err := s.guardExec(ctx, st.CheckCommand, st.RunOn); err != nil {
+	if err := s.guardCommand(ctx, st.CheckCommand, oldPtr, st.RunOn); err != nil {
 		return Quest{}, err
 	}
 	_, err = tx.ExecContext(ctx, `

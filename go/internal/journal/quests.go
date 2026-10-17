@@ -313,10 +313,7 @@ func (s *Store) createQuest(ctx context.Context, q Quest, changeKind, changeDeta
 		st := q.Steps[i]
 		NormalizeStepCheck(&st)
 		ClampStep(&st)
-		if err := s.guardAuthor(ctx, st.CheckCommand, nil); err != nil {
-			return Quest{}, err
-		}
-		if err := s.guardExec(ctx, st.CheckCommand, st.RunOn); err != nil {
+		if err := s.guardCommand(ctx, st.CheckCommand, nil, st.RunOn); err != nil {
 			return Quest{}, err
 		}
 		_, err := tx.ExecContext(ctx, `

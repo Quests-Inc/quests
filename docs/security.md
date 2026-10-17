@@ -24,8 +24,7 @@ queue, secrets) is in [`automation.md`](automation.md).
 - **Workspace per request** — `withWorkspace` in `go/internal/httpapi/workspaces.go`: sessions/tokens are pinned, the
   `X-Quests-Workspace` header is checked against membership. The assistant's loopback token must name the workspace
   (it used to fall into the default one — an invited user could rewrite the owner's quests through it).
-- **Commands** — `guardAuthor` (only owners write a command; editing around an existing one is fine) and
-  `guardExec` (a command needs a runner), both in `go/internal/store/workspaces.go`. A command stored without a runner
+- **Commands** — `kernel.Commands.Check` (only owners write a command, editing around an existing one is fine; a command needs a runner), in `go/internal/kernel/commands.go`. A command stored without a runner
   is never run: steps stay idle, notes and templates report "choose a runner".
   Secrets names that would bend how a process starts (`PATH`, `LD_*`, `BASH_ENV`, `QUESTS_*`…) are refused and never exported.
 - **Exports** — PDF is rendered in-process by `go/internal/pdfdoc` from a document the client describes (title, markdown, steps):

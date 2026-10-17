@@ -57,12 +57,7 @@ var (
 
 type rowScanner = dbx.Scanner
 
-// guardAuthor refuses a command written by someone who is not an owner of the workspace (kernel.CommandAuthor).
-func (s *Store) guardAuthor(ctx context.Context, command, old *string) error {
-	return kernel.CommandAuthor(ctx, s.Identity, command, old)
-}
-
-// guardExec refuses a command that has no runner (kernel.CommandExec).
-func (s *Store) guardExec(_ context.Context, command, runOn *string) error {
-	return kernel.CommandExec(command, runOn)
+// guardCommand applies the shared policy for user code (kernel.Commands): owner-only authoring, and a runner is required.
+func (s *Store) guardCommand(ctx context.Context, command, old, runOn *string) error {
+	return kernel.Commands{Roles: s.Identity}.Check(ctx, command, old, runOn)
 }

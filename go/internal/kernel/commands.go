@@ -21,11 +21,11 @@ type RoleLookup interface {
 	MemberRole(ctx context.Context, workspaceID, userID int64) (string, error)
 }
 
-// CommandAuthor refuses a command written by someone who is not an owner of the workspace. A command runs with the
+// commandAuthor refuses a command written by someone who is not an owner of the workspace. A command runs with the
 // authority of the machine that executes it (a runner the owner registered), so authoring one is an owner's right.
 // old is the command already stored (nil for a new one): leaving it unchanged is fine, so a member can still edit
 // the rest of a step, a template or a note.
-func CommandAuthor(ctx context.Context, roles RoleLookup, command, old *string) error {
+func commandAuthor(ctx context.Context, roles RoleLookup, command, old *string) error {
 	if command == nil || strings.TrimSpace(*command) == "" {
 		return nil
 	}
@@ -49,8 +49,8 @@ func CommandAuthor(ctx context.Context, roles RoleLookup, command, old *string) 
 	return nil
 }
 
-// CommandExec refuses a command that has no runner (non-empty command, run_on empty).
-func CommandExec(command, runOn *string) error {
+// commandExec refuses a command that has no runner (non-empty command, run_on empty).
+func commandExec(command, runOn *string) error {
 	if command == nil || strings.TrimSpace(*command) == "" {
 		return nil
 	}
@@ -58,4 +58,19 @@ func CommandExec(command, runOn *string) error {
 		return nil
 	}
 	return ErrNoRunner
+}
+
+// Commands is the one policy for user code: every place that stores a command (a step check, a note check, a template
+// emit) asks it, instead of keeping its own pair of guards.
+type Commands struct {
+	Roles RoleLookup
+}
+
+// Check refuses a command that its author may not write (not an owner of the workspace) or that has no runner to
+// execute on. old is the command already stored (nil for a new one), runOn the runner label it is bound to.
+func (c Commands) Check(ctx context.Context, command, old, runOn *string) error {
+	if err := commandAuthor(ctx, c.Roles, command, old); err != nil {
+		return err
+	}
+	return commandExec(command, runOn)
 }

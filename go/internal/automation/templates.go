@@ -244,10 +244,7 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunOn.Error())
 	}
 
-	if err := s.guardAuthor(ctx, asStringPtr(body["emit_pool_command"]), nil); err != nil {
-		return TemplateRead{}, err
-	}
-	if err := s.guardExec(ctx, asStringPtr(body["emit_pool_command"]), emitRunOn); err != nil {
+	if err := s.guardCommand(ctx, asStringPtr(body["emit_pool_command"]), nil, emitRunOn); err != nil {
 		return TemplateRead{}, err
 	}
 	if raw, ok := body["steps"]; ok {
@@ -313,10 +310,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	if !ValidRunOn(emitRunOn) {
 		return TemplateRead{}, errBad("emit_run_on: " + ErrBadRunOn.Error())
 	}
-	if err := s.guardAuthor(ctx, asStringPtr(merged["emit_pool_command"]), cur.EmitPoolCmd); err != nil {
-		return TemplateRead{}, err
-	}
-	if err := s.guardExec(ctx, asStringPtr(merged["emit_pool_command"]), emitRunOn); err != nil {
+	if err := s.guardCommand(ctx, asStringPtr(merged["emit_pool_command"]), cur.EmitPoolCmd, emitRunOn); err != nil {
 		return TemplateRead{}, err
 	}
 	_, err = s.DB.ExecContext(ctx, `
@@ -448,10 +442,7 @@ func (s *Store) guardTemplateSteps(ctx context.Context, tid int64, steps []any) 
 		if cmd != nil && existing[strings.TrimSpace(*cmd)] {
 			old = cmd
 		}
-		if err := s.guardAuthor(ctx, cmd, old); err != nil {
-			return err
-		}
-		if err := s.guardExec(ctx, cmd, NormalizeRunOn(asStringPtr(m["run_on"]))); err != nil {
+		if err := s.guardCommand(ctx, cmd, old, NormalizeRunOn(asStringPtr(m["run_on"]))); err != nil {
 			return err
 		}
 	}

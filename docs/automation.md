@@ -30,7 +30,7 @@ a template's `emit_pool_command`, and (planned, quest=438) event hooks. The deta
 ## Life of a job
 
 ```
-owner writes command + run_on          (rules 3, 4: guardAuthor, guardExec)
+owner writes command + run_on          (rules 3, 4: kernel.Commands.Check)
         │
 scheduler / event ── EnqueueJob ──►  runner_job (state queued, dedupe_key, valid_until, timeout)
                                           │  one open job per dedupe_key: a slow runner is never piled up
@@ -48,7 +48,7 @@ kind have their own validity window and timeout.
 
 | Concern | Place |
 |---|---|
-| Who may write a command, "a command needs a runner" | `internal/kernel/commands.go` (`CommandAuthor`, `CommandExec`); each context has thin `guardAuthor` / `guardExec` wrappers (`journal`, `knowledge`, `automation` stores) |
+| Who may write a command, "a command needs a runner" | `internal/kernel/commands.go` (`kernel.Commands.Check`: author, then runner); each store (`journal`, `knowledge`, `automation`) has one `guardCommand` wrapper that supplies its role lookup |
 | Runners, tokens, queue, leases, expiry | `internal/automation/runner.go`, `runner_jobs.go`; HTTP `automation/http/runners.go` |
 | Runner label rules | `internal/kernel/runlabel.go` |
 | What to enqueue and when | `internal/schedule`: `checks.go` (steps), `notecheck.go` (notes), `emit_remote.go` / `emit_roll.go` (templates) |
