@@ -28,6 +28,8 @@ type CustomNode struct {
 	Graph       graph.Graph         `json:"graph"`
 	CreatedAt   time.Time           `json:"created_at"`
 	UpdatedAt   time.Time           `json:"updated_at"`
+	// Subjects: the kinds of entity the sources inside read (`step`, `note`…): what a picker offers the node for.
+	Subjects []string `json:"subjects"`
 	// NeedsRunner: the node holds a Code node.
 	NeedsRunner bool `json:"needs_runner"`
 	// Problem is why the definition does not resolve at the moment (a node inside it was deleted), or empty.
@@ -128,6 +130,7 @@ func annotate(nodes []CustomNode) {
 		if err := errs[nodes[i].ID]; err != nil {
 			nodes[i].Problem = err.Error()
 		}
+		nodes[i].Subjects = nodes[i].Graph.Subjects()
 		nodes[i].NeedsRunner = reg[nodes[i].Def().TypeName()].Contains[graph.KindCode] > 0
 	}
 }
@@ -315,4 +318,29 @@ func (s *Store) customNodeUsers(ctx context.Context, id int64) ([]string, error)
 		}
 	}
 	return by, nil
+}
+
+// InstallStarters makes a custom node of every sample that has none yet (found by title) and returns the new ones. The samples
+// are the starting library: a script that is one such node does what the sample did, with its entity number and code as fields.
+func (s *Store) InstallStarters(ctx context.Context) ([]CustomNode, error) {
+	have, err := s.ListCustomNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	titles := map[string]bool{}
+	for _, n := range have {
+		titles[n.Title] = true
+	}
+	made := []CustomNode{}
+	for _, sm := range graph.Samples() {
+		if titles[sm.Title] {
+			continue
+		}
+		n, err := s.CreateCustomNode(ctx, graph.Starter(sm))
+		if err != nil {
+			return nil, fmt.Errorf("образец %q: %w", sm.ID, err)
+		}
+		made = append(made, n)
+	}
+	return made, nil
 }

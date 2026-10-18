@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Candidate, ChosenField } from '@/entities/script'
+  import type { CustomNode } from '@/shared/api/execution.gen.ts'
   import ModalFoot from '@/shared/ui/ModalFoot.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
@@ -14,6 +15,7 @@
     candidates,
     nodeTitle,
     onClose,
+    nodes,
     onBake,
   }: {
     open: boolean
@@ -21,10 +23,12 @@
     candidates: Candidate[]
     nodeTitle: (id: number) => string
     onClose: () => void
-    onBake: (title: string, chosen: ChosenField[]) => Promise<void>
+    nodes: CustomNode[]
+    onBake: (title: string, chosen: ChosenField[], replaceId?: number) => Promise<void>
   } = $props()
 
   let title = $state('')
+  let replaceId = $state('')
   let on = $state<boolean[]>([])
   let labels = $state<string[]>([])
   let busy = $state(false)
@@ -33,6 +37,7 @@
   $effect(() => {
     if (!open) return
     title = ''
+    replaceId = ''
     error = ''
     on = candidates.map(() => false)
     labels = candidates.map((c) => c.param.replace(/^vars\./, ''))
@@ -43,7 +48,7 @@
     error = ''
     try {
       const chosen = candidates.flatMap((c, i) => (on[i] ? [{ candidate: c, name: '', label: labels[i].trim() || c.param }] : []))
-      await onBake(title, chosen)
+      await onBake(title, chosen, replaceId ? Number(replaceId) : undefined)
       onClose()
     } catch (e) {
       error = e instanceof Error ? e.message : String(e)
@@ -66,6 +71,13 @@
     <label class="field">
       <span class="label">Название</span>
       <input type="text" bind:value={title} required maxlength="200" placeholder="например: Актуализировать заметку" />
+    </label>
+    <label class="field">
+      <span class="label">Куда</span>
+      <select bind:value={replaceId} onchange={() => { const n = nodes.find((x) => String(x.id) === replaceId); if (n) title = n.title }}>
+        <option value="">новая нода</option>
+        {#each nodes as n (n.id)}<option value={String(n.id)}>заменить «{n.title}» (скрипты с ней подхватят новую)</option>{/each}
+      </select>
     </label>
     <div class="field">
       <span class="label">Редактируемые поля</span>

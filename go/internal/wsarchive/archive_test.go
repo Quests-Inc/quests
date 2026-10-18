@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/quests-inc/quests/go/internal/execution"
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/identity"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
@@ -294,5 +295,82 @@ func TestScriptsSurviveExportAndImport(t *testing.T) {
 	v1, err := f.st.Execution.ScriptGraph(ctx, list[0].ID, 1)
 	if err != nil || !strings.Contains(string(v1), "echo 1") {
 		t.Fatalf("version 1 of the imported script: %s %v", v1, err)
+	}
+}
+
+// A script that holds a custom node and reads a note by id follows them to the new workspace (quest=458).
+func TestScriptGraphIDsFollowTheImport(t *testing.T) {
+	f := newFixture(t)
+	ctx := f.ctx()
+	// A throw-away note and node, so the ids of the real ones are not 1.
+	if _, err := f.st.Knowledge.CreateNote(ctx, knowledge.Note{Title: "Лишняя"}); err != nil {
+		t.Fatal(err)
+	}
+	note, err := f.st.Knowledge.CreateNote(ctx, knowledge.Note{Title: "Проверяемая"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inner := graph.Graph{
+		Nodes: []graph.Node{{ID: 1, Type: "source.note", Params: []byte(`{"id":` + itoa(note.ID) + `}`)}, {ID: 2, Type: "sink.done"}},
+		Edges: []graph.Edge{{From: graph.End{Node: 1, Port: "ref"}, To: graph.End{Node: 2, Port: "trigger"}}},
+	}
+	if _, err := f.st.Execution.CreateCustomNode(ctx, graph.Custom{Title: "Лишняя нода", Graph: inner}); err != nil {
+		t.Fatal(err)
+	}
+	node, err := f.st.Execution.CreateCustomNode(ctx, graph.Custom{
+		Title:  "Проверка заметки",
+		Fields: []graph.CustomField{{Name: "note", Type: "int", Default: note.ID, Node: 1, Param: "id"}},
+		Graph:  inner,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := []byte(`{"nodes":[{"id":1,"type":"custom.` + itoa(node.ID) + `"},{"id":2,"type":"source.note","params":{"id":` + itoa(note.ID) + `}},{"id":3,"type":"sink.done"}],
+		"edges":[{"from":{"node":2,"port":"ref"},"to":{"node":3,"port":"trigger"}}]}`)
+	if _, err := f.st.Execution.CreateScript(ctx, "С нодой", "", g); err != nil {
+		t.Fatal(err)
+	}
+
+	w := f.export(t)
+	rec := httptest.NewRecorder()
+	f.h.Import(rec, upload(t, "ws.zip", w.Body.Bytes(), f.user))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("import = %d %s", rec.Code, rec.Body.String())
+	}
+	var wsID int64
+	if err := f.st.DB.QueryRowContext(context.Background(), `SELECT id FROM workspace WHERE name = 'Импортированное'`).Scan(&wsID); err != nil {
+		t.Fatal(err)
+	}
+	ictx := wsctx.WithUser(wsctx.With(context.Background(), wsID), f.user.ID)
+	notes, _ := f.st.Knowledge.ListNotes(ictx, knowledge.NoteFilter{})
+	var newNote int64
+	for _, n := range notes {
+		if n.Title == "Проверяемая" {
+			newNote = n.ID
+		}
+	}
+	nodes, err := f.st.Execution.ListCustomNodes(ictx)
+	if err != nil || len(nodes) != 2 || newNote == 0 || newNote == note.ID {
+		t.Fatalf("imported nodes %+v note %d (was %d): %v", nodes, newNote, note.ID, err)
+	}
+	var imported execution.CustomNode
+	for _, n := range nodes {
+		if n.Title == "Проверка заметки" {
+			imported = n
+		}
+	}
+	if imported.Problem != "" || string(imported.Graph.Nodes[0].Params) != `{"id":`+itoa(newNote)+`}` || imported.Fields[0].Default != float64(newNote) {
+		t.Fatalf("the node's inside points at the new note: %+v", imported)
+	}
+	scripts, _ := f.st.Execution.ListScripts(ictx)
+	raw, err := f.st.Execution.ScriptGraph(ictx, scripts[0].ID, scripts[0].Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"custom.`+itoa(imported.ID)+`"`) || !strings.Contains(string(raw), `"id":`+itoa(newNote)) {
+		t.Fatalf("the script's graph follows the import: %s", raw)
+	}
+	if _, err := f.st.Execution.CreateScript(ictx, "ещё раз", "", raw); err != nil {
+		t.Fatalf("the imported graph is a valid script: %v", err)
 	}
 }

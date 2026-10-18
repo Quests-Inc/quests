@@ -156,3 +156,52 @@ func TestCustomMissingInnerTypeIsReported(t *testing.T) {
 		t.Fatalf("errors: %v", errs)
 	}
 }
+
+func TestRemapIDsFollowsTheImport(t *testing.T) {
+	g := Graph{Nodes: []Node{node(1, "source.step", `{"id":5}`), node(2, "custom.7", ``), node(3, "source.note", `{"id":9}`), node(4, "source.quest", ``)}}
+	customs := func(id int64) (int64, bool) { return id + 100, id == 7 }
+	ents := func(kind string, id int64) (int64, bool) { return id + 1000, kind == "step" }
+	out, dangling := g.RemapIDs(customs, ents)
+	if string(out.Nodes[0].Params) != `{"id":1005}` || out.Nodes[1].Type != "custom.107" {
+		t.Fatalf("remapped: %+v", out.Nodes)
+	}
+	if out.Nodes[2].Params != nil || dangling != 1 {
+		t.Fatalf("a source whose entity is not in the archive loses its id: %s %d", out.Nodes[2].Params, dangling)
+	}
+	if string(g.Nodes[0].Params) != `{"id":5}` {
+		t.Fatal("the original graph was changed")
+	}
+	c := codeNode()
+	c.Graph.Nodes = []Node{node(1, "source.step", `{"id":5}`)}
+	c.Fields = []CustomField{{Name: "n", Type: "int", Default: float64(5), Node: 1, Param: "id"}}
+	rc, _ := c.RemapIDs(customs, ents)
+	if rc.Fields[0].Default != int64(1005) {
+		t.Fatalf("field default: %v", rc.Fields[0].Default)
+	}
+}
+
+func TestEverySampleIsAStarterNode(t *testing.T) {
+	for _, s := range Samples() {
+		c := Starter(s)
+		c.ID = 1
+		if err := c.Check(Builtin()); err != nil {
+			t.Fatalf("%s: %v", s.ID, err)
+		}
+		reg, errs := Builtin().WithCustoms([]Custom{c})
+		if len(errs) != 0 {
+			t.Fatalf("%s: %v", s.ID, errs)
+		}
+		// A script that is the node alone is a whole script.
+		one := Graph{Nodes: []Node{{ID: 1, Type: "custom.1"}}}
+		if err := one.Check(reg); err != nil {
+			t.Fatalf("%s as a script: %v", s.ID, err)
+		}
+		ex, err := Expand(one, []Custom{c}, reg)
+		if err != nil {
+			t.Fatalf("%s: %v", s.ID, err)
+		}
+		if _, err := NewRun(ex, reg); err != nil {
+			t.Fatalf("%s expands to a graph that cannot run: %v", s.ID, err)
+		}
+	}
+}

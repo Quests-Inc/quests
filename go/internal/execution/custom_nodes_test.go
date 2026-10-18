@@ -98,3 +98,26 @@ func TestCustomNodeLifecycle(t *testing.T) {
 		t.Fatalf("after delete: %v", err)
 	}
 }
+
+func TestInstallStartersMakesTheSamplesNodes(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	made, err := st.InstallStarters(ctx)
+	if err != nil || len(made) != len(graph.Samples()) {
+		t.Fatalf("install: %d %v", len(made), err)
+	}
+	for _, n := range made {
+		if n.Problem != "" || len(n.Subjects) == 0 {
+			t.Fatalf("a starter that does not resolve or names no entity: %+v", n)
+		}
+	}
+	// A script that is one such node is a whole script; the second install adds nothing.
+	one := []byte(fmt.Sprintf(`{"nodes":[{"id":1,"type":"custom.%d"}],"edges":[]}`, made[0].ID))
+	if _, err := st.CreateScript(ctx, "из образца", "", one); err != nil {
+		t.Fatalf("a script made of a starter node: %v", err)
+	}
+	again, err := st.InstallStarters(ctx)
+	if err != nil || len(again) != 0 {
+		t.Fatalf("second install: %d %v", len(again), err)
+	}
+}

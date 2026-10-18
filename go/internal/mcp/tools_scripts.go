@@ -11,7 +11,7 @@ import (
 // without one tool per action.
 func scriptTools(c *Client) []Tool {
 	type args struct {
-		Action      string  `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind,custom_list,custom_get,custom_create,custom_update,custom_delete"`
+		Action      string  `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind,custom_list,custom_get,custom_create,custom_update,custom_delete,custom_starters"`
 		ID          int64   `json:"id,omitempty" desc:"script id (get/update/delete), the step/note/template id (bind/unbind)"`
 		Version     int     `json:"version,omitempty" desc:"get: a past graph version; update: the version you read (always required)"`
 		Title       string  `json:"title,omitempty" desc:"create (required) / update"`
@@ -24,7 +24,7 @@ func scriptTools(c *Client) []Tool {
 		ScriptID    int64   `json:"script_id,omitempty" desc:"bind / hook_create / hook_update: which script"`
 		Limit       int     `json:"limit,omitempty" desc:"list: default 20, max 100"`
 	}
-	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
+	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
 		func(ctx context.Context, a args) (any, error) {
 			switch a.Action {
 			case "list":
@@ -57,7 +57,7 @@ func scriptTools(c *Client) []Tool {
 				return scriptBind(ctx, c, a.Subject, a.ID, a.ScriptID)
 			case "unbind":
 				return scriptUnbind(ctx, c, a.Subject, a.ID)
-			case "custom_list", "custom_get", "custom_create", "custom_update", "custom_delete":
+			case "custom_list", "custom_get", "custom_create", "custom_update", "custom_delete", "custom_starters":
 				return scriptCustom(ctx, c, a.Action, a.ID, a.Node)
 			default:
 				return nil, &Err{422, "action: list, get, create, update, delete, validate, nodes, samples, bind, unbind or custom_list / custom_get / custom_create / custom_update / custom_delete"}
@@ -307,6 +307,13 @@ func scriptCustom(ctx context.Context, c *Client, action string, id int64, node 
 			return nil, err
 		}
 		return ok(ctx, c, id, map[string]any{"version": n["version"], "needs_runner": n["needs_runner"]}), nil
+	case "custom_starters":
+		var out map[string]any
+		if err := c.Do(ctx, http.MethodPost, base+"/starters", nil, map[string]any{}, &out); err != nil {
+			return nil, err
+		}
+		made, _ := out["created"].([]any)
+		return map[string]any{"ok": true, "created": len(made), "workspace": c.Workspace(ctx)}, nil
 	default: // custom_delete
 		if id < 1 {
 			return nil, &Err{422, "custom_delete needs id"}

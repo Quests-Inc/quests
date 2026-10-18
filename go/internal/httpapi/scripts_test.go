@@ -298,6 +298,14 @@ func TestCustomNodesOverHTTP(t *testing.T) {
 	}
 	scriptPath := "/api/scripts/" + jsonNum(out["id"])
 
+	// The starting library installs once.
+	if code, out = call(http.MethodPost, "/api/script-custom-nodes/starters", `{}`); code != http.StatusOK || len(out["created"].([]any)) == 0 {
+		t.Fatalf("starters: %d %v", code, out)
+	}
+	if code, out = call(http.MethodPost, "/api/script-custom-nodes/starters", `{}`); code != http.StatusOK || len(out["created"].([]any)) != 0 {
+		t.Fatalf("starters again: %d %v", code, out)
+	}
+
 	// Stale version, in use, then free to delete.
 	if code, _ = call(http.MethodPut, path, strings.Replace(def, `{"title"`, `{"version":7,"title"`, 1)); code != http.StatusConflict {
 		t.Fatalf("stale: %d, want 409", code)

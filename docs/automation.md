@@ -94,7 +94,7 @@ In the editor: right-click the field → «Добавить ноду» → group
 in the palette) makes a node of one `Code` node: its inputs become variables (the name in capitals), its fields fixed variables
 the script edits on the node. Several picked nodes can be baked into one («Запечь выделенное…»): links leaving the selection
 become inputs and outputs, and any scalar parameter of the picked nodes (a source's entity number, a code variable) can be kept
-as an editable field. A node holding code runs on a runner. Details and limits: ADR-0003 §6a; `script` tool actions `custom_*`.
+as an editable field. A node holding code runs on a runner. A new script is made of one ready node («Новый скрипт», «Из ноды» in a form); the former samples are the starting nodes («Поставить стартовые ноды», `custom_starters`). A baked node is edited in its form (name, field labels and values) or unfolded into the script and baked again over it. Details and limits: ADR-0003 §6a; `script` tool actions `custom_*`.
 
 ### Runs (ADR-0003, stage 4)
 

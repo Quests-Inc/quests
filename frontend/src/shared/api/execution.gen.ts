@@ -57,6 +57,10 @@ export interface CustomNode {
   created_at: string;
   updated_at: string;
   /**
+   * Subjects: the kinds of entity the sources inside read (`step`, `note`…): what a picker offers the node for.
+   */
+  subjects: string[];
+  /**
    * NeedsRunner: the node holds a Code node.
    */
   needs_runner: boolean;

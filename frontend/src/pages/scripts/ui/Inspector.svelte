@@ -12,6 +12,16 @@
   /** What the selected node or link is made of, and its parameters. */
   let { ed, onEditCustom }: { ed: ScriptEditor; onEditCustom?: (type: string) => void } = $props()
 
+  let unfoldError = $state('')
+  async function unfold(id: number) {
+    unfoldError = ''
+    try {
+      await ed.unfold(id)
+    } catch (e) {
+      unfoldError = e instanceof Error ? e.message : String(e)
+    }
+  }
+
   const node = $derived(ed.selectedNode != null ? ed.graph.nodes.find((n) => n.id === ed.selectedNode) : undefined)
   const edge = $derived(ed.selectedEdge != null ? ed.graph.edges[ed.selectedEdge] : undefined)
   const intoCode = $derived(
@@ -52,6 +62,8 @@
         <CustomParams fields={ed.infos.find((i) => i.name === node.type)?.fields ?? []} params={node.params as never} onChange={set} />
         {#if ed.infos.find((i) => i.name === node.type)?.description}<p class="explain">{ed.infos.find((i) => i.name === node.type)?.description}</p>{/if}
         {#if onEditCustom}<button type="button" class="btn btn--ghost" onclick={() => onEditCustom(node.type)}>Править ноду…</button>{/if}
+        <button type="button" class="btn btn--ghost" title="Заменить ноду её частями, чтобы изменить их и запечь снова" onclick={() => void unfold(node.id)}>Развернуть в ноды</button>
+        {#if unfoldError}<p class="insp__err">{unfoldError}</p>{/if}
       {:else if node.type === 'code'}
         <CodeParams params={node.params as never} onChange={set} />
       {:else if node.type === 'parse'}

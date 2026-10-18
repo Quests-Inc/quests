@@ -477,3 +477,84 @@ func (g Graph) CustomUses() []int64 {
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
+
+// RemapIDs rewrites the numbers a graph holds when it moves to another workspace (an import gives every entity a new id): the
+// custom nodes it uses (`custom.N`) and the entity a source reads (`id`). A source whose entity is not in the archive loses
+// its id, so it reads the entity the script is bound to instead of an unrelated one; the count of those comes back.
+func (g Graph) RemapIDs(custom func(id int64) (int64, bool), entity func(kind string, id int64) (int64, bool)) (Graph, int) {
+	dangling := 0
+	nodes := make([]Node, len(g.Nodes))
+	for i, n := range g.Nodes {
+		if id, ok := CustomID(n.Type); ok {
+			if nid, found := custom(id); found {
+				n.Type = CustomPrefix + strconv.FormatInt(nid, 10)
+			}
+		} else if kind, ok := strings.CutPrefix(n.Type, "source."); ok && len(n.Params) > 0 {
+			var m map[string]any
+			if json.Unmarshal(n.Params, &m) == nil {
+				if v, has := m["id"].(float64); has && v > 0 {
+					if nid, found := entity(kind, int64(v)); found {
+						m["id"] = nid
+					} else {
+						delete(m, "id")
+						dangling++
+					}
+					if len(m) == 0 {
+						n.Params = nil
+					} else {
+						n.Params, _ = json.Marshal(m)
+					}
+				}
+			}
+		}
+		nodes[i] = n
+	}
+	return Graph{Nodes: nodes, Edges: g.Edges}, dangling
+}
+
+// RemapIDs is Graph.RemapIDs for the inside of a custom node, and for the baked default of a field that sets a source's id.
+func (c Custom) RemapIDs(custom func(id int64) (int64, bool), entity func(kind string, id int64) (int64, bool)) (Custom, int) {
+	g, dangling := c.Graph.RemapIDs(custom, entity)
+	c.Graph = g
+	fields := make([]CustomField, len(c.Fields))
+	for i, f := range c.Fields {
+		if kind, ok := strings.CutPrefix(nodeType(c.Graph, f.Node), "source."); ok && f.Param == "id" && f.Default != nil {
+			if v, isNum := f.Default.(float64); isNum && v > 0 {
+				if nid, found := entity(kind, int64(v)); found {
+					f.Default = nid
+				} else {
+					f.Default = nil
+					dangling++
+				}
+			}
+		}
+		fields[i] = f
+	}
+	c.Fields = fields
+	return c, dangling
+}
+
+// Starter is the custom node a sample stands for: the sample's whole graph baked into one node, its entity number and the text of
+// its code left as fields. A script that is that one node does what the sample did.
+func Starter(s Sample) Custom {
+	c := Custom{Title: s.Title, Description: s.Description, Inputs: []CustomPort{}, Outputs: []CustomPort{}, Graph: s.Graph}
+	names := map[string]int{}
+	name := func(base string) string {
+		names[base]++
+		if names[base] == 1 {
+			return base
+		}
+		return base + "_" + strconv.Itoa(names[base])
+	}
+	for _, n := range s.Graph.Nodes {
+		switch {
+		case strings.HasPrefix(n.Type, "source.") && n.Type != "source.workspace":
+			c.Fields = append(c.Fields, CustomField{Name: name("entity_id"), Label: "Номер сущности", Type: "int", Node: n.ID, Param: "id"})
+		case n.Type == codeType:
+			var p codeParams
+			_ = json.Unmarshal(n.Params, &p)
+			c.Fields = append(c.Fields, CustomField{Name: name("command"), Label: "Код", Type: "str", Default: p.Text, Node: n.ID, Param: "text"})
+		}
+	}
+	return c
+}

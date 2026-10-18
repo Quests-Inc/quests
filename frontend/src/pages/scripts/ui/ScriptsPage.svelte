@@ -2,17 +2,17 @@
   import { untrack } from 'svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { candidates, customIdOf, codeSpecOf, loadScripts, PURPOSE_NONE, PURPOSES, purposeOfKind, scriptsList } from '@/entities/script'
+  import { candidates, codeSpecOf, customIdOf, customNodes, loadCustomNodes, loadScripts, PURPOSE_NONE, PURPOSES, purposeOfKind, scriptsList, singleNodeGraph } from '@/entities/script'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { createScript, deleteScript, getCustomNodes, getScript, getScriptSamples, getScriptUses } from '@/shared/api/client.ts'
+  import { createScript, deleteScript, getCustomNodes, getScript, getScriptUses, installStarterNodes } from '@/shared/api/client.ts'
   import type { CustomNode, ScriptUse } from '@/shared/api/execution.gen.ts'
-  import type { Sample } from '@/shared/api/scriptgraph.gen.ts'
   import { groupScripts } from '../model/groups.ts'
   import { createCanvas } from '../model/canvas.svelte.ts'
   import { createScriptEditor } from '../model/editor.svelte.ts'
   import BakeModal from './BakeModal.svelte'
   import CodeNodeModal from './CodeNodeModal.svelte'
   import Inspector from './Inspector.svelte'
+  import NodeMetaModal from './NodeMetaModal.svelte'
   import Palette from './Palette.svelte'
   import ProblemList from './ProblemList.svelte'
   import ScriptCanvas from './ScriptCanvas.svelte'
@@ -29,12 +29,12 @@
   const ed = createScriptEditor()
   const cv = createCanvas(ed)
 
-  let samples = $state<Sample[]>([])
   let selectedId = $state<number | null>(null)
   let busy = $state(false)
   let menu = $state(false)
   let uses = $state<ScriptUse[]>([])
   let folded = $state<Set<string>>(new Set())
+  const readyNodes = $derived(customNodes.items.filter((n) => !n.problem))
   const groups = $derived(groupScripts(scriptsList.items, PURPOSES, PURPOSE_NONE))
   function fold(key: string) {
     const next = new Set(folded)
@@ -48,7 +48,7 @@
     if (!active) return
     untrack(() => {
       void loadScripts(true)
-      if (!samples.length) void getScriptSamples().then((s) => (samples = s)).catch(() => {})
+      void loadCustomNodes(true)
     })
   })
 
@@ -72,13 +72,33 @@
     else void openScript(id)
   }
 
-  async function createFrom(sample: Sample) {
+  /** A new script is made of one ready node (its sources and sinks come with it); the starting library can be installed first. */
+  async function createFrom(node: CustomNode) {
     menu = false
     busy = true
     try {
-      const s = await createScript({ title: sample.title, description: sample.description, purpose: purposeOfKind(sample.subject), graph: sample.graph })
+      const subject = node.subjects?.[0] ?? ''
+      const s = await createScript({
+        title: node.title,
+        description: node.description,
+        purpose: purposeOfKind(subject),
+        graph: singleNodeGraph(node),
+      })
       await loadScripts(true)
       await openScript(s.id)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
+    } finally {
+      busy = false
+    }
+  }
+
+  async function installStarters() {
+    busy = true
+    try {
+      await installStarterNodes()
+      await loadCustomNodes(true)
+      await ed.refreshInfos()
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
     } finally {
@@ -121,6 +141,7 @@
 
   // Custom nodes (quest=458): a node written as code, or the picked nodes baked into one.
   let codeModal = $state<{ open: boolean; editing: CustomNode | null }>({ open: false, editing: null })
+  let metaNode = $state<CustomNode | null>(null)
   let bakeOpen = $state(false)
   function newCode() {
     codeModal.editing = null
@@ -132,6 +153,10 @@
     return n ? `${ed.meta(n.type).title} №${id}` : `№${id}`
   }
 
+  async function refreshNodes() {
+    await Promise.all([ed.refreshInfos(), loadCustomNodes(true)])
+  }
+
   async function editCustom(type: string) {
     const id = customIdOf(type)
     if (id == null) return
@@ -139,7 +164,7 @@
       const node = (await getCustomNodes()).find((n) => n.id === id)
       if (!node) throw new Error('нода не найдена')
       if (!codeSpecOf(node)) {
-        toast('Запечённую ноду пока правят через API или MCP (script custom_update)', { kind: 'error' })
+        metaNode = node
         return
       }
       codeModal = { open: true, editing: node }
@@ -160,14 +185,19 @@
     </div>
     {#if menu}
       <ul class="scripts__samples">
-        {#each samples as s (s.id)}
+        {#each readyNodes as n (n.id)}
           <li>
-            <button type="button" onclick={() => void createFrom(s)}>
-              <b>{s.title}</b>
-              <small>{s.description}</small>
+            <button type="button" onclick={() => void createFrom(n)}>
+              <b>{n.title}</b>
+              <small>{n.description}</small>
             </button>
           </li>
+        {:else}
+          <li class="scripts__none-nodes">Готовых нод нет.</li>
         {/each}
+        {#if !readyNodes.length}
+          <li><button type="button" disabled={busy} onclick={() => void installStarters()}><b>Поставить стартовые ноды</b><small>Прежние образцы: шаг, заметка, шаблон, хук.</small></button></li>
+        {/if}
       </ul>
     {/if}
     <div class="scripts__items">
@@ -192,7 +222,7 @@
           {/if}
         </section>
       {:else}
-        <p class="scripts__none">Скриптов пока нет. Начните с образца.</p>
+        <p class="scripts__none">Скриптов пока нет. Начните с готовой ноды.</p>
       {/each}
     </div>
   </aside>
@@ -203,13 +233,18 @@
         <h2>Скрипты</h2>
         <p class="explain">
           Скрипт — это схема из нод: источник читает шаг или заметку, нода кода выполняется на раннере, разбор проверяет ответ,
-          приёмник записывает результат. Выберите скрипт слева или начните с образца.
+          приёмник записывает результат. Выберите скрипт слева или начните с готовой ноды.
         </p>
         <div class="scripts__cards">
-          {#each samples as s (s.id)}
-            <button type="button" class="scripts__card" onclick={() => void createFrom(s)}>
-              <b>{s.title}</b>
-              <small>{s.description}</small>
+          {#each readyNodes as n (n.id)}
+            <button type="button" class="scripts__card" onclick={() => void createFrom(n)}>
+              <b>{n.title}</b>
+              <small>{n.description}</small>
+            </button>
+          {:else}
+            <button type="button" class="scripts__card" disabled={busy} onclick={() => void installStarters()}>
+              <b>Поставить стартовые ноды</b>
+              <small>Готовые ноды из прежних образцов: шаг, заметка, шаблон, хук.</small>
             </button>
           {/each}
         </div>
@@ -263,16 +298,19 @@
   open={codeModal.open}
   editing={codeModal.editing}
   onClose={() => (codeModal.open = false)}
-  onSaved={() => void ed.refreshInfos()}
+  onSaved={() => void refreshNodes()}
 />
+<NodeMetaModal open={metaNode !== null} node={metaNode} onClose={() => (metaNode = null)} onSaved={() => void refreshNodes()} />
 <BakeModal
   open={bakeOpen}
   count={ed.picked.size}
   candidates={bakeCandidates}
   {nodeTitle}
   onClose={() => (bakeOpen = false)}
-  onBake={async (title, chosen) => {
-    await ed.bake(title, chosen)
+  nodes={customNodes.items}
+  onBake={async (title, chosen, replaceId) => {
+    await ed.bake(title, chosen, replaceId)
+    void loadCustomNodes(true)
   }}
 />
 

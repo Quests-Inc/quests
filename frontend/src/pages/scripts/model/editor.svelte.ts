@@ -5,6 +5,8 @@ import {
   bakeSelection,
   type ChosenField,
   commitPositions,
+  inlineCustom,
+  customIdOf,
   connect,
   defaultParams,
   disconnect,
@@ -23,6 +25,8 @@ import {
 } from '@/entities/script'
 import {
   createCustomNode,
+  getCustomNodes,
+  updateCustomNode,
   getNodePorts,
   getScriptNodes,
   updateScript,
@@ -215,14 +219,33 @@ export function createScriptEditor() {
     scheduleCheck()
   }
 
+  /** Put a custom node's parts in its place (its fields written into them) to change them; bake again to keep the change. */
+  async function unfold(nodeId: number) {
+    const n = graph.nodes.find((x) => x.id === nodeId)
+    const id = n ? customIdOf(n.type) : null
+    if (id == null) return
+    const def = (await getCustomNodes()).find((x) => x.id === id)
+    if (!def) throw new Error('нода не найдена')
+    await apply(inlineCustom(graph, nodeId, def))
+    select(null)
+  }
+
   /** The numbers of the picked nodes. */
   const pickedIds = () => [...picked].map((k) => Number(k.slice(1)))
 
   /** Make a custom node of the picked nodes and put it where they were. Throws what the server refuses with. */
-  async function bake(title: string, chosen: ChosenField[]) {
+  async function bake(title: string, chosen: ChosenField[], replaceId?: number) {
     const ids = pickedIds()
     const { def, map } = bakeSelection(graph, ids, portsOf, title, chosen)
-    const made = await createCustomNode(def)
+    let made
+    if (replaceId) {
+      // The node that is replaced keeps its number, so the scripts that use it follow; its ports are the new ones.
+      const cur = (await getCustomNodes()).find((n) => n.id === replaceId)
+      if (!cur) throw new Error('нода не найдена')
+      made = await updateCustomNode(replaceId, { ...def, version: cur.version })
+    } else {
+      made = await createCustomNode(def)
+    }
     await refreshInfos()
     const id = nextNodeId(graph)
     await apply(replaceSelection(graph, ids, map, made.id, id))
@@ -389,6 +412,7 @@ export function createScriptEditor() {
     ensureInfos,
     refreshInfos,
     bake,
+    unfold,
     pickedIds,
     select,
     selectEdge,
