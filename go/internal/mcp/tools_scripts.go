@@ -8,21 +8,21 @@ import (
 )
 
 // scriptTools is one multi-action tool (like trash): the agent works with the script library
-// without blowing the ≤50 tool budget (ADR-0003).
+// without one tool per action.
 func scriptTools(c *Client) []Tool {
 	type args struct {
 		Action      string  `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind"`
-		ID          int64   `json:"id,omitempty" desc:"script id (get/update/delete) or the step/note/template id (bind/unbind)"`
+		ID          int64   `json:"id,omitempty" desc:"script id (get/update/delete), the step/note/template id (bind/unbind)"`
 		Version     int     `json:"version,omitempty" desc:"get: a past graph version; update: the version you read (always required)"`
 		Title       string  `json:"title,omitempty" desc:"create (required) / update"`
 		Description *string `json:"description,omitempty" desc:"create/update"`
 		Graph       any     `json:"graph,omitempty" desc:"create/update/validate: node graph (docs/adr/0003-script-graphs.md, docs/automation.md)"`
 		Sample      string  `json:"sample,omitempty" desc:"create: copy a sample id from action=samples instead of graph"`
 		Subject     string  `json:"subject,omitempty" enum:"step,note,template" desc:"bind/unbind: what to attach the script to"`
-		ScriptID    int64   `json:"script_id,omitempty" desc:"bind: which script"`
+		ScriptID    int64   `json:"script_id,omitempty" desc:"bind / hook_create / hook_update: which script"`
 		Limit       int     `json:"limit,omitempty" desc:"list: default 20, max 100"`
 	}
-	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template). Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
+	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template). Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
 		func(ctx context.Context, a args) (any, error) {
 			switch a.Action {
 			case "list":

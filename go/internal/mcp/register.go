@@ -18,7 +18,7 @@ func New(c *Client, version string) *Server {
 	s := NewServer("quests", version, Instructions())
 	for _, group := range [][]Tool{
 		workspaceTools(c), questTools(c), stepTools(c), questlineTools(c), noteTools(c),
-		templateTools(c), scriptTools(c), tagTools(c), secretTools(c), runnerTools(c), graphTools(c), assetTools(c),
+		templateTools(c), scriptTools(c), hookTools(c), tagTools(c), secretTools(c), runnerTools(c), graphTools(c), assetTools(c),
 	} {
 		s.Add(group...)
 	}

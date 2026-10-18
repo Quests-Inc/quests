@@ -121,8 +121,9 @@ func TestToolsListShape(t *testing.T) {
 	s, _ := newTestServer(t, &fakeAPI{})
 	resps := rpc(t, s, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	tools := resps[0]["result"].(map[string]any)["tools"].([]any)
-	if len(tools) < 40 || len(tools) > 50 {
-		t.Fatalf("tool count %d outside the planned ~45", len(tools))
+	// A budget of our own, not a protocol limit: the agent loads the tool list lazily, so the cost is the size of the schemas.
+	if len(tools) < 40 || len(tools) > 70 {
+		t.Fatalf("tool count %d outside the budget of 40..70", len(tools))
 	}
 	byName := map[string]map[string]any{}
 	size := 0
@@ -141,7 +142,7 @@ func TestToolsListShape(t *testing.T) {
 		size += len(b)
 	}
 	for _, n := range []string{"list_quests", "get_quest", "get_step", "update_steps", "set_note_flag", "list_workspaces", "switch_workspace",
-		"icon", "get_attachment", "set_tags", "list_secrets", "dry_run_emit_pool", "script"} {
+		"icon", "get_attachment", "set_tags", "list_secrets", "dry_run_emit_pool", "script", "hook"} {
 		if byName[n] == nil {
 			t.Errorf("missing tool %s", n)
 		}
@@ -527,6 +528,49 @@ func TestScriptToolListsCreatesAndBinds(t *testing.T) {
 	}
 	if text, isErr := result(t, resps[6]); !isErr || !strings.Contains(text, "graph or sample") {
 		t.Fatalf("create without graph must be refused: %s", text)
+	}
+}
+
+func TestHookToolListsCreatesAndDetaches(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{
+		"GET /api/hooks":       `[{"id":4,"name":"лог","events":["quest_completed"],"script_id":3,"enabled":true}]`,
+		"GET /api/hooks/4":     `{"id":4,"name":"лог","script_id":3}`,
+		"GET /api/hook-events": `{"aliases":{"complete":["quest_completed"]},"kinds":["quest_completed"]}`,
+		"POST /api/hooks":      `{"id":5,"events":["quest_completed"],"script_id":3}`,
+		"PATCH /api/hooks/4":   `{"id":4,"quest_id":null}`,
+		"DELETE /api/hooks/4":  ``,
+	}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "hook", `{"action":"list"}`),
+		call(2, "hook", `{"action":"get","id":4}`),
+		call(3, "hook", `{"action":"events"}`),
+		call(4, "hook", `{"action":"create","events":["complete"],"script_id":3,"run_on":"dev"}`),
+		call(5, "hook", `{"action":"update","id":4,"quest_id":0}`),
+		call(6, "hook", `{"action":"delete","id":4}`),
+		call(7, "hook", `{"action":"create","events":["complete"]}`),
+		call(8, "hook", `{"action":"update","id":4}`),
+	)
+	if text, isErr := result(t, resps[0]); isErr || !strings.Contains(text, `"total":1`) {
+		t.Fatalf("list: %s", text)
+	}
+	if text, isErr := result(t, resps[2]); isErr || !strings.Contains(text, `"aliases"`) {
+		t.Fatalf("hook_events: %s", text)
+	}
+	if text, isErr := result(t, resps[3]); isErr || !strings.Contains(text, `"id":5`) {
+		t.Fatalf("hook_create: %s", text)
+	}
+	if text, isErr := result(t, resps[4]); isErr || !strings.Contains(text, `"id":4`) {
+		t.Fatalf("hook_update: %s", text)
+	}
+	if text, isErr := result(t, resps[5]); isErr || !strings.Contains(text, `"deleted":true`) {
+		t.Fatalf("hook_delete: %s", text)
+	}
+	if text, isErr := result(t, resps[6]); !isErr || !strings.Contains(text, "script_id") {
+		t.Fatalf("hook_create without a script must be refused: %s", text)
+	}
+	if text, isErr := result(t, resps[7]); !isErr || !strings.Contains(text, "at least one field") {
+		t.Fatalf("an empty update must be refused: %s", text)
 	}
 }
 
