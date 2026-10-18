@@ -15,16 +15,17 @@ type NodeType struct {
 	// Trusted: the node is our own code and runs on the server. Everything built in is trusted but Code, which is a
 	// user's text that only a runner may execute. Letting an admin trust more is later (ADR-0003).
 	Trusted bool
+	// Contains: what a custom node holds inside (kind → number of nodes), so the outer graph still sees its source or sink.
+	Contains map[Kind]int
+	// Description and Fields describe a custom node to an editor.
+	Description string
+	Fields      []CustomField
 	// Ports returns the inputs and outputs for the given parameters, or says they are wrong.
 	Ports func(params json.RawMessage) (in, out []Port, err error)
 }
 
 // Registry maps a node type name to its description.
 type Registry map[string]NodeType
-
-func fixed(in, out []Port) func(json.RawMessage) ([]Port, []Port, error) {
-	return func(json.RawMessage) ([]Port, []Port, error) { return in, out, nil }
-}
 
 func req(name string, t PortType) Port { return Port{Name: name, Type: t} }
 func opt(name string, t PortType) Port { return Port{Name: name, Type: t, Optional: true} }
@@ -41,7 +42,7 @@ func Builtin() Registry {
 	source := func(entity string, ref PortType, fields ...Port) {
 		out := append([]Port{req("ref", ref), req("secrets", TSecret)}, fields...)
 		out = append(out, req("event", TDoc))
-		add(NodeType{Name: "source." + entity, Title: "Источник: " + entity, Kind: KindSource, Trusted: true, Ports: fixed(nil, out)})
+		add(NodeType{Name: "source." + entity, Title: "Источник: " + entity, Kind: KindSource, Trusted: true, Ports: sourcePorts(out)})
 	}
 	source("step", TRefStep, req("title", TStr), req("description", TStr), req("progress", TInt), req("total", TInt), req("done", TBool))
 	source("note", TRefNote, req("title", TStr))
@@ -83,6 +84,25 @@ func Builtin() Registry {
 	add(NodeType{Name: "sink.http", Title: "HTTP-запрос", Kind: KindSink, Trusted: true, Ports: httpSinkPorts})
 	add(NodeType{Name: "sink.socket", Title: "Сокет (unix)", Kind: KindSink, Trusted: true, Ports: socketSinkPorts})
 	return r
+}
+
+// SourceParams are the parameters of a source node: the id of the entity it reads. Without one the source reads the entity
+// the run was triggered for (the script's binding), which is what scripts saved before the parameter still do.
+type SourceParams struct {
+	ID int64 `json:"id,omitempty"`
+}
+
+func sourcePorts(out []Port) func(json.RawMessage) ([]Port, []Port, error) {
+	return func(raw json.RawMessage) ([]Port, []Port, error) {
+		var p SourceParams
+		if err := strictParams(raw, &p); err != nil {
+			return nil, nil, err
+		}
+		if p.ID < 0 {
+			return nil, nil, fmt.Errorf("параметр %q: положительное число", "id")
+		}
+		return nil, out, nil
+	}
 }
 
 func httpSinkPorts(raw json.RawMessage) ([]Port, []Port, error) {
@@ -178,7 +198,7 @@ func oneOf(key string, allowed ...string) func(json.RawMessage) error {
 func (r Registry) Infos() []NodeInfo {
 	out := make([]NodeInfo, 0, len(r))
 	for _, t := range r {
-		out = append(out, NodeInfo{Name: t.Name, Title: t.Title, Kind: t.Kind, Trusted: t.Trusted})
+		out = append(out, NodeInfo{Name: t.Name, Title: t.Title, Kind: t.Kind, Trusted: t.Trusted, Description: t.Description, Fields: t.Fields})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Kind != out[j].Kind {
@@ -189,7 +209,7 @@ func (r Registry) Infos() []NodeInfo {
 	return out
 }
 
-var kindOrder = map[Kind]int{KindSource: 0, KindCode: 1, KindParse: 2, KindControl: 3, KindSink: 4}
+var kindOrder = map[Kind]int{KindSource: 0, KindCode: 1, KindParse: 2, KindControl: 3, KindSink: 4, KindCustom: 5}
 
 // Ports returns the inputs and outputs a node of the type would have with the parameters, or why the parameters are wrong.
 func (r Registry) Ports(typ string, params json.RawMessage) (in, out []Port, err error) {

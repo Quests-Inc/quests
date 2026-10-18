@@ -36,11 +36,13 @@ func (e *GraphError) Error() string {
 
 // Script is a stored script as the API shows it. Graph is set when one script is read, not in a list.
 type Script struct {
-	ID          int64     `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Version     int       `json:"version"`
-	Subjects    []string  `json:"subjects"`
+	ID          int64    `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Version     int      `json:"version"`
+	Subjects    []string `json:"subjects"`
+	// Purpose is what the script is for, chosen by hand: one of ScriptPurposes, or "" (unsorted).
+	Purpose     string    `json:"purpose"`
 	NeedsRunner bool      `json:"needs_runner"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -49,11 +51,27 @@ type Script struct {
 	Graph    json.RawMessage `json:"graph,omitempty"`
 }
 
+// ScriptPurposes are the values Purpose may take besides "".
+var ScriptPurposes = []string{"step", "note", "template", "hook"}
+
+func checkPurpose(p string) error {
+	if p == "" {
+		return nil
+	}
+	for _, v := range ScriptPurposes {
+		if p == v {
+			return nil
+		}
+	}
+	return errBad("назначение скрипта: step, note, template, hook или пусто")
+}
+
 // ScriptUpdate is a change to a script. Graph nil leaves the graph as it is; ExpectedVersion is the version the editor
 // read, so two editors cannot overwrite each other.
 type ScriptUpdate struct {
 	Title           *string
 	Description     *string
+	Purpose         *string
 	Graph           []byte
 	ExpectedVersion int
 }
@@ -67,12 +85,12 @@ type prepared struct {
 	needsRunner bool
 }
 
-func prepareGraph(raw []byte) (prepared, error) {
+func prepareGraph(raw []byte, reg graph.Registry) (prepared, error) {
 	g, err := graph.Decode(raw)
 	if err != nil {
 		return prepared{}, errBad(err.Error())
 	}
-	if ps := g.Validate(graph.Builtin()); len(ps) > 0 {
+	if ps := g.Validate(reg); len(ps) > 0 {
 		return prepared{}, &GraphError{Problems: ps}
 	}
 	canon, err := json.Marshal(g)
@@ -83,7 +101,7 @@ func prepareGraph(raw []byte) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	return prepared{json: canon, logic: logic, subjects: strings.Join(g.Subjects(), ","), needsRunner: g.RunsOnRunner()}, nil
+	return prepared{json: canon, logic: logic, subjects: strings.Join(g.Subjects(), ","), needsRunner: g.RunsOnRunnerIn(reg)}, nil
 }
 
 // sameLogic reports whether a stored graph does what the prepared one does, wherever its nodes sit.
@@ -111,11 +129,23 @@ func checkScriptText(title, description string) (string, error) {
 
 // CreateScript stores a new script at version 1. The graph is checked first; a bad one is a *GraphError.
 func (s *Store) CreateScript(ctx context.Context, title, description string, graphJSON []byte) (Script, error) {
+	return s.CreateScriptFor(ctx, title, description, "", graphJSON)
+}
+
+// CreateScriptFor is CreateScript with the purpose the script is made for.
+func (s *Store) CreateScriptFor(ctx context.Context, title, description, purpose string, graphJSON []byte) (Script, error) {
 	title, err := checkScriptText(title, description)
 	if err != nil {
 		return Script{}, err
 	}
-	p, err := prepareGraph(graphJSON)
+	if err := checkPurpose(purpose); err != nil {
+		return Script{}, err
+	}
+	reg, _, err := s.Registry(ctx)
+	if err != nil {
+		return Script{}, err
+	}
+	p, err := prepareGraph(graphJSON, reg)
 	if err != nil {
 		return Script{}, err
 	}
@@ -125,8 +155,8 @@ func (s *Store) CreateScript(ctx context.Context, title, description string, gra
 		return Script{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	res, err := tx.ExecContext(ctx, `INSERT INTO script (title, description, version, subjects, needs_runner, created_at, updated_at)
-		VALUES (?, ?, 1, ?, ?, ?, ?)`, title, description, p.subjects, boolInt(p.needsRunner), now, now)
+	res, err := tx.ExecContext(ctx, `INSERT INTO script (title, description, purpose, version, subjects, needs_runner, created_at, updated_at)
+		VALUES (?, ?, ?, 1, ?, ?, ?, ?)`, title, description, purpose, p.subjects, boolInt(p.needsRunner), now, now)
 	if err != nil {
 		return Script{}, err
 	}
@@ -141,7 +171,7 @@ func (s *Store) CreateScript(ctx context.Context, title, description string, gra
 	return s.GetScript(ctx, id)
 }
 
-const scriptCols = `id, title, description, version, subjects, needs_runner, created_at, updated_at`
+const scriptCols = `id, title, description, purpose, version, subjects, needs_runner, created_at, updated_at`
 
 func scanScript(sc rowScanner) (Script, error) {
 	var (
@@ -150,7 +180,7 @@ func scanScript(sc rowScanner) (Script, error) {
 		needs            int
 		created, updated string
 	)
-	if err := sc.Scan(&sc2.ID, &sc2.Title, &sc2.Description, &sc2.Version, &subjects, &needs, &created, &updated); err != nil {
+	if err := sc.Scan(&sc2.ID, &sc2.Title, &sc2.Description, &sc2.Purpose, &sc2.Version, &subjects, &needs, &created, &updated); err != nil {
 		return Script{}, err
 	}
 	sc2.Subjects = []string{}
@@ -283,12 +313,23 @@ func (s *Store) UpdateScript(ctx context.Context, id int64, in ScriptUpdate) (Sc
 	if title, err = checkScriptText(title, description); err != nil {
 		return Script{}, err
 	}
+	purpose := cur.Purpose
+	if in.Purpose != nil {
+		purpose = *in.Purpose
+		if err := checkPurpose(purpose); err != nil {
+			return Script{}, err
+		}
+	}
 
 	version, subjects, needs := cur.Version, strings.Join(cur.Subjects, ","), cur.NeedsRunner
 	var newGraph []byte
 	var moveOnly bool
 	if in.Graph != nil {
-		p, err := prepareGraph(in.Graph)
+		reg, _, err := s.Registry(ctx)
+		if err != nil {
+			return Script{}, err
+		}
+		p, err := prepareGraph(in.Graph, reg)
 		if err != nil {
 			return Script{}, err
 		}
@@ -310,8 +351,8 @@ func (s *Store) UpdateScript(ctx context.Context, id int64, in ScriptUpdate) (Sc
 		return Script{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	res, err := tx.ExecContext(ctx, `UPDATE script SET title = ?, description = ?, version = ?, subjects = ?, needs_runner = ?, updated_at = ?
-		WHERE id = ? AND version = ?`, title, description, version, subjects, boolInt(needs), now, id, cur.Version)
+	res, err := tx.ExecContext(ctx, `UPDATE script SET title = ?, description = ?, purpose = ?, version = ?, subjects = ?, needs_runner = ?, updated_at = ?
+		WHERE id = ? AND version = ?`, title, description, purpose, version, subjects, boolInt(needs), now, id, cur.Version)
 	if err != nil {
 		return Script{}, err
 	}

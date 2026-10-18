@@ -3,12 +3,14 @@
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { createScript, getScriptSamples } from '@/shared/api/client.ts'
   import type { Sample } from '@/shared/api/scriptgraph.gen.ts'
+  import { purposeOfKind } from '../model/purpose.ts'
   import { loadScripts, scriptsFor, scriptsList } from '../model/scriptsList.svelte.ts'
 
   /**
    * Which script a step or a note runs. `value` is the script id as text, '' = none. Only the scripts that read this kind of
    * entity are offered; one that is chosen but no longer listed stays visible so it is not lost silently. A new script can be
-   * made from a sample right here and is chosen at once. `legacy` is a command typed before scripts existed: it is shown, not edited.
+   * made from a sample right here and is chosen at once; `entityId` (the entity it is made for) becomes the id of the sample's
+   * source nodes of this kind, so the script names its entity itself. `legacy` is a command typed before scripts existed: it is shown, not edited.
    */
   let {
     value = $bindable(''),
@@ -17,7 +19,8 @@
     label = 'Скрипт',
     legacy = '',
     onClearLegacy,
-  }: { value?: string; kind: 'step' | 'note' | 'template' | 'quest' | 'workspace'; onchange?: () => void; label?: string; legacy?: string; onClearLegacy?: () => void } = $props()
+    entityId,
+  }: { value?: string; kind: 'step' | 'note' | 'template' | 'quest' | 'workspace'; onchange?: () => void; label?: string; legacy?: string; onClearLegacy?: () => void; entityId?: number } = $props()
 
   let samples = $state<Sample[]>([])
   let menu = $state(false)
@@ -41,10 +44,18 @@
     if (menu && !samples.length) samples = await getScriptSamples().catch((): Sample[] => [])
   }
 
+  function withEntity(g: Sample['graph'], k: string, id?: number): Sample['graph'] {
+    if (!id) return g
+    return {
+      ...g,
+      nodes: g.nodes.map((n) => (n.type === `source.${k}` ? { ...n, params: { ...((n.params as object) ?? {}), id } } : n)),
+    }
+  }
+
   async function make(s: Sample) {
     busy = true
     try {
-      const created = await createScript({ title: s.title, description: s.description, graph: s.graph })
+      const created = await createScript({ title: s.title, description: s.description, purpose: purposeOfKind(kind), graph: withEntity(s.graph, kind, entityId) })
       await loadScripts(true)
       value = String(created.id)
       menu = false

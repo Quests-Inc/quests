@@ -24,6 +24,11 @@ func (h *Handler) registerScripts(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/script-nodes", h.listScriptNodes)
 	mux.HandleFunc("POST /api/script-nodes/ports", h.scriptNodePorts)
 	mux.HandleFunc("GET /api/script-samples", h.listScriptSamples)
+	mux.HandleFunc("GET /api/script-custom-nodes", h.listCustomNodes)
+	mux.HandleFunc("POST /api/script-custom-nodes", h.createCustomNode)
+	mux.HandleFunc("GET /api/script-custom-nodes/{id}", h.getCustomNode)
+	mux.HandleFunc("PUT /api/script-custom-nodes/{id}", h.updateCustomNode)
+	mux.HandleFunc("DELETE /api/script-custom-nodes/{id}", h.deleteCustomNode)
 	h.registerBindings(mux)
 }
 
@@ -33,6 +38,7 @@ const maxScriptBody = graph.MaxBytes + 16<<10
 func scriptErr(w http.ResponseWriter, err error) {
 	var ge *execution.GraphError
 	var inUse *execution.ScriptInUse
+	var nodeInUse *execution.CustomNodeInUse
 	switch {
 	case errors.As(err, &inUse):
 		writeJSON(w, http.StatusConflict, map[string]any{"detail": err.Error(), "uses": inUse.Uses})
@@ -42,6 +48,10 @@ func scriptErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, execution.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "скрипт не найден")
+	case errors.Is(err, execution.ErrCustomVersion):
+		writeErr(w, http.StatusConflict, err.Error())
+	case errors.As(err, &nodeInUse):
+		writeJSON(w, http.StatusConflict, map[string]any{"detail": err.Error(), "used_by": nodeInUse.By})
 	case errors.Is(err, execution.ErrScriptVersion):
 		writeErr(w, http.StatusConflict, err.Error())
 	default:
@@ -117,12 +127,13 @@ func (h *Handler) createScript(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Title       string          `json:"title"`
 		Description string          `json:"description"`
+		Purpose     string          `json:"purpose"`
 		Graph       json.RawMessage `json:"graph"`
 	}
 	if !decodeScriptBody(w, r, &in) {
 		return
 	}
-	sc, err := h.Store.CreateScript(r.Context(), in.Title, in.Description, in.Graph)
+	sc, err := h.Store.CreateScriptFor(r.Context(), in.Title, in.Description, in.Purpose, in.Graph)
 	if err != nil {
 		scriptErr(w, err)
 		return
@@ -141,13 +152,14 @@ func (h *Handler) updateScript(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Title       *string         `json:"title"`
 		Description *string         `json:"description"`
+		Purpose     *string         `json:"purpose"`
 		Graph       json.RawMessage `json:"graph"`
 		Version     int             `json:"version"`
 	}
 	if !decodeScriptBody(w, r, &in) {
 		return
 	}
-	upd := execution.ScriptUpdate{Title: in.Title, Description: in.Description, ExpectedVersion: in.Version}
+	upd := execution.ScriptUpdate{Title: in.Title, Description: in.Description, Purpose: in.Purpose, ExpectedVersion: in.Version}
 	if len(in.Graph) > 0 && string(in.Graph) != "null" {
 		upd.Graph = in.Graph
 	}
@@ -187,15 +199,25 @@ func (h *Handler) validateScript(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "problems": []graph.Problem{{Message: err.Error()}}})
 		return
 	}
-	ps := g.Validate(graph.Builtin())
+	reg, _, err := h.Store.Registry(r.Context())
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	ps := g.Validate(reg)
 	if ps == nil {
 		ps = []graph.Problem{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": len(ps) == 0, "problems": ps, "needs_runner": g.RunsOnRunner(), "subjects": g.Subjects()})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": len(ps) == 0, "problems": ps, "needs_runner": g.RunsOnRunnerIn(reg), "subjects": g.Subjects()})
 }
 
-func (h *Handler) listScriptNodes(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, graph.Builtin().Infos())
+func (h *Handler) listScriptNodes(w http.ResponseWriter, r *http.Request) {
+	reg, _, err := h.Store.Registry(r.Context())
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, reg.Infos())
 }
 
 // scriptNodePorts gives the ports a node of a type would have with the parameters, so an editor can draw them as the user
@@ -208,7 +230,12 @@ func (h *Handler) scriptNodePorts(w http.ResponseWriter, r *http.Request) {
 	if !decodeScriptBody(w, r, &in) {
 		return
 	}
-	inputs, outputs, err := graph.Builtin().Ports(in.Type, in.Params)
+	reg, _, err := h.Store.Registry(r.Context())
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	inputs, outputs, err := reg.Ports(in.Type, in.Params)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -293,4 +320,92 @@ func (h *Handler) scriptUses(w http.ResponseWriter, r *http.Request) {
 // listScriptSamples are the examples to start a script from (copied into the workspace by creating a script from one).
 func (h *Handler) listScriptSamples(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, graph.Samples())
+}
+
+// Custom nodes (quest=458). Everyone in the workspace reads them; only an owner writes, like the scripts that hold them.
+func (h *Handler) listCustomNodes(w http.ResponseWriter, r *http.Request) {
+	list, err := h.Store.ListCustomNodes(r.Context())
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (h *Handler) getCustomNode(w http.ResponseWriter, r *http.Request) {
+	id, ok := scriptID(w, r)
+	if !ok {
+		return
+	}
+	n, err := h.Store.GetCustomNode(r.Context(), id)
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, n)
+}
+
+type customBody struct {
+	Title       string              `json:"title"`
+	Description string              `json:"description"`
+	Version     int                 `json:"version"`
+	Inputs      []graph.CustomPort  `json:"inputs"`
+	Outputs     []graph.CustomPort  `json:"outputs"`
+	Fields      []graph.CustomField `json:"fields"`
+	Graph       graph.Graph         `json:"graph"`
+}
+
+func (b customBody) custom() graph.Custom {
+	return graph.Custom{Title: b.Title, Description: b.Description, Inputs: b.Inputs, Outputs: b.Outputs, Fields: b.Fields, Graph: b.Graph}
+}
+
+func (h *Handler) createCustomNode(w http.ResponseWriter, r *http.Request) {
+	if !h.RequireOwner(w, r, "create custom nodes") {
+		return
+	}
+	var in customBody
+	if !decodeScriptBody(w, r, &in) {
+		return
+	}
+	n, err := h.Store.CreateCustomNode(r.Context(), in.custom())
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, n)
+}
+
+func (h *Handler) updateCustomNode(w http.ResponseWriter, r *http.Request) {
+	if !h.RequireOwner(w, r, "change custom nodes") {
+		return
+	}
+	id, ok := scriptID(w, r)
+	if !ok {
+		return
+	}
+	var in customBody
+	if !decodeScriptBody(w, r, &in) {
+		return
+	}
+	n, err := h.Store.UpdateCustomNode(r.Context(), id, in.custom(), in.Version)
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, n)
+}
+
+func (h *Handler) deleteCustomNode(w http.ResponseWriter, r *http.Request) {
+	if !h.RequireOwner(w, r, "delete custom nodes") {
+		return
+	}
+	id, ok := scriptID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.Store.DeleteCustomNode(r.Context(), id); err != nil {
+		scriptErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,6 +1,8 @@
 import { getScripts } from '@/shared/api/client.ts'
 import type { Script } from '@/shared/api/execution.gen.ts'
 
+import { purposeOfKind } from './purpose.ts'
+
 /** Scripts for pickers. One shared list, refreshed at most every 20 s however many forms ask for it. */
 export const scriptsList = $state({
   items: [] as Script[],
@@ -28,7 +30,13 @@ export function loadScripts(force: boolean = false) {
   return inflight
 }
 
-/** The scripts that read this kind of entity (a note script does not fit a step). */
+/**
+ * The scripts offered for this kind of entity (a note script does not fit a step): those made for it, and the unsorted ones
+ * whose sources read it.
+ */
 export function scriptsFor(kind: string): Script[] {
-  return scriptsList.items.filter((s) => s.subjects?.length === 1 && s.subjects[0] === kind)
+  const purpose = purposeOfKind(kind)
+  return scriptsList.items.filter((s) =>
+    s.purpose ? s.purpose === purpose : s.subjects?.length === 1 && s.subjects[0] === kind
+  )
 }

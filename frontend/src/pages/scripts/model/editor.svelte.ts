@@ -2,6 +2,8 @@
 // Сам граф правится чистыми функциями из entities/script; здесь — то, что живёт между правками.
 import {
   addNode,
+  bakeSelection,
+  type ChosenField,
   commitPositions,
   connect,
   defaultParams,
@@ -9,15 +11,24 @@ import {
   KIND_COLORS,
   layout,
   moveNode,
+  nextNodeId,
   type NodePorts,
   portsKey,
   pruneEdges,
   removeNode,
+  replaceSelection,
   setEdge,
   setParams,
   type ScriptNodeView,
 } from '@/entities/script'
-import { getNodePorts, getScriptNodes, updateScript, validateScript, type ScriptFull } from '@/shared/api/client.ts'
+import {
+  createCustomNode,
+  getNodePorts,
+  getScriptNodes,
+  updateScript,
+  validateScript,
+  type ScriptFull,
+} from '@/shared/api/client.ts'
 import type { Edge, End, Graph, NodeInfo, Problem } from '@/shared/api/scriptgraph.gen.ts'
 
 const HISTORY = 100
@@ -29,6 +40,7 @@ export function createScriptEditor() {
   let scriptId = $state<number | null>(null)
   let title = $state('')
   let description = $state('')
+  let purpose = $state('')
   let version = $state(1)
   let subjects = $state<string[]>([])
   let graph = $state.raw<Graph>(EMPTY)
@@ -54,7 +66,7 @@ export function createScriptEditor() {
   let timer: ReturnType<typeof setTimeout> | null = null
   let openSeq = 0
 
-  const stamp = (g: Graph, t = title, d = description) => JSON.stringify([t, d, g])
+  const stamp = (g: Graph, t = title, d = description, p = purpose) => JSON.stringify([t, d, p, g])
 
   /** The ports of a node; empty until the server has answered for its type and parameters. */
   function portsOf(id: number): NodePorts | undefined {
@@ -132,6 +144,7 @@ export function createScriptEditor() {
     scriptId = s.id
     title = s.title
     description = s.description
+    purpose = s.purpose
     version = s.version
     subjects = s.subjects ?? []
     undo = []
@@ -145,7 +158,7 @@ export function createScriptEditor() {
     if (mine !== openSeq) return
     graph = s.graph // portsOf looks nodes up in the current graph, so it must hold this one before it is laid out
     graph = layout(s.graph, portsOf)
-    savedKey = stamp(graph, s.title, s.description)
+    savedKey = stamp(graph, s.title, s.description, s.purpose)
     void checkNow()
   }
 
@@ -153,7 +166,7 @@ export function createScriptEditor() {
   function reset() {
     openSeq++
     scriptId = null
-    title = description = ''
+    title = description = purpose = ''
     graph = EMPTY
     problems = []
     undo = redo = []
@@ -187,6 +200,35 @@ export function createScriptEditor() {
     await apply(next)
     select(id)
     return id
+  }
+
+  /** Load the catalogue again (a custom node was made, changed or deleted) and forget the ports it had. */
+  async function refreshInfos() {
+    try {
+      infos = await getScriptNodes()
+    } catch {
+      /* the old catalogue stays */
+    }
+    ports.clear()
+    portsTick++
+    await ensurePorts(graph)
+    scheduleCheck()
+  }
+
+  /** The numbers of the picked nodes. */
+  const pickedIds = () => [...picked].map((k) => Number(k.slice(1)))
+
+  /** Make a custom node of the picked nodes and put it where they were. Throws what the server refuses with. */
+  async function bake(title: string, chosen: ChosenField[]) {
+    const ids = pickedIds()
+    const { def, map } = bakeSelection(graph, ids, portsOf, title, chosen)
+    const made = await createCustomNode(def)
+    await refreshInfos()
+    const id = nextNodeId(graph)
+    await apply(replaceSelection(graph, ids, map, made.id, id))
+    picked = new Set()
+    select(id)
+    return made
   }
 
   async function remove() {
@@ -250,7 +292,7 @@ export function createScriptEditor() {
     saving = true
     error = ''
     try {
-      const s = await updateScript(scriptId, { version, title, description, graph })
+      const s = await updateScript(scriptId, { version, title, description, purpose, graph })
       version = s.version
       savedKey = stamp(graph)
       return true
@@ -277,6 +319,12 @@ export function createScriptEditor() {
     },
     set description(v: string) {
       description = v
+    },
+    get purpose() {
+      return purpose
+    },
+    set purpose(v: string) {
+      purpose = v
     },
     get version() {
       return version
@@ -339,6 +387,9 @@ export function createScriptEditor() {
     open,
     reset,
     ensureInfos,
+    refreshInfos,
+    bake,
+    pickedIds,
     select,
     selectEdge,
     add,

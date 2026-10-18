@@ -17,17 +17,15 @@
 
   let { open = false, x = 0, y = 0, items = [], onSelect, onClose }: { open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
 
+  type Branch = { id: string, items: CtxItem[], search?: CtxItem[], left: number, right: number, top: number, query: string }
+
   let menuEl = $state((null as HTMLDivElement | null))
-  let subEl = $state((null as HTMLDivElement | null))
   let posX = $state(0)
   let posY = $state(0)
   let placed = $state(false)
-  let subX = $state(0)
-  let subY = $state(0)
-  let subPlaced = $state(false)
-  let branch: { id: string, items: CtxItem[], search?: CtxItem[], left: number, right: number, top: number } | null = $state(null)
-  let query = $state('')
-  const shown = $derived(branch ? (branch.search && query.trim() ? filterMenuItems(branch.search, query) : branch.items) : [])
+  /** Открытые подменю по глубине: [0] — от пункта корня, [1] — от пункта в нём и т.д. */
+  let branches: Branch[] = $state([])
+  const shownOf = (b: Branch) => (b.search && b.query.trim() ? filterMenuItems(b.search, b.query) : b.items)
   const focusOnMount = (node: HTMLElement) => node.focus({ preventScroll: true })
 
   const PAD = 8
@@ -51,45 +49,44 @@
     placed = true
   }
 
-  function openBranch(item: CtxItem, el: HTMLElement) {
+  function openBranch(item: CtxItem, el: HTMLElement, depth: number) {
     if (!item.children?.length) return
-    if (branch?.id === item.id) return
-    const rect = el.getBoundingClientRect()
-    subPlaced = false
-    query = ''
-    branch = {
-      id: item.id,
-      items: item.children,
-      search: item.search,
-      left: rect.left,
-      right: rect.right,
-      top: rect.top,
+    if (branches[depth]?.id === item.id) {
+      branches = branches.slice(0, depth + 1)
+      return
     }
+    const rect = el.getBoundingClientRect()
+    branches = [
+      ...branches.slice(0, depth),
+      { id: item.id, items: item.children, search: item.search, left: rect.left, right: rect.right, top: rect.top, query: '' },
+    ]
   }
 
-  function placeSub() {
-    const el = subEl
-    const anchor = branch
-    if (!el || !anchor) return
-    const { width, height } = el.getBoundingClientRect()
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    let left = anchor.right - 6
-    let top = anchor.top
-    if (left + width > vw - PAD) left = anchor.left - width + 6
-    if (left < PAD) left = PAD
-    if (left + width > vw - PAD) left = Math.max(PAD, vw - width - PAD)
-    if (top + height > vh - PAD) top = vh - height - PAD
-    if (top < PAD) top = PAD
-    subX = left
-    subY = top
-    subPlaced = true
+  /** Ставит панель подменю рядом с пунктом, от которого оно открыто; при нехватке места — слева, внутрь окна. */
+  function placeSub(node: HTMLElement, anchor: Branch) {
+    const put = (a: Branch) => {
+      const { width, height } = node.getBoundingClientRect()
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      let left = a.right - 6
+      let top = a.top
+      if (left + width > vw - PAD) left = a.left - width + 6
+      if (left < PAD) left = PAD
+      if (left + width > vw - PAD) left = Math.max(PAD, vw - width - PAD)
+      if (top + height > vh - PAD) top = vh - height - PAD
+      if (top < PAD) top = PAD
+      node.style.left = `${left}px`
+      node.style.top = `${top}px`
+      node.classList.add('ctx-menu--placed')
+    }
+    put(anchor)
+    return { update: put }
   }
 
-  function onRowEnter(item: CtxItem, el: HTMLElement, inSub: boolean) {
+  function onRowEnter(item: CtxItem, el: HTMLElement, depth: number) {
     if (item.sep || item.disabled) return
-    if (!inSub && item.children?.length) openBranch(item, el)
-    else if (!inSub) branch = null
+    if (item.children?.length) openBranch(item, el, depth)
+    else branches = branches.slice(0, depth)
   }
 
   function pick(item: CtxItem) {
@@ -101,8 +98,7 @@
   $effect(() => {
     if (!open) {
       placed = false
-      branch = null
-      subPlaced = false
+      branches = []
       return
     }
     const ax = x
@@ -111,7 +107,7 @@
     posX = ax
     posY = ay
     placed = false
-    branch = null
+    branches = []
     let cancelled = false
     tick().then(() => {
       if (cancelled) return
@@ -128,29 +124,6 @@
     return () => {
       cancelled = true
       window.removeEventListener('resize', onResize)
-    }
-  })
-
-  $effect(() => {
-    if (!open || !branch) {
-      subPlaced = false
-      return
-    }
-    void branch.id
-    void shown.length
-    let cancelled = false
-    tick().then(() => {
-      if (cancelled) return
-      if (!subEl) {
-        requestAnimationFrame(() => {
-          if (!cancelled) placeSub()
-        })
-        return
-      }
-      placeSub()
-    })
-    return () => {
-      cancelled = true
     }
   })
 
@@ -176,20 +149,20 @@
   })
 </script>
 
-{#snippet rows(list: CtxItem[], inSub: boolean)}
+{#snippet rows(list: CtxItem[], depth: number)}
   {#each list as item (item.id)}
     {#if item.sep}
       <div class="ctx-menu__sep" role="separator"></div>
-    {:else if item.children?.length && !inSub}
+    {:else if item.children?.length}
       <button
         type="button"
         class="ctx-menu__item ctx-menu__item--branch"
-        class:ctx-menu__item--open={branch?.id === item.id}
+        class:ctx-menu__item--open={branches[depth]?.id === item.id}
         role="menuitem"
         aria-haspopup="menu"
-        aria-expanded={branch?.id === item.id}
-        onmouseenter={(e) => onRowEnter(item, e.currentTarget, false)}
-        onclick={(e) => openBranch(item, e.currentTarget)}
+        aria-expanded={branches[depth]?.id === item.id}
+        onmouseenter={(e) => onRowEnter(item, e.currentTarget, depth)}
+        onclick={(e) => openBranch(item, e.currentTarget, depth)}
       >
         <span class="ctx-menu__label">{item.label}</span>
         <span class="ctx-menu__chev" aria-hidden="true">›</span>
@@ -203,7 +176,7 @@
         role={item.checked == null ? 'menuitem' : 'menuitemradio'}
         aria-checked={item.checked == null ? undefined : item.checked}
         disabled={item.disabled}
-        onmouseenter={(e) => onRowEnter(item, e.currentTarget, inSub)}
+        onmouseenter={(e) => onRowEnter(item, e.currentTarget, depth)}
         onclick={() => pick(item)}
       >
         <span class="ctx-menu__label">{item.label}</span>
@@ -223,35 +196,30 @@
     style="left: {posX}px; top: {posY}px"
     role="menu"
   >
-    {@render rows(items, false)}
+    {@render rows(items, 0)}
   </div>
-  {#if branch}
-    <div
-      bind:this={subEl}
-      class="ctx-menu ctx-menu--sub"
-      class:ctx-menu--placed={subPlaced}
-      style="left: {subX}px; top: {subY}px"
-      role="menu"
-    >
-      {#if branch.search}
+  {#each branches as b, i (b.id)}
+    {@const shown = shownOf(b)}
+    <div class="ctx-menu ctx-menu--sub" use:placeSub={b} role="menu">
+      {#if b.search}
         <input
           class="ctx-menu__search"
           type="search"
           placeholder="Найти…"
           aria-label="Поиск по пунктам"
-          bind:value={query}
+          bind:value={b.query}
           use:focusOnMount
           onkeydown={(e) => {
             if (e.key === 'Enter' && shown[0]) pick(shown[0])
           }}
         />
       {/if}
-      {#if branch.search && !shown.length}
+      {#if b.search && !shown.length}
         <div class="ctx-menu__empty">Ничего не найдено</div>
       {/if}
-      {@render rows(shown, true)}
+      {@render rows(shown, i + 1)}
     </div>
-  {/if}
+  {/each}
 {/if}
 
 <style>

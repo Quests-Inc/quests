@@ -43,8 +43,12 @@ type resolved struct {
 }
 
 // Validate finds every problem it can: unknown types and wrong parameters, links between ports that do not exist or do not
-// fit, inputs fed twice, required inputs left open, cycles, a path through two Code nodes, a graph with no source or no sink.
-func (g Graph) Validate(reg Registry) []Problem {
+// fit, inputs fed twice, required inputs left open, cycles, a graph with no source or no sink.
+func (g Graph) Validate(reg Registry) []Problem { return g.validate(reg, false) }
+
+// validate checks the graph; a fragment (the inside of a custom node) may leave inputs open, since the outer graph wires
+// them, and needs neither a source nor a sink of its own.
+func (g Graph) validate(reg Registry, fragment bool) []Problem {
 	var ps []Problem
 	add := func(node int, format string, a ...any) {
 		ps = append(ps, Problem{Node: node, Message: fmt.Sprintf(format, a...)})
@@ -89,6 +93,9 @@ func (g Graph) Validate(reg Registry) []Problem {
 		}
 		nodes[n.ID] = r
 		kinds[t.Kind]++
+		for k, c := range t.Contains {
+			kinds[k] += c
+		}
 	}
 
 	// Links.
@@ -120,7 +127,7 @@ func (g Graph) Validate(reg Registry) []Problem {
 			add(e.To.Node, "вход %q (%s) не принимает %s из ноды %d, выход %q", ip.Name, ip.Type, op.Type, e.From.Node, op.Name)
 			continue
 		}
-		if op.Type == TSecret && to.typ.Name != codeType {
+		if op.Type == TSecret && to.typ.Name != codeType && to.typ.Kind != KindCustom {
 			add(e.To.Node, "секреты принимает только нода кода")
 			continue
 		}
@@ -155,7 +162,7 @@ func (g Graph) Validate(reg Registry) []Problem {
 			switch {
 			case len(es) > 1 && !p.Multi:
 				add(id, "вход %q принимает одну связь, пришло %d", p.Name, len(es))
-			case len(es) == 0 && !p.Optional:
+			case len(es) == 0 && !p.Optional && !fragment:
 				add(id, "не подключён обязательный вход %q", p.Name)
 			}
 			if p.Group != "" && len(es) > 0 {
@@ -163,14 +170,14 @@ func (g Graph) Validate(reg Registry) []Problem {
 			}
 		}
 		for _, p := range r.in {
-			if p.Group != "" && !groups[p.Group] {
+			if p.Group != "" && !groups[p.Group] && !fragment {
 				add(id, "нужно подключить хотя бы один из входов группы (%s)", groupNames(r.in, p.Group))
 				break
 			}
 		}
 		switch r.typ.Name {
 		case "any_of", "all_of":
-			if len(feeds[id]["in"]) < 2 {
+			if len(feeds[id]["in"]) < 2 && !fragment {
 				add(id, "%s: нужно не меньше двух входов", r.typ.Title)
 			}
 		case codeType:
@@ -185,14 +192,14 @@ func (g Graph) Validate(reg Registry) []Problem {
 		}
 	}
 
-	if kinds[KindSource] == 0 {
+	if kinds[KindSource] == 0 && !fragment {
 		add(0, "нет ни одного источника")
 	}
-	if kinds[KindSink] == 0 {
+	if kinds[KindSink] == 0 && !fragment {
 		add(0, "нет ни одного приёмника")
 	}
 
-	// Cycles, and the longest chain of Code nodes along any path (more than one is not v1).
+	// Cycles. Code nodes may follow one another: each waits for its own job and passes its output on.
 	preds := map[int][]int{}
 	succ := map[int][]int{}
 	indeg := map[int]int{}
@@ -223,22 +230,6 @@ func (g Graph) Validate(reg Registry) []Problem {
 	if len(order) < len(ids) {
 		add(0, "в графе есть цикл")
 		return ps
-	}
-	codes := map[int]int{} // number of Code nodes on the heaviest path ending at the node, itself included
-	for _, id := range order {
-		c := 0
-		for _, p := range preds[id] {
-			if codes[p] > c {
-				c = codes[p]
-			}
-		}
-		if nodes[id].typ.Name == codeType {
-			c++
-			if c > 1 {
-				add(id, "на пути больше одной ноды кода (цепочка заданий — не в этой версии)")
-			}
-		}
-		codes[id] = c
 	}
 	return ps
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // Limits of node parameters.
@@ -32,14 +33,45 @@ func strictParams(raw json.RawMessage, into any) error {
 	return nil
 }
 
+// codeParams are the parameters of a Code node. Vars are fixed environment variables of the job, next to the values that
+// arrive over links: the part of a script the owner tunes without touching the text (a custom node exposes them as fields).
+type codeParams struct {
+	Language string            `json:"language"`
+	Text     string            `json:"text"`
+	Vars     map[string]string `json:"vars,omitempty"`
+}
+
+// MaxCodeVars caps the fixed variables of one Code node.
+const MaxCodeVars = 50
+
+func (p codeParams) checkVars() error {
+	if len(p.Vars) > MaxCodeVars {
+		return fmt.Errorf("переменных не больше %d", MaxCodeVars)
+	}
+	size := 0
+	for k, v := range p.Vars {
+		if !aliasRe.MatchString(k) {
+			return fmt.Errorf("переменная %q: заглавные латинские буквы, цифры и _", k)
+		}
+		if strings.HasPrefix(k, "QUESTS_") {
+			return fmt.Errorf("переменная %q: имена QUESTS_… занимает сервис", k)
+		}
+		size += len(k) + len(v)
+	}
+	if size > MaxEnvBytes {
+		return fmt.Errorf("переменные больше %d КБ", MaxEnvBytes>>10)
+	}
+	return nil
+}
+
 // codePorts: Code takes the secrets and any number of values over links (the environment of the job). It leaves by `stdout`
 // (a clean exit: the text it printed) or by `failed` (anything else: a JSON document, see Failure).
 func codePorts(raw json.RawMessage) ([]Port, []Port, error) {
-	var p struct {
-		Language string `json:"language"`
-		Text     string `json:"text"`
-	}
+	var p codeParams
 	if err := strictParams(raw, &p); err != nil {
+		return nil, nil, err
+	}
+	if err := p.checkVars(); err != nil {
 		return nil, nil, err
 	}
 	switch p.Language {

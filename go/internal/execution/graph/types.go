@@ -1,5 +1,5 @@
-// Package graph is the model of a script (ADR-0003): a directed acyclic graph of typed nodes, one `Code` node at most on
-// any path, everything else built in and trusted. It knows nothing about the database or about runners: it describes the
+// Package graph is the model of a script (ADR-0003): a directed acyclic graph of typed nodes; `Code` nodes may follow one another,
+// everything else is built in and trusted. It knows nothing about the database or about runners: it describes the
 // nodes, decodes a stored graph and checks it. Running it is the evaluator's job.
 package graph
 

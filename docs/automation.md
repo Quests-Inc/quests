@@ -80,9 +80,21 @@ stay the step's own.
 `add_step` / `create_quest`; attaching a script to an existing step or note is `script` bind. Graph format:
 [`adr/0003-script-graphs.md`](adr/0003-script-graphs.md).
 
-A graph is validated on save (types of ports, required inputs, cycles, one `Code` node per path); a bad one is a 422 listing
+A script has a **purpose**, chosen by hand (`purpose`: `step`, `note`, `template`, `hook` or empty = «Общие»). It sorts the
+«Скрипты» tab and narrows the pickers: a step offers the scripts for steps, plus unsorted ones whose sources read steps. The
+`script` tool takes `purpose` on create and update.
+
+A graph is validated on save (types of ports, required inputs, cycles); a bad one is a 422 listing
 the problems per node. Steps, notes and template emit run through the evaluator (see Runs below).
 
+
+### Custom nodes
+
+In the editor: right-click the field → «Добавить ноду» → group → node (own nodes are the last group). «Новая нода из кода…» (also
+in the palette) makes a node of one `Code` node: its inputs become variables (the name in capitals), its fields fixed variables
+the script edits on the node. Several picked nodes can be baked into one («Запечь выделенное…»): links leaving the selection
+become inputs and outputs, and any scalar parameter of the picked nodes (a source's entity number, a code variable) can be kept
+as an editable field. A node holding code runs on a runner. Details and limits: ADR-0003 §6a; `script` tool actions `custom_*`.
 
 ### Runs (ADR-0003, stage 4)
 

@@ -236,3 +236,82 @@ func TestBindingAScriptToAStepAndANote(t *testing.T) {
 		t.Fatalf("a free script can be deleted: %d", code)
 	}
 }
+
+func TestCustomNodesOverHTTP(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	h := s.Handler()
+	call := func(method, path, body string) (int, map[string]any) {
+		var in any
+		if body != "" {
+			in = json.RawMessage(body)
+		}
+		return secretReq(h, method, path, in)
+	}
+	def := `{"title":"Число","inputs":[{"name":"secrets","node":1,"port":"secrets"}],
+		"outputs":[{"name":"out","node":1,"port":"stdout"}],
+		"fields":[{"name":"cmd","type":"str","default":"echo 1","node":1,"param":"text"}],
+		"graph":{"nodes":[{"id":1,"type":"code","params":{"text":"echo 1"}}],"edges":[]}}`
+
+	code, out := call(http.MethodPost, "/api/script-custom-nodes", def)
+	if code != http.StatusCreated || out["version"] != float64(1) || out["needs_runner"] != true {
+		t.Fatalf("create: %d %v", code, out)
+	}
+	id := jsonNum(out["id"])
+	path := "/api/script-custom-nodes/" + id
+
+	if code, out = call(http.MethodPost, "/api/script-custom-nodes", `{"title":"","graph":{"nodes":[],"edges":[]}}`); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a bad definition: %d %v", code, out)
+	}
+	if code, list := secretReqList(t, h, "/api/script-custom-nodes"); code != http.StatusOK || len(list) != 1 {
+		t.Fatalf("list: %d %v", code, list)
+	}
+	if code, out = call(http.MethodGet, path, ""); code != http.StatusOK || out["title"] != "Число" {
+		t.Fatalf("get: %d %v", code, out)
+	}
+	if code, _ = call(http.MethodGet, "/api/script-custom-nodes/999", ""); code != http.StatusNotFound {
+		t.Fatalf("missing: %d", code)
+	}
+
+	// The catalogue and the port resolver know the node, the validator accepts a script that uses it.
+	_, nodes := secretReqList(t, h, "/api/script-nodes")
+	found := false
+	for _, n := range nodes {
+		found = found || n["name"] == "custom."+id
+	}
+	if !found {
+		t.Fatalf("custom node missing from the catalogue: %v", nodes)
+	}
+	if code, out = call(http.MethodPost, "/api/script-nodes/ports", `{"type":"custom.`+id+`","params":{"cmd":"echo 5"}}`); code != http.StatusOK {
+		t.Fatalf("ports: %d %v", code, out)
+	}
+	if code, out = call(http.MethodPost, "/api/script-nodes/ports", `{"type":"custom.`+id+`","params":{"nope":1}}`); code != http.StatusUnprocessableEntity {
+		t.Fatalf("ports of a wrong field: %d %v", code, out)
+	}
+	use := `{"nodes":[{"id":1,"type":"source.step"},{"id":2,"type":"custom.` + id + `"},{"id":3,"type":"sink.done"}],
+		"edges":[{"from":{"node":1,"port":"secrets"},"to":{"node":2,"port":"secrets"}},{"from":{"node":2,"port":"out"},"to":{"node":3,"port":"trigger"}}]}`
+	if code, out = call(http.MethodPost, "/api/scripts/validate", `{"graph":`+use+`}`); code != http.StatusOK || out["ok"] != true || out["needs_runner"] != true {
+		t.Fatalf("validate: %d %v", code, out)
+	}
+	code, out = call(http.MethodPost, "/api/scripts", `{"title":"со своей нодой","purpose":"step","graph":`+use+`}`)
+	if code != http.StatusCreated || out["purpose"] != "step" {
+		t.Fatalf("script: %d %v", code, out)
+	}
+	scriptPath := "/api/scripts/" + jsonNum(out["id"])
+
+	// Stale version, in use, then free to delete.
+	if code, _ = call(http.MethodPut, path, strings.Replace(def, `{"title"`, `{"version":7,"title"`, 1)); code != http.StatusConflict {
+		t.Fatalf("stale: %d, want 409", code)
+	}
+	if code, out = call(http.MethodPut, path, strings.Replace(def, `{"title":"Число"`, `{"version":1,"title":"Число 2"`, 1)); code != http.StatusOK || out["version"] != float64(2) {
+		t.Fatalf("update: %d %v", code, out)
+	}
+	if code, out = call(http.MethodDelete, path, ""); code != http.StatusConflict || out["used_by"] == nil {
+		t.Fatalf("delete while used: %d %v", code, out)
+	}
+	if code, _ = call(http.MethodDelete, scriptPath, ""); code != http.StatusNoContent {
+		t.Fatalf("delete script: %d", code)
+	}
+	if code, _ = call(http.MethodDelete, path, ""); code != http.StatusNoContent {
+		t.Fatalf("delete node: %d", code)
+	}
+}

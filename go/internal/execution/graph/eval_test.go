@@ -431,3 +431,53 @@ func (h *bigHost) Source(ctx context.Context, n Node) (map[string]any, error) {
 	m["title"] = h.big
 	return m, err
 }
+
+// Code nodes may follow one another: the second job is queued only when the first one's output arrives.
+func TestCodeChain(t *testing.T) {
+	g := Graph{
+		Nodes: []Node{node(1, "source.step", ""), node(2, "code", codeEcho), node(3, "code", codeEcho), node(4, "sink.done", "")},
+		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "in"), link(3, "stdout", 4, "trigger")},
+	}
+	r, err := NewRun(g, Builtin())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &fakeHost{}
+	reqs, err := r.Advance(context.Background(), h)
+	if err != nil || len(reqs) != 1 || reqs[0].Node != 2 {
+		t.Fatalf("first: %v %+v", err, reqs)
+	}
+	reqs, err = r.Resume(context.Background(), h, 2, *stdout("one"))
+	if err != nil || len(reqs) != 1 || reqs[0].Node != 3 {
+		t.Fatalf("second: %v %+v", err, reqs)
+	}
+	if got := reqs[0].Env["QUESTS_IN_N2_STDOUT"]; got != "one" {
+		t.Fatalf("env of the second node: %q", got)
+	}
+	if _, err := r.Resume(context.Background(), h, 3, *stdout("two")); err != nil {
+		t.Fatal(err)
+	}
+	if !r.Finished() || len(h.sinks) != 1 {
+		t.Fatalf("finished=%v sinks=%d", r.Finished(), len(h.sinks))
+	}
+}
+
+func TestCodeVarsReachTheEnvironment(t *testing.T) {
+	g := Graph{
+		Nodes: []Node{node(1, "source.step", ""), node(2, "code", `{"text":"true","vars":{"REF":"abc123"}}`), node(3, "sink.done", "")},
+		Edges: []Edge{link(1, "secrets", 2, "secrets"), link(2, "stdout", 3, "trigger")},
+	}
+	_, _, reqs := runGraph(t, g, nil)
+	if len(reqs) != 1 || reqs[0].Env["REF"] != "abc123" {
+		t.Fatalf("env: %+v", reqs)
+	}
+	bad := g
+	bad.Nodes = []Node{g.Nodes[0], node(2, "code", `{"text":"true","vars":{"QUESTS_X":"1"}}`), g.Nodes[2]}
+	if err := bad.Check(Builtin()); err == nil {
+		t.Fatal("a service variable name was accepted")
+	}
+	bad.Nodes[1] = node(2, "code", `{"text":"true","vars":{"lower":"1"}}`)
+	if err := bad.Check(Builtin()); err == nil {
+		t.Fatal("a lower-case name was accepted")
+	}
+}

@@ -60,7 +60,11 @@ const implicitPrefix = "implicit:"
 // startRun evaluates the graph as far as it goes and queues a job for every Code node that is ready. It reports whether it
 // queued anything: false means an open job for the same binding already exists (nothing piles up while a device is away).
 func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64, g graph.Graph, subj runSubject, b runBinding) (bool, error) {
-	run, err := graph.NewRun(g, builtinNodes)
+	g, reg, err := r.expand(ctx, g)
+	if err != nil {
+		return false, err
+	}
+	run, err := graph.NewRun(g, reg)
 	if err != nil {
 		return false, err
 	}
@@ -115,8 +119,21 @@ func (r *CheckRunner) enqueueCode(ctx context.Context, runID int64, req graph.Co
 	if len(b.Env) > 0 {
 		env = mergeEnv(b.Env, req.Env)
 	}
+	// The job's secrets are those of the entity it is about; a source with an id of its own names another one.
+	questID, stepID, templateID, noteID := b.QuestID, b.StepID, b.TemplateID, b.NoteID
+	if req.Secrets && req.SecretsOf.ID != 0 {
+		id := req.SecretsOf.ID
+		switch req.SecretsOf.Kind {
+		case "step":
+			stepID, templateID, noteID = &id, nil, nil
+		case "template":
+			stepID, templateID, noteID = nil, &id, nil
+		case "note":
+			stepID, templateID, noteID = nil, nil, &id
+		}
+	}
 	_, created, err := r.Store.Execution.EnqueueJob(ctx, execution.JobSpec{
-		RunnerLabel: b.Label, Kind: b.Kind, QuestID: b.QuestID, StepID: b.StepID, TemplateID: b.TemplateID, NoteID: b.NoteID,
+		RunnerLabel: b.Label, Kind: b.Kind, QuestID: questID, StepID: stepID, TemplateID: templateID, NoteID: noteID,
 		Title: b.Title, DedupeKey: dedupe, Command: bakeCommand(req.Text, req.Language),
 		TimeoutSeconds: int(b.Timeout / time.Second), ValidFor: b.ValidFor,
 		RunID: &runID, RunNode: &node, Env: env,
@@ -225,7 +242,13 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		log.Printf("script run %d: %v", run.ID, err)
 		return
 	}
-	rn, err := graph.Restore(g, builtinNodes, run.Snapshot)
+	g, reg, err := r.expand(ctx, g)
+	if err != nil {
+		_ = r.Store.Execution.SaveRun(ctx, run.ID, execution.RunFailed, run.Snapshot, err.Error())
+		log.Printf("script run %d: %v", run.ID, err)
+		return
+	}
+	rn, err := graph.Restore(g, reg, run.Snapshot)
 	if err != nil {
 		_ = r.Store.Execution.SaveRun(ctx, run.ID, execution.RunFailed, run.Snapshot, err.Error())
 		log.Printf("script run %d: %v", run.ID, err)
@@ -267,6 +290,21 @@ func bindingOfJob(j execution.RunnerJob) runBinding {
 		Timeout: time.Duration(j.TimeoutSeconds) * time.Second, ValidFor: 24 * time.Hour,
 		QuestID: j.QuestID, StepID: j.StepID, TemplateID: j.TemplateID, NoteID: j.NoteID,
 	}
+}
+
+// expand replaces the custom nodes of a script graph by their inner nodes (quest=458), with the registry that knows them.
+// A run keeps the numbers of the expanded graph in its snapshot, so a custom node edited while a job waits makes the
+// resume fail instead of running a different graph silently.
+func (r *CheckRunner) expand(ctx context.Context, g graph.Graph) (graph.Graph, graph.Registry, error) {
+	if len(g.CustomUses()) == 0 {
+		return g, builtinNodes, nil
+	}
+	reg, customs, err := r.Store.Execution.Registry(ctx)
+	if err != nil {
+		return g, nil, err
+	}
+	ex, err := graph.Expand(g, customs, reg)
+	return ex, reg, err
 }
 
 // graphOf finds the graph a run executes.

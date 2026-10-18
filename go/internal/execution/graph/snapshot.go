@@ -101,7 +101,11 @@ func decodeValue(t PortType, raw json.RawMessage) (any, error) {
 	case TDoc:
 		return json.RawMessage(raw), nil
 	case TSecret:
-		return Secrets{}, nil
+		var v Secrets
+		if len(raw) > 0 {
+			_ = json.Unmarshal(raw, &v) // a snapshot from before the secrets named their entity holds {}
+		}
+		return v, nil
 	case TRefStep, TRefNote, TRefTemplate, TRefQuest, TRefWorkspace:
 		var v Ref
 		return v, json.Unmarshal(raw, &v)

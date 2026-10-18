@@ -52,7 +52,7 @@ A link carries a **token**: either a *value* or an *exit signal*.
   each node, so "why did the step not update" is answerable.
 - Failures are data, not hidden code: a `Code` node leaves by `stdout` or by `failed` (a document with a `kind`); an unconnected `failed` does nothing.
 
-Graph shape: acyclic; a path holds at most one `Code` node (two would be a chain of jobs with state between them: not v1);
+Graph shape: acyclic; `Code` nodes may follow one another: each queues its own job when its inputs are ready, and its output feeds the next (quest=458);
 fan-out is free; fan-in only through `Any of` / `All of`.
 
 ### 4. Port types
@@ -106,6 +106,35 @@ How a script is attached to an entity (a step, a note, a template, a quest, the 
 (an interval, once, watch, or an event), the runner(s), the timeout, the validity window, parameters. In v1 these stay where
 they are (columns of a step, a note, a template). The engine, not the graph, also does the bookkeeping that belongs to the
 schedule (`check_last_run_at` after any finished run, the period of an emit, de-duplication).
+
+**Source ids (quest=456).** A source node has an optional parameter `id`, the entity it reads. A graph made for a step, a note
+or a template gets that entity's id in its sources, so the script names what it works on; several sources of one kind with
+different ids are fine. A source without `id` reads the entity the binding triggers (older scripts and hooks). The secrets
+a source hands to a `Code` node are those of its own entity (step, note or template); the job is queued under that entity.
+The binding keeps only when, where and how often.
+
+### 6a. Custom nodes (quest=458)
+
+The owner may make a node of their own, in two ways: **write it as code** (one `Code` node with named inputs and fields) or
+**bake** selected nodes of a script into one. Either is a *definition* stored in the workspace (`custom_node`): an inner graph, which
+inner ports are its inputs and outputs, and which inner parameters are editable **fields** (`str`, `int` or `bool`, with the baked
+value as default). In a script it is the node `custom.<id>`; its parameters are the field values.
+
+- **Expansion, not a new evaluator.** Before a run the graph is expanded: every custom node is replaced by its inner nodes
+  (numbers `outer*10000+inner`, fields written into the inner parameters, links rewired to the exposed ports), as deep as the
+  nodes nest (3 levels). The evaluator, snapshots and jobs know only built-in nodes. A custom node holds its definition by id,
+  so one edited while a job waits makes that run fail on resume rather than run a different graph.
+- **Typing.** The ports of a custom node are those of the inner ports it exposes (same types, so the same wiring rules); the
+  validator treats it as holding what is inside (a source, a sink, code), and a node that holds code needs a runner.
+- **Fields.** A field names an inner node and a parameter: a top-level key (`id` of a source, `operand` of a compare, `text`) or
+  `vars.NAME`, a fixed environment variable of a `Code` node (new: `Code` takes `vars`, names in capitals, never `QUESTS_…`).
+- **Inputs of a code node.** Each input of a node written as code arrives as the variable of the same name in capitals.
+- **Checks on save.** Ports and nodes exist, names are `[a-z][a-z0-9_]*` and unique, an inner input that needs a value is wired
+  inside or exposed, no node contains itself or closes a loop through the nodes it uses. A node something uses is not deleted.
+- **Owner-only**, like scripts: it is user code. API `/api/script-custom-nodes`, MCP `script` actions `custom_*`.
+
+Not yet: editing a baked node in the UI (a code node is edited in its form; a baked one through the API), and the samples are
+still samples, not baked nodes.
 
 ### 7. Secrets
 

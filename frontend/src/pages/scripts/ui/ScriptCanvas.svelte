@@ -1,6 +1,7 @@
 <script lang="ts">
   import { GraphMinimap, GraphTools } from '@/entities/graph'
-  import { anchorOf, portColor, type ScriptNodeView, wirePath } from '@/entities/script'
+  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+  import { anchorOf, KIND_ORDER, KIND_TITLES, portColor, type ScriptNodeView, wirePath } from '@/entities/script'
   import type { End } from '@/shared/api/scriptgraph.gen.ts'
   import type { Canvas } from '../model/canvas.svelte.ts'
   import type { ScriptEditor } from '../model/editor.svelte.ts'
@@ -11,12 +12,42 @@
    * (`createGraphGestures`); a script node is one more kind of card for them. A wire is drawn from a port's
    * anchor to a port's anchor, so what it joins is exact; dragging from an output to an input makes one.
    */
-  let { ed, cv }: { ed: ScriptEditor; cv: Canvas } = $props()
+  let { ed, cv, onNewCode, onBake }: { ed: ScriptEditor; cv: Canvas; onNewCode?: () => void; onBake?: () => void } = $props()
 
   $effect(() => {
     cv.sync()
   })
   $effect(() => cv.watchSize())
+
+  // Right click on the bare field: «Добавить ноду» → a group of the catalogue → a node of the group.
+  let menu = $state({ open: false, x: 0, y: 0 })
+  const menuItems = $derived([
+    {
+      id: 'add',
+      label: 'Добавить ноду',
+      children: KIND_ORDER.map((kind) => ({
+        id: `g:${kind}`,
+        label: KIND_TITLES[kind] ?? kind,
+        children: ed.infos.filter((i) => i.kind === kind).map((i) => ({ id: `n:${i.name}`, label: i.title })),
+      })).filter((g) => g.children.length),
+    },
+    ...(onNewCode || (onBake && ed.picked.size > 1) ? [{ id: 'sep', sep: true }] : []),
+    ...(onNewCode ? [{ id: 'code', label: 'Новая нода из кода…' }] : []),
+    ...(onBake && ed.picked.size > 1 ? [{ id: 'bake', label: `Запечь выделенное (${ed.picked.size})…` }] : []),
+  ])
+
+  function onContext(e: MouseEvent) {
+    e.preventDefault()
+    if ((e.target as Element).closest('[data-gkey]')) return
+    cv.cancelLink()
+    menu = { open: true, x: e.clientX, y: e.clientY }
+  }
+
+  function onMenuSelect(id: string) {
+    if (id === 'code') onNewCode?.()
+    else if (id === 'bake') onBake?.()
+    else if (id.startsWith('n:')) void cv.addAtPoint(id.slice(2), { clientX: menu.x, clientY: menu.y })
+  }
 
   let hint = $derived(cv.pending ? 'Выберите вход, куда вести связь · Esc или клик по полю — отмена' : '')
 
@@ -70,6 +101,7 @@
   onpointercancel={cv.onUp}
   onwheel={cv.onWheel}
   onkeydown={cv.onKey}
+  oncontextmenu={onContext}
 >
   {#if hint}<p class="scv__hint">{hint}</p>{/if}
   {#if !ed.graph.nodes.length}<p class="scv__empty">Пусто. Добавьте ноды из палитры слева.</p>{/if}
@@ -136,6 +168,8 @@
     canRedo={ed.canRedo}
   />
 </div>
+
+<ContextMenu open={menu.open} x={menu.x} y={menu.y} items={menuItems} onSelect={onMenuSelect} onClose={() => (menu.open = false)} />
 
 <style>
   .scv {

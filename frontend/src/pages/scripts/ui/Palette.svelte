@@ -4,7 +4,7 @@
   import type { Canvas } from '../model/canvas.svelte.ts'
 
   /** The node types, grouped by what they do. A click puts a node in the middle of the field. */
-  let { ed, cv }: { ed: ScriptEditor; cv: Canvas } = $props()
+  let { ed, cv, onNewCode }: { ed: ScriptEditor; cv: Canvas; onNewCode?: () => void } = $props()
 
   const groups = $derived(
     KIND_ORDER.map((kind) => ({ kind, items: ed.infos.filter((i) => i.kind === kind) })).filter((g) => g.items.length)
@@ -12,6 +12,9 @@
 </script>
 
 <aside class="pal" aria-label="Ноды">
+  {#if onNewCode}
+    <button type="button" class="pal__new" onclick={onNewCode}>+ Нода из кода</button>
+  {/if}
   {#each groups as g (g.kind)}
     <section class="pal__group" style:--c={KIND_COLORS[g.kind]}>
     <h3>{KIND_TITLES[g.kind] ?? g.kind}</h3>
@@ -82,6 +85,19 @@
   }
   .pal__item:active {
     box-shadow: none;
+  }
+  .pal__new {
+    padding: 0.4rem 0.6rem;
+    border: 1px dashed var(--color-border-strong, #4a4a4a);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-fg, #e8e8e8);
+    font: inherit;
+    font-size: var(--text-sm, 0.85rem);
+    cursor: pointer;
+  }
+  .pal__new:hover {
+    background: var(--color-bg-hover, #2a2a2a);
   }
   small {
     color: color-mix(in srgb, var(--color-fg, #e8e8e8) 65%, transparent);

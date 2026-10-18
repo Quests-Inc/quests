@@ -5,10 +5,12 @@
   import ChoiceParams from './params/ChoiceParams.svelte'
   import CodeParams from './params/CodeParams.svelte'
   import CompareParams from './params/CompareParams.svelte'
+  import CustomParams from './params/CustomParams.svelte'
   import ParseParams from './params/ParseParams.svelte'
+  import SourceParams from './params/SourceParams.svelte'
 
   /** What the selected node or link is made of, and its parameters. */
-  let { ed }: { ed: ScriptEditor } = $props()
+  let { ed, onEditCustom }: { ed: ScriptEditor; onEditCustom?: (type: string) => void } = $props()
 
   const node = $derived(ed.selectedNode != null ? ed.graph.nodes.find((n) => n.id === ed.selectedNode) : undefined)
   const edge = $derived(ed.selectedEdge != null ? ed.graph.edges[ed.selectedEdge] : undefined)
@@ -46,7 +48,11 @@
     <p class="explain">{node.type}{meta.trusted ? '' : ' · исполняется только на раннере'}</p>
     {#if ed.portsOf(node.id)?.error}<p class="insp__err">{ed.portsOf(node.id)?.error}</p>{/if}
     {#key node.id}
-      {#if node.type === 'code'}
+      {#if node.type.startsWith('custom.')}
+        <CustomParams fields={ed.infos.find((i) => i.name === node.type)?.fields ?? []} params={node.params as never} onChange={set} />
+        {#if ed.infos.find((i) => i.name === node.type)?.description}<p class="explain">{ed.infos.find((i) => i.name === node.type)?.description}</p>{/if}
+        {#if onEditCustom}<button type="button" class="btn btn--ghost" onclick={() => onEditCustom(node.type)}>Править ноду…</button>{/if}
+      {:else if node.type === 'code'}
         <CodeParams params={node.params as never} onChange={set} />
       {:else if node.type === 'parse'}
         <ParseParams params={node.params as never} onChange={set} />
@@ -58,6 +64,8 @@
         <ChoiceParams params={node.params as never} field="result" options={RESULTS} label="Итог" onChange={set} />
       {:else if node.type === 'sink.template_error'}
         <ChoiceParams params={node.params as never} field="kind" options={KINDS} label="Вид ошибки" onChange={set} />
+      {:else if node.type.startsWith('source.') && node.type !== 'source.workspace'}
+        <SourceParams params={node.params as never} onChange={set} />
       {:else}
         <p class="explain">Параметров нет.</p>
       {/if}

@@ -86,6 +86,16 @@ func (g Graph) RunsOnRunner() bool {
 	return false
 }
 
+// RunsOnRunnerIn is RunsOnRunner for a graph that may hold custom nodes: one that holds code needs a runner too.
+func (g Graph) RunsOnRunnerIn(reg Registry) bool {
+	for _, n := range g.Nodes {
+		if n.Type == codeType || reg[n.Type].Contains[KindCode] > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // Subjects lists the kinds of entity the graph's sources read (`step`, `note`…), so a script can be offered only where it
 // fits.
 func (g Graph) Subjects() []string {
