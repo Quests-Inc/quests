@@ -53,6 +53,9 @@ func (s *Store) BindScript(ctx context.Context, subjectType string, subjectID, s
 	if err != nil {
 		return err
 	}
+	if len(sc.Subjects) == 0 {
+		return errBad("в скрипте нет источника этой сущности: добавьте ноды")
+	}
 	if len(sc.Subjects) != 1 || sc.Subjects[0] != subjectType {
 		return errBad(fmt.Sprintf("скрипт читает %s, а привязывается к %s", strings.Join(sc.Subjects, ", "), subjectType))
 	}

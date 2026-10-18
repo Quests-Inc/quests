@@ -2,6 +2,7 @@
 // Сам граф правится чистыми функциями из entities/script; здесь — то, что живёт между правками.
 import {
   addNode,
+  appendGraph,
   bakeSelection,
   type ChosenField,
   commitPositions,
@@ -14,6 +15,7 @@ import {
   layout,
   moveNode,
   nextNodeId,
+  nodeKey,
   type NodePorts,
   portsKey,
   pruneEdges,
@@ -106,6 +108,10 @@ export function createScriptEditor() {
   async function checkNow(): Promise<void> {
     if (timer) clearTimeout(timer)
     timer = null
+    if (!graph.nodes.length) {
+      problems = [] // an empty script is a fresh start, not a mistake
+      return
+    }
     const snapshot = graph
     checking = true
     try {
@@ -234,8 +240,8 @@ export function createScriptEditor() {
   const pickedIds = () => [...picked].map((k) => Number(k.slice(1)))
 
   /** Make a custom node of the picked nodes and put it where they were. Throws what the server refuses with. */
-  async function bake(title: string, chosen: ChosenField[], replaceId?: number) {
-    const ids = pickedIds()
+  async function bake(title: string, chosen: ChosenField[], replaceId?: number, whole = false) {
+    const ids = whole ? graph.nodes.map((n) => n.id) : pickedIds()
     const { def, map } = bakeSelection(graph, ids, portsOf, title, chosen)
     let made
     if (replaceId) {
@@ -247,11 +253,30 @@ export function createScriptEditor() {
       made = await createCustomNode(def)
     }
     await refreshInfos()
+    if (whole) return made // the script itself stays as it is; the node is a copy of it
     const id = nextNodeId(graph)
     await apply(replaceSelection(graph, ids, map, made.id, id))
     picked = new Set()
     select(id)
     return made
+  }
+
+  /** Remove these nodes (a right click on a card), whatever is picked. */
+  async function removeNodes(ids: number[]) {
+    let next = graph
+    for (const id of ids) next = removeNode(next, id)
+    selectedNode = null
+    picked = new Set()
+    await apply(next)
+  }
+
+  /** Put another graph (a sample, another script) in with its middle on (x, y) and pick what came. */
+  async function insert(extra: Graph, x: number, y: number) {
+    const { graph: next, ids } = appendGraph(graph, extra, x, y)
+    if (!ids.length) return
+    await apply(next)
+    selectedNode = null
+    picked = new Set(ids.map(nodeKey))
   }
 
   async function remove() {
@@ -413,6 +438,8 @@ export function createScriptEditor() {
     refreshInfos,
     bake,
     unfold,
+    insert,
+    removeNodes,
     pickedIds,
     select,
     selectEdge,

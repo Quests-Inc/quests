@@ -114,7 +114,8 @@ export function createGraphGestures(deps: {
       return
     }
     if (e.button !== 0) return
-    if (deps.selectMode()) {
+    // Ctrl / Cmd holds the picking tools without the selection mode: a frame on the field, a click on a card.
+    if (deps.selectMode() || e.ctrlKey || e.metaKey) {
       const r = deps.getStage()?.getBoundingClientRect()
       if (!r) return
       const x = e.clientX - r.left
@@ -135,7 +136,7 @@ export function createGraphGestures(deps: {
       }
       return
     }
-    if (deps.selectMode()) {
+    if (deps.selectMode() || (e.button === 0 && (e.ctrlKey || e.metaKey))) {
       if (e.button !== 0 || (e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__changed')) return
       e.stopPropagation()
       const group = deps.getPicked().has(n.key)

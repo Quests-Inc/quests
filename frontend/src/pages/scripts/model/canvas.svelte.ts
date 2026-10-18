@@ -4,7 +4,7 @@ import { untrack } from 'svelte'
 
 import { fitCamera, minimapModel } from '@/entities/graph'
 import { NODE_W, type ScriptNodeView, viewNodes } from '@/entities/script'
-import type { End } from '@/shared/api/scriptgraph.gen.ts'
+import type { End, Graph } from '@/shared/api/scriptgraph.gen.ts'
 import { createGraphGestures } from '@/widgets/graph-canvas'
 
 import type { ScriptEditor } from './editor.svelte.ts'
@@ -114,7 +114,7 @@ export function createCanvas(ed: ScriptEditor) {
 
   function onBgDown(e: PointerEvent) {
     manual = true
-    bgDown = (e.target as Element).closest('[data-gkey]') ? null : { x: e.clientX, y: e.clientY }
+    bgDown = e.button !== 0 || (e.target as Element).closest('[data-gkey]') ? null : { x: e.clientX, y: e.clientY }
     gest.onBgDown(e)
   }
 
@@ -140,7 +140,12 @@ export function createCanvas(ed: ScriptEditor) {
       } // a plain click on an output keeps the link pending until an input is clicked
     }
     // A click on the bare field (not a drag) drops the selection and an unfinished link.
-    if (bgDown && Math.hypot(e.clientX - bgDown.x, e.clientY - bgDown.y) < 4 && !target(e)) {
+    if (
+      bgDown &&
+      Math.hypot(e.clientX - bgDown.x, e.clientY - bgDown.y) < 4 &&
+      !target(e) &&
+      !(e.ctrlKey || e.metaKey)
+    ) {
       ed.select(null)
       ed.picked = new Set()
       pending = null
@@ -187,6 +192,12 @@ export function createCanvas(ed: ScriptEditor) {
   function addAtPoint(type: string, at: { clientX: number; clientY: number }) {
     const w = gest.worldAt(at)
     return ed.add(type, w.x, w.y)
+  }
+
+  /** Put another graph where the pointer was (right-click menu). */
+  function insertAtPoint(extra: Graph, at: { clientX: number; clientY: number }) {
+    const w = gest.worldAt(at)
+    return ed.insert(extra, w.x, w.y)
   }
 
   /** Middle of the minimap becomes the middle of the field. */
@@ -246,6 +257,7 @@ export function createCanvas(ed: ScriptEditor) {
     onKey,
     addAtCenter,
     addAtPoint,
+    insertAtPoint,
     miniGo,
   }
 }

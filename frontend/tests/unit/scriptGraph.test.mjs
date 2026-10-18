@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 
 import {
   addNode,
+  appendGraph,
   connect,
   disconnect,
   moveNode,
@@ -193,4 +194,30 @@ test('позиции, на которые холст утащил ноды, во
   const moved = commitPositions(g, views)
   expect(moved.nodes[0]).toMatchObject({ x: 55, y: -10 })
   expect(moved.nodes[1]).toBe(g.nodes[1]) // нетронутая нода осталась как была
+})
+
+test('another graph is put into this one: renumbered after ours, links kept, centred on the point', () => {
+  const ours = {
+    nodes: [
+      { id: 1, type: 'source.step', x: 0, y: 0 },
+      { id: 5, type: 'sink.done', x: 10, y: 0 },
+    ],
+    edges: [],
+  }
+  const theirs = {
+    nodes: [
+      { id: 1, type: 'source.note', x: 0, y: 0 },
+      { id: 2, type: 'sink.done', x: 200, y: 100 },
+    ],
+    edges: [{ from: { node: 1, port: 'ref' }, to: { node: 2, port: 'trigger' } }],
+  }
+  const { graph, ids } = appendGraph(ours, theirs, 500, 300)
+  expect(ids).toEqual([6, 7])
+  expect(graph.nodes.slice(2).map((n) => [n.id, n.x, n.y])).toEqual([
+    [6, 400, 250],
+    [7, 600, 350],
+  ])
+  expect(graph.edges).toEqual([{ from: { node: 6, port: 'ref' }, to: { node: 7, port: 'trigger' } }])
+  expect(ours.nodes).toHaveLength(2)
+  expect(appendGraph(ours, { nodes: [], edges: [] }, 0, 0)).toEqual({ graph: ours, ids: [] })
 })

@@ -2,10 +2,11 @@
   import { untrack } from 'svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { candidates, codeSpecOf, customIdOf, customNodes, loadCustomNodes, loadScripts, PURPOSE_NONE, PURPOSES, purposeOfKind, scriptsList, singleNodeGraph } from '@/entities/script'
+  import { candidates, codeSpecOf, customIdOf, customNodes, loadCustomNodes, loadScripts, PURPOSE_NONE, PURPOSES, scriptsList } from '@/entities/script'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { createScript, deleteScript, getCustomNodes, getScript, getScriptUses, installStarterNodes } from '@/shared/api/client.ts'
+  import { createScript, deleteScript, getCustomNodes, getScript, getScriptSamples, getScriptUses, updateScript } from '@/shared/api/client.ts'
   import type { CustomNode, ScriptUse } from '@/shared/api/execution.gen.ts'
+  import type { Graph, Sample } from '@/shared/api/scriptgraph.gen.ts'
   import { groupScripts } from '../model/groups.ts'
   import { createCanvas } from '../model/canvas.svelte.ts'
   import { createScriptEditor } from '../model/editor.svelte.ts'
@@ -16,6 +17,7 @@
   import Palette from './Palette.svelte'
   import ProblemList from './ProblemList.svelte'
   import ScriptCanvas from './ScriptCanvas.svelte'
+  import ScriptListMenu from './ScriptListMenu.svelte'
 
   /**
    * The script library (ADR-0003): the workspace's scripts, and an editor for the chosen one: nodes on a field, links from
@@ -31,10 +33,11 @@
 
   let selectedId = $state<number | null>(null)
   let busy = $state(false)
-  let menu = $state(false)
+  let samples = $state<Sample[]>([])
+  let scriptMenu = $state<{ open: boolean; x: number; y: number; id: number | null }>({ open: false, x: 0, y: 0, id: null })
+  let bakeWhole = $state(false)
   let uses = $state<ScriptUse[]>([])
   let folded = $state<Set<string>>(new Set())
-  const readyNodes = $derived(customNodes.items.filter((n) => !n.problem))
   const groups = $derived(groupScripts(scriptsList.items, PURPOSES, PURPOSE_NONE))
   function fold(key: string) {
     const next = new Set(folded)
@@ -42,13 +45,14 @@
     folded = next
   }
   // 'leave' asks before dropping unsaved edits for another script; 'delete' before removing this one.
-  let ask = $state<{ kind: 'leave'; id: number | null } | { kind: 'delete' } | null>(null)
+  let ask = $state<{ kind: 'leave'; id: number | null } | { kind: 'delete'; id: number } | null>(null)
 
   $effect(() => {
     if (!active) return
     untrack(() => {
       void loadScripts(true)
       void loadCustomNodes(true)
+      if (!samples.length) void getScriptSamples().then((x) => (samples = x)).catch(() => {})
     })
   })
 
@@ -72,18 +76,11 @@
     else void openScript(id)
   }
 
-  /** A new script is made of one ready node (its sources and sinks come with it); the starting library can be installed first. */
-  async function createFrom(node: CustomNode) {
-    menu = false
+  /** A new script is an empty field with a default name; nodes and whole graphs are added from the right-click menu. */
+  async function createEmpty() {
     busy = true
     try {
-      const subject = node.subjects?.[0] ?? ''
-      const s = await createScript({
-        title: node.title,
-        description: node.description,
-        purpose: purposeOfKind(subject),
-        graph: singleNodeGraph(node),
-      })
+      const s = await createScript({ title: 'Новый скрипт', graph: { nodes: [], edges: [] } })
       await loadScripts(true)
       await openScript(s.id)
     } catch (e) {
@@ -93,16 +90,44 @@
     }
   }
 
-  async function installStarters() {
-    busy = true
+  /** Change a script of the list without opening it; the one open and edited takes the change into the editor instead. */
+  async function patchScript(id: number, body: { title?: string; purpose?: string }) {
     try {
-      await installStarterNodes()
-      await loadCustomNodes(true)
-      await ed.refreshInfos()
+      if (id === selectedId && ed.dirty) {
+        if (body.title !== undefined) ed.title = body.title
+        if (body.purpose !== undefined) ed.purpose = body.purpose
+        toast('Изменение в редакторе: сохраните скрипт', { kind: 'info' })
+        return
+      }
+      const cur = await getScript(id)
+      await updateScript(id, { version: cur.version, ...body })
+      await loadScripts(true)
+      if (id === selectedId) await openScript(id)
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
-    } finally {
-      busy = false
+    }
+  }
+
+  /** The script as a custom node (a copy; the script stays): open it, then the bake form takes all its nodes. */
+  async function bakeScript(id: number) {
+    if (id !== selectedId) {
+      if (ed.dirty) {
+        toast('Сначала сохраните открытый скрипт', { kind: 'error' })
+        return
+      }
+      await openScript(id)
+    }
+    bakeWhole = true
+    bakeOpen = true
+  }
+
+  /** Put a whole graph (a sample, another script) into the open one, nodes unfolded, where the menu was opened. */
+  async function insertGraph(kind: 'sample' | 'script', ref: string | number, at: { clientX: number; clientY: number }) {
+    try {
+      const graph: Graph | undefined = kind === 'sample' ? samples.find((x) => x.id === ref)?.graph : (await getScript(Number(ref))).graph
+      if (graph) await cv.insertAtPoint(graph, at)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
     }
   }
 
@@ -113,13 +138,14 @@
     }
   }
 
-  async function remove() {
+  async function remove(id: number) {
     ask = null
-    if (selectedId == null) return
     try {
-      await deleteScript(selectedId)
-      selectedId = null
-      ed.reset()
+      await deleteScript(id)
+      if (id === selectedId) {
+        selectedId = null
+        ed.reset()
+      }
       await loadScripts(true)
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
@@ -147,7 +173,7 @@
     codeModal.editing = null
     codeModal.open = true
   }
-  const bakeCandidates = $derived(bakeOpen ? candidates(ed.graph, ed.pickedIds()) : [])
+  const bakeCandidates = $derived(bakeOpen ? candidates(ed.graph, bakeWhole ? ed.graph.nodes.map((n) => n.id) : ed.pickedIds()) : [])
   const nodeTitle = (id: number) => {
     const n = ed.graph.nodes.find((x) => x.id === id)
     return n ? `${ed.meta(n.type).title} №${id}` : `№${id}`
@@ -179,27 +205,10 @@
 <div class="scripts" class:scripts--collapsed={sidebarCollapsed}>
   <aside class="scripts__list" aria-label="Скрипты">
     <div class="scripts__tools">
-      <button type="button" class="btn scripts__new" aria-expanded={menu} onclick={() => (menu = !menu)}>
+      <button type="button" class="btn scripts__new" disabled={busy} onclick={() => void createEmpty()}>
         <Icon name="add" /> Новый скрипт
       </button>
     </div>
-    {#if menu}
-      <ul class="scripts__samples">
-        {#each readyNodes as n (n.id)}
-          <li>
-            <button type="button" onclick={() => void createFrom(n)}>
-              <b>{n.title}</b>
-              <small>{n.description}</small>
-            </button>
-          </li>
-        {:else}
-          <li class="scripts__none-nodes">Готовых нод нет.</li>
-        {/each}
-        {#if !readyNodes.length}
-          <li><button type="button" disabled={busy} onclick={() => void installStarters()}><b>Поставить стартовые ноды</b><small>Прежние образцы: шаг, заметка, шаблон, хук.</small></button></li>
-        {/if}
-      </ul>
-    {/if}
     <div class="scripts__items">
       {#each groups as g (g.key)}
         <section class="sgroup" style:--c={g.color}>
@@ -212,7 +221,16 @@
             <ul>
               {#each g.items as s (s.id)}
                 <li>
-                  <button type="button" class="scripts__item" class:scripts__item--on={s.id === selectedId} onclick={() => pick(s.id)}>
+                  <button
+                    type="button"
+                    class="scripts__item"
+                    class:scripts__item--on={s.id === selectedId}
+                    onclick={() => pick(s.id)}
+                    oncontextmenu={(e) => {
+                      e.preventDefault()
+                      scriptMenu = { open: true, x: e.clientX, y: e.clientY, id: s.id }
+                    }}
+                  >
                     <span>{s.title}</span>
                     <small>{(s.subjects ?? []).join(', ')} · {s.needs_runner ? 'раннер' : 'сервер'} · v{s.version}</small>
                   </button>
@@ -222,7 +240,7 @@
           {/if}
         </section>
       {:else}
-        <p class="scripts__none">Скриптов пока нет. Начните с готовой ноды.</p>
+        <p class="scripts__none">Скриптов пока нет. «Новый скрипт» создаёт пустой.</p>
       {/each}
     </div>
   </aside>
@@ -233,21 +251,8 @@
         <h2>Скрипты</h2>
         <p class="explain">
           Скрипт — это схема из нод: источник читает шаг или заметку, нода кода выполняется на раннере, разбор проверяет ответ,
-          приёмник записывает результат. Выберите скрипт слева или начните с готовой ноды.
+          приёмник записывает результат. Выберите скрипт слева или создайте новый: пустое поле, куда ноды и целые графы добавляются правым кликом.
         </p>
-        <div class="scripts__cards">
-          {#each readyNodes as n (n.id)}
-            <button type="button" class="scripts__card" onclick={() => void createFrom(n)}>
-              <b>{n.title}</b>
-              <small>{n.description}</small>
-            </button>
-          {:else}
-            <button type="button" class="scripts__card" disabled={busy} onclick={() => void installStarters()}>
-              <b>Поставить стартовые ноды</b>
-              <small>Готовые ноды из прежних образцов: шаг, заметка, шаблон, хук.</small>
-            </button>
-          {/each}
-        </div>
       </div>
     {:else}
       <div class="scripts__bar">
@@ -264,7 +269,7 @@
           >
             {#if ed.saving}…{:else}<Icon name="save" />{/if}
           </button>
-          <button type="button" class="btn btn--icon btn--danger" title="Удалить" aria-label="Удалить" onclick={() => (ask = { kind: 'delete' })}>
+          <button type="button" class="btn btn--icon btn--danger" title="Удалить" aria-label="Удалить" onclick={() => selectedId != null && (ask = { kind: 'delete', id: selectedId })}>
             <Icon name="delete" />
           </button>
         </div>
@@ -281,7 +286,19 @@
         <Palette {ed} {cv} onNewCode={newCode} />
         <div class="scripts__center">
           <ProblemList problems={ed.problems} label={nodeLabel} onPick={(n) => ed.select(n)} />
-          <ScriptCanvas {ed} {cv} onNewCode={newCode} onBake={() => (bakeOpen = true)} />
+          <ScriptCanvas
+            {ed}
+            {cv}
+            onNewCode={newCode}
+            onBake={() => {
+              bakeWhole = false
+              bakeOpen = true
+            }}
+            onEditCustom={(t) => void editCustom(t)}
+            samples={samples.map((x) => ({ id: x.id, title: x.title }))}
+            scripts={scriptsList.items.filter((x) => x.id !== selectedId).map((x) => ({ id: x.id, title: x.title }))}
+            onInsert={(k, id, at) => void insertGraph(k, id, at)}
+          />
         </div>
         <Inspector {ed} onEditCustom={(t) => void editCustom(t)} />
       </div>
@@ -301,15 +318,24 @@
   onSaved={() => void refreshNodes()}
 />
 <NodeMetaModal open={metaNode !== null} node={metaNode} onClose={() => (metaNode = null)} onSaved={() => void refreshNodes()} />
+<ScriptListMenu
+  menu={scriptMenu}
+  scripts={scriptsList.items}
+  onClose={() => (scriptMenu.open = false)}
+  onRename={(id, title) => patchScript(id, { title })}
+  onPurpose={(id, purpose) => void patchScript(id, { purpose })}
+  onBake={(id) => void bakeScript(id)}
+  onDelete={(id) => (ask = { kind: 'delete', id })}
+/>
 <BakeModal
   open={bakeOpen}
-  count={ed.picked.size}
+  count={bakeWhole ? ed.graph.nodes.length : ed.picked.size}
   candidates={bakeCandidates}
   {nodeTitle}
   onClose={() => (bakeOpen = false)}
   nodes={customNodes.items}
   onBake={async (title, chosen, replaceId) => {
-    await ed.bake(title, chosen, replaceId)
+    await ed.bake(title, chosen, replaceId, bakeWhole)
     void loadCustomNodes(true)
   }}
 />
@@ -319,7 +345,7 @@
   title="Удалить скрипт?"
   message="Скрипт и все его версии будут удалены. Если он где-то подключён, сервер откажет и покажет, где."
   onCancel={() => (ask = null)}
-  onConfirm={() => void remove()}
+  onConfirm={() => ask?.kind === 'delete' && void remove(ask.id)}
 />
 <ConfirmModal
   open={ask?.kind === 'leave'}
@@ -376,7 +402,7 @@
     overflow-y: auto;
     padding-bottom: 0.5rem;
   }
-  /* A group of scripts made from one sample: a title bar in the sample's colour and the scripts under it on a rail of that colour. */
+  /* A group of scripts of one purpose: a title bar in its colour and the scripts under it on a rail of that colour. */
   .sgroup {
     margin-top: 0.6rem;
   }
@@ -415,31 +441,6 @@
   .sgroup ul {
     margin-left: 0.55rem !important;
     border-left: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-  }
-  .scripts__samples {
-    display: grid;
-    gap: 0.3rem;
-    padding: 0.5rem 0.6rem !important;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-  .scripts__samples button,
-  .scripts__card {
-    width: 100%;
-    display: grid;
-    gap: 0.15rem;
-    padding: 0.5rem 0.7rem;
-    border: 0;
-    border-radius: var(--pill-radius, 12px);
-    background: var(--pill-bg, #0f0f0f);
-    box-shadow: var(--pill-shadow, none);
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-  .scripts__samples button:hover,
-  .scripts__card:hover {
-    background: var(--color-bg-hover, #2a2a2a);
   }
   small {
     color: var(--color-fg-muted, #9a9a9a);
@@ -488,11 +489,6 @@
   }
   .scripts__empty h2 {
     margin: 0;
-  }
-  .scripts__cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-    gap: 0.6rem;
   }
   .scripts__bar {
     display: flex;

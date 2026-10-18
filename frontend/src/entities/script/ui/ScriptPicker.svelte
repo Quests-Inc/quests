@@ -135,6 +135,8 @@
     flex: none;
   }
   .spick__menu {
+    max-height: 16rem;
+    overflow-y: auto;
     margin: 0;
     padding: 0;
     list-style: none;

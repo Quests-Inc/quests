@@ -125,11 +125,23 @@ func TestScriptRefusals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.UpdateScript(ctx, sc.ID, ScriptUpdate{Graph: []byte(`{"nodes":[],"edges":[]}`), ExpectedVersion: 1}); err == nil {
-		t.Fatal("an empty graph must be refused on update")
+	if _, err := st.UpdateScript(ctx, sc.ID, ScriptUpdate{Graph: []byte(`{"nodes":[{"id":1,"type":"nope"}],"edges":[]}`), ExpectedVersion: 1}); err == nil {
+		t.Fatal("a bad graph must be refused on update")
 	}
 	if got, _ := st.GetScript(ctx, sc.ID); got.Version != 1 {
 		t.Fatalf("a refused update changed the version: %+v", got)
+	}
+
+	// An empty script is allowed (a new one starts empty); it has no subject, so it cannot be bound.
+	empty, err := st.CreateScript(ctx, "Новый скрипт", "", []byte(`{"nodes":[],"edges":[]}`))
+	if err != nil || empty.NeedsRunner || len(empty.Subjects) != 0 {
+		t.Fatalf("empty script: %+v %v", empty, err)
+	}
+	if err := st.BindScript(ctx, SubjectStep, 1, empty.ID); err == nil {
+		t.Fatal("an empty script was bound")
+	}
+	if _, err := graph.NewRun(graph.Graph{}, graph.Builtin()); err == nil {
+		t.Fatal("an empty graph ran")
 	}
 }
 

@@ -119,3 +119,58 @@ test('baking over an existing node updates it by number and takes its place', as
   expect(ed.graph.nodes.map((n) => n.type)).toEqual(['source.note', 'custom.7'])
   expect(calls.some((c) => c.key === 'POST /api/script-custom-nodes')).toBe(false)
 })
+
+test('a whole graph is put in with its nodes picked; right-click removal takes the nodes it is given', async () => {
+  fakeServer()
+  const ed = createScriptEditor()
+  await ed.open(script({ nodes: [{ id: 1, type: 'source.note' }], edges: [] }))
+  await ed.insert(
+    {
+      nodes: [
+        { id: 1, type: 'code', params: { text: 'echo 1' }, x: 0, y: 0 },
+        { id: 2, type: 'code', params: { text: 'echo 2' }, x: 100, y: 0 },
+      ],
+      edges: [{ from: { node: 1, port: 'stdout' }, to: { node: 2, port: 'in' } }],
+    },
+    400,
+    200
+  )
+  expect(ed.graph.nodes.map((n) => n.id)).toEqual([1, 2, 3])
+  expect(ed.graph.edges).toEqual([{ from: { node: 2, port: 'stdout' }, to: { node: 3, port: 'in' } }])
+  expect([...ed.picked]).toEqual(['n2', 'n3'])
+  await ed.removeNodes([2, 3])
+  expect(ed.graph.nodes.map((n) => n.id)).toEqual([1])
+  expect(ed.picked.size).toBe(0)
+})
+
+test('baking the whole script makes a node and leaves the script alone', async () => {
+  const calls = fakeServer()
+  const ed = createScriptEditor()
+  const g = {
+    nodes: [
+      { id: 1, type: 'source.note' },
+      { id: 2, type: 'code', params: { text: 'echo 1' } },
+    ],
+    edges: [],
+  }
+  await ed.open(script(g))
+  const before = ed.graph
+  const made = await ed.bake('Весь скрипт', [], undefined, true)
+  expect(made.id).toBe(11)
+  expect(calls.find((c) => c.key === 'POST /api/script-custom-nodes')?.body.graph.nodes.map((n: any) => n.id)).toEqual([
+    1, 2,
+  ])
+  expect(ed.graph).toBe(before)
+})
+
+test('an empty script is not a problem', async () => {
+  const calls = fakeServer()
+  const ed = createScriptEditor()
+  await ed.open(script({ nodes: [], edges: [] }))
+  await ed.add('code', 0, 0)
+  await ed.removeNodes([1])
+  await new Promise((r) => setTimeout(r, 450))
+  expect(ed.problems).toEqual([])
+  expect(ed.graph.nodes).toEqual([])
+  expect(calls.length).toBeGreaterThan(0)
+})
