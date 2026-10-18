@@ -4,6 +4,7 @@
     QUEST_STATUSES,
     QUEST_STATUS_LABELS,
     createQuest,
+    createHook,
     updateQuest,
     deleteQuest,
     addQuestStep,
@@ -23,6 +24,7 @@
   } from '@/shared/lib/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '@/shared/lib/duration.ts'
   import { questStepDraft, questStepsPayload, StepsEditor } from '@/entities/quest'
+  import { HooksField, type HookDraft } from '@/entities/hook/@x/quest'
   import Icon from '@/shared/ui/Icon.svelte'
   import { MentionTextarea } from '@/entities/template'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
@@ -95,6 +97,8 @@
   let secProps = $state(false)
   let secDeadline = $state(false)
   let secSteps = $state(true)
+  let secHooks = $state(false)
+  let hookDrafts = $state<HookDraft[]>([])
 
   let suggestOn = $derived(mode === 'create')
   // Questline/section suggestion (quest=205): only while creating, and only
@@ -203,6 +207,8 @@
     secProps = false
     secDeadline = false
     secSteps = true
+    secHooks = false
+    hookDrafts = []
   }
 
   // Init when `open` becomes true. Only track `open` — reading quest/mode
@@ -310,6 +316,22 @@
       }
       if (mode === 'create') {
         saved = await createQuest({ ...payload, steps: stepsPayload })
+        const qid = Number(saved?.id)
+        if (qid > 0 && hookDrafts.length) {
+          for (const d of hookDrafts) {
+            const sid = Number(d.script_id)
+            if (!(sid > 0) || !d.events.length) continue
+            await createHook({
+              name: d.name.trim(),
+              enabled: d.enabled,
+              events: d.events,
+              script_id: sid,
+              run_on: d.run_on.trim(),
+              quest_id: d.thisQuest ? qid : null,
+            })
+          }
+          hookDrafts = []
+        }
       } else {
         saved = await updateQuest(quest.id, payload)
         const afterSteps = await syncQuestSteps(quest.id, stepsPayload, quest?.steps || [])
@@ -492,6 +514,22 @@
     {#if !(onDraft && mode === 'edit')}
       <FormSection title="Шаги" summary={stepsSummary} bind:open={secSteps}>
         <StepsEditor bind:steps variant="quest" {quests} {questlines} {notes} {attachments} />
+      </FormSection>
+    {/if}
+
+    {#if !onDraft}
+      <FormSection
+        title="Хуки"
+        summary={mode === 'create' ? (hookDrafts.length ? `${hookDrafts.length}` : '') : ''}
+        bind:open={secHooks}
+      >
+        <HooksField
+          questId={mode === 'edit' ? quest?.id : null}
+          bind:drafts={hookDrafts}
+          defaultEvents={['complete']}
+          showScope={true}
+          open={secHooks}
+        />
       </FormSection>
     {/if}
 

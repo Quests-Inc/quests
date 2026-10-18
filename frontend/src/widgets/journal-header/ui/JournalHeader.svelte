@@ -568,7 +568,7 @@
       class:view-tab--on={view === 'hooks'}
       role="tab"
       aria-selected={view === 'hooks'}
-      title="Хуки: скрипт на событие квеста"
+      title="Хуки: список; добавляют в карточке квеста или шага"
       onclick={() => onViewChange('hooks')}
     >
       <Icon name="flag" size={15} />

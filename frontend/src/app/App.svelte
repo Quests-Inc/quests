@@ -660,7 +660,9 @@
   {:else if nav.view === 'scripts'}
     <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} sidebarCollapsed={sidebarCollapsed.scripts} /></div>
   {:else if nav.view === 'hooks'}
-    <div class="journal__hooks"><HooksPage active={nav.view === 'hooks'} /></div>
+    <div class="journal__hooks">
+      <HooksPage active={nav.view === 'hooks'} onOpenQuest={(id) => selectQuestFromUi(id)} />
+    </div>
   {:else if nav.view === 'history'}
     <div class="journal__history">
       <HistoryPage

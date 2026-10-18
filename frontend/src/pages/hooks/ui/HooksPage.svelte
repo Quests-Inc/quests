@@ -1,47 +1,40 @@
 <script lang="ts">
   import Icon from '@/shared/ui/Icon.svelte'
-  import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
-  import { ScriptPicker } from '@/entities/script'
-  import { loadRunners, runnersList } from '@/entities/runner'
+  import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import {
-    createHook,
     deleteHook,
-    getHookEvents,
     getHooks,
     updateHook,
     type Hook,
-    type HookEventsCatalog,
   } from '@/shared/api/client.ts'
+  import { displayEvents } from '@/entities/hook'
+  import HookModal from './HookModal.svelte'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
 
-  /** Event hooks of the workspace: an event plus a library script, run on a device. */
-  let { active = true }: { active?: boolean } = $props()
+  /** Workspace hooks: the list, and a form to add or change one (a quest's or a step's own card has the same form). */
+  let {
+    active = true,
+    onOpenQuest,
+  }: {
+    active?: boolean
+    onOpenQuest?: (id: number) => void
+  } = $props()
 
   let hooks: Hook[] = $state([])
-  let catalog: HookEventsCatalog | null = $state(null)
   let loaded = $state(false)
+  let search = $state('')
+  let scope: 'all' | 'quest' | 'workspace' = $state('all')
+  let stateFilter: 'all' | 'on' | 'off' = $state('all')
+  let pending: Hook | null = $state(null)
   let editing: Hook | null = $state(null)
   let formOpen = $state(false)
-
-  let name = $state('')
-  let enabled = $state(true)
-  let pickedEvents = $state<string[]>(['complete'])
-  let scriptId = $state('')
-  let questId = $state('')
-  let runOn = $state('')
-  let busy = $state(false)
-
-  const aliasEntries = $derived(
-    catalog ? Object.entries(catalog.aliases).sort(([a], [b]) => a.localeCompare(b)) : []
-  )
+  let deleteBusy = $state(false)
 
   async function load() {
     try {
-      const [h, ev] = await Promise.all([getHooks(), catalog ? Promise.resolve(catalog) : getHookEvents()])
-      hooks = h ?? []
-      if (!catalog) catalog = ev
+      hooks = (await getHooks()) ?? []
     } catch {
-      /* toast from request */
+      hooks = []
     } finally {
       loaded = true
     }
@@ -50,279 +43,443 @@
   $effect(() => {
     if (!active) return
     void load()
-    void loadRunners()
   })
 
-  function openNew() {
-    editing = null
-    name = ''
-    enabled = true
-    pickedEvents = ['complete']
-    scriptId = ''
-    questId = ''
-    runOn = ''
-    formOpen = true
-  }
-
-  function openEdit(h: Hook) {
-    editing = h
-    name = h.name
-    enabled = h.enabled
-    pickedEvents = h.events_raw?.length ? [...h.events_raw] : [...h.events]
-    scriptId = String(h.script_id)
-    questId = h.quest_id != null ? String(h.quest_id) : ''
-    runOn = h.run_on || ''
-    formOpen = true
-  }
-
-  function toggleEvent(ev: string) {
-    if (pickedEvents.includes(ev)) pickedEvents = pickedEvents.filter((e) => e !== ev)
-    else pickedEvents = [...pickedEvents, ev]
-  }
-
-  async function save() {
-    const sid = Number(scriptId)
-    if (!pickedEvents.length || !(sid > 0) || busy) return
-    busy = true
-    try {
-      const q = Number(questId)
-      const body = {
-        name: name.trim(),
-        enabled,
-        events: pickedEvents,
-        script_id: sid,
-        run_on: runOn.trim(),
-        quest_id: q > 0 ? q : null,
-      }
-      if (editing) await updateHook(editing.id, body)
-      else await createHook(body)
-      formOpen = false
-      await load()
-      toast(editing ? 'Хук сохранён' : 'Хук создан')
-    } catch (e: any) {
-      toast(e?.message || 'Не удалось сохранить хук', { kind: 'error' })
-    } finally {
-      busy = false
-    }
-  }
-
-  async function remove(h: Hook) {
-    if (!confirm(`Удалить хук «${h.name || h.id}»?`)) return
-    try {
-      await deleteHook(h.id)
-      if (editing?.id === h.id) formOpen = false
-      await load()
-    } catch (e: any) {
-      toast(e?.message || 'Не удалось удалить', { kind: 'error' })
-    }
-  }
+  let filtered = $derived.by(() => {
+    const q = search.trim().toLowerCase()
+    return hooks.filter((h) => {
+      if (scope === 'quest' && h.quest_id == null) return false
+      if (scope === 'workspace' && h.quest_id != null) return false
+      if (stateFilter === 'on' && !h.enabled) return false
+      if (stateFilter === 'off' && h.enabled) return false
+      if (!q) return true
+      const hay = [
+        h.name,
+        String(h.id),
+        h.script_title,
+        String(h.script_id),
+        h.run_on,
+        h.quest_id != null ? `quest ${h.quest_id}` : 'журнал',
+        ...displayEvents(h),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  })
 
   async function setEnabled(h: Hook, on: boolean) {
     try {
       await updateHook(h.id, { enabled: on })
       await load()
-    } catch (e: any) {
-      toast(e?.message || 'Не удалось изменить', { kind: 'error' })
+    } catch (e) {
+      toast(e instanceof Error && e.message ? e.message : 'Не удалось изменить', { kind: 'error' })
     }
+  }
+
+  async function confirmDelete() {
+    if (!pending) return
+    deleteBusy = true
+    try {
+      await deleteHook(pending.id)
+      pending = null
+      await load()
+    } catch (e) {
+      toast(e instanceof Error && e.message ? e.message : 'Не удалось удалить', { kind: 'error' })
+    } finally {
+      deleteBusy = false
+    }
+  }
+
+  function openForm(h: Hook | null) {
+    editing = h
+    formOpen = true
   }
 </script>
 
-<div class="hooks">
-  <section class="hooks__block">
-    <header class="hooks__head">
-      <h2>Хуки</h2>
-      <button type="button" class="btn" onclick={openNew}>
-        <Icon name="add" size={14} />
-        Новый
+<div class="hookpage">
+  <div class="hookpage__tools">
+    <div class="hookpage__top">
+      <input
+        class="search hookpage__search"
+        type="search"
+        placeholder="Поиск по названию, событию, скрипту…"
+        bind:value={search}
+        aria-label="Поиск хуков"
+      />
+      <button type="button" class="btn btn--accent btn--icon-only" title="Новый хук" aria-label="Новый хук" onclick={() => openForm(null)}>
+        <Icon name="add" size={16} />
       </button>
-    </header>
-    <p class="hooks__lead">На событие квеста запускается скрипт из библиотеки — на раннере, не на сервере.</p>
-
-    {#if !loaded}
-      <p class="hooks__muted">Загрузка…</p>
-    {:else if !hooks.length}
-      <p class="hooks__muted">Хуков пока нет.</p>
-    {:else}
-      <ul class="hooks__list">
-        {#each hooks as h (h.id)}
-          <li class="hooks__row" class:hooks__row--off={!h.enabled}>
-            <button type="button" class="hooks__main" onclick={() => openEdit(h)}>
-              <span class="hooks__title">{h.name || `хук #${h.id}`}</span>
-              <span class="hooks__meta">
-                {(h.events_raw?.length ? h.events_raw : h.events).join(', ')}
-                · {h.script_title || `скрипт ${h.script_id}`}
-                {#if h.quest_id}· квест {h.quest_id}{/if}
-                {#if h.run_on}· {h.run_on}{/if}
-              </span>
-            </button>
-            <label class="hooks__en">
-              <input type="checkbox" checked={h.enabled} onchange={(e) => void setEnabled(h, e.currentTarget.checked)} />
-              вкл
-            </label>
-            <button type="button" class="btn hooks__del" title="Удалить" onclick={() => void remove(h)}>
-              <Icon name="delete" size={14} />
-            </button>
-          </li>
+    </div>
+    <div class="hookpage__row">
+      <div class="hookpage__seg" role="group" aria-label="Область">
+        {#each [
+          { id: 'all', label: 'Все' },
+          { id: 'quest', label: 'Квест' },
+          { id: 'workspace', label: 'Журнал' },
+        ] as s}
+          <button
+            type="button"
+            class="hookpage__pill"
+            class:hookpage__pill--on={scope === s.id}
+            onclick={() => (scope = s.id as typeof scope)}>{s.label}</button
+          >
         {/each}
-      </ul>
+      </div>
+      <div class="hookpage__seg" role="group" aria-label="Состояние">
+        {#each [
+          { id: 'all', label: 'Любые' },
+          { id: 'on', label: 'Вкл' },
+          { id: 'off', label: 'Выкл' },
+        ] as s}
+          <button
+            type="button"
+            class="hookpage__pill"
+            class:hookpage__pill--on={stateFilter === s.id}
+            onclick={() => (stateFilter = s.id as typeof stateFilter)}
+          >
+            {s.label}
+            {#if s.id === 'all'}
+              <span class="hookpage__n">{hooks.length}</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+    </div>
+  </div>
+
+  <div class="hookpage__list">
+    {#if !loaded}
+      <p class="empty">Загрузка…</p>
+    {:else if hooks.length === 0}
+      <p class="empty">Хуков пока нет. Добавьте первый кнопкой «Хук» или в карточке квеста или шага.</p>
+    {:else if filtered.length === 0}
+      <p class="empty">Ничего не найдено</p>
+    {:else}
+      {#each filtered as h (h.id)}
+        <article
+          class="hookpage__item"
+          class:hookpage__item--off={!h.enabled}
+          role="listitem"
+          onclick={() => openForm(h)}
+        >
+          <div class="hookpage__icon" aria-hidden="true">
+            <Icon name="flag" size={18} />
+          </div>
+          <div class="hookpage__main">
+            <div class="hookpage__name">
+              <span class="hookpage__file">{h.name || `хук #${h.id}`}</span>
+              {#if !h.enabled}
+                <span class="hookpage__chip">выкл</span>
+              {/if}
+              {#if h.quest_id == null}
+                <span class="hookpage__chip">журнал</span>
+              {:else}
+                <button
+                  type="button"
+                  class="hookpage__chip hookpage__chip--link"
+                  title="Открыть квест"
+                  onclick={(e) => {
+                    e.stopPropagation()
+                    onOpenQuest?.(h.quest_id as number)
+                  }}>квест {h.quest_id}</button
+                >
+              {/if}
+            </div>
+            <div class="hookpage__meta">
+              <span>{displayEvents(h).join(', ')}</span>
+              <span>{h.script_title || `скрипт ${h.script_id}`}</span>
+              {#if h.run_on}<span>{h.run_on}</span>{/if}
+            </div>
+          </div>
+          <div class="hookpage__acts">
+            <button
+              type="button"
+              class="hookpage__ico"
+              title="Редактировать"
+              aria-label="Редактировать"
+              onclick={(e) => {
+                e.stopPropagation()
+                openForm(h)
+              }}
+            >
+              <Icon name="edit" size={16} />
+            </button>
+            <button
+              type="button"
+              class="hookpage__ico hookpage__ico--danger"
+              title="Удалить"
+              aria-label="Удалить"
+              onclick={(e) => {
+                e.stopPropagation()
+                pending = h
+              }}
+            >
+              <Icon name="delete" size={16} />
+            </button>
+            <button
+              type="button"
+              class="switch"
+              class:switch--on={h.enabled}
+              role="switch"
+              aria-checked={h.enabled}
+              title={h.enabled ? 'Выключить' : 'Включить'}
+              aria-label={h.enabled ? 'Выключить хук' : 'Включить хук'}
+              onclick={(e) => {
+                e.stopPropagation()
+                void setEnabled(h, !h.enabled)
+              }}
+            >
+              <span class="switch__knob"></span>
+            </button>
+          </div>
+        </article>
+      {/each}
     {/if}
-  </section>
-
-  {#if formOpen}
-    <section class="hooks__block formscope">
-      <header class="hooks__head">
-        <h2>{editing ? 'Правка хука' : 'Новый хук'}</h2>
-        <button type="button" class="btn" onclick={() => (formOpen = false)}>Закрыть</button>
-      </header>
-
-      <label class="hooks__field">
-        <span>Название</span>
-        <input type="text" bind:value={name} placeholder="необязательно" />
-      </label>
-
-      <fieldset class="hooks__field">
-        <legend>События</legend>
-        <div class="hooks__events">
-          {#each aliasEntries as [alias, kinds]}
-            <label class="hooks__chip" title={kinds.join(', ')}>
-              <input type="checkbox" checked={pickedEvents.includes(alias)} onchange={() => toggleEvent(alias)} />
-              {alias}
-            </label>
-          {/each}
-        </div>
-      </fieldset>
-
-      <div class="hooks__field">
-        <ScriptPicker bind:value={scriptId} kind="quest" label="Скрипт" />
-      </div>
-
-      <label class="hooks__field">
-        <span>Квест (необязательно)</span>
-        <input type="text" bind:value={questId} placeholder="id — только этот квест" inputmode="numeric" />
-      </label>
-
-      <div class="hooks__field hooks__run">
-        <span>Раннер</span>
-        <RunnerPicker bind:value={runOn} runners={runnersList.items} />
-      </div>
-
-      <label class="hooks__en hooks__field">
-        <input type="checkbox" bind:checked={enabled} />
-        Включён
-      </label>
-
-      <div class="hooks__actions">
-        <button type="button" class="btn btn--primary" disabled={busy || !scriptId || !pickedEvents.length} onclick={() => void save()}>
-          {editing ? 'Сохранить' : 'Создать'}
-        </button>
-      </div>
-    </section>
-  {/if}
+  </div>
 </div>
 
+<HookModal open={formOpen} hook={editing} onClose={() => (formOpen = false)} onSaved={() => void load()} />
+
+<ConfirmModal
+  open={pending != null}
+  title="Удалить хук?"
+  message={pending ? `Удалить «${pending.name || `хук #${pending.id}`}»?` : ''}
+  busy={deleteBusy}
+  onCancel={() => {
+    if (!deleteBusy) pending = null
+  }}
+  onConfirm={confirmDelete}
+/>
+
 <style>
-  .hooks {
+  .hookpage {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    padding: 1rem 1.25rem 2rem;
-    max-width: 40rem;
+    min-height: 0;
+    height: 100%;
   }
-  .hooks__block h2 {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
+
+  .hookpage__tools {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-border, #333);
   }
-  .hooks__head {
+
+  .hookpage__top {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-  }
-  .hooks__lead,
-  .hooks__muted {
-    margin: 0 0 1rem;
-    color: var(--muted, #666);
-    font-size: 0.9rem;
-  }
-  .hooks__list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-  .hooks__row {
-    display: flex;
-    align-items: center;
     gap: 0.5rem;
-    border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
-    padding: 0.35rem 0;
   }
-  .hooks__row--off {
-    opacity: 0.55;
+
+  .hookpage__search {
+    flex: 1 1 auto;
+    min-width: 0;
   }
-  .hooks__main {
-    flex: 1;
-    text-align: left;
-    background: none;
-    border: 0;
-    padding: 0.25rem 0;
-    cursor: pointer;
-    color: inherit;
-    font: inherit;
-  }
-  .hooks__title {
-    display: block;
-    font-weight: 560;
-  }
-  .hooks__meta {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--muted, #666);
-  }
-  .hooks__en {
-    display: inline-flex;
+
+  .hookpage__row {
+    display: flex;
     align-items: center;
-    gap: 0.35rem;
-    font-size: 0.85rem;
-    white-space: nowrap;
-  }
-  .hooks__del {
-    padding: 0.25rem 0.4rem;
-  }
-  .hooks__field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    margin: 0 0 0.9rem;
-    border: 0;
-    padding: 0;
-    font-size: 0.9rem;
-  }
-  .hooks__field input[type='text'] {
-    font: inherit;
-    padding: 0.4rem 0.55rem;
-  }
-  .hooks__events {
-    display: flex;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    gap: 0.4rem 0.75rem;
   }
-  .hooks__chip {
+
+  .hookpage__seg {
+    display: inline-flex;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    overflow: hidden;
+  }
+
+  .hookpage__pill {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.85rem;
+    padding: 0.28rem 0.65rem;
+    border: 0;
+    border-right: 1px solid var(--color-border, #333);
+    background: transparent;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
   }
-  .hooks__run {
-    flex-direction: row;
+
+  .hookpage__pill:last-child {
+    border-right: 0;
+  }
+
+  .hookpage__pill:hover {
+    color: var(--color-fg, #e8e8e8);
+  }
+
+  .hookpage__pill--on {
+    color: var(--color-fg, #e8e8e8);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, transparent);
+  }
+
+  .hookpage__n {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
+  }
+
+  .hookpage__list {
+    overflow: auto;
+    padding: 0.35rem 0 1rem;
+    min-height: 0;
+  }
+
+  .empty {
+    margin: 1.5rem 1rem;
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .hookpage__item {
+    display: flex;
     align-items: center;
     gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    border-left: 2px solid transparent;
+    cursor: pointer;
   }
-  .hooks__actions {
-    margin-top: 0.5rem;
+
+  .hookpage__item:hover {
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
+  }
+
+  .hookpage__item--off .hookpage__main,
+  .hookpage__item--off .hookpage__icon {
+    opacity: 0.5;
+  }
+
+  .hookpage__icon {
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    color: var(--color-fg-muted, #9a9a9a);
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 5%, transparent);
+  }
+
+  .hookpage__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .hookpage__name {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .hookpage__file {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+  }
+
+  .hookpage__chip {
+    flex: 0 0 auto;
+    padding: 0 0.3rem;
+    border: 1px solid var(--color-border, #3a3a3a);
+    border-radius: var(--radius-sm, 3px);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .hookpage__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.85rem;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
+  .hookpage__acts {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    flex-shrink: 0;
+  }
+
+  .hookpage__chip--link {
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .hookpage__chip--link:hover {
+    color: var(--color-accent, #c9a227);
+    border-color: var(--color-accent, #c9a227);
+  }
+
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 1.25rem;
+    margin: 0 0 0 0.35rem;
+    padding: 0;
+    border: 1px solid var(--color-border-strong, #4a4a4a);
+    border-radius: 999px;
+    background: var(--color-bg-muted, #242424);
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .switch__knob {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: calc(1.25rem - 4px);
+    height: calc(1.25rem - 4px);
+    border-radius: 999px;
+    background: var(--color-fg-muted, #9a9a9a);
+    transition:
+      transform 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .switch--on {
+    border-color: color-mix(in srgb, var(--color-accent, #c9a227) 55%, var(--color-border, #333));
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 28%, var(--color-bg-muted, #242424));
+  }
+
+  .switch--on .switch__knob {
+    transform: translateX(1rem);
+    background: var(--color-accent, #c9a227);
+  }
+
+  .hookpage__ico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--radius-md, 4px);
+    background: transparent;
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+
+  .hookpage__ico:hover {
+    color: var(--color-fg, #e8e8e8);
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 8%, transparent);
+  }
+
+  .hookpage__ico--danger:hover {
+    color: var(--color-danger, #c44);
   }
 </style>

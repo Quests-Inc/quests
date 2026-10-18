@@ -1,6 +1,7 @@
 .journal__graph,
 .journal__runners,
 .journal__scripts,
+.journal__hooks,
 .journal__history,
 .journal__attachments {
   flex: 1 1 auto;

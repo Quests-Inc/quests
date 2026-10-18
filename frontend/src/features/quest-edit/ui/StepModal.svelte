@@ -1,7 +1,9 @@
 <script lang="ts">
   import { bindScript, unbindScript, updateQuestStep } from '@/shared/api/client.ts'
   import { checkPayload, questStepDraft, StepAutoCheck } from '@/entities/quest'
+  import { HooksField } from '@/entities/hook/@x/quest'
   import { MentionTextarea } from '@/entities/template'
+  import FormSection from '@/shared/ui/FormSection.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
   import ModalFoot from '@/shared/ui/ModalFoot.svelte'
@@ -34,12 +36,14 @@
   let draft = $state(questStepDraft())
   let saving = $state(false)
   let formError = $state('')
+  let secHooks = $state(false)
 
   $effect(() => {
     if (!open) return
     untrack(() => {
       formError = ''
       saving = false
+      secHooks = false
       draft = questStepDraft(step)
     })
   })
@@ -132,6 +136,17 @@
         bind:scriptId={draft.script_id}
       />
     </div>
+
+    {#if !onDraft && questId != null}
+      <FormSection title="Хуки" bind:open={secHooks}>
+        <HooksField
+          questId={questId}
+          defaultEvents={['step']}
+          showScope={false}
+          open={secHooks}
+        />
+      </FormSection>
+    {/if}
 
     <ModalFoot onCancel={onClose} submitLabel={onDraft ? "В черновик" : "Сохранить"} submitIcon="save" busy={saving} />
   </form>
