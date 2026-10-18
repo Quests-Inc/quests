@@ -102,6 +102,8 @@
           <input type="text" bind:value={f.label} placeholder={f.name} aria-label="Подпись поля" />
           {#if f.type === 'bool'}
             <label class="check"><input type="checkbox" checked={f.default === true} onchange={(e) => setDefault(f, e.currentTarget.checked)} />по умолчанию</label>
+          {:else if f.type === 'str' && (f.param === 'text' || text(f).length > 60 || text(f).includes('\n'))}
+            <textarea class="mono block" rows="6" spellcheck="false" aria-label="Значение по умолчанию" onchange={(e) => setDefault(f, e.currentTarget.value)}>{text(f)}</textarea>
           {:else}
             <input
               type={f.type === 'int' ? 'number' : 'text'}
@@ -133,6 +135,13 @@
     gap: 0.3rem;
     margin-bottom: 0.3rem;
     align-items: center;
+  }
+  .block {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: var(--text-xs, 0.75rem);
+    resize: vertical;
+    white-space: pre;
   }
   .row input[type='text'],
   .row input[type='number'] {

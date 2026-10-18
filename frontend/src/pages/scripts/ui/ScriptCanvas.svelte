@@ -1,7 +1,7 @@
 <script lang="ts">
   import { GraphMinimap, GraphTools } from '@/entities/graph'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
-  import { anchorOf, KIND_ORDER, KIND_TITLES, portColor, type ScriptNodeView, wirePath } from '@/entities/script'
+  import { anchorOf, customIdOf, KIND_ORDER, KIND_TITLES, nodeKey, portColor, type ScriptNodeView, wirePath } from '@/entities/script'
   import type { End } from '@/shared/api/scriptgraph.gen.ts'
   import type { Canvas } from '../model/canvas.svelte.ts'
   import type { ScriptEditor } from '../model/editor.svelte.ts'
@@ -12,16 +12,34 @@
    * (`createGraphGestures`); a script node is one more kind of card for them. A wire is drawn from a port's
    * anchor to a port's anchor, so what it joins is exact; dragging from an output to an input makes one.
    */
-  let { ed, cv, onNewCode, onBake }: { ed: ScriptEditor; cv: Canvas; onNewCode?: () => void; onBake?: () => void } = $props()
+  let {
+    ed,
+    cv,
+    onNewCode,
+    onBake,
+    onEditCustom,
+    samples = [],
+    scripts = [],
+    onInsert,
+  }: {
+    ed: ScriptEditor
+    cv: Canvas
+    onNewCode?: () => void
+    onBake?: () => void
+    onEditCustom?: (type: string) => void
+    /** whole graphs that can be put in as they are (the former samples, other scripts) */
+    samples?: { id: string; title: string }[]
+    scripts?: { id: number; title: string }[]
+    onInsert?: (kind: 'sample' | 'script', id: string | number, at: { clientX: number; clientY: number }) => void
+  } = $props()
 
-  $effect(() => {
-    cv.sync()
-  })
-  $effect(() => cv.watchSize())
+  // Right click: on a card, what can be done to it (to all the picked ones, when it is one of several); on the bare field, what can be
+  // added: «Добавить ноду» → a group of the catalogue → a node; «Добавить граф» → whole samples or scripts, unfolded.
+  let menu = $state<{ open: boolean; x: number; y: number; node: number | null }>({ open: false, x: 0, y: 0, node: null })
+  const pickedIds = $derived([...ed.picked].map((k) => Number(k.slice(1))))
+  const target = $derived(menu.node != null && ed.picked.has(nodeKey(menu.node)) && ed.picked.size > 1 ? pickedIds : menu.node != null ? [menu.node] : [])
 
-  // Right click on the bare field: «Добавить ноду» → a group of the catalogue → a node of the group.
-  let menu = $state({ open: false, x: 0, y: 0 })
-  const menuItems = $derived([
+  const addItems = $derived([
     {
       id: 'add',
       label: 'Добавить ноду',
@@ -31,22 +49,85 @@
         children: ed.infos.filter((i) => i.kind === kind).map((i) => ({ id: `n:${i.name}`, label: i.title })),
       })).filter((g) => g.children.length),
     },
+    ...(onInsert && (samples.length || scripts.length)
+      ? [
+          {
+            id: 'graph',
+            label: 'Добавить граф',
+            children: [
+              ...(samples.length
+                ? [{ id: 'gs', label: 'Образцы', children: samples.map((x) => ({ id: `ins:sample:${x.id}`, label: x.title })) }]
+                : []),
+              ...(scripts.length
+                ? [
+                    {
+                      id: 'gk',
+                      label: 'Скрипты',
+                      children: scripts.map((x) => ({ id: `ins:script:${x.id}`, label: x.title })),
+                      search: scripts.map((x) => ({ id: `ins:script:${x.id}`, label: x.title })),
+                    },
+                  ]
+                : []),
+            ],
+          },
+        ]
+      : []),
     ...(onNewCode || (onBake && ed.picked.size > 1) ? [{ id: 'sep', sep: true }] : []),
     ...(onNewCode ? [{ id: 'code', label: 'Новая нода из кода…' }] : []),
     ...(onBake && ed.picked.size > 1 ? [{ id: 'bake', label: `Запечь выделенное (${ed.picked.size})…` }] : []),
   ])
 
+  const nodeItems = $derived.by(() => {
+    if (target.length > 1) return [{ id: 'del', label: `Удалить выделенные (${target.length})`, danger: true }]
+    const n = ed.graph.nodes.find((x) => x.id === menu.node)
+    const custom = n ? customIdOf(n.type) != null : false
+    return [
+      ...(custom && onEditCustom ? [{ id: 'edit', label: 'Править…' }] : []),
+      ...(custom ? [{ id: 'unfold', label: 'Развернуть в ноды' }] : []),
+      ...(onBake ? [{ id: 'bake1', label: 'Запечь в ноду…' }] : []),
+      ...(custom || onBake ? [{ id: 'sep', sep: true }] : []),
+      { id: 'del', label: 'Удалить', danger: true },
+    ]
+  })
+  const menuItems = $derived(menu.node != null ? nodeItems : addItems)
+
   function onContext(e: MouseEvent) {
     e.preventDefault()
-    if ((e.target as Element).closest('[data-gkey]')) return
     cv.cancelLink()
-    menu = { open: true, x: e.clientX, y: e.clientY }
+    const key = (e.target as Element).closest('[data-gkey]')?.getAttribute('data-gkey')
+    const node = key ? Number(key.slice(1)) : null
+    // A card that is not among the picked ones is what the menu is about; the picked ones stay for the field's own menu.
+    if (node != null && !ed.picked.has(key as string)) {
+      ed.picked = new Set()
+      ed.select(node)
+    }
+    menu = { open: true, x: e.clientX, y: e.clientY, node }
   }
 
-  function onMenuSelect(id: string) {
+  async function onMenuSelect(id: string) {
+    const at = { clientX: menu.x, clientY: menu.y }
     if (id === 'code') onNewCode?.()
     else if (id === 'bake') onBake?.()
-    else if (id.startsWith('n:')) void cv.addAtPoint(id.slice(2), { clientX: menu.x, clientY: menu.y })
+    else if (id.startsWith('n:')) void cv.addAtPoint(id.slice(2), at)
+    else if (id.startsWith('ins:')) {
+      const [, kind, ref] = id.split(':')
+      onInsert?.(kind as 'sample' | 'script', kind === 'script' ? Number(ref) : ref, at)
+    } else if (menu.node != null) {
+      const node = menu.node
+      const type = ed.graph.nodes.find((x) => x.id === node)?.type ?? ''
+      if (id === 'del') await ed.removeNodes(target)
+      else if (id === 'edit') onEditCustom?.(type)
+      else if (id === 'unfold') {
+        try {
+          await ed.unfold(node)
+        } catch (err) {
+          ed.error = err instanceof Error ? err.message : String(err)
+        }
+      } else if (id === 'bake1') {
+        ed.picked = new Set([nodeKey(node)])
+        onBake?.()
+      }
+    }
   }
 
   let hint = $derived(cv.pending ? 'Выберите вход, куда вести связь · Esc или клик по полю — отмена' : '')
@@ -169,7 +250,7 @@
   />
 </div>
 
-<ContextMenu open={menu.open} x={menu.x} y={menu.y} items={menuItems} onSelect={onMenuSelect} onClose={() => (menu.open = false)} />
+<ContextMenu open={menu.open} x={menu.x} y={menu.y} items={menuItems} onSelect={(id) => void onMenuSelect(id)} onClose={() => (menu.open = false)} />
 
 <style>
   .scv {

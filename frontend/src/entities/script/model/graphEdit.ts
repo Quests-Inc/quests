@@ -105,3 +105,31 @@ export function pruneEdges(g: Graph, portsOf: PortsOf): Graph {
 export function portsKey(n: Pick<Node, 'type' | 'params'>): string {
   return `${n.type}|${n.params === undefined ? '' : JSON.stringify(n.params)}`
 }
+
+/**
+ * Put another graph (a sample, another script) into this one: its nodes are numbered after ours, its links come with them, and
+ * its middle lands on (x, y). The new nodes' numbers are returned so the editor can pick them.
+ */
+export function appendGraph(g: Graph, extra: Graph, x: number, y: number): { graph: Graph; ids: number[] } {
+  if (!extra.nodes.length) return { graph: g, ids: [] }
+  let next = nextNodeId(g) - 1
+  const renum = new Map<number, number>()
+  for (const n of extra.nodes) renum.set(n.id, ++next)
+  const xs = extra.nodes.map((n) => n.x ?? 0)
+  const ys = extra.nodes.map((n) => n.y ?? 0)
+  const mid = (a: number[]) => (Math.min(...a) + Math.max(...a)) / 2
+  const dx = x - mid(xs)
+  const dy = y - mid(ys)
+  const nodes: Node[] = extra.nodes.map((n) => ({
+    ...n,
+    id: renum.get(n.id) as number,
+    x: Math.round((n.x ?? 0) + dx),
+    y: Math.round((n.y ?? 0) + dy),
+  }))
+  const edges: Edge[] = extra.edges.map((e) => ({
+    ...e,
+    from: { ...e.from, node: renum.get(e.from.node) as number },
+    to: { ...e.to, node: renum.get(e.to.node) as number },
+  }))
+  return { graph: { nodes: [...g.nodes, ...nodes], edges: [...g.edges, ...edges] }, ids: nodes.map((n) => n.id) }
+}

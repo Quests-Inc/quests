@@ -94,7 +94,7 @@ In the editor: right-click the field → «Добавить ноду» → group
 in the palette) makes a node of one `Code` node: its inputs become variables (the name in capitals), its fields fixed variables
 the script edits on the node. Several picked nodes can be baked into one («Запечь выделенное…»): links leaving the selection
 become inputs and outputs, and any scalar parameter of the picked nodes (a source's entity number, a code variable) can be kept
-as an editable field. A node holding code runs on a runner. A new script is made of one ready node («Новый скрипт», «Из ноды» in a form); the former samples are the starting nodes («Поставить стартовые ноды», `custom_starters`). A baked node is edited in its form (name, field labels and values) or unfolded into the script and baked again over it. Details and limits: ADR-0003 §6a; `script` tool actions `custom_*`.
+as an editable field. A node holding code runs on a runner. «Новый скрипт» makes an empty script named «Новый скрипт» (an empty one can be saved, not bound or run); «Из ноды» in a form makes a script of one ready node; the former samples are the starting nodes («Поставить стартовые ноды», `custom_starters`), and right click → «Добавить граф» puts a sample or another script into the open one with its nodes unfolded. A baked node is edited in its form (name, field labels and values) or unfolded into the script and baked again over it. Details and limits: ADR-0003 §6a; `script` tool actions `custom_*`.
 
 ### Runs (ADR-0003, stage 4)
 
@@ -130,3 +130,10 @@ Jobs queued before runs existed have no `run_id` and are served by the older kin
 
 [`security.md`](security.md) (trust boundaries) · [`secrets.md`](secrets.md) · [`emit.md`](emit.md) ·
 [`note-check.md`](note-check.md) · [`architecture.md`](architecture.md) · ADR-0001 (shared kernel).
+
+### Menus and picking in the editor
+
+- Right click on the field: «Добавить ноду» (group → node), «Добавить граф» (samples, scripts), «Новая нода из кода…», and with two or more picked, «Запечь выделенное…».
+- Right click on a card: delete; for a custom node also edit and unfold; «Запечь в ноду…». On one of several picked cards: only delete (all picked).
+- Right click on a script in the list: rename, purpose (second menu), «Запечь в кастомную ноду…» (a copy of the whole script), delete.
+- Ctrl / Cmd picks without the selection mode, in the script editor and on the map: ctrl+click a card, ctrl+drag a frame.

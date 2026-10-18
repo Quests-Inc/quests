@@ -90,8 +90,11 @@ func prepareGraph(raw []byte, reg graph.Registry) (prepared, error) {
 	if err != nil {
 		return prepared{}, errBad(err.Error())
 	}
-	if ps := g.Validate(reg); len(ps) > 0 {
-		return prepared{}, &GraphError{Problems: ps}
+	// A script may be empty: a new one starts so, and clearing the field is a save like another. It cannot run or be bound.
+	if len(g.Nodes) > 0 || len(g.Edges) > 0 {
+		if ps := g.Validate(reg); len(ps) > 0 {
+			return prepared{}, &GraphError{Problems: ps}
+		}
 	}
 	canon, err := json.Marshal(g)
 	if err != nil {

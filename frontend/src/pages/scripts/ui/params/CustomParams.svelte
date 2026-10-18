@@ -15,6 +15,8 @@
     values = { ...values, [f.name]: v }
     onChange(values)
   }
+  /** Code and other long text: a block that can be stretched, not a one-line input. */
+  const block = (f: CustomField) => f.type === 'str' && (f.param === 'text' || String(fieldValue(f, values)).length > 60 || String(fieldValue(f, values)).includes('\n'))
   const num = (s: string) => (s.trim() === '' ? 0 : Math.trunc(Number(s)))
 </script>
 
@@ -27,6 +29,8 @@
       <span class="label">{f.label || f.name}</span>
       {#if f.type === 'int'}
         <input type="number" step="1" value={String(fieldValue(f, values))} onchange={(e) => set(f, num(e.currentTarget.value))} />
+      {:else if block(f)}
+        <textarea class="mono block" rows="10" spellcheck="false" value={String(fieldValue(f, values))} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
       {:else}
         <input type="text" value={String(fieldValue(f, values))} onchange={(e) => set(f, e.currentTarget.value)} />
       {/if}
@@ -35,3 +39,14 @@
 {:else}
   <p class="explain">У этой ноды нет редактируемых полей.</p>
 {/each}
+
+<style>
+  .block {
+    width: 100%;
+    font-size: var(--text-xs, 0.75rem);
+    line-height: 1.4;
+    resize: vertical;
+    white-space: pre;
+    overflow: auto;
+  }
+</style>
