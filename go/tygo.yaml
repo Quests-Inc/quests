@@ -88,6 +88,7 @@ packages:
     exclude_files:
       - "store.go"
       - "wsdata.go"
+      - "wsdata_graphs.go"
       - "durations.go"
       - "emit_data.go"
     type_mappings:
