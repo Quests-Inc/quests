@@ -104,6 +104,11 @@ export function updateCustomNode(id: number, body: CustomNodeBody) {
   return request<CustomNode>(`/api/script-custom-nodes/${id}`, { method: 'PUT', body: JSON.stringify(body) })
 }
 
+/** Install the starting library (the former samples) as custom nodes; the ones already there stay. */
+export function installStarterNodes() {
+  return request<{ created: CustomNode[] }>('/api/script-custom-nodes/starters', { method: 'POST', body: '{}' })
+}
+
 export function deleteCustomNode(id: number) {
   return request(`/api/script-custom-nodes/${id}`, { method: 'DELETE' })
 }

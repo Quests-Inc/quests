@@ -260,3 +260,71 @@ export function fieldValue(f: CustomField, params: unknown): string | number | b
   if (f.default !== undefined) return f.default as string | number | boolean
   return f.type === 'bool' ? false : ''
 }
+
+/** A one-node script: the custom node `nodeId` alone, with the entity number put into its `entity_id` field when it has one. */
+export function singleNodeGraph(node: { id: number; fields: CustomField[] }, entityId?: number): Graph {
+  const params: Record<string, unknown> = {}
+  if (entityId && node.fields.some((f) => f.name === 'entity_id')) params.entity_id = entityId
+  return { nodes: [{ id: 1, type: customType(node.id), ...(Object.keys(params).length ? { params } : {}) }], edges: [] }
+}
+
+/**
+ * The custom node `nodeId` of the graph replaced by what it is made of, as the server expands it before a run: the inner nodes
+ * are numbered after the graph's own, the node's field values (else the baked ones) are written into them, the links go to the
+ * inner ports. The way back from a baked node to its parts, to change them and bake again.
+ */
+export function inlineCustom(g: Graph, nodeId: number, def: CustomDef): Graph {
+  const site = g.nodes.find((n) => n.id === nodeId)
+  if (!site) return g
+  const values = (site.params ?? {}) as Record<string, unknown>
+  let next = g.nodes.reduce((m, n) => Math.max(m, n.id), 0)
+  const renum = new Map<number, number>()
+  for (const n of def.graph.nodes) renum.set(n.id, ++next)
+  const xs = def.graph.nodes.map((n) => n.x ?? 0)
+  const ys = def.graph.nodes.map((n) => n.y ?? 0)
+  const mid = (a: number[]) => (a.length ? (Math.min(...a) + Math.max(...a)) / 2 : 0)
+  const dx = (site.x ?? 0) - mid(xs)
+  const dy = (site.y ?? 0) - mid(ys)
+  const inner: Node[] = def.graph.nodes.map((n) => {
+    let params = n.params as Record<string, unknown> | undefined
+    for (const f of def.fields.filter((x) => x.node === n.id)) {
+      const v = values[f.name] ?? f.default
+      if (v === undefined) continue
+      params = { ...(params ?? {}) }
+      if (f.param.startsWith('vars.'))
+        params.vars = { ...((params.vars as object) ?? {}), [f.param.slice(5)]: String(v) }
+      else params[f.param] = v
+    }
+    return {
+      ...n,
+      id: renum.get(n.id) as number,
+      ...(params === undefined ? {} : { params }),
+      x: Math.round((n.x ?? 0) + dx),
+      y: Math.round((n.y ?? 0) + dy),
+    }
+  })
+  const edges: Edge[] = [
+    ...g.edges.filter((e) => e.from.node !== nodeId && e.to.node !== nodeId),
+    ...def.graph.edges.map((e) => ({
+      ...e,
+      from: { ...e.from, node: renum.get(e.from.node) as number },
+      to: { ...e.to, node: renum.get(e.to.node) as number },
+    })),
+  ]
+  for (const e of g.edges) {
+    if (e.to.node === nodeId) {
+      for (const p of def.inputs.filter((i) => i.name === e.to.port)) {
+        const code = def.graph.nodes.find((n) => n.id === p.node)?.type === 'code' && p.port === 'in'
+        edges.push({
+          ...e,
+          to: { node: renum.get(p.node) as number, port: p.port },
+          ...(code && !e.alias ? { alias: p.name.toUpperCase() } : {}),
+        })
+      }
+    } else if (e.from.node === nodeId) {
+      const p = def.outputs.find((o) => o.name === e.from.port)
+      if (p) edges.push({ ...e, from: { node: renum.get(p.node) as number, port: p.port } })
+    }
+  }
+  return { nodes: [...g.nodes.filter((n) => n.id !== nodeId), ...inner], edges }
+}

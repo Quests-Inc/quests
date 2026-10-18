@@ -65,6 +65,7 @@ var kindTable = map[string]string{
 var ExportTables = []TableSpec{
 	{Name: "script", HasID: true, Text: []string{"title", "description"}},
 	{Name: "script_version", FK: map[string]string{"script_id": "script"}},
+	{Name: "custom_node", HasID: true, Text: []string{"title", "description"}},
 	{Name: "questcategory", HasID: true},
 	{Name: "questline", HasID: true, FK: map[string]string{"category_id": "questcategory"}, Text: []string{"title", "description"}},
 	{Name: "questtemplate", HasID: true, FK: map[string]string{"category_id": "questcategory", "questline_id": "questline"}, Text: []string{"title", "description"}},
@@ -504,6 +505,10 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 				return rep, err
 			}
 		}
+	}
+	// Scripts and custom nodes hold numbers in their graphs (`custom.N`, the entity a source reads): they follow to the new ids.
+	if err = s.remapScriptGraphs(ctx, tx, ids, &rep); err != nil {
+		return rep, err
 	}
 	// quest.source is "template:N" for emitted quests.
 	srows, qerr := tx.QueryContext(ctx, `SELECT id, source FROM quest WHERE source LIKE 'template:%'`)

@@ -7,7 +7,9 @@ import {
   codeSpecOf,
   customIdOf,
   fieldValue,
+  inlineCustom,
   replaceSelection,
+  singleNodeGraph,
   slug,
 } from '../../src/entities/script/model/customNode.ts'
 
@@ -141,4 +143,43 @@ test("field values: the node's own, else the baked default", () => {
   expect(fieldValue(f, { ref: 'x' })).toBe('x')
   expect(fieldValue(f, undefined)).toBe('abc')
   expect(fieldValue({ name: 'b', type: 'bool', node: 1, param: 'x' }, {})).toBe(false)
+})
+
+test('a one-node script carries the entity number when the node has a field for it', () => {
+  const node = { id: 4, fields: [{ name: 'entity_id', type: 'int', node: 1, param: 'id' }] }
+  expect(singleNodeGraph(node, 9)).toEqual({
+    nodes: [{ id: 1, type: 'custom.4', params: { entity_id: 9 } }],
+    edges: [],
+  })
+  expect(singleNodeGraph({ id: 4, fields: [] }, 9).nodes[0].params).toBeUndefined()
+  expect(singleNodeGraph(node).nodes[0].params).toBeUndefined()
+})
+
+test('a custom node is unfolded into its parts, fields written, links rewired', () => {
+  const def = codeNodeDef(spec)
+  const outer = {
+    nodes: [
+      { id: 1, type: 'source.note', x: 0, y: 0 },
+      { id: 2, type: 'custom.7', params: { ref: 'zzz' }, x: 300, y: 100 },
+      { id: 3, type: 'sink.done', x: 600, y: 100 },
+    ],
+    edges: [
+      { from: { node: 1, port: 'secrets' }, to: { node: 2, port: 'secrets' } },
+      { from: { node: 1, port: 'title' }, to: { node: 2, port: 'note_id' } },
+      { from: { node: 2, port: 'stdout' }, to: { node: 3, port: 'trigger' } },
+    ],
+  }
+  const out = inlineCustom(outer, 2, def)
+  expect(out.nodes.map((n) => [n.id, n.type])).toEqual([
+    [1, 'source.note'],
+    [3, 'sink.done'],
+    [4, 'code'],
+  ])
+  expect(out.nodes[2].params.vars).toEqual({ REF: 'zzz', N: '3' })
+  expect(out.nodes[2].x).toBe(300)
+  expect(out.edges).toEqual([
+    { from: { node: 1, port: 'secrets' }, to: { node: 4, port: 'secrets' } },
+    { from: { node: 1, port: 'title' }, to: { node: 4, port: 'in' }, alias: 'NOTE_ID' },
+    { from: { node: 4, port: 'stdout' }, to: { node: 3, port: 'trigger' } },
+  ])
 })

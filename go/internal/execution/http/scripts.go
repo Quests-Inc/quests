@@ -26,6 +26,7 @@ func (h *Handler) registerScripts(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/script-samples", h.listScriptSamples)
 	mux.HandleFunc("GET /api/script-custom-nodes", h.listCustomNodes)
 	mux.HandleFunc("POST /api/script-custom-nodes", h.createCustomNode)
+	mux.HandleFunc("POST /api/script-custom-nodes/starters", h.installStarters)
 	mux.HandleFunc("GET /api/script-custom-nodes/{id}", h.getCustomNode)
 	mux.HandleFunc("PUT /api/script-custom-nodes/{id}", h.updateCustomNode)
 	mux.HandleFunc("DELETE /api/script-custom-nodes/{id}", h.deleteCustomNode)
@@ -408,4 +409,17 @@ func (h *Handler) deleteCustomNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// installStarters puts the library's starting nodes (the former samples) into the workspace; the ones it already has stay.
+func (h *Handler) installStarters(w http.ResponseWriter, r *http.Request) {
+	if !h.RequireOwner(w, r, "create custom nodes") {
+		return
+	}
+	made, err := h.Store.InstallStarters(r.Context())
+	if err != nil {
+		scriptErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"created": made})
 }

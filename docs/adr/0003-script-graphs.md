@@ -133,8 +133,18 @@ value as default). In a script it is the node `custom.<id>`; its parameters are 
   inside or exposed, no node contains itself or closes a loop through the nodes it uses. A node something uses is not deleted.
 - **Owner-only**, like scripts: it is user code. API `/api/script-custom-nodes`, MCP `script` actions `custom_*`.
 
-Not yet: editing a baked node in the UI (a code node is edited in its form; a baked one through the API), and the samples are
-still samples, not baked nodes.
+- **Starting library.** The samples are no longer a separate kind of thing a user picks from: `POST /api/script-custom-nodes/starters`
+  (MCP `custom_starters`) bakes each sample into a custom node (`graph.Starter`: its whole graph, the entity number as field
+  `entity_id`, the text of each `Code` node as `command`). A script that is one such node does what the sample did; «Новый
+  скрипт» and «Из ноды» in the step / note / template / hook forms make exactly that (the entity number goes into `entity_id`).
+  The samples stay in the server only as the source of the starters.
+- **Changing a baked node.** Name, description and the fields' labels and baked values are edited in the node's form; the inside
+  and the ports by «Развернуть в ноды» (the node's parts in its place, fields written in) and «Запечь» over the same node, which
+  updates it by number so the scripts that use it follow. A script whose node lost a port it used is reported by the validator
+  when opened.
+- **Export / import.** `custom_node` travels with the workspace; the numbers inside graphs are rewritten with the new ids
+  (`custom.N`, the `id` of sources, the baked default of a field that sets it). A source whose entity is not in the archive loses
+  its `id` (it then reads the entity the script is bound to) and is counted as a dangling reference.
 
 ### 7. Secrets
 
