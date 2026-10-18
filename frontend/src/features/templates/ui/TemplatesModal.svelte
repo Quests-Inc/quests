@@ -696,6 +696,7 @@
           </span>
           <ScriptPicker
             kind="template"
+            entityId={editing?.id}
             bind:value={emitScript}
             legacy={emitPoolCommand}
             onClearLegacy={() => (emitPoolCommand = '')}

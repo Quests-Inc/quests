@@ -127,6 +127,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     <div class="nc__body">
       <ScriptPicker
         kind="note"
+        entityId={noteId}
         bind:value={scriptId}
         legacy={command}
         onClearLegacy={() => {

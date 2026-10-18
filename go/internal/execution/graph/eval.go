@@ -23,8 +23,11 @@ type Ref struct {
 }
 
 // Secrets is the opaque token of a source's secrets: the evaluator only notes that a Code node takes them, the host puts
-// the values into the job's environment when the runner claims it.
-type Secrets struct{}
+// the values into the job's environment when the runner claims it. It names the entity the secrets are those of, so a
+// source with an id of its own hands over the secrets of that entity.
+type Secrets struct {
+	Of Ref `json:"of"`
+}
 
 // Token is what a link carries.
 type Token struct {
@@ -47,6 +50,8 @@ type CodeRequest struct {
 	Env map[string]string
 	// Secrets: the node takes the secrets of the source; the host resolves them when the job is claimed.
 	Secrets bool
+	// SecretsOf is the entity whose secrets those are (the source's ref); zero when the source did not name it.
+	SecretsOf Ref
 }
 
 // CodeOutcome is how a Code node's job ended: the port it leaves by and its text (stdout for `stdout`, the reason for
@@ -91,6 +96,11 @@ type Run struct {
 func NewRun(g Graph, reg Registry) (*Run, error) {
 	if err := g.Check(reg); err != nil {
 		return nil, err
+	}
+	for _, n := range g.Nodes {
+		if reg[n.Type].Kind == KindCustom {
+			return nil, fmt.Errorf("нода %d: пользовательские ноды разворачиваются до запуска (Expand)", n.ID)
+		}
 	}
 	r := &Run{
 		nodes: map[int]*resolved{}, feeds: map[int]map[string][]Edge{},
@@ -392,15 +402,16 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 
 // codeRequest builds what the runner needs from the values that arrived over links.
 func (r *Run) codeRequest(rs *resolved, ins map[string][]Token) (*CodeRequest, error) {
-	var p struct {
-		Language string `json:"language"`
-		Text     string `json:"text"`
-	}
+	var p codeParams
 	if err := strictParams(rs.node.Params, &p); err != nil {
 		return nil, err
 	}
 	req := &CodeRequest{Node: rs.node.ID, Text: p.Text, Language: p.Language, Env: map[string]string{}}
 	size := 0
+	for name, val := range p.Vars {
+		req.Env[name] = val // fixed variables first: a link into the same name cannot be there (QUESTS_IN_ is not a valid alias)
+		size += len(name) + len(val)
+	}
 	for i, tok := range ins["in"] {
 		if tok.Exit {
 			continue // an optional value that did not come
@@ -415,6 +426,9 @@ func (r *Run) codeRequest(rs *resolved, ins map[string][]Token) (*CodeRequest, e
 	}
 	if toks := ins["secrets"]; len(toks) == 1 && !toks[0].Exit {
 		req.Secrets = true
+		if sec, ok := toks[0].Value.(Secrets); ok {
+			req.SecretsOf = sec.Of
+		}
 	}
 	return req, nil
 }

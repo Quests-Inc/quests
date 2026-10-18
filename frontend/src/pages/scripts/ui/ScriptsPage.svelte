@@ -2,14 +2,16 @@
   import { untrack } from 'svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { loadScripts, scriptsList } from '@/entities/script'
+  import { candidates, customIdOf, codeSpecOf, loadScripts, PURPOSE_NONE, PURPOSES, purposeOfKind, scriptsList } from '@/entities/script'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
-  import { createScript, deleteScript, getScript, getScriptSamples, getScriptUses } from '@/shared/api/client.ts'
-  import type { ScriptUse } from '@/shared/api/execution.gen.ts'
+  import { createScript, deleteScript, getCustomNodes, getScript, getScriptSamples, getScriptUses } from '@/shared/api/client.ts'
+  import type { CustomNode, ScriptUse } from '@/shared/api/execution.gen.ts'
   import type { Sample } from '@/shared/api/scriptgraph.gen.ts'
   import { groupScripts } from '../model/groups.ts'
   import { createCanvas } from '../model/canvas.svelte.ts'
   import { createScriptEditor } from '../model/editor.svelte.ts'
+  import BakeModal from './BakeModal.svelte'
+  import CodeNodeModal from './CodeNodeModal.svelte'
   import Inspector from './Inspector.svelte'
   import Palette from './Palette.svelte'
   import ProblemList from './ProblemList.svelte'
@@ -33,7 +35,7 @@
   let menu = $state(false)
   let uses = $state<ScriptUse[]>([])
   let folded = $state<Set<string>>(new Set())
-  const groups = $derived(groupScripts(scriptsList.items, samples))
+  const groups = $derived(groupScripts(scriptsList.items, PURPOSES, PURPOSE_NONE))
   function fold(key: string) {
     const next = new Set(folded)
     if (!next.delete(key)) next.add(key)
@@ -74,7 +76,7 @@
     menu = false
     busy = true
     try {
-      const s = await createScript({ title: sample.title, description: sample.description, graph: sample.graph })
+      const s = await createScript({ title: sample.title, description: sample.description, purpose: purposeOfKind(sample.subject), graph: sample.graph })
       await loadScripts(true)
       await openScript(s.id)
     } catch (e) {
@@ -114,6 +116,35 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && selectedId != null) {
       e.preventDefault()
       void save()
+    }
+  }
+
+  // Custom nodes (quest=458): a node written as code, or the picked nodes baked into one.
+  let codeModal = $state<{ open: boolean; editing: CustomNode | null }>({ open: false, editing: null })
+  let bakeOpen = $state(false)
+  function newCode() {
+    codeModal.editing = null
+    codeModal.open = true
+  }
+  const bakeCandidates = $derived(bakeOpen ? candidates(ed.graph, ed.pickedIds()) : [])
+  const nodeTitle = (id: number) => {
+    const n = ed.graph.nodes.find((x) => x.id === id)
+    return n ? `${ed.meta(n.type).title} №${id}` : `№${id}`
+  }
+
+  async function editCustom(type: string) {
+    const id = customIdOf(type)
+    if (id == null) return
+    try {
+      const node = (await getCustomNodes()).find((n) => n.id === id)
+      if (!node) throw new Error('нода не найдена')
+      if (!codeSpecOf(node)) {
+        toast('Запечённую ноду пока правят через API или MCP (script custom_update)', { kind: 'error' })
+        return
+      }
+      codeModal = { open: true, editing: node }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
     }
   }
 </script>
@@ -203,15 +234,21 @@
           </button>
         </div>
       </div>
-      <input type="text" class="scripts__desc" bind:value={ed.description} placeholder="Описание (необязательно)" aria-label="Описание" />
+      <div class="scripts__meta">
+        <input type="text" class="scripts__desc" bind:value={ed.description} placeholder="Описание (необязательно)" aria-label="Описание" />
+        <select bind:value={ed.purpose} aria-label="Для чего скрипт" title="Для чего скрипт: по этому он попадает в списки выбора и в группы слева">
+          <option value="">общий</option>
+          {#each PURPOSES as p (p.id)}<option value={p.id}>{p.title}</option>{/each}
+        </select>
+      </div>
       {#if ed.error}<p class="scripts__err">{ed.error}</p>{/if}
       <div class="scripts__work">
-        <Palette {ed} {cv} />
+        <Palette {ed} {cv} onNewCode={newCode} />
         <div class="scripts__center">
           <ProblemList problems={ed.problems} label={nodeLabel} onPick={(n) => ed.select(n)} />
-          <ScriptCanvas {ed} {cv} />
+          <ScriptCanvas {ed} {cv} onNewCode={newCode} onBake={() => (bakeOpen = true)} />
         </div>
-        <Inspector {ed} />
+        <Inspector {ed} onEditCustom={(t) => void editCustom(t)} />
       </div>
       {#if uses.length}
         <p class="scripts__uses">
@@ -221,6 +258,23 @@
     {/if}
   </section>
 </div>
+
+<CodeNodeModal
+  open={codeModal.open}
+  editing={codeModal.editing}
+  onClose={() => (codeModal.open = false)}
+  onSaved={() => void ed.refreshInfos()}
+/>
+<BakeModal
+  open={bakeOpen}
+  count={ed.picked.size}
+  candidates={bakeCandidates}
+  {nodeTitle}
+  onClose={() => (bakeOpen = false)}
+  onBake={async (title, chosen) => {
+    await ed.bake(title, chosen)
+  }}
+/>
 
 <ConfirmModal
   open={ask?.kind === 'delete'}
@@ -406,6 +460,19 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
+  }
+  .scripts__meta {
+    display: flex;
+    gap: 0.6rem;
+  }
+  .scripts__meta input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+  .scripts__meta select {
+    flex: 0 0 11rem;
+    width: 11rem;
   }
   .scripts__title {
     flex: 1 1 14rem;

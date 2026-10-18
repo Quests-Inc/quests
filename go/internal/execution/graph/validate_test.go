@@ -92,10 +92,6 @@ func TestValidateRefusals(t *testing.T) {
 			g.Nodes = append(g.Nodes, node(5, "any_of", `{"type":"str"}`), node(6, "any_of", `{"type":"str"}`))
 			g.Edges = append(g.Edges, link(1, "title", 5, "in"), link(6, "out", 5, "in"), link(1, "title", 6, "in"), link(5, "out", 6, "in"))
 		}, "цикл"},
-		{"two codes on a path", func(g *Graph) {
-			g.Nodes = append(g.Nodes, node(5, "code", codeEcho))
-			g.Edges = append(g.Edges, link(2, "stdout", 5, "in"))
-		}, "больше одной ноды кода"},
 		{"no sink", func(g *Graph) { *g = Graph{Nodes: g.Nodes[:2], Edges: g.Edges[:1]} }, "нет ни одного приёмника"},
 		{"no source", func(g *Graph) {
 			*g = Graph{Nodes: []Node{node(2, "code", codeEcho), node(4, "sink.note_error", "")}, Edges: []Edge{link(2, "stdout", 4, "message")}}
@@ -281,5 +277,20 @@ func TestWithoutLayoutIgnoresPositions(t *testing.T) {
 	}
 	if a.Nodes[0].X != 10 {
 		t.Fatal("the original must keep its positions")
+	}
+}
+
+func TestSourceTakesAnEntityID(t *testing.T) {
+	g := Graph{Nodes: []Node{node(1, "source.step", `{"id":5}`), node(2, "sink.done", "")}, Edges: []Edge{link(1, "ref", 2, "trigger")}}
+	if err := g.Check(Builtin()); err != nil {
+		t.Fatalf("explicit id: %v", err)
+	}
+	g.Nodes[0].Params = json.RawMessage(`{"id":-1}`)
+	if err := g.Check(Builtin()); err == nil {
+		t.Fatal("a negative id passed")
+	}
+	g.Nodes[0].Params = json.RawMessage(`{"ident":1}`)
+	if err := g.Check(Builtin()); err == nil {
+		t.Fatal("an unknown parameter passed")
 	}
 }

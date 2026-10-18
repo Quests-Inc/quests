@@ -183,6 +183,12 @@ export function createCanvas(ed: ScriptEditor) {
     return ed.add(type, c.x - NODE_W / 2 + jitter, c.y - 50 + jitter)
   }
 
+  /** Put a new node where the pointer was (right-click menu): its top-left corner under the cursor. */
+  function addAtPoint(type: string, at: { clientX: number; clientY: number }) {
+    const w = gest.worldAt(at)
+    return ed.add(type, w.x, w.y)
+  }
+
   /** Middle of the minimap becomes the middle of the field. */
   function miniGo(e: { currentTarget: HTMLElement; clientX: number; clientY: number }) {
     const m = mini
@@ -229,6 +235,9 @@ export function createCanvas(ed: ScriptEditor) {
     watchSize,
     fit: refit,
     startLink,
+    cancelLink: () => {
+      pending = null
+    },
     finishLink,
     onBgDown,
     onWheel,
@@ -236,6 +245,7 @@ export function createCanvas(ed: ScriptEditor) {
     onUp,
     onKey,
     addAtCenter,
+    addAtPoint,
     miniGo,
   }
 }

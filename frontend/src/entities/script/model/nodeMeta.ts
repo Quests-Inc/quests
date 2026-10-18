@@ -1,7 +1,7 @@
 import type { Kind } from '@/shared/api/scriptgraph.gen.ts'
 
 /** The order node kinds are listed in the palette. */
-export const KIND_ORDER: Kind[] = ['source', 'code', 'parse', 'control', 'sink']
+export const KIND_ORDER: Kind[] = ['source', 'code', 'parse', 'control', 'sink', 'custom']
 
 export const KIND_TITLES: Record<string, string> = {
   source: 'Источники',
@@ -9,6 +9,7 @@ export const KIND_TITLES: Record<string, string> = {
   parse: 'Разбор',
   control: 'Управление',
   sink: 'Приёмники',
+  custom: 'Свои ноды',
 }
 
 /** The colour of a node's header by kind. */
@@ -18,6 +19,7 @@ export const KIND_COLORS: Record<string, string> = {
   parse: '#4aa3df',
   control: '#b06ad8',
   sink: '#d85a5a',
+  custom: '#3aa89a',
 }
 
 /** Parameters a node gets when it is added: a valid starting point the owner then edits. */

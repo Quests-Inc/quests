@@ -75,9 +75,14 @@ packages:
     exclude_files:
       - "store.go"
       - "durations.go"
+    frontmatter: |
+      import type { CustomField, CustomPort, Graph } from "./scriptgraph.gen";
     type_mappings:
       time.Time: "string"
       time.Duration: "number"
+      graph.CustomPort: "CustomPort"
+      graph.CustomField: "CustomField"
+      graph.Graph: "Graph"
   - path: "github.com/quests-inc/quests/go/internal/store"
     output_path: "../frontend/src/shared/api/store.gen.ts"
     exclude_files:
@@ -109,6 +114,7 @@ packages:
       - "graph.go"
       - "types.go"
       - "info.go"
+      - "custom.go"
       - "samples.go"
       - "validate.go"
     type_mappings:

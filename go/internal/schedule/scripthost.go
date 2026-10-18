@@ -24,10 +24,22 @@ func (r *CheckRunner) hostFor(s runSubject) graph.Host { return scriptHost{r: r,
 
 func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, error) {
 	kind := strings.TrimPrefix(n.Type, "source.")
-	if kind != h.subj.Type {
-		return nil, fmt.Errorf("источник %q в запуске для %q", kind, h.subj.Type)
+	// The source names its entity; without an id it reads the one the run was triggered for (the script's binding).
+	var sp graph.SourceParams
+	if len(n.Params) > 0 {
+		if err := json.Unmarshal(n.Params, &sp); err != nil {
+			return nil, fmt.Errorf("параметры источника: %w", err)
+		}
 	}
-	ref := graph.Ref{Kind: kind, ID: h.subj.ID}
+	id := sp.ID
+	if id == 0 {
+		if kind != h.subj.Type {
+			return nil, fmt.Errorf("источник %q без id в запуске для %q: укажите id сущности", kind, h.subj.Type)
+		}
+		id = h.subj.ID
+	}
+	ref := graph.Ref{Kind: kind, ID: id}
+	secrets := graph.Secrets{Of: ref}
 	evMap := h.subj.Event
 	if evMap == nil {
 		evMap = map[string]any{}
@@ -35,37 +47,37 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 	event := any(evMap)
 	switch kind {
 	case "note":
-		note, err := h.r.Store.Knowledge.GetNote(ctx, h.subj.ID)
+		note, err := h.r.Store.Knowledge.GetNote(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": note.Title, "event": event}, nil
+		return map[string]any{"ref": ref, "secrets": secrets, "title": note.Title, "event": event}, nil
 	case "template":
-		t, err := h.r.Store.Automation.TemplateRowByID(ctx, h.subj.ID)
+		t, err := h.r.Store.Automation.TemplateRowByID(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": t.Title, "period": h.subj.Period, "event": event}, nil
+		return map[string]any{"ref": ref, "secrets": secrets, "title": t.Title, "period": h.subj.Period, "event": event}, nil
 	case "step":
-		_, st, ok := h.r.stepByID(ctx, h.subj.ID)
+		_, st, ok := h.r.stepByID(ctx, id)
 		if !ok {
 			return nil, errors.New("шаг не найден")
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": st.Title, "description": st.Description,
+		return map[string]any{"ref": ref, "secrets": secrets, "title": st.Title, "description": st.Description,
 			"progress": st.ProgressCurrent, "total": st.ProgressTotal, "done": st.Done, "event": event}, nil
 	case "quest":
-		q, err := h.r.Store.Journal.GetQuest(ctx, h.subj.ID)
+		q, err := h.r.Store.Journal.GetQuest(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "title": q.Title, "status": string(q.Status),
+		return map[string]any{"ref": ref, "secrets": secrets, "title": q.Title, "status": string(q.Status),
 			"description": q.Description, "event": event}, nil
 	case "workspace":
-		name, err := h.r.Store.Execution.Identity.WorkspaceName(ctx, h.subj.ID)
+		name, err := h.r.Store.Execution.Identity.WorkspaceName(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": graph.Secrets{}, "name": name, "event": event}, nil
+		return map[string]any{"ref": ref, "secrets": secrets, "name": name, "event": event}, nil
 	}
 	return nil, fmt.Errorf("источник %q ещё не подключён", n.Type)
 }

@@ -197,3 +197,24 @@ func TestMarkTemplatesIgnoresParametersAndPositions(t *testing.T) {
 		t.Fatalf("templates: %v (sample %s)", got, sm.ID)
 	}
 }
+
+func TestScriptPurpose(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	sc, err := st.CreateScriptFor(ctx, "для заметок", "", "note", scriptGraph("echo 1"))
+	if err != nil || sc.Purpose != "note" {
+		t.Fatalf("create: %+v %v", sc, err)
+	}
+	if _, err := st.CreateScriptFor(ctx, "x", "", "bogus", scriptGraph("echo 1")); err == nil {
+		t.Fatal("an unknown purpose was accepted")
+	}
+	p := "hook"
+	sc2, err := st.UpdateScript(ctx, sc.ID, ScriptUpdate{Purpose: &p, ExpectedVersion: 1})
+	if err != nil || sc2.Purpose != "hook" || sc2.Version != 1 {
+		t.Fatalf("update: %+v %v", sc2, err)
+	}
+	plain, err := st.CreateScript(ctx, "без назначения", "", scriptGraph("echo 1"))
+	if err != nil || plain.Purpose != "" {
+		t.Fatalf("default purpose: %+v %v", plain, err)
+	}
+}

@@ -20,6 +20,7 @@
     runOn = $bindable(''),
     scriptId = $bindable(''),
     text = '',
+    stepId,
   }: {
     command?: string
     interval?: string
@@ -28,6 +29,8 @@
     runOn?: string
     scriptId?: string
     text?: string
+    /** The step itself, when it exists already: a script made here names it as its source. */
+    stepId?: number
   } = $props()
 
   const MODES = [
@@ -59,7 +62,7 @@
 
 <div class="autocheck formscope">
   <div class="autocheck__script">
-    <ScriptPicker kind="step" bind:value={scriptId} legacy={command} onClearLegacy={() => (command = '')} />
+    <ScriptPicker kind="step" entityId={stepId} bind:value={scriptId} legacy={command} onClearLegacy={() => (command = '')} />
   </div>
   <div class="autocheck__row">
     {#if hasCommand && runMode !== 'once'}

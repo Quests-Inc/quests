@@ -1,4 +1,4 @@
-import type { Script, ScriptUse } from './execution.gen'
+import type { CustomNode, Script, ScriptUse } from './execution.gen'
 import { request } from './http.ts'
 import type { Graph, NodeInfo, Port, Problem, Sample } from './scriptgraph.gen'
 
@@ -27,14 +27,14 @@ export function getScriptVersion(id: number, version: number) {
   return request<{ id: number; version: number; graph: Graph }>(`/api/scripts/${id}/versions/${version}`)
 }
 
-export function createScript(body: { title: string; description?: string; graph: Graph }) {
+export function createScript(body: { title: string; description?: string; purpose?: string; graph: Graph }) {
   return request<ScriptFull>('/api/scripts', { method: 'POST', body: JSON.stringify(body) })
 }
 
 /** `version` is the one the editor read; a newer one on the server answers 409. */
 export function updateScript(
   id: number,
-  body: { version: number; title?: string; description?: string; graph?: Graph }
+  body: { version: number; title?: string; description?: string; purpose?: string; graph?: Graph }
 ) {
   return request<ScriptFull>(`/api/scripts/${id}`, { method: 'PUT', body: JSON.stringify(body) })
 }
@@ -79,4 +79,31 @@ export function bindScript(kind: ScriptSubject, id: number, scriptId: number) {
 
 export function unbindScript(kind: ScriptSubject, id: number) {
   return request(`/api/${subjectPath(kind)}/${id}/script`, { method: 'DELETE' })
+}
+
+/** What the server takes to make or change a custom node (quest=458); `version` is the one the editor read. */
+export interface CustomNodeBody {
+  title: string
+  description?: string
+  version?: number
+  inputs: CustomNode['inputs']
+  outputs: CustomNode['outputs']
+  fields: CustomNode['fields']
+  graph: Graph
+}
+
+export function getCustomNodes() {
+  return request<CustomNode[]>('/api/script-custom-nodes')
+}
+
+export function createCustomNode(body: CustomNodeBody) {
+  return request<CustomNode>('/api/script-custom-nodes', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export function updateCustomNode(id: number, body: CustomNodeBody) {
+  return request<CustomNode>(`/api/script-custom-nodes/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+}
+
+export function deleteCustomNode(id: number) {
+  return request(`/api/script-custom-nodes/${id}`, { method: 'DELETE' })
 }

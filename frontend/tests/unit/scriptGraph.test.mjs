@@ -68,7 +68,7 @@ test('типы портов: те же правила, что на сервер�
 
 test('метаданные нод: порядок видов, стартовые параметры и операции сравнения', () => {
   expect(KIND_ORDER[0]).toBe('source')
-  expect(KIND_ORDER.at(-1)).toBe('sink')
+  expect(KIND_ORDER.at(-1)).toBe('custom')
   expect(defaultParams('compare')).toEqual({ type: 'int', op: 'ge', operand: 1 })
   expect(defaultParams('source.step')).toBeUndefined()
   expect(COMPARE_OPS.bool.map((o) => o.id)).toEqual(['eq'])
