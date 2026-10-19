@@ -3,9 +3,7 @@ import type { EmitPreview } from '@/shared/api/templates.ts'
 // Быстрые действия над шаблоном из списка и контекстного меню: включить/выключить, дублировать, эмитировать, скопировать ссылку.
 const messageOf = (e: unknown) => (e as { message?: string })?.message || String(e)
 
-type T = { id: number; enabled?: boolean; title?: string; script_id?: number | null; emit_pool_command?: string | null }
-
-const dynamic = (t: T) => Boolean(t.script_id || t.emit_pool_command)
+type T = { id: number; enabled?: boolean; title?: string }
 
 export function createTemplateActions(deps: {
   api: {
@@ -42,12 +40,11 @@ export function createTemplateActions(deps: {
 
   async function emit(t: T) {
     deps.setError('')
-    if (dynamic(t)) deps.notify('Ждём ответ устройства (до минуты)…', 'success', 3000)
     try {
       const q = await deps.api.emit(t.id)
       if (q.emitted === false) {
-        // The template's script or command made no quest this time (or the device has not answered): not a quest, not an error.
-        deps.notify(q.detail || 'Квест не создан', 'success', 6000)
+        // A template made by a script is queued for its device: the quest appears when the device answers (an event of its own).
+        deps.notify(q.detail || 'Выпуск поставлен в очередь', 'success', 6000)
         return
       }
       deps.onChanged()

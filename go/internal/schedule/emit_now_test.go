@@ -33,7 +33,7 @@ func TestManualEmitWaitsForTheScriptsQuest(t *testing.T) {
 	}()
 	defer stopped.Store(true)
 
-	qid, err := MaterializeTemplateManual(ctx, st, events.New(), tmpl.ID, time.Now(), rand.New(rand.NewSource(1)))
+	qid, err := materializeManual(ctx, st, events.New(), tmpl.ID, time.Now(), rand.New(rand.NewSource(1)), emitNowWait)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestManualEmitMakesNoQuestWithoutAnAnswer(t *testing.T) {
 				}()
 				defer stopped.Store(true)
 			}
-			_, err := MaterializeTemplateManual(ctx, st, events.New(), tmpl.ID, time.Now(), rand.New(rand.NewSource(1)))
+			_, err := materializeManual(ctx, st, events.New(), tmpl.ID, time.Now(), rand.New(rand.NewSource(1)), emitNowWait)
 			var es *EmitStatusError
 			if !errors.As(err, &es) || es.Code != tc.code || es.Outcome != tc.outcome {
 				t.Fatalf("want %d %s, got %v", tc.code, tc.outcome, err)
@@ -115,4 +115,32 @@ func TestPreviewEmitCreatesNothing(t *testing.T) {
 	if _, err := PreviewEmit(ctx, st, plain.ID, time.Now()); !errors.As(err, &es) || es.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("a template with no script or command: %v", err)
 	}
+}
+
+// The manual emit of a dynamic template does not wait: it answers «queued» at once, and the quest appears when the device
+// has answered.
+func TestManualEmitIsQueuedAndTheQuestAppearsLater(t *testing.T) {
+	fastEmit(t)
+	st, tmpl := scriptedTemplate(t, `echo '{"title":"Из скрипта","steps":[{"title":"Письмо"}]}'`)
+	ctx := bg()
+	qid, err := MaterializeTemplateManual(ctx, st, events.New(), tmpl.ID, time.Now(), rand.New(rand.NewSource(1)))
+	var es *EmitStatusError
+	if !errors.As(err, &es) || es.Code != http.StatusAccepted || es.Outcome != OutcomeQueued || qid != 0 {
+		t.Fatalf("want queued, got %d %v", qid, err)
+	}
+	if n, _ := st.Journal.ListQuests(ctx, journal.ListFilter{}); len(n) != 0 {
+		t.Fatalf("a quest before the device answered: %+v", n)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		runQueuedJobs(t, st, nil)
+		if n, _ := st.Journal.ListQuests(ctx, journal.ListFilter{}); len(n) == 1 {
+			if n[0].Title != "Из скрипта" {
+				t.Fatalf("the quest: %+v", n[0])
+			}
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("the quest did not appear")
 }

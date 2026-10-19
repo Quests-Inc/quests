@@ -31,7 +31,13 @@ const (
 	OutcomeMiss    = "miss"
 	OutcomeFailed  = "failed"
 	OutcomePending = "pending"
+	// OutcomeQueued: the emit was put on its way and nobody waits for it.
+	OutcomeQueued = "queued"
 )
+
+// manualEmitBackgroundWait is how long a manual emit that nobody waits for keeps looking for its device's answer; the job
+// itself stops waiting for the device after three minutes.
+const manualEmitBackgroundWait = 4 * time.Minute
 
 // EmitStatusError is an emit that made no quest, with how the API should say so. The HTTP layer reads it through EmitStatus.
 type EmitStatusError struct {

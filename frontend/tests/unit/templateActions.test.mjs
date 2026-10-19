@@ -64,11 +64,10 @@ test('copyRef копирует template=id', async () => {
   ])
 })
 
-test('эмит динамического шаблона: ждём устройство, пустой ответ — не квест и не ошибка', async () => {
-  const a = make('', null, { emitted: false, detail: 'Квеста сейчас нет' })
-  await a.act.emit({ id: 5, title: 'Почта', script_id: 13 })
-  expect(a.log).toContainEqual(['notify', 'Ждём ответ устройства (до минуты)…', 'success'])
-  expect(a.log).toContainEqual(['notify', 'Квеста сейчас нет', 'success'])
+test('эмит динамического шаблона ставится в очередь: ответ — не квест и не ошибка, квест придёт событием', async () => {
+  const a = make('', null, { emitted: false, outcome: 'queued', detail: 'Выпуск поставлен в очередь' })
+  await a.act.emit({ id: 5, title: 'Почта' })
+  expect(a.log).toContainEqual(['notify', 'Выпуск поставлен в очередь', 'success'])
   expect(a.log.some((x) => x[0] === 'changed')).toBe(false)
 })
 
