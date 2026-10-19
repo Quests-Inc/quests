@@ -249,7 +249,8 @@ func TestSamplesAndImplicitGraphsAreValid(t *testing.T) {
 		if err := s.Graph.Check(Builtin()); err != nil {
 			t.Errorf("sample %q: %v", s.ID, err)
 		}
-		if got := s.Graph.Subjects(); len(got) != 1 || got[0] != s.Subject {
+		// A text sample (an embedded script) reads no entity: it takes its arguments from the text it is embedded in.
+		if got := s.Graph.Subjects(); s.Subject == "text" && len(got) != 0 || s.Subject != "text" && (len(got) != 1 || got[0] != s.Subject) {
 			t.Errorf("sample %q: reads %v, says %s", s.ID, got, s.Subject)
 		}
 		if s.Graph.RunsOnRunner() != s.NeedsRunner {

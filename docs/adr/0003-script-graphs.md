@@ -146,6 +146,37 @@ value as default). In a script it is the node `custom.<id>`; its parameters are 
   (`custom.N`, the `id` of sources, the baked default of a field that sets it). A source whose entity is not in the archive loses
   its `id` (it then reads the entity the script is bound to) and is counted as a dangling reference.
 
+### 6b. Embedded evaluation: `script=N` inside text (quest=471)
+
+A script can be called from a markdown text (a note, a step) to compute a value on the spot, for example a dice roll
+`5+3к8` in a lore note. Decided with the owner on 2026-10-19.
+
+- **Entry and exit without an entity.** Two new nodes. `Args` (source): declares named, typed parameters (`expr: str`); the values
+  come from the place of the embedding, so one script serves any number of embeddings. `Result` (sink): hands one `str` back to
+  the caller and changes nothing. The embedding is `script=N` with the arguments (query form, `script=12?expr=3к8`).
+- **Synchronous, server-only.** `POST /api/scripts/{id}/eval {args}` returns the value. It queues no job and writes nothing. A
+  graph that holds a `Code` node is refused for embedding (an asynchronous mode is a later decision). The value is not stored:
+  it lives in the page until it is thrown again.
+- **No notation in the server.** Dice are not built in; the notation is a table of **operators** in the arithmetic node, written
+  by the owner. Nodes:
+  - `Expr`: arithmetic over named inputs (`a + b*2`), with its own precedence-climbing parser (no eval). Core: `+ - * / %`,
+    parentheses, unary minus, `min max floor ceil round abs`, `rand(lo, hi)` / `randf(lo, hi)` and the repeaters `sum(n, e)`,
+    `rmax(n, e)`, `rmin(n, e)` (`n` is read once, `e` is evaluated afresh on every repeat). The expression is a parameter or, when
+    that is empty, the input `expr`. Outputs `value` (float) and `text` (str: `24`, not `24.0`).
+  - **Operators** (`Expr` parameter `operators`): `{symbol, arity (1 prefix | 2 infix), prec (1..9), right?, def}`. `def` is an
+    expression over `a` (and `b`) made of the core only: an operator cannot call itself or another user operator, so there is no
+    recursion. `+ -` are precedence 1, `* / %` 2, unary minus 3. `{symbol: "к", arity: 2, prec: 5, def: "sum(a, rand(1, b))"}` makes
+    `3к8` a roll of three eight-sided dice; `{symbol: "к", arity: 1, def: "rand(1, a)"}` makes `к8` one die. Another notation
+    (`d`, advantage, exploding dice) is another row, not another server release.
+  - `Random`: an integer or float in a range, or a pick from a list; `count` repeats it and `aggregate` folds the results (for
+    graphs that need a roll as a node of its own).
+  - `Regex`: modes `match` and `groups`; RE2 only. (A replace-with-handler mode was built first and removed: the operator table
+    does the job with no nested graph.)
+  - `5+3к8` is then `Args → Expr(operators: к, d) → Result`: three nodes (the starter «Текст: кости»).
+- **Limits** (so the nodes cannot be used to burn the server): expression length (500), nesting depth (32), operators per node (8),
+  repeats per `sum` / `Random` (1000), rolls per call (5000), evaluations per call (100000), a time cap on `eval` (2 s) and 8 evaluations at a time.
+- **Not now:** a default runner (all of this is trusted and needs none), `list<T>` with `Map` / `Fold`.
+
 ### 7. Secrets
 
 - The owner kinds get a fifth: **`workspace`** (a secret row owned by the workspace itself). The chain is now

@@ -52,7 +52,7 @@ type Script struct {
 }
 
 // ScriptPurposes are the values Purpose may take besides "".
-var ScriptPurposes = []string{"step", "note", "template", "hook"}
+var ScriptPurposes = []string{"step", "note", "template", "hook", "embed"}
 
 func checkPurpose(p string) error {
 	if p == "" {
@@ -63,7 +63,7 @@ func checkPurpose(p string) error {
 			return nil
 		}
 	}
-	return errBad("назначение скрипта: step, note, template, hook или пусто")
+	return errBad("назначение скрипта: step, note, template, hook, embed или пусто")
 }
 
 // ScriptUpdate is a change to a script. Graph nil leaves the graph as it is; ExpectedVersion is the version the editor

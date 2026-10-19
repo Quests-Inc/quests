@@ -33,6 +33,7 @@
     onStartEdit,
     onFinishEdit,
     onOpen,
+    labels = {},
     onOpenMore,
     onShowChanges,
   }: {
@@ -62,6 +63,8 @@
     onStartEdit(n: GraphNodeView): void
     onFinishEdit: (save: boolean) => void
     onOpen?: (kind: string, id: number) => void
+    /** Подписи ссылок kind:id → заголовок, те же что в обычном просмотре. */
+    labels?: Record<string, string>
     onOpenMore(n: GraphNodeView, type: string): void
     onShowChanges: (key: string) => void
   } = $props()
@@ -190,7 +193,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
           </div>
           {#if n.desc && tier !== 'title'}
             <div class="gcard__body" style:max-height="{big ? CARD[n.type].max : CARD.stepBody.max}px">
-              <MarkdownBody source={n.desc} labels={{}} onRef={(k, id) => onOpen?.(k, id)} />
+              <MarkdownBody source={n.desc} {labels} onRef={(k, id) => onOpen?.(k, id)} />
             </div>
           {/if}
         {:else}

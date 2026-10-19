@@ -19,6 +19,14 @@ export function getScripts() {
   return request<Script[]>('/api/scripts')
 }
 
+/** Run a script made of server nodes only (Args … Result) and get its value; nothing is saved. */
+export function evalScript(id: number, args: Record<string, string>) {
+  return request<{ value: string; version: number }>(`/api/scripts/${id}/eval`, {
+    method: 'POST',
+    body: JSON.stringify({ args }),
+  })
+}
+
 export function getScript(id: number) {
   return request<ScriptFull>(`/api/scripts/${id}`)
 }

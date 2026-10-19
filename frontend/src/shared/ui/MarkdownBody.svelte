@@ -4,6 +4,9 @@
   import { parseRefHref } from '@/shared/lib/refs.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { tailFade } from '@/shared/lib/typewriter.ts'
+  import { refPreview } from '@/shared/lib/refPreview.ts'
+  import { scriptEmbed } from '@/shared/lib/scriptEmbed.ts'
+  import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
   import copySvg from '@/assets/icons/copy.svg?raw'
   import checkSvg from '@/assets/icons/checkmark.svg?raw'
 
@@ -108,6 +111,9 @@
     bind:this={root}
     onclick={onClick}
     use:captureImgErrors
+    use:refIcons
+    use:scriptEmbed
+    use:refPreview={onRef}
     use:tailFade={typing}
   >{@html html}</div>
 {/if}

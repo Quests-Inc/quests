@@ -56,6 +56,8 @@ func Builtin() Registry {
 	add(NodeType{Name: "any_of", Title: "Любой из", Kind: KindControl, Trusted: true, Ports: anyOfPorts})
 	add(NodeType{Name: "all_of", Title: "Каждый из", Kind: KindControl, Trusted: true, Ports: allOfPorts})
 
+	registerEmbed(add)
+
 	sink := func(name, title string, params func(json.RawMessage) error, in ...Port) {
 		ports := func(p json.RawMessage) ([]Port, []Port, error) {
 			if params != nil {

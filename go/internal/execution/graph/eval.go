@@ -90,6 +90,8 @@ type Run struct {
 	failures map[int]string
 	tokens   map[End]Token
 	outcomes map[int]CodeOutcome
+	// budget: set for an embedded evaluation (Random counts its rolls, Regex its handlers' depth).
+	budget *budget
 }
 
 // NewRun prepares a run of the graph; a graph that does not validate cannot run.
@@ -386,6 +388,12 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 			}
 		case "all_of":
 			out = map[string]Token{"out": {Type: TAny, Value: true}}
+		case "expr":
+			out, err = runExpr(rs, ins, r.budgetOrNew())
+		case "random":
+			out, err = runRandom(rs, ins, r.budgetOrNew())
+		case "regex":
+			out, err = runRegex(rs, ins["in"][0])
 		}
 		if err != nil {
 			return nil, err
@@ -398,6 +406,13 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 		set(nil)
 	}
 	return nil, nil
+}
+
+func (r *Run) budgetOrNew() *budget {
+	if r.budget == nil {
+		r.budget = &budget{}
+	}
+	return r.budget
 }
 
 // codeRequest builds what the runner needs from the values that arrived over links.

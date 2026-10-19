@@ -27,6 +27,7 @@
     rootId = null,
     nonce = 0,
     questlines = [],
+    labels = {},
     onCenter,
     onOpen,
   }: {
@@ -35,6 +36,7 @@
     rootId?: number | null
     nonce?: number
     questlines?: { id: number; title?: string }[]
+    labels?: Record<string, string>
     onCenter?: (type: string | null, id: number | null) => void
     onOpen?: (kind: string, id: number) => void
   } = $props()
@@ -369,6 +371,7 @@
     {onGroupCtx}
     {onEdgeCtx}
     {onOpen}
+    {labels}
     onStartEdit={startEditNote}
     onFinishEdit={finishEdit}
     onShowChanges={showChanges}

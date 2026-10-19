@@ -106,8 +106,12 @@ func TestInstallStartersMakesTheSamplesNodes(t *testing.T) {
 	if err != nil || len(made) != len(graph.Samples()) {
 		t.Fatalf("install: %d %v", len(made), err)
 	}
+	text := map[string]bool{} // a sample for embedding in a text reads no entity: its arguments come from the text
+	for _, sm := range graph.Samples() {
+		text[sm.Title] = sm.Subject == "text"
+	}
 	for _, n := range made {
-		if n.Problem != "" || len(n.Subjects) == 0 {
+		if n.Problem != "" || len(n.Subjects) == 0 && !text[n.Title] {
 			t.Fatalf("a starter that does not resolve or names no entity: %+v", n)
 		}
 	}

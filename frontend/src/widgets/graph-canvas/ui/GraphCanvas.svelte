@@ -32,6 +32,7 @@
     onGroupCtx,
     onEdgeCtx,
     onOpen,
+    labels = {},
     onStartEdit,
     onFinishEdit,
     onShowChanges,
@@ -57,6 +58,7 @@
     onGroupCtx: (e: MouseEvent, g: { type: string; owner: string }) => void
     onEdgeCtx: (e: MouseEvent, edge: { from: string; to: string; kind: string }) => void
     onOpen?: (kind: string, id: number) => void
+    labels?: Record<string, string>
     onStartEdit: (n: { key: string }) => void
     onFinishEdit: (saveIt: boolean) => void
     onShowChanges: (key: string) => void
@@ -136,6 +138,7 @@
         {onStartEdit}
         {onFinishEdit}
         {onOpen}
+        {labels}
         onOpenMore={stage.openMore}
         {onShowChanges}
       />

@@ -229,6 +229,18 @@
   text-decoration: underline;
 }
 
+/* Иконка сущности перед именем ссылки (см. shared/lib/refIcons.svelte.ts); цвет — текущий цвет ссылки. */
+.md-ref__ico {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.25em;
+  vertical-align: -0.12em;
+  background-color: currentColor;
+  -webkit-mask: var(--ref-ico) center / contain no-repeat;
+  mask: var(--ref-ico) center / contain no-repeat;
+}
+
 .md table {
   display: block;
   width: max-content;
@@ -277,4 +289,64 @@
   margin: 0 0 var(--space-5, 1.5rem);
   padding: 0 0 var(--space-4, 1rem);
   border-bottom: 2px solid var(--color-border-strong, #4a4a4a);
+}
+
+/* Wiki-превью ссылки (shared/lib/refPreview.ts). Попап в body, поверх карты и модалок. */
+.ref-preview {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(22rem, calc(100vw - 16px));
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 8px;
+  background: var(--color-surface, #1c1c1c);
+  color: var(--color-text, inherit);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.4;
+}
+.ref-preview__head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.ref-preview__type {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.ref-preview__meta {
+  margin-top: 0.2rem;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+.ref-preview__body {
+  margin-top: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.ref-preview__open {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent, #c9a227);
+  font: inherit;
+  cursor: pointer;
+}
+.ref-preview__open:hover {
+  text-decoration: underline;
+}
+
+/* Живая вставка script=N{…} (shared/lib/scriptEmbed.ts): клик считает и подставляет значение. */
+.md-script {
+  border-bottom: 1px dashed currentColor;
+  text-decoration: none;
+  cursor: pointer;
+}
+.md-script--busy {
+  opacity: 0.6;
+}
+.md-script--err {
+  color: var(--color-danger, #d85a5a);
 }

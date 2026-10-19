@@ -116,6 +116,16 @@ What a plain `check_command` stands for is an *implicit graph* built in `scriptr
 
 Jobs queued before runs existed have no `run_id` and are served by the older kinds until they finish.
 
+### Computing inside a text: `script=N{…}`
+
+A markdown text (a note, a step, the map's cards) may hold `script=12{5+3к8}`: a live link that, on click, calls script 12 with the
+text in braces and shows `5+3к8 = 19`; a next click throws again, nothing is stored. The script is `Args → … → Result` made of
+server nodes only (`expr`, `random`, `regex`, `compare`, `parse`…); a graph with a `Code` node is refused. The text goes to the first
+parameter of `Args` (`POST /api/scripts/{id}/eval {"args": {"_": "…"}}`, or named args; MCP `script` action `eval`).
+Dice are not a feature of the server: the example script is `Args → Expr → Result`, and the `Expr` node has a table of operators
+(`к`: `sum(a, rand(1, b))` for «N dice with b sides», `к` as a prefix for one die; the same for `d`), so `5+3к8` is parsed by precedence and computed in one node.
+Limits and the reasoning: ADR-0003 §6b.
+
 ## Known exceptions (to be removed or kept deliberately)
 
 - **Event hooks** are workspace rows (`hook` + a library script). Matching events enqueue a `script_run` / runner job;

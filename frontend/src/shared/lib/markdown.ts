@@ -183,6 +183,8 @@ function ensureLinkHook() {
   })
 }
 
+const SCRIPT_EMBED_RE = /\bscript=(\d+)\{([^{}[\]\n]{1,200})\}/g
+
 function splitCode(src: string) {
   return String(src || '').split(/(```[\s\S]*?```|`[^`]+`)/)
 }
@@ -194,6 +196,8 @@ function linkifyRefs(source: string, opts: { labels?: Record<string, string> } =
       if (i % 2 === 1) return part
       const chunk = part
         .replace(ATTACHMENT_IMG_RE, (_, alt, id) => `![${alt}](${attachmentImageSrc(id)})`)
+        // `script=12{3к8}`: a live computation (shared/lib/scriptEmbed.ts); the text in braces is the script's argument.
+        .replace(SCRIPT_EMBED_RE, (_, id, arg) => `[${arg.trim()}](?script=${id}&_=${encodeURIComponent(arg.trim())})`)
         .replace(REF_RE, (full, kind, id) => {
           const label = labels[`${kind}:${id}`] || full
           return `[${label}](${refHref(kind, id)})`

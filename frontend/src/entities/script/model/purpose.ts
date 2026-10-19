@@ -4,11 +4,13 @@ export const PURPOSES = [
   { id: 'note', title: 'Заметки', color: '#7a9e3a' },
   { id: 'template', title: 'Шаблоны', color: '#c47a20' },
   { id: 'hook', title: 'Хуки', color: '#b06ad8' },
+  { id: 'embed', title: 'Вставки в текст', color: '#3aa89a' },
 ] as const
 
 export const PURPOSE_NONE = { id: '', title: 'Общие', color: '#8a8a8a' }
 
 /** The purpose a script made for this kind of entity gets (a picker's `kind`, a sample's subject). */
 export function purposeOfKind(kind: string): string {
+  if (kind === 'text') return 'embed'
   return kind === 'quest' || kind === 'workspace' ? 'hook' : kind
 }
