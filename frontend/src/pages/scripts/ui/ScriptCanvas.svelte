@@ -33,6 +33,11 @@
     onInsert?: (kind: 'sample' | 'script', id: string | number, at: { clientX: number; clientY: number }) => void
   } = $props()
 
+  $effect(() => {
+    cv.sync()
+  })
+  $effect(() => cv.watchSize())
+
   // Right click: on a card, what can be done to it (to all the picked ones, when it is one of several); on the bare field, what can be
   // added: «Добавить ноду» → a group of the catalogue → a node; «Добавить граф» → whole samples or scripts, unfolded.
   let menu = $state<{ open: boolean; x: number; y: number; node: number | null }>({ open: false, x: 0, y: 0, node: null })
