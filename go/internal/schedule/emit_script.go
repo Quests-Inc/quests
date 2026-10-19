@@ -33,6 +33,7 @@ type settledEmit struct {
 	Closed  bool          `json:"closed,omitempty"`
 	RollID  int64         `json:"roll_id,omitempty"`
 	FailMsg string        `json:"fail_msg,omitempty"`
+	Err     string        `json:"err,omitempty"` // why this attempt failed, retried or not
 	Spec    *resolvedSpec `json:"spec,omitempty"`
 }
 
@@ -99,7 +100,7 @@ func (r *CheckRunner) sinkTemplate(ctx context.Context, subj runSubject, n graph
 	if err != nil {
 		return err
 	}
-	raw, err := json.Marshal(settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Spec: res.Spec})
+	raw, err := json.Marshal(settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Err: res.Err, Spec: res.Spec})
 	if err != nil {
 		return err
 	}
@@ -142,7 +143,7 @@ func driveEmit(ctx context.Context, r *CheckRunner, tmpl templateRow, period str
 		tid := tmpl.ID
 		if _, serr := r.startRun(ctx, ref, scriptID, g, runSubject{Type: "template", ID: tmpl.ID, Period: period, Now: now}, runBinding{
 			Label: label, Kind: execution.JobKindEmitPool, Title: "шаблон: " + tmpl.Title,
-			Dedupe: dedupe, Timeout: emitPoolTimeout, ValidFor: emitJobValidFor, TemplateID: &tid, Key: key,
+			Dedupe: dedupe, Timeout: emitPoolTimeout, ValidFor: emitJobValidity(period), TemplateID: &tid, Key: key,
 		}); serr != nil {
 			return emitResult{}, false, serr
 		}
@@ -184,7 +185,7 @@ func driveEmit(ctx context.Context, r *CheckRunner, tmpl templateRow, period str
 	if derr := st.Execution.DeleteRun(ctx, run.ID); derr != nil {
 		log.Printf("emit: delete run %d: %v", run.ID, derr)
 	}
-	return emitResult{Spec: settled.Spec, RollID: settled.RollID, FailMsg: settled.FailMsg}, true, nil
+	return emitResult{Spec: settled.Spec, RollID: settled.RollID, FailMsg: settled.FailMsg, Err: settled.Err}, true, nil
 }
 
 // readSettledEmit is the sink's decision, or — for a run the previous release left in the mailbox — the same decision
@@ -197,10 +198,10 @@ func readSettledEmit(ctx context.Context, st *store.Store, tmpl templateRow, per
 				msg = "запуск скрипта не удался"
 			}
 			res, err := settleEmitAttempt(ctx, st, tmpl, period, now, emitOutput{}, execInfo{Status: "error"}, errors.New("запуск скрипта не удался: "+msg))
-			return settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Spec: res.Spec}, err
+			return settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Err: res.Err, Spec: res.Spec}, err
 		}
 		res, err := settleEmitAttempt(ctx, st, tmpl, period, now, emitOutput{Nothing: true}, execInfo{Status: "ok"}, nil)
-		return settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Spec: res.Spec}, err
+		return settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Err: res.Err, Spec: res.Spec}, err
 	}
 	var probe map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(run.Result), &probe); err != nil {
@@ -237,7 +238,7 @@ func readSettledEmit(ctx context.Context, st *store.Store, tmpl templateRow, per
 		}
 	}
 	res, err := settleEmitAttempt(ctx, st, tmpl, period, now, out, info, execErr)
-	return settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Spec: res.Spec}, err
+	return settledEmit{Applied: true, RollID: res.RollID, FailMsg: res.FailMsg, Err: res.Err, Spec: res.Spec}, err
 }
 
 // emitUsesPool says whether a template makes its quest by a command or a script, not from its own fields.

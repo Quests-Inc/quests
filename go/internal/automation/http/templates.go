@@ -118,6 +118,17 @@ func (h *Handler) emitTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "Template not found")
 		return
 	}
+	var es emitStatus
+	if errors.As(err, &es) {
+		status, outcome, detail := es.EmitStatus()
+		if status >= 400 {
+			writeErr(w, status, detail)
+			return
+		}
+		// Nothing to create is an answer, not an error: 200 for «no quest this time», 202 for «still waiting».
+		writeJSON(w, status, map[string]any{"emitted": false, "outcome": outcome, "detail": detail})
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -148,4 +159,32 @@ func (h *Handler) getTemplateStreak(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, row)
+}
+
+// emitTest runs the template's emit on its device with its secrets and answers what quest it would make; nothing is created.
+func (h *Handler) emitTest(w http.ResponseWriter, r *http.Request) {
+	if !h.RequireOwner(w, r, "test a template's emit") {
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id < 1 {
+		writeErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	out, err := h.PreviewEmit(r.Context(), id, timeutil.NowUTC())
+	if errors.Is(err, h.ErrTemplateNotFound) {
+		writeErr(w, http.StatusNotFound, "Template not found")
+		return
+	}
+	var es emitStatus
+	if errors.As(err, &es) {
+		status, _, detail := es.EmitStatus()
+		writeErr(w, status, detail)
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }

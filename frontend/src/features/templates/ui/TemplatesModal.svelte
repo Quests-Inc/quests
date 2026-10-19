@@ -4,7 +4,7 @@
     WEEKDAY_LABELS,
     QUEST_SIGNIFICANCES,
     copyTemplate,
-    emitTemplate,
+    emitTemplate, emitTemplateTest,
     createTemplate,
     deleteTemplate,
     getTemplateStreak,
@@ -445,13 +445,13 @@
     if (action === 'copy-id') await actions.copyRef(t)
     else if (action === 'edit') openEdit(t)
     else if (action === 'emit') await onEmit(t)
+    else if (action === 'emit-test') await actions.test(t)
     else if (action === 'duplicate') await onCopy(t)
     else if (action === 'toggle') await onToggleEnabled(t)
     else if (action === 'secrets') onOpenSecrets?.(t.id)
   }
 
-  // A template=N link opens the modal straight on that template's edit form —
-  // once per opening, so going back to the list stays on the list.
+  // A template=N link opens the modal on that template's edit form, once per opening.
   let focusApplied = false
   $effect(() => {
     if (!open) {
@@ -466,7 +466,7 @@
   })
 
   const actions = createTemplateActions({
-    api: { update: updateTemplate, copy: copyTemplate, emit: emitTemplate },
+    api: { update: updateTemplate, copy: copyTemplate, emit: emitTemplate, test: emitTemplateTest },
     refresh: () => refresh(),
     onChanged: () => onChanged(),
     setError: (m) => (error = m),

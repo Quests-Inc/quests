@@ -32,13 +32,19 @@ export function rowMeta(t: TemplateRead, streak?: Streak): string {
     .join(' · ')
 }
 
-export function templateMenuItems(t: { id: number; enabled?: boolean } | null) {
+export function templateMenuItems(
+  t: { id: number; enabled?: boolean; script_id?: number | null; emit_pool_command?: string | null } | null
+) {
   if (!t) return []
   return [
     { id: 'copy-id', label: `Копировать template=${t.id}` },
     { id: 'sep-copy', sep: true },
     { id: 'edit', label: 'Редактировать' },
     { id: 'emit', label: 'Эмитировать сейчас' },
+    // A template that makes its quest by a script or a command can be tried on its device, with its secrets, creating nothing.
+    ...(t.script_id || t.emit_pool_command
+      ? [{ id: 'emit-test', label: 'Проверить выпуск (квест не создаётся)' }]
+      : []),
     { id: 'duplicate', label: 'Дублировать (копия выключена)' },
     { id: 'toggle', label: t.enabled ? 'Выключить' : 'Включить' },
     { id: 'sep-secrets', sep: true },

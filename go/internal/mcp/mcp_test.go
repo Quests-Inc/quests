@@ -641,3 +641,18 @@ func TestDryRunEmitScript(t *testing.T) {
 		t.Fatalf("ambiguous: %s", text)
 	}
 }
+
+func TestDryRunOnRunnerCallsTheTestEndpoint(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{"POST /api/templates/5/emit-test": `{"outcome":"quest","title":"Почта","steps":[{"title":"а"}]}`}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "dry_run_emit_pool", `{"template_id":5,"on_runner":true}`),
+		call(2, "dry_run_emit_pool", `{"command":"true","on_runner":true}`),
+	)
+	if text, isErr := result(t, resps[0]); isErr || !strings.Contains(text, `"outcome":"quest"`) {
+		t.Fatalf("on runner: %s", text)
+	}
+	if text, isErr := result(t, resps[1]); !isErr || !strings.Contains(text, "on_runner needs template_id") {
+		t.Fatalf("command on runner: %s", text)
+	}
+}

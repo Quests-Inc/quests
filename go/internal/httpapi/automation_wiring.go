@@ -25,6 +25,9 @@ func (s *Server) automationHTTP() *automationhttp.Handler {
 			EmitTemplate: func(ctx context.Context, id int64, now time.Time) (int64, error) {
 				return schedule.MaterializeTemplateManual(ctx, s.Store, s.Hub, id, now, nil)
 			},
+			PreviewEmit: func(ctx context.Context, id int64, now time.Time) (any, error) {
+				return schedule.PreviewEmit(ctx, s.Store, id, now)
+			},
 			ErrTemplateNotFound: schedule.ErrTemplateNotFound,
 		}
 	})

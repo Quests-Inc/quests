@@ -32,3 +32,9 @@ test('templateMenuItems: пусто без шаблона; подпись вкл
   expect(templateMenuItems({ id: 7 }).find((i) => i.id === 'toggle').label).toBe('Включить')
   expect(templateMenuItems({ id: 7 })[0].label).toBe('Копировать template=7')
 })
+
+test('templateMenuItems: проверка выпуска только у шаблона со скриптом или командой', () => {
+  expect(templateMenuItems({ id: 7 }).some((i) => i.id === 'emit-test')).toBe(false)
+  expect(templateMenuItems({ id: 7, script_id: 13 }).some((i) => i.id === 'emit-test')).toBe(true)
+  expect(templateMenuItems({ id: 7, emit_pool_command: 'echo' }).some((i) => i.id === 'emit-test')).toBe(true)
+})

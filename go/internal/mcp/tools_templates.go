@@ -191,11 +191,23 @@ func templateTools(c *Client) []Tool {
 	type dryArgs struct {
 		Command    *string `json:"command,omitempty" desc:"text to try"`
 		TemplateID *int64  `json:"template_id,omitempty" desc:"or: use this template's emit script (its Code node) or stored command"`
+		OnRunner   bool    `json:"on_runner,omitempty" desc:"with template_id: run it for real on the template's device, with its secrets (what Test emit does in the web); creates no quest, waits up to a minute"`
 	}
-	dry := Typed("dry_run_emit_pool", "Run an emit command here, like the scheduler would (20 s limit, no quest created, real side effects of the script do happen) and show the quest it prints. Give command or template_id: a template with an emit script runs that script's Code node (its fixed variables set), otherwise its emit_pool_command. Template secrets are not readable, so a command that needs them only works if they are in this machine's environment. A green result does not prove it works on the runner device (other env, other tools).",
+	dry := Typed("dry_run_emit_pool", "Run an emit command here, like the scheduler would (20 s limit, no quest created, real side effects of the script do happen) and show the quest it prints. Give command or template_id: a template with an emit script runs that script's Code node (its fixed variables set), otherwise its emit_pool_command. Template secrets are not readable, so here a command that needs them only works if they are in this machine's environment; on_runner=true runs it on the template's device with its secrets instead. A green result does not prove it works on the runner device (other env, other tools).",
 		func(ctx context.Context, a dryArgs) (any, error) {
 			if (a.Command == nil) == (a.TemplateID == nil) {
 				return nil, &Err{422, "provide exactly one of: command, template_id"}
+			}
+			if a.OnRunner {
+				if a.TemplateID == nil {
+					return nil, &Err{422, "on_runner needs template_id"}
+				}
+				var out map[string]any
+				if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/templates/%d/emit-test", *a.TemplateID), nil, map[string]any{}, &out); err != nil {
+					return nil, err
+				}
+				out["workspace"] = c.Workspace(ctx)
+				return out, nil
 			}
 			cmd := ""
 			if a.Command != nil {
