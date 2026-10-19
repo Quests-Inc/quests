@@ -1,6 +1,8 @@
 <script lang="ts">
   import DOMPurify from 'dompurify'
   import { tailFade } from '@/shared/lib/typewriter.ts'
+  import { refPreview } from '@/shared/lib/refPreview.ts'
+  import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
   import { renderRefTextHtml, parseRefHref } from '@/shared/lib/refs.ts'
 
   let {
@@ -43,5 +45,5 @@
 
 {#if source}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <span class={className} onclick={onClick} use:tailFade={typing}>{@html html}</span>
+  <span class={className} onclick={onClick} use:tailFade={typing} use:refIcons use:refPreview={onRef}>{@html html}</span>
 {/if}

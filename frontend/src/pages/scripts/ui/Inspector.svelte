@@ -5,6 +5,10 @@
   import ChoiceParams from './params/ChoiceParams.svelte'
   import CodeParams from './params/CodeParams.svelte'
   import CompareParams from './params/CompareParams.svelte'
+  import ArgsParams from './params/ArgsParams.svelte'
+  import ExprParams from './params/ExprParams.svelte'
+  import RandomParams from './params/RandomParams.svelte'
+  import RegexParams from './params/RegexParams.svelte'
   import CustomParams from './params/CustomParams.svelte'
   import ParseParams from './params/ParseParams.svelte'
   import SourceParams from './params/SourceParams.svelte'
@@ -76,6 +80,14 @@
         <ChoiceParams params={node.params as never} field="result" options={RESULTS} label="Итог" onChange={set} />
       {:else if node.type === 'sink.template_error'}
         <ChoiceParams params={node.params as never} field="kind" options={KINDS} label="Вид ошибки" onChange={set} />
+      {:else if node.type === 'args'}
+        <ArgsParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'expr'}
+        <ExprParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'random'}
+        <RandomParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'regex'}
+        <RegexParams params={node.params as never} onChange={set} />
       {:else if node.type.startsWith('source.') && node.type !== 'source.workspace'}
         <SourceParams params={node.params as never} onChange={set} />
       {:else}

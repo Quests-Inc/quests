@@ -198,7 +198,6 @@
           class="notes__preview block--prose"
           class:notes__preview--doc={viewMode === 'formatted'}
           bind:this={previewEl}
-          title={viewMode === 'formatted' ? 'Двойной клик — править' : undefined}
           ondblclick={onStartBodyEdit}
         >
           <MarkdownBody source={ed.description} {labels} {onRef} />

@@ -11,20 +11,21 @@ import (
 // without one tool per action.
 func scriptTools(c *Client) []Tool {
 	type args struct {
-		Action      string  `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind,custom_list,custom_get,custom_create,custom_update,custom_delete,custom_starters"`
-		ID          int64   `json:"id,omitempty" desc:"script id (get/update/delete), the step/note/template id (bind/unbind)"`
-		Version     int     `json:"version,omitempty" desc:"get: a past graph version; update: the version you read (always required)"`
-		Title       string  `json:"title,omitempty" desc:"create (required) / update"`
-		Description *string `json:"description,omitempty" desc:"create/update"`
-		Purpose     *string `json:"purpose,omitempty" desc:"create/update: what the script is for (step, note, template, hook; empty = unsorted)"`
-		Graph       any     `json:"graph,omitempty" desc:"create/update/validate: node graph (docs/adr/0003-script-graphs.md, docs/automation.md)"`
-		Node        any     `json:"node,omitempty" desc:"custom_create/custom_update: {title, description?, inputs:[{name,node,port}], outputs:[{name,node,port}], fields:[{name,label?,type:str|int|bool,default?,node,param}], graph}; update also takes version; param is a key of the inner node's params or vars.NAME of a code node; used in a graph as type custom.<id>"`
-		Sample      string  `json:"sample,omitempty" desc:"create: copy a sample id from action=samples instead of graph"`
-		Subject     string  `json:"subject,omitempty" enum:"step,note,template" desc:"bind/unbind: what to attach the script to"`
-		ScriptID    int64   `json:"script_id,omitempty" desc:"bind / hook_create / hook_update: which script"`
-		Limit       int     `json:"limit,omitempty" desc:"list: default 20, max 100"`
+		Action      string            `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind,custom_list,custom_get,custom_create,custom_update,custom_delete,custom_starters,eval"`
+		ID          int64             `json:"id,omitempty" desc:"script id (get/update/delete), the step/note/template id (bind/unbind)"`
+		Version     int               `json:"version,omitempty" desc:"get: a past graph version; update: the version you read (always required)"`
+		Title       string            `json:"title,omitempty" desc:"create (required) / update"`
+		Description *string           `json:"description,omitempty" desc:"create/update"`
+		Purpose     *string           `json:"purpose,omitempty" desc:"create/update: what the script is for (step, note, template, hook, embed = a script embedded in a text as script=N{...}; empty = unsorted)"`
+		Graph       any               `json:"graph,omitempty" desc:"create/update/validate: node graph (docs/adr/0003-script-graphs.md, docs/automation.md)"`
+		Node        any               `json:"node,omitempty" desc:"custom_create/custom_update: {title, description?, inputs:[{name,node,port}], outputs:[{name,node,port}], fields:[{name,label?,type:str|int|bool,default?,node,param}], graph}; update also takes version; param is a key of the inner node's params or vars.NAME of a code node; used in a graph as type custom.<id>"`
+		Sample      string            `json:"sample,omitempty" desc:"create: copy a sample id from action=samples instead of graph"`
+		Subject     string            `json:"subject,omitempty" enum:"step,note,template" desc:"bind/unbind: what to attach the script to"`
+		ScriptID    int64             `json:"script_id,omitempty" desc:"bind / hook_create / hook_update: which script"`
+		Limit       int               `json:"limit,omitempty" desc:"list: default 20, max 100"`
+		Args        map[string]string `json:"args,omitempty" desc:"eval: named arguments of the script's Args node, as text"`
 	}
-	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
+	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template), eval (id + args: run a script made of server nodes only, Args → … → Result, and get its value: the same as an embedded `script=N`). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
 		func(ctx context.Context, a args) (any, error) {
 			switch a.Action {
 			case "list":
@@ -51,6 +52,15 @@ func scriptTools(c *Client) []Tool {
 					return nil, err
 				}
 				return map[string]any{"items": nodes, "total": len(nodes), "workspace": c.Workspace(ctx)}, nil
+			case "eval":
+				if a.ID < 1 {
+					return nil, &Err{422, "eval needs id (and args)"}
+				}
+				var out map[string]any
+				if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/scripts/%d/eval", a.ID), nil, map[string]any{"args": a.Args}, &out); err != nil {
+					return nil, err
+				}
+				return map[string]any{"value": out["value"], "version": out["version"], "workspace": c.Workspace(ctx)}, nil
 			case "samples":
 				return scriptSamples(ctx, c)
 			case "bind":
@@ -60,7 +70,7 @@ func scriptTools(c *Client) []Tool {
 			case "custom_list", "custom_get", "custom_create", "custom_update", "custom_delete", "custom_starters":
 				return scriptCustom(ctx, c, a.Action, a.ID, a.Node)
 			default:
-				return nil, &Err{422, "action: list, get, create, update, delete, validate, nodes, samples, bind, unbind or custom_list / custom_get / custom_create / custom_update / custom_delete"}
+				return nil, &Err{422, "action: list, get, create, update, delete, validate, nodes, samples, bind, unbind or eval, or custom_list / custom_get / custom_create / custom_update / custom_delete"}
 			}
 		})
 	return []Tool{s}

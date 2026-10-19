@@ -33,6 +33,14 @@ export function defaultParams(type: string): unknown {
       return { type: 'int', op: 'ge', operand: 1 }
     case 'any_of':
       return { type: 'int' }
+    case 'args':
+      return { params: [{ name: 'expr', type: 'str' }] }
+    case 'expr':
+      return { expr: '', vars: [] }
+    case 'random':
+      return { kind: 'int', lo: 1, hi: 6, count: 1, aggregate: 'sum' }
+    case 'regex':
+      return { mode: 'match', pattern: '.*' }
     case 'sink.step_result':
       return { result: 'done' }
     case 'sink.template_error':

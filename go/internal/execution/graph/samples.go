@@ -33,6 +33,18 @@ curl -fsS "$URL" | jq -c '{progress: .done, total: .all}'`
 const templateEmitScript = `# напечатайте один квест JSON-документом; {} — квеста сейчас нет
 echo '{"title": "Квест из скрипта", "steps": [{"title": "Шаг"}]}'`
 
+// DiceScript is the example of an embedded script (`script=N{5+3к8}`, ADR-0003 §6b): one Expr node whose operators `к` and `d`
+// are defined in its table as `sum(a, rand(1, b))`. The notation lives in the node's parameters, not in the server.
+func DiceScript() Graph {
+	return buildGraph([]nodeSpec{
+		{1, "args", kv{"params": []kv{{"name": "expr", "type": "str"}}}},
+		{2, "expr", kv{"operators": DiceOperators()}},
+		{3, "sink.result", nil},
+	},
+		[4]any{1, "expr", 2, "expr"}, [4]any{2, "text", 3, "value"},
+	)
+}
+
 // Samples returns the library's examples.
 func Samples() []Sample {
 	followProgress := buildGraph([]nodeSpec{
@@ -43,6 +55,11 @@ func Samples() []Sample {
 		[4]any{1, "progress", 2, "in"}, [4]any{1, "ref", 3, "ref"}, [4]any{2, "yes", 3, "trigger"},
 	)
 	return []Sample{
+		{
+			ID: "text-dice", Title: "Текст: кости", Subject: "text", NeedsRunner: false,
+			Description: "Для вставки script=N{5+3к8} в текст: три ноды, операторы к и d (NкM — N бросков по 1..M) заданы таблицей в ноде «Выражение». Без раннера, считается на сервере.",
+			Graph:       DiceScript(),
+		},
 		{
 			ID: "step-number", Title: "Шаг: прогресс из числа", Subject: "step", NeedsRunner: true,
 			Description: "Команда печатает число (прогресс шага) или JSON с progress, total и description. Всё, что в ответе есть, попадает в шаг.",

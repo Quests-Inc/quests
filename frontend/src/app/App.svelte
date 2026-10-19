@@ -9,6 +9,7 @@
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
+  import { bindRefRegistries } from '@/app/model/refRegistry.svelte.ts'
   import {
     attachmentIdFromUrl,
     healthFrom,
@@ -154,6 +155,7 @@
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
   let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments }))
+  bindRefRegistries(() => ({ notes, quests, questlines, labels: refLabels }))
 
   async function load({ silent = false } = {}) {
     if (!silent) loading = true
@@ -733,7 +735,7 @@
         rootType={nav.graphRoot.type}
         rootId={nav.graphRoot.id}
         nonce={graphNonce}
-        {questlines}
+        {questlines} labels={refLabels}
         onCenter={onGraphCenter}
         onOpen={onGraphOpen}
       />
