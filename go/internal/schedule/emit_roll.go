@@ -96,6 +96,8 @@ type emitResult struct {
 	Spec    *resolvedSpec
 	RollID  int64
 	FailMsg string
+	// Err is why this very attempt failed (it may still be retried later); FailMsg only says that the attempts ran out.
+	Err string
 }
 
 // poolOpts tunes resolveEmit. ignorePause lets a manual run ("materialize
@@ -227,9 +229,9 @@ func settleEmitAttempt(ctx context.Context, st *store.Store, tmpl templateRow, p
 			return emitResult{}, err
 		}
 		if newOutcome == "error" {
-			return emitResult{RollID: id, FailMsg: execErr.Error()}, nil
+			return emitResult{RollID: id, FailMsg: execErr.Error(), Err: execErr.Error()}, nil
 		}
-		return emitResult{RollID: id}, nil
+		return emitResult{RollID: id, Err: execErr.Error()}, nil
 	}
 
 	if resolved == nil {

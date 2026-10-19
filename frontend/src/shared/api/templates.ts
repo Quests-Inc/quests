@@ -30,9 +30,29 @@ export function copyTemplate(id: number) {
   return request<TemplateRead>(`/api/templates/${id}/copy`, { method: 'POST' })
 }
 
-/** Force-materialize one quest from a template (manual emit for testing). */
+/**
+ * Force-materialize one quest from a template. A template that makes its quest by a script waits for the device (up to a
+ * minute); when it made none, the answer says so (`emitted: false`) instead of being a quest.
+ */
 export function emitTemplate(id: number) {
-  return request(`/api/templates/${id}/emit`, { method: 'POST' })
+  return request<{ title?: string; emitted?: boolean; outcome?: string; detail?: string }>(
+    `/api/templates/${id}/emit`,
+    { method: 'POST' }
+  )
+}
+
+/** What a test of a template's emit found out on its device; nothing is created. */
+export interface EmitPreview {
+  outcome: 'quest' | 'miss' | 'failed' | 'pending'
+  title?: string
+  description?: string
+  steps?: { title: string; description?: string }[]
+  ignored_fields?: string[]
+  error?: string
+}
+
+export function emitTemplateTest(id: number) {
+  return request<EmitPreview>(`/api/templates/${id}/emit-test`, { method: 'POST' })
 }
 
 const SECRET_OWNER_PATH = {

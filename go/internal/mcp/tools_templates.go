@@ -190,12 +190,24 @@ func templateTools(c *Client) []Tool {
 
 	type dryArgs struct {
 		Command    *string `json:"command,omitempty" desc:"text to try"`
-		TemplateID *int64  `json:"template_id,omitempty" desc:"or: use this template's stored command"`
+		TemplateID *int64  `json:"template_id,omitempty" desc:"or: use this template's emit script (its Code node) or stored command"`
+		OnRunner   bool    `json:"on_runner,omitempty" desc:"with template_id: run it for real on the template's device, with its secrets (what Test emit does in the web); creates no quest, waits up to a minute"`
 	}
-	dry := Typed("dry_run_emit_pool", "Run an emit_pool_command here, like the scheduler would (20 s limit, no quest created, real side effects of the script do happen) and show the quest it prints. Give command or template_id. A green result does not prove it works on the runner device (other env, other tools).",
+	dry := Typed("dry_run_emit_pool", "Run an emit command here, like the scheduler would (20 s limit, no quest created, real side effects of the script do happen) and show the quest it prints. Give command or template_id: a template with an emit script runs that script's Code node (its fixed variables set), otherwise its emit_pool_command. Template secrets are not readable, so here a command that needs them only works if they are in this machine's environment; on_runner=true runs it on the template's device with its secrets instead. A green result does not prove it works on the runner device (other env, other tools).",
 		func(ctx context.Context, a dryArgs) (any, error) {
 			if (a.Command == nil) == (a.TemplateID == nil) {
 				return nil, &Err{422, "provide exactly one of: command, template_id"}
+			}
+			if a.OnRunner {
+				if a.TemplateID == nil {
+					return nil, &Err{422, "on_runner needs template_id"}
+				}
+				var out map[string]any
+				if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/templates/%d/emit-test", *a.TemplateID), nil, map[string]any{}, &out); err != nil {
+					return nil, err
+				}
+				out["workspace"] = c.Workspace(ctx)
+				return out, nil
 			}
 			cmd := ""
 			if a.Command != nil {
@@ -205,12 +217,19 @@ func templateTools(c *Client) []Tool {
 				if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/templates/%d", *a.TemplateID), nil, nil, &t); err != nil {
 					return nil, err
 				}
+				if sid, isScript := t["script_id"].(float64); isScript && sid > 0 {
+					text, env, err := emitScriptCommand(ctx, c, int64(sid))
+					if err != nil {
+						return nil, err
+					}
+					return runEmitPool(ctx, text, env), nil
+				}
 				cmd = str(t["emit_pool_command"])
 				if strings.TrimSpace(cmd) == "" {
-					return nil, &Err{422, fmt.Sprintf("template %d has no emit_pool_command set", *a.TemplateID)}
+					return nil, &Err{422, fmt.Sprintf("template %d has neither an emit script nor an emit_pool_command", *a.TemplateID)}
 				}
 			}
-			return runEmitPool(ctx, cmd), nil
+			return runEmitPool(ctx, cmd, nil), nil
 		})
 
 	return []Tool{list, get, create, upd, del, dry}
@@ -219,7 +238,7 @@ func templateTools(c *Client) []Tool {
 const emitPoolTimeout = 20 * time.Second
 
 // runEmitPool executes a command like the scheduler (shebang → its own interpreter, otherwise sh -c) and parses its stdout.
-func runEmitPool(ctx context.Context, command string) map[string]any {
+func runEmitPool(ctx context.Context, command string, env map[string]string) map[string]any {
 	ctx, cancel := context.WithTimeout(ctx, emitPoolTimeout)
 	defer cancel()
 	home, _ := os.UserHomeDir()
@@ -242,6 +261,12 @@ func runEmitPool(ctx context.Context, command string) map[string]any {
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
 	cmd.Dir = home
+	if len(env) > 0 {
+		cmd.Env = os.Environ()
+		for k, v := range env {
+			cmd.Env = append(cmd.Env, k+"="+v)
+		}
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()

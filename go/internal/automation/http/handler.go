@@ -28,8 +28,16 @@ type Handler struct {
 	// EmitTemplate creates a quest from a template right now and returns its id; automation.ErrNotFound-like
 	// errors are reported through ErrTemplateNotFound.
 	EmitTemplate func(ctx context.Context, id int64, now time.Time) (questID int64, err error)
+	// PreviewEmit runs a template's script or command on its device and says what quest it would make, creating none.
+	PreviewEmit func(ctx context.Context, id int64, now time.Time) (any, error)
 	// ErrTemplateNotFound is what EmitTemplate returns when the template is gone.
 	ErrTemplateNotFound error
+}
+
+// emitStatus is implemented by the error of an emit that made no quest and knows how to answer for it (nothing this time, a
+// failure, a device that did not answer).
+type emitStatus interface {
+	EmitStatus() (status int, outcome, detail string)
 }
 
 // Register mounts every route of the context.
@@ -41,6 +49,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/templates/{id}", h.deleteTemplate)
 	mux.HandleFunc("POST /api/templates/{id}/copy", h.copyTemplate)
 	mux.HandleFunc("POST /api/templates/{id}/emit", h.emitTemplate)
+	mux.HandleFunc("POST /api/templates/{id}/emit-test", h.emitTest)
 	mux.HandleFunc("GET /api/templates/{id}/emit-attempts", h.listEmitAttempts)
 	mux.HandleFunc("GET /api/templates/{id}/streak", h.getTemplateStreak)
 }

@@ -612,3 +612,47 @@ func TestTrashToolListsAndRestores(t *testing.T) {
 		t.Fatalf("restore without an id must be refused: %s", text)
 	}
 }
+
+// A template with an emit script is tried by the script's Code node, with the fixed variables it sets; a node made of code
+// counts with the values of its fields; two Code nodes are ambiguous.
+func TestDryRunEmitScript(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{
+		"GET /api/templates/5":           `{"script_id":13,"emit_pool_command":null}`,
+		"GET /api/scripts/13":            `{"graph":{"nodes":[{"id":1,"type":"source.template"},{"id":2,"type":"code","params":{"text":"echo '{\"title\":\"Почта\",\"steps\":[{\"title\":\"'\"$WHO\"'\"}]}'","vars":{"WHO":"письмо"}}}]}}`,
+		"GET /api/templates/6":           `{"script_id":14}`,
+		"GET /api/scripts/14":            `{"graph":{"nodes":[{"id":1,"type":"custom.3","params":{"who":"из ноды"}}]}}`,
+		"GET /api/script-custom-nodes/3": `{"fields":[{"name":"who","default":"по умолчанию","node":1,"param":"vars.WHO"}],"graph":{"nodes":[{"id":1,"type":"code","params":{"text":"echo '{\"title\":\"T\",\"steps\":[{\"title\":\"'\"$WHO\"'\"}]}'"}}]}}`,
+		"GET /api/templates/7":           `{"script_id":15}`,
+		"GET /api/scripts/15":            `{"graph":{"nodes":[{"id":1,"type":"code","params":{"text":"true"}},{"id":2,"type":"code","params":{"text":"true"}}]}}`,
+	}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "dry_run_emit_pool", `{"template_id":5}`),
+		call(2, "dry_run_emit_pool", `{"template_id":6}`),
+		call(3, "dry_run_emit_pool", `{"template_id":7}`),
+	)
+	for i, want := range []string{"письмо", "из ноды"} {
+		text, isErr := result(t, resps[i])
+		if isErr || !strings.Contains(text, `"ok":true`) || !strings.Contains(text, want) {
+			t.Fatalf("%d: %s", i, text)
+		}
+	}
+	if text, isErr := result(t, resps[2]); !isErr || !strings.Contains(text, "2 Code nodes") {
+		t.Fatalf("ambiguous: %s", text)
+	}
+}
+
+func TestDryRunOnRunnerCallsTheTestEndpoint(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{"POST /api/templates/5/emit-test": `{"outcome":"quest","title":"Почта","steps":[{"title":"а"}]}`}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "dry_run_emit_pool", `{"template_id":5,"on_runner":true}`),
+		call(2, "dry_run_emit_pool", `{"command":"true","on_runner":true}`),
+	)
+	if text, isErr := result(t, resps[0]); isErr || !strings.Contains(text, `"outcome":"quest"`) {
+		t.Fatalf("on runner: %s", text)
+	}
+	if text, isErr := result(t, resps[1]); !isErr || !strings.Contains(text, "on_runner needs template_id") {
+		t.Fatalf("command on runner: %s", text)
+	}
+}

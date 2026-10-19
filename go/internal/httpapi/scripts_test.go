@@ -323,3 +323,24 @@ func TestCustomNodesOverHTTP(t *testing.T) {
 		t.Fatalf("delete node: %d", code)
 	}
 }
+
+// A test emit of a template that has neither script nor command has nothing to run; a manual emit of it still makes the
+// quest from its own steps.
+func TestTemplateEmitTestNeedsAScriptOrCommand(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	h := s.Handler()
+	code, out := secretReq(h, http.MethodPost, "/api/templates", map[string]any{"title": "Обычный", "enabled": false, "steps": []any{map[string]any{"title": "Шаг"}}})
+	if code != http.StatusCreated {
+		t.Fatalf("create: %d %v", code, out)
+	}
+	id := jsonNum(out["id"])
+	if code, out = secretReq(h, http.MethodPost, "/api/templates/"+id+"/emit-test", map[string]any{}); code != http.StatusUnprocessableEntity {
+		t.Fatalf("emit-test of a plain template: %d %v", code, out)
+	}
+	if code, out = secretReq(h, http.MethodPost, "/api/templates/"+id+"/emit", map[string]any{}); code != http.StatusCreated || out["title"] != "Обычный" {
+		t.Fatalf("manual emit of a plain template: %d %v", code, out)
+	}
+	if code, _ = secretReq(h, http.MethodPost, "/api/templates/9999/emit-test", map[string]any{}); code != http.StatusNotFound {
+		t.Fatalf("emit-test of a missing template: %d", code)
+	}
+}

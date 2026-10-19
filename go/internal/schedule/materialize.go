@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -349,10 +351,35 @@ func loadTemplateRow(ctx context.Context, st *store.Store, id int64) (templateRo
 // MaterializeTemplateManual creates one quest from a template immediately (GUI
 // testing). It skips weekday schedule, the daily period_key slot, surprise
 // chance/window rolls, and emit-pool time gates. Each call uses period_key
-// manual-<unix> so repeated emits never collide. When emit_pool_command is set
-// it still runs once for that key; an empty pool or command error falls back to
-// template steps instead of inserting a failed quest like the scheduler does.
+// manual-<unixnano> so repeated emits never collide.
+//
+// A template that makes its quest by a script or a command (emitUsesPool) gets its quest from a run on a
+// device. That is queued and the call returns at once with an EmitStatusError (202, queued): the quest appears
+// when the device answers (an event like any quest that appears), and a script that printed nothing or failed
+// leaves only the template's emit log. The template's own steps stand in only for a template that has no
+// script or command, which is made right away.
 func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events.Hub, templateID int64, now time.Time, rng *rand.Rand) (int64, error) {
+	tmpl, err := loadTemplateRow(ctx, st, templateID)
+	if err != nil {
+		return 0, err
+	}
+	if !emitUsesPool(ctx, st, tmpl) {
+		return materializeManual(ctx, st, hub, templateID, now, rng, 0)
+	}
+	bg := context.WithoutCancel(ctx) // the request is over when the answer goes out; the run goes on
+	go func() {
+		ctx, cancel := context.WithTimeout(bg, manualEmitBackgroundWait+time.Minute)
+		defer cancel()
+		if _, err := materializeManual(ctx, st, hub, templateID, now, rng, manualEmitBackgroundWait); err != nil {
+			log.Printf("manual emit of template %d: %v", templateID, err)
+		}
+	}()
+	return 0, &EmitStatusError{Code: http.StatusAccepted, Outcome: OutcomeQueued,
+		Detail: "Выпуск поставлен в очередь: квест появится, когда устройство ответит."}
+}
+
+// materializeManual is MaterializeTemplateManual made at once; a dynamic template waits `wait` for its device.
+func materializeManual(ctx context.Context, st *store.Store, hub *events.Hub, templateID int64, now time.Time, rng *rand.Rand, wait time.Duration) (int64, error) {
 	if rng == nil {
 		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
@@ -375,7 +402,7 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 		}
 	}
 	localNow := now.In(loc)
-	key := fmt.Sprintf("manual-%d", now.Unix())
+	key := fmt.Sprintf("%s%d", manualPeriodPrefix, now.UnixNano())
 
 	emitMode := strings.ToLower(strings.TrimSpace(tmpl.EmitMode))
 	var deadline *time.Time
@@ -390,9 +417,14 @@ func MaterializeTemplateManual(ctx context.Context, st *store.Store, hub *events
 	var poolRollID int64
 	var spec *resolvedSpec
 	if usePool {
-		res, perr := resolveEmit(ctx, st, tmpl, key, now, poolOpts{ignorePause: true})
+		// A dynamic template's quest comes from a run on a device: wait for it. Nothing printed, a failure and a device that
+		// does not answer make no quest (the template's own steps are not a stand-in for what the script was to say).
+		res, pending, perr := waitEmit(ctx, st, tmpl, key, wait)
 		if perr != nil {
 			return 0, perr
+		}
+		if res.Spec == nil {
+			return 0, emitOutcomeError(tmpl, res, pending)
 		}
 		poolRollID = res.RollID
 		spec = res.Spec

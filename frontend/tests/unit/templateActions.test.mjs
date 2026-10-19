@@ -2,17 +2,22 @@ import { expect, test } from 'bun:test'
 
 import { createTemplateActions } from '../../src/features/templates/model/templateActions.ts'
 
-function make(fail = '') {
+function make(fail = '', preview = null, emitResult = null) {
   const log = []
   const g =
     (n) =>
     async (...a) => {
       if (fail === n) throw new Error('сбой ' + n)
       log.push([n, ...a])
-      return { title: 'Квест' }
+      return n === 'emit' && emitResult ? emitResult : { title: 'Квест' }
     }
   const act = createTemplateActions({
-    api: { update: g('update'), copy: g('copy'), emit: g('emit') },
+    api: {
+      update: g('update'),
+      copy: g('copy'),
+      emit: g('emit'),
+      test: async (id) => ({ ...(preview ?? { outcome: 'miss' }), id }),
+    },
     refresh: async () => void log.push(['refresh']),
     onChanged: () => log.push(['changed']),
     setError: (m) => log.push(['error', m]),
@@ -57,4 +62,23 @@ test('copyRef копирует template=id', async () => {
     ['clip', 'template=4'],
     ['notify', 'Скопировано template=4', 'success'],
   ])
+})
+
+test('эмит динамического шаблона ставится в очередь: ответ — не квест и не ошибка, квест придёт событием', async () => {
+  const a = make('', null, { emitted: false, outcome: 'queued', detail: 'Выпуск поставлен в очередь' })
+  await a.act.emit({ id: 5, title: 'Почта' })
+  expect(a.log).toContainEqual(['notify', 'Выпуск поставлен в очередь', 'success'])
+  expect(a.log.some((x) => x[0] === 'changed')).toBe(false)
+})
+
+test('проверка выпуска: квест с шагами, пусто, сбой', async () => {
+  const quest = make('', { outcome: 'quest', title: 'Почта', steps: [{ title: 'а' }, { title: 'б' }] })
+  await quest.act.test({ id: 5, script_id: 13 })
+  expect(quest.log.at(-1)).toEqual(['notify', 'Проверка: «Почта», шагов 2: а; б. Квест не создан.', 'success'])
+  const miss = make('', { outcome: 'miss' })
+  await miss.act.test({ id: 5 })
+  expect(miss.log.at(-1)).toEqual(['notify', 'Проверка: скрипт ничего не вернул, квеста сейчас нет.', 'success'])
+  const fail = make('', { outcome: 'failed', error: 'нет MAIL_HOST' })
+  await fail.act.test({ id: 5 })
+  expect(fail.log.at(-1)).toEqual(['notify', 'Проверка не удалась: нет MAIL_HOST', 'error'])
 })

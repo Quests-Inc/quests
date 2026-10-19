@@ -17,6 +17,15 @@ import (
 // emitJobValidFor is how long an emit_pool_command may wait for its device.
 const emitJobValidFor = 24 * time.Hour
 
+// emitJobValidity is how long a job may wait for its device. A manual emit or a test (periods `manual-…`, `test-…`) is
+// waited for by somebody right now, so its job must not linger and run a day later.
+func emitJobValidity(period string) time.Duration {
+	if strings.HasPrefix(period, manualPeriodPrefix) || strings.HasPrefix(period, testPeriodPrefix) {
+		return 3 * time.Minute
+	}
+	return emitJobValidFor
+}
+
 // takeLegacyEmit reads a template job that was queued before emit went through a graph (no run). The tick still pulls it:
 // a device that never shows up leaves the job skipped, as the marker for the period, and a finished job is taken once.
 func takeLegacyEmit(ctx context.Context, st *store.Store, tmpl templateRow, job execution.RunnerJob) (out emitOutput, info execInfo, err error, ready bool) {
