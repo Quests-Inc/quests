@@ -53,7 +53,7 @@ test('шапка: четыре вкладки и две группы, актив
     'Заметки',
     'Карта',
     'Календарь',
-    'Ещё',
+    'Архив',
     'Автоматика',
   ])
   expect(tabs.filter((t) => t.getAttribute('aria-selected') === 'true').map((t) => t.getAttribute('title'))).toEqual([
@@ -125,4 +125,34 @@ test('каркас списка: сворачивание хранится по 
   expect(root.style.getPropertyValue('--sbl-w')).toBe('264px')
   unmount(app)
   target.remove()
+})
+
+test('группа раскрывается по наведению, пункт переключает вкладку и закрывает список, Esc закрывает', () => {
+  const h = mountHeader('journal')
+  const group = h.target.querySelector<HTMLElement>('.view-group')!
+  expect(h.target.querySelector('.view-drop')).toBeNull()
+  group.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }))
+  flushSync()
+  const items = [...h.target.querySelectorAll<HTMLElement>('.view-drop [role=menuitem]')]
+  expect(items.map((i) => i.textContent?.trim())).toEqual(['Вложения', 'История'])
+  items[1].click()
+  flushSync()
+  expect(h.calls).toEqual(['view:history'])
+  expect(h.target.querySelector('.view-drop')).toBeNull()
+  group.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }))
+  flushSync()
+  group.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  flushSync()
+  expect(h.target.querySelector('.view-drop')).toBeNull()
+  h.stop()
+})
+
+test('касание и клавиатура: тап по группе открывает список, наведение мыши не нужно', () => {
+  const h = mountHeader('journal')
+  const trigger = h.target.querySelector<HTMLElement>('.view-tab--group')!
+  trigger.click()
+  flushSync()
+  expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  expect(h.target.querySelectorAll('.view-drop [role=menuitem]')).toHaveLength(2)
+  h.stop()
 })
