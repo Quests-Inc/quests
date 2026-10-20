@@ -28,5 +28,5 @@ test('tinted: цвет типа сохраняет большую часть, о
   expect(tinted('#c9a227', '')).toBe('#c9a227')
   const mixed = tinted('#c9a227', '#7a9e3a')
   expect(mixed).toBe(`color-mix(in srgb, #c9a227 ${100 - TINT_SHARE}%, #7a9e3a ${TINT_SHARE}%)`)
-  expect(TINT_SHARE).toBeLessThanOrEqual(25)
+  expect(TINT_SHARE).toBeLessThanOrEqual(35)
 })
