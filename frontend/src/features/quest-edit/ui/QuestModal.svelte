@@ -576,7 +576,4 @@
     gap: 0.5rem;
   }
 
-  .inline-line .deadline-date {
-    width: auto;
-  }
 </style>

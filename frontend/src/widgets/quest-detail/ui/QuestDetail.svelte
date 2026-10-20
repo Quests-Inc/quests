@@ -642,6 +642,7 @@
   {:else if inQuestline}
     <div class="detail__line" style="--line-color: {lineMeta.color}">
       <div class="detail__line-wash" aria-hidden="true"></div>
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <header
         class="detail__line-head"
         class:detail__line-head--custom={Boolean(lineMeta.iconUrl)}

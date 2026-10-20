@@ -23,6 +23,8 @@
     uploadAttachmentRevision,
   } from '@/shared/api/client.ts'
   import { createAttachmentOps } from '../model/attachmentOps.svelte.ts'
+  import { createAttachmentGroup } from '../model/attachmentGroup.svelte.ts'
+  import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
 
@@ -31,12 +33,14 @@
     selectedId = null,
     onSelect,
     onOpenOwner,
+    onOpenGraph,
     onChanged,
   }: {
     questlines?: any[],
     selectedId?: number | null,
     onSelect?: (id: number | null) => void,
     onOpenOwner?: (kind: string, id: number) => void,
+    onOpenGraph?: (type: 'quest' | 'questline' | 'note', id: number) => void,
     onChanged?: () => void,
   } = $props()
 
@@ -67,14 +71,12 @@
   let sort = $state('new')
   let grouped = $state(true)
   let versionInput = $state((null as HTMLInputElement | null))
-
   const foldedGroups = createFoldedGroups()
 
   let ctxOpen = $state(false)
   let ctxX = $state(0)
   let ctxY = $state(0)
   let ctxAtt = $state((null as any | null))
-
   let titles = $derived.by(() => {
     const m: Record<string, string> = {}
     for (const q of quests) m[`quest:${q.id}`] = q.title || `quest=${q.id}`
@@ -135,10 +137,16 @@
       uploadRevision: uploadAttachmentRevision,
     },
   })
-  const toggleHidden = ops.toggleHidden
-  const makeCurrent = ops.makeCurrent
-  const saveComment = ops.saveComment
-  const confirmDelete = ops.confirmDelete
+  const visibleIds = () => (grouped ? groups.filter((g) => !foldedGroups.has(String(g.key))).flatMap((g) => g.files) : filtered).map((a) => a.id)
+  const grp = createAttachmentGroup({
+    rows: () => attachments,
+    selectedId: () => selectedId,
+    download: (a) => downloadAtt(a),
+    setHidden: setAttachmentHidden,
+    remove: deleteAttachment,
+    onChanged: () => onChanged?.(),
+    onDeleted: (ids) => ids.includes(selectedId ?? -1) && onSelect?.(null),
+  })
 
   $effect(() => {
     const id = selectedId
@@ -180,15 +188,19 @@
     }
   }
 
+  let ctxGroup = $state<number[]>([])
   let ctxItems = $derived.by(() => {
     const a = ctxAtt
     if (!a) return []
+    if (ctxGroup.length > 1) return grp.items(ctxGroup)
     return [
+      { id: 'copy-id', label: `Копировать attachment=${a.id}` },
+      { id: 'graph', label: 'Открыть на карте' },
+      { id: 'sep-ref', sep: true },
       { id: 'download', label: 'Скачать' },
       { id: 'new-version', label: 'Новая версия…' },
       { id: 'hide', label: a.hidden ? 'Вернуть' : 'Скрыть' },
       { id: 'open', label: 'Открыть владельца' },
-      { id: 'copy-id', label: `Копировать attachment=${a.id}` },
       { id: 'sep-danger', sep: true },
       { id: 'delete', label: 'Удалить…', danger: true },
     ]
@@ -199,28 +211,35 @@
     if (target instanceof Element && target.closest('a, button, input, textarea')) return
     event.preventDefault()
     event.stopPropagation()
+    ctxGroup = grp.multi.targets(a.id)
+    if (ctxGroup.length < 2) grp.multi.clear()
     ctxAtt = a
     ctxX = event.clientX
     ctxY = event.clientY
     ctxOpen = true
   }
 
-  function onAttSelect(action: string) {
+  function onAttSelect(action: string): void {
     const a = ctxAtt
     if (!a) return
-    if (action === 'download') downloadAtt(a)
+    if (ctxGroup.length > 1) return void grp.run(action, ctxGroup)
+    if (action === 'graph') onOpenGraph?.(ownerKind(a) as 'quest' | 'questline' | 'note', Number(a.owner_id))
+    else if (action === 'download') downloadAtt(a)
     else if (action === 'new-version') pickVersion(a)
-    else if (action === 'hide') toggleHidden(a)
+    else if (action === 'hide') ops.toggleHidden(a)
     else if (action === 'open') onOpenOwner?.(ownerKind(a), Number(a.owner_id))
     else if (action === 'copy-id') copyRef(a)
     else if (action === 'delete') ops.pending = { att: a, revision: null }
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape' && selectedId != null && !ops.pending) {
-      const t = e.target
-      if (t instanceof Element && t.closest('input, textarea')) return
-      onSelect?.(null)
+    const t = e.target
+    if (t instanceof Element && t.closest('input, textarea, select')) return
+    if (e.key === 'Escape' && grp.multi.size > 0) grp.multi.clear()
+    else if (e.key === 'Escape' && selectedId != null && !ops.pending) onSelect?.(null)
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA' && !e.shiftKey) {
+      e.preventDefault()
+      grp.selectAll(visibleIds())
     }
   }
 </script>
@@ -329,12 +348,12 @@
         ownerLabel={ownerLabel(a)}
         onClose={() => onSelect?.(null)}
         onDownload={(revision = null) => downloadAtt(a, revision)}
-        onToggleHidden={() => toggleHidden(a)}
+        onToggleHidden={() => ops.toggleHidden(a)}
         onPickVersion={() => pickVersion(a)}
         onDelete={() => (ops.pending = { att: a, revision: null })}
         onOpenOwner={() => onOpenOwner?.(ownerKind(a), Number(a.owner_id))}
-        onSaveComment={() => saveComment(a)}
-        onMakeCurrent={(revision) => makeCurrent(a, revision)}
+        onSaveComment={() => ops.saveComment(a)}
+        onMakeCurrent={(revision) => ops.makeCurrent(a, revision)}
         onDeleteRevision={(revision) => (ops.pending = { att: a, revision })}
         onCopyRef={() => copyRef(a)}
       />
@@ -347,10 +366,11 @@
   <article
     class="attpage__item"
     class:attpage__item--on={a.id === selectedId}
+    class:attpage__item--picked={grp.multi.has(a.id)}
     class:attpage__item--hidden={a.hidden}
     data-att-id={a.id}
     role="listitem"
-    onclick={() => onSelect?.(a.id)}
+    onclick={(e) => !grp.click(e, a.id, visibleIds()) && onSelect?.(a.id)}
     oncontextmenu={(e) => openAttMenu(e, a)}
   >
     <div class="attpage__thumb">
@@ -406,7 +426,7 @@
         disabled={ops.busyId === a.id}
         onclick={(e) => {
           e.stopPropagation()
-          toggleHidden(a)
+          ops.toggleHidden(a)
         }}
       >
         <Icon name={a.hidden ? 'eye' : 'eye-off'} size={16} />
@@ -427,6 +447,15 @@
   </article>
 {/snippet}
 
+<SidebarPicked count={grp.multi.size} onClear={() => grp.multi.clear()} compact />
+<ConfirmModal
+  open={grp.ask.length > 0}
+  title="Удалить вложения?"
+  message={`Удалить выбранные вложения (${grp.ask.length}) вместе со всеми версиями? Это необратимо.`}
+  busy={grp.busy}
+  onCancel={grp.cancelDelete}
+  onConfirm={grp.confirmDelete}
+/>
 <input bind:this={versionInput} class="attpage__file-input" type="file" onchange={onVersionPick} />
 
 <ConfirmModal
@@ -441,7 +470,7 @@
   onCancel={() => {
     if (!ops.deleteBusy) ops.pending = null
   }}
-  onConfirm={confirmDelete}
+  onConfirm={ops.confirmDelete}
 />
 
 <ContextMenu
@@ -455,6 +484,7 @@
 
 <style>
   .attpage {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -590,7 +620,8 @@
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
   }
 
-  .attpage__item--on {
+  .attpage__item--on,
+  .attpage__item--picked {
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, var(--color-bg-raised, #1a1a1a));
     border-left-color: var(--color-accent, #c9a227);
   }

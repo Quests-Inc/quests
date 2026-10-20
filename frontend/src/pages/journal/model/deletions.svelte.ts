@@ -13,6 +13,8 @@ export function createDeletions(deps: {
   reload: () => Promise<unknown> | unknown
   /** Квест удалён: выбор снимается, список перечитывается. */
   onQuestDeleted: (id: number) => void
+  /** Несколько квестов удалены разом: выбор снимается, список перечитывается, один тост с отменой. */
+  onQuestsDeleted: (ids: number[]) => void
   setError: (message: string) => void
   api: {
     deleteQuest: (id: number) => Promise<unknown>
@@ -24,6 +26,9 @@ export function createDeletions(deps: {
   let questBusy = $state(false)
   let animActive = $state(false)
   let animResolve: (() => void) | null = null
+
+  let manyIds = $state<number[]>([])
+  let manyBusy = $state(false)
 
   let stepOpen = $state(false)
   let stepBusy = $state(false)
@@ -73,6 +78,33 @@ export function createDeletions(deps: {
   }
   function cancelQuest() {
     if (!questBusy) questAsk = false
+  }
+
+  // --- несколько квестов (выделение в списке) ---
+  function askMany(ids: number[]) {
+    if (ids.length && !manyBusy) manyIds = [...ids]
+  }
+  async function confirmMany() {
+    if (!manyIds.length || manyBusy) return
+    manyBusy = true
+    deps.setError('')
+    const done: number[] = []
+    let failed = 0
+    for (const id of manyIds) {
+      try {
+        await deps.api.deleteQuest(id)
+        done.push(id)
+      } catch {
+        failed += 1
+      }
+    }
+    manyIds = []
+    manyBusy = false
+    if (done.length) deps.onQuestsDeleted(done)
+    if (failed) fail(new Error(`Не удалось удалить: ${failed}`))
+  }
+  function cancelMany() {
+    if (!manyBusy) manyIds = []
   }
 
   // --- шаг ---
@@ -137,6 +169,12 @@ export function createDeletions(deps: {
     get animActive() {
       return animActive
     },
+    get manyIds() {
+      return manyIds
+    },
+    get manyBusy() {
+      return manyBusy
+    },
     get stepOpen() {
       return stepOpen
     },
@@ -153,6 +191,9 @@ export function createDeletions(deps: {
       return lineBusy
     },
     askQuest,
+    askMany,
+    confirmMany,
+    cancelMany,
     animDone,
     confirmQuest,
     cancelQuest,

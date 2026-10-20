@@ -5,7 +5,7 @@ import { untrack } from 'svelte'
 import { fitCamera, minimapModel } from '@/entities/graph'
 import { NODE_W, type ScriptNodeView, viewNodes } from '@/entities/script'
 import type { End, Graph } from '@/shared/api/scriptgraph.gen.ts'
-import { createGraphGestures } from '@/widgets/graph-canvas'
+import { createGraphGestures, handleCanvasKey } from '@/widgets/graph-canvas'
 
 import type { ScriptEditor } from './editor.svelte.ts'
 
@@ -41,6 +41,9 @@ export function createCanvas(ed: ScriptEditor) {
     finishLink: () => {},
     setLinkCursor: () => {},
     selectMode: () => selectMode,
+    enterSelect: () => {
+      selectMode = true
+    },
     getPicked: () => ed.picked,
     setPicked: (s) => {
       ed.picked = s
@@ -158,26 +161,32 @@ export function createCanvas(ed: ScriptEditor) {
   const target = (e: PointerEvent) => document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-in], [data-out]')
 
   function onKey(e: KeyboardEvent) {
-    const t = e.target as Element
-    if (t.closest('input, textarea, select')) return
-    const mod = e.ctrlKey || e.metaKey
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault()
-      void ed.remove()
-    } else if (e.key === 'Escape') {
-      pending = null
-      selectMode = false
-      full = false
-    } else if (mod && e.key.toLowerCase() === 'z') {
-      e.preventDefault()
-      if (e.shiftKey) ed.redo()
-      else ed.undo()
-    } else if (mod && e.key.toLowerCase() === 'y') {
-      e.preventDefault()
-      ed.redo()
-    } else if (e.key.toLowerCase() === 'v' && !mod) {
-      selectMode = !selectMode
-    }
+    handleCanvasKey(e, {
+      linking: pending != null,
+      selectMode,
+      full,
+      cancelLink: () => {
+        pending = null
+      },
+      toggleSelect: () => {
+        selectMode = !selectMode
+      },
+      toggleFull: () => {
+        full = !full
+      },
+      fit: refit,
+      zoom: (dir) => {
+        manual = true
+        gest.zoomStep(dir)
+      },
+      undo: ed.undo,
+      redo: ed.redo,
+      selectAll: () => {
+        selectMode = true
+        ed.picked = new Set(views.map((n) => n.key))
+      },
+      remove: () => void ed.remove(),
+    })
   }
 
   /** Put a new node near the middle of what is on screen. */

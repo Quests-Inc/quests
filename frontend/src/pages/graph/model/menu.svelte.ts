@@ -51,6 +51,11 @@ export function createGraphMenu(deps: {
   titleOf: (key: string) => string
   hidePicked: () => Promise<void>
   toggleSelectMode: () => void
+  copyRef: (n: { type: string; id: number | string }) => void
+  highlightEdge: (edge: { from: string; to: string; kind: string }) => void
+  getLit?: () => { from: string; to: string; kind: string } | null
+  fit: () => void
+  clearPicked: () => void
   hideKeys: (keys: string[]) => Promise<void>
   createNoteHere: (at: At, linkFrom: string) => Promise<void>
   openEntity: (kind: 'note' | 'step' | 'questline', at: At, extra?: { owner?: string }) => void
@@ -159,6 +164,7 @@ export function createGraphMenu(deps: {
     return graphMenuItems(ctx, {
       selectMode: deps.selectMode(),
       pickedCount: deps.pickedSize(),
+      lit: deps.getLit?.() ?? null,
       rootKey: deps.getRootKey(),
       nodes: deps.getNodes(),
       expandKeys: deps.getExpandKeys(),
@@ -175,7 +181,11 @@ export function createGraphMenu(deps: {
   async function onCtxSelect(id: string) {
     const n = ctx.node
     const at = ctx.at
-    if (id === 'hide-picked') await deps.hidePicked()
+    if (id === 'copy-ref' && n) deps.copyRef(n)
+    else if (id === 'edge-light' && ctx.edge) deps.highlightEdge(ctx.edge)
+    else if (id === 'hide-picked') await deps.hidePicked()
+    else if (id === 'clear-picked') deps.clearPicked()
+    else if (id === 'fit') deps.fit()
     else if (id === 'select-mode') {
       close()
       deps.toggleSelectMode()
@@ -279,6 +289,6 @@ export function createGraphMenu(deps: {
     items,
     onCtxSelect,
     onFilesPicked,
-    edgeActions: edgeMenuItems,
+    edgeActions: (e: MenuEdge) => edgeMenuItems(e, deps.getLit?.() ?? null),
   }
 }

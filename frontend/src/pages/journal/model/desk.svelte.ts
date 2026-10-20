@@ -41,6 +41,7 @@ export function createJournalDesk(deps: {
   getRefLabels: () => Record<string, string>
   openSecrets: (owner: { kind: string; id: number } | null) => void
   onGraphDirty: () => void
+  openGraph: (type: 'quest' | 'questline', id: number) => void
 }) {
   const remoteEdits = new Map<number, number>()
   const REMOTE_EDIT_TTL_MS = 8000
@@ -201,6 +202,12 @@ export function createJournalDesk(deps: {
     clearLine: () => menu.clearLine(),
     reload: () => deps.reload(),
     onQuestDeleted: (id) => onDeleted(id),
+    onQuestsDeleted: (ids) => {
+      if (ids.includes(deps.getSelectedId() ?? -1)) deps.setSelectedId(null)
+      multi.clear()
+      deps.reload()
+      toastTrashed('quest', ids, `Удалено квестов: ${ids.length}`)
+    },
     setError: (message) => deps.setError(message),
     api: { deleteQuest, deleteQuestStep, deleteQuestline },
   })
@@ -215,6 +222,13 @@ export function createJournalDesk(deps: {
     selectQuest: (id) => deps.setSelectedId(id),
     selectedQuestId: () => deps.getSelectedId(),
     copyId: (kind, id) => void copyId(kind, id),
+    openGraph: (type, id) => deps.openGraph(type, id),
+    addStep: (questId) => {
+      stepModalQuestId = questId
+      stepModalStep = null
+      stepModalOpen = true
+    },
+    askDeleteMany: (ids) => del.askMany(ids),
     openSecrets: (owner) => deps.openSecrets(owner),
     openCreate: (defaults) => openCreate(defaults),
     editQuest: (q) => openEdit(q),

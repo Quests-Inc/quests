@@ -40,6 +40,10 @@ function make() {
     titleOf: (key) => key,
     hidePicked: async () => calls.push('hide-picked'),
     toggleSelectMode: () => calls.push('mode'),
+    fit: () => calls.push('fit'),
+    copyRef: (n) => calls.push(`ref:${n.type}=${n.id}`),
+    highlightEdge: (e) => calls.push(`light:${e.from}>${e.to}`),
+    clearPicked: () => calls.push('clear-picked'),
     hideKeys: async (keys) => calls.push(`hide:${keys.join(',')}`),
     createNoteHere: async (_at, from) => calls.push(`note:${from}`),
     openEntity: (kind) => calls.push(`entity:${kind}`),
@@ -98,4 +102,30 @@ test('создание квеста открывает форму, закрыт�
   expect(menu.questModal.open).toBe(false)
   menu.close()
   expect(menu.ctx.open).toBe(false)
+})
+
+test('меню пустого поля: режим выделения и «Вписать в экран» — и они срабатывают', async () => {
+  const { menu, calls, ev } = make()
+  menu.onCtx(ev(), null as never)
+  const ids = menu.items().map((item) => item.id)
+  expect(ids).toContain('select-mode')
+  expect(ids).toContain('fit')
+  await menu.onCtxSelect('fit')
+  expect(calls).toContain('fit')
+})
+
+test('«Подсветить узлы» в меню линии зовёт подсветку именно этой линии', async () => {
+  const { menu, calls, ev } = make()
+  menu.onEdgeCtx(ev(), { kind: 'reference', from: 'note:1', to: 'note:2' })
+  expect(menu.items().map((i) => i.id)[0]).toBe('edge-light')
+  await menu.onCtxSelect('edge-light')
+  expect(calls).toEqual(['light:note:1>note:2'])
+})
+
+test('меню карточки: «Копировать quest=N» первым, ссылка на сущность уходит в буфер', async () => {
+  const { menu, calls, ev } = make()
+  menu.onCtx(ev(), node('quest:5', 'quest', 5))
+  expect(menu.items()[0].label).toBe('Копировать quest=5')
+  await menu.onCtxSelect('copy-ref')
+  expect(calls).toContain('ref:quest=5')
 })

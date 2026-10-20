@@ -8,8 +8,8 @@ function make(picked: number[] = []) {
   const log: any[] = []
   const cleared: number[] = []
   const quests = [
-    { id: 1, status: 'active' },
-    { id: 2, status: 'frozen' },
+    { id: 1, status: 'active', pinned: true },
+    { id: 2, status: 'frozen', pinned: true },
     { id: 3, status: 'failed', failure_inbox: true },
   ]
   const step = { id: 10, title: 'шаг', progress_total: 4 }
@@ -21,11 +21,14 @@ function make(picked: number[] = []) {
       picked: (id) => (picked.length > 1 && picked.includes(id) ? picked : [id]),
       clearPicked: () => void cleared.push(1),
       copyMany: (k, ids) => log.push(['copyMany', k, ids]),
-      questlines: () => [{ id: 7, category_id: 3 }],
+      questlines: () => [{ id: 7, title: 'Линия', category_id: 3 }],
       findStep: (id) => (id === 10 ? { step, questId: 1 } : null),
       selectQuest: (id) => (selected = id),
       selectedQuestId: () => selected,
       copyId: (k, id) => log.push(['copy', k, id]),
+      openGraph: (t, id) => log.push(['graph', t, id]),
+      addStep: (q) => log.push(['addStep', q]),
+      askDeleteMany: (ids) => log.push(['askMany', ids]),
       openSecrets: (o) => log.push(['secrets', o]),
       openCreate: (d) => log.push(['create', d]),
       editQuest: (q) => log.push(['editQuest', q.id]),
@@ -40,6 +43,9 @@ function make(picked: number[] = []) {
         patchSignificance: (q, v) => log.push(['sig', q.id, v]),
         exportQuest: (q, m) => log.push(['export', q.id, m]),
         ackFailure: (q) => log.push(['ack', q.id]),
+        pin: (q, v) => log.push(['pin', q.id, v]),
+        pinMany: (qs, v) => log.push(['pinMany', qs.map((q) => q.id), v]),
+        moveMany: (qs, l) => log.push(['moveMany', qs.map((q) => q.id), l]),
         postponeMany: (qs, m) => log.push(['postponeMany', qs.map((q) => q.id), m]),
         patchStatusMany: (qs, s) => log.push(['statusMany', qs.map((q) => q.id), s]),
         patchSignificanceMany: (qs, v) => log.push(['sigMany', qs.map((q) => q.id), v]),
@@ -147,4 +153,50 @@ test('меню на выделенной группе: действия идут
   expect(t.log).toEqual([])
   expect(t.selected()).toBe(9)
   t.stop()
+})
+
+test('«Открыть на карте», «Добавить шаг», «Закрепить» у квеста, шага и квестлайна', async () => {
+  const t = make()
+  t.menu.openQuest(t.ev, { id: 1 })
+  const ids = t.menu.items.map((i) => i.id)
+  expect(ids.slice(0, 2)).toEqual(['copy-id', 'graph'])
+  expect(t.menu.items.find((i) => i.id === 'pin')?.label).toBe('Снять закреп')
+  await t.menu.select('graph')
+  await t.menu.select('add-step')
+  await t.menu.select('pin')
+  t.menu.openStep(t.ev, { id: 10 })
+  await t.menu.select('graph')
+  await t.menu.select('add-step')
+  t.menu.openLine(t.ev, { id: 7 })
+  await t.menu.select('graph')
+  expect(t.log).toEqual([
+    ['graph', 'quest', 1],
+    ['addStep', 1],
+    ['pin', 1, false],
+    ['graph', 'quest', 1],
+    ['addStep', 1],
+    ['graph', 'questline', 7],
+  ])
+})
+
+test('меню группы: закрепить, переместить, удалить, снять выделение', async () => {
+  const t = make([1, 2])
+  t.menu.openQuest(t.ev, { id: 1 })
+  const ids = t.menu.items.map((i) => i.id)
+  expect(ids).toContain('delete-many')
+  expect(t.menu.items.find((i) => i.id === 'delete-many')?.label).toBe('Удалить (2)')
+  expect(t.menu.items.find((i) => i.id === 'pin')?.label).toBe('Снять закреп')
+  expect(t.menu.items.find((i) => i.id === 'move')?.children?.map((c) => c.id)).toEqual(['move:none', 'move:7'])
+  await t.menu.select('pin')
+  await t.menu.select('move:7')
+  await t.menu.select('move:none')
+  await t.menu.select('delete-many')
+  await t.menu.select('clear-picked')
+  expect(t.log).toEqual([
+    ['pinMany', [1, 2], false],
+    ['moveMany', [1, 2], 7],
+    ['moveMany', [1, 2], null],
+    ['askMany', [1, 2]],
+  ])
+  expect(t.cleared.length).toBeGreaterThan(0)
 })

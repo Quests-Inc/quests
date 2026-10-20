@@ -71,6 +71,8 @@ export function createGraphStage(deps: {
   let selectMode = $state(false)
   let picked = $state<Set<string>>(new Set())
   let selectedKey = $state<string | null>(null)
+  /** An edge picked in its menu: it and both its ends stand out (the rest is dimmed) until Esc, the same menu item again, a pick of another card or a new centre. Panning and zooming keep it. */
+  let lit = $state<{ from: string; to: string; kind: string } | null>(null)
   /** Stacking order of touched cards: the last one touched has the highest number. */
   let front = $state<Record<string, number>>({})
   let frontSeq = 0
@@ -241,6 +243,28 @@ export function createGraphStage(deps: {
     deps.clearMarquee()
   }
 
+  /** Ctrl+A: selection mode on and every card on the field picked. */
+  function selectAll() {
+    selectMode = true
+    picked = new Set(nodes().map((n) => n.key))
+    deps.clearMarquee()
+  }
+
+  /** Light the edge up; the same edge once more turns it off. */
+  function highlight(edge: { from: string; to: string; kind: string }) {
+    const same = lit && lit.from === edge.from && lit.to === edge.to && lit.kind === edge.kind
+    lit = same ? null : { from: edge.from, to: edge.to, kind: edge.kind }
+  }
+
+  function clearLit() {
+    lit = null
+  }
+
+  /** Selection mode on, what is picked stays. */
+  function enterSelect() {
+    selectMode = true
+  }
+
   function clearPicked() {
     picked = new Set()
   }
@@ -281,6 +305,7 @@ export function createGraphStage(deps: {
       return
     }
     selectedKey = n.key
+    lit = null
   }
 
   function showChanges(key: string) {
@@ -453,6 +478,13 @@ export function createGraphStage(deps: {
     openMore,
     toggleSelectMode,
     clearPicked,
+    enterSelect,
+    highlight,
+    clearLit,
+    get lit() {
+      return lit
+    },
+    selectAll,
     hidePicked,
     hideKeys,
     select,

@@ -32,6 +32,8 @@ export function createGraphGestures(deps: {
   finishLink: (n: GraphNodeView) => unknown
   setLinkCursor: (p: { x: number; y: number }) => void
   selectMode: () => boolean
+  /** Ctrl / Shift picked something outside the selection mode: turn it on, so the picked ones can be acted on. */
+  enterSelect?: () => void
   getPicked: () => Set<string>
   setPicked: (s: Set<string>) => void
   getSaved: () => Map<string, { x: number; y: number }>
@@ -114,8 +116,8 @@ export function createGraphGestures(deps: {
       return
     }
     if (e.button !== 0) return
-    // Ctrl / Cmd holds the picking tools without the selection mode: a frame on the field, a click on a card.
-    if (deps.selectMode() || e.ctrlKey || e.metaKey) {
+    // Ctrl / Cmd / Shift hold the picking tools without the selection mode: a frame on the field, a click on a card.
+    if (deps.selectMode() || e.ctrlKey || e.metaKey || e.shiftKey) {
       const r = deps.getStage()?.getBoundingClientRect()
       if (!r) return
       const x = e.clientX - r.left
@@ -136,7 +138,7 @@ export function createGraphGestures(deps: {
       }
       return
     }
-    if (deps.selectMode() || (e.button === 0 && (e.ctrlKey || e.metaKey))) {
+    if (deps.selectMode() || (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey))) {
       if (e.button !== 0 || (e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__changed')) return
       e.stopPropagation()
       const group = deps.getPicked().has(n.key)
@@ -279,6 +281,8 @@ export function createGraphGestures(deps: {
         deps.setPicked(next)
       }
     }
+    if ((drag?.kind === 'marquee' || drag?.kind === 'multi') && !deps.selectMode() && deps.getPicked().size)
+      deps.enterSelect?.()
     if (drag?.kind === 'group' && drag.moved) {
       for (const s of drag.members) deps.getSaved().set(s.m.key, { x: s.m.x, y: s.m.y })
     }
@@ -300,6 +304,13 @@ export function createGraphGestures(deps: {
     zoomAt(cam.k * f, e.clientX - r.left, e.clientY - r.top)
   }
 
+  /** Zoom around the middle of the field from the keyboard: 1 closer, −1 farther, 0 back to 1:1. */
+  function zoomStep(dir: 1 | -1 | 0) {
+    const r = deps.getStage()?.getBoundingClientRect()
+    if (!r) return
+    zoomAt(dir === 0 ? 1 : cam.k * (dir > 0 ? 1.25 : 1 / 1.25), r.width / 2, r.height / 2)
+  }
+
   return {
     get cam() {
       return cam
@@ -315,6 +326,7 @@ export function createGraphGestures(deps: {
     },
     worldAt,
     zoomAt,
+    zoomStep,
     onTouchDown,
     onBgDown,
     onCardDown,

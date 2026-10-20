@@ -22,6 +22,7 @@
 }
 
 .journal__viewport {
+  position: relative;
   grid-area: 1 / 1;
   min-height: 0;
   display: flex;
@@ -32,9 +33,9 @@
 .journal__header {
   position: relative;
   flex-shrink: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3, 0.75rem);
   min-height: var(--header-height, 3.25rem);
   padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
@@ -45,44 +46,22 @@
 .header-left {
   display: flex;
   align-items: center;
-  /* nowrap: wrapping chips under the action row was one way they
-       "competed" for space and visually collided with the gear. */
-  flex-wrap: nowrap;
-  gap: var(--space-3, 0.75rem);
   min-width: 0;
-  /* Yield width to header-actions if both claim space — actions stay
-       clickable; health collapses / clips rather than painting over gear. */
-  flex: 1 1 auto;
-  z-index: 1;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2, 0.5rem);
-  min-height: var(--nav-control-h, 2rem);
-}
-
-.journal__header .sidebar-toggle {
-  width: var(--nav-control-h, 2rem);
-  height: var(--nav-control-h, 2rem);
-  padding: 0;
 }
 
 .header-actions {
+  justify-self: end;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.1rem;
   flex-shrink: 0;
-  /* Above health if a residual overlap remains — clicks stay on actions. */
-  position: relative;
-  z-index: 2;
   font-family: var(--font-display, Georgia, serif);
 }
 
 .header-actions .btn {
+  white-space: nowrap;
   height: var(--nav-control-h, 2rem);
   min-height: 0;
   padding: 0 0.5rem;
@@ -126,77 +105,14 @@
   padding: 0;
 }
 
-.header-actions--icons .btn__text {
-  display: none;
-}
-
-.header-actions--icons .btn {
-  width: var(--nav-control-h, 2rem);
-  min-width: var(--nav-control-h, 2rem);
-  padding: 0;
-  gap: 0;
-}
-
 .header-actions .btn--overflow .icon {
   transform: rotate(90deg);
-}
-
-/* Off-screen twin used only to measure whether the full labeled row
-     would fit — never shown, never wraps (nowrap so its scrollWidth is
-     the row's true natural width). See JournalHeader's ResizeObserver. */
-.header-actions--measure {
-  position: fixed;
-  left: -9999px;
-  top: 0;
-  visibility: hidden;
-  flex-wrap: nowrap;
-  pointer-events: none;
 }
 
 .btn--icon-only {
   width: 2.25rem;
   padding: 0;
   gap: 0;
-}
-
-/* True page-center regardless of how wide header-left/actions end up —
-     a shared grid track for centering only works when both sides are the
-     same width, which stopped being true once actions/health got their
-     own content-driven widths. */
-.view-tabs {
-  display: inline-flex;
-  align-items: stretch;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  /* Above header-left (z-index: 1): that flex cluster stretches across
-       the header and was eating clicks on the centered tabs. */
-  z-index: 3;
-  gap: 0.15rem;
-  border: 0;
-  border-radius: 0;
-  overflow: visible;
-  background: transparent;
-}
-
-/* The centred tabs do not fit between the clusters (JournalHeader measures it): own row under them, as in portrait. */
-.journal__header--stacked {
-  flex-wrap: wrap;
-}
-
-.journal__header--stacked .view-tabs {
-  position: static;
-  left: auto;
-  top: auto;
-  transform: none;
-  margin: 0;
-  order: 3;
-  flex: 1 1 100%;
-  display: flex;
-  width: 100%;
-  justify-content: center;
-  border-top: 1px solid var(--color-border, #333);
 }
 
 .view-tab {
@@ -219,26 +135,8 @@
 
 /* Icon rides along in the markup but only earns its keep once labels
      get cut off on a very narrow screen — see the 480px override below. */
-.view-tabs .view-tab .icon {
+.view-tabs .view-tab > .icon:first-child {
   display: none;
-}
-
-/* Labels do not fit even on their own row (JournalHeader measures it): icons only, as in the 480px override. */
-.journal__header--icon-tabs .view-tab {
-  padding: 0 0.5rem;
-}
-
-.journal__header--icon-tabs .view-tabs .view-tab .icon {
-  display: inline-flex;
-}
-
-.journal__header--icon-tabs .view-tab__label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
 }
 
 .view-tab + .view-tab {
@@ -269,4 +167,66 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Health on the left, section tabs in the middle, the same actions on the right in every section. */
+.view-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.view-tab--group {
+  position: relative;
+}
+
+.view-tab--group .icon:last-child {
+  opacity: 0.6;
+  /* The chevron sits on the text's centre line, not above it. */
+  transform: translateY(1px);
+}
+
+/* Labels give way to icons as the row runs out of width. */
+@media (max-width: 1100px) {
+  .header-actions .btn__text {
+    display: none;
+  }
+
+  .header-actions .btn {
+    width: var(--nav-control-h, 2rem);
+    min-width: var(--nav-control-h, 2rem);
+    padding: 0;
+    gap: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .view-tabs .view-tab > .icon:first-child {
+    display: inline-flex;
+  }
+
+  .view-tab--group > .view-tab__label,
+  .view-tab:not(.view-tab--group) > .view-tab__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .view-tab {
+    padding: 0 0.5rem;
+  }
+
+  /* Icon-only: the chevron drops under the icon so a group is as wide as the other tabs. */
+  .view-tab--group > .icon:last-child {
+    position: absolute;
+    left: 50%;
+    bottom: 1px;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+  }
 }

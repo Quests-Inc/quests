@@ -44,6 +44,7 @@
   import { SettingsModal } from '@/features/settings'
   import ToastHost from '@/shared/ui/ToastHost.svelte'
   import { JournalHeader } from '@/widgets/journal-header'
+  import { sidebars, SIDEBAR_ONE_PANE } from '@/shared/lib/sidebar.svelte.ts'
   import { NotesPage } from '@/pages/notes'
   import { AttachmentsPage } from '@/pages/attachments'
   import { LoginScreen, InviteScreen, NoWorkspaceScreen } from '@/pages/auth'
@@ -86,38 +87,9 @@
   const selectNoteFromUi = nav.selectNote
   const selectAttachmentFromUi = nav.selectAttachment
   const onGraphOpen = nav.openRef
-  /** Sidebar visibility per view that has one — remembered across reloads. */
-  let sidebarCollapsed: Record<string, boolean> = $state(loadSidebarCollapsed())
-
-  function loadSidebarCollapsed() {
-    try {
-      const raw = JSON.parse(localStorage.getItem('quests.sidebarCollapsed') || '{}')
-      return { journal: !!raw.journal, notes: !!raw.notes, scripts: !!raw.scripts }
-    } catch {
-      return { journal: false, notes: false, scripts: false }
-    }
-  }
-
-  function toggleSidebar(key: string) {
-    setSidebarCollapsed(key, !sidebarCollapsed[key])
-  }
-
-  function setSidebarCollapsed(key: string, value: boolean) {
-    if (sidebarCollapsed[key] === value) return
-    sidebarCollapsed = { ...sidebarCollapsed, [key]: value }
-    try {
-      localStorage.setItem('quests.sidebarCollapsed', JSON.stringify(sidebarCollapsed))
-    } catch {
-      /* ignore */
-    }
-  }
-
-  /** Below this, the sidebar/list takes the full screen instead of a side column. */
-  const NARROW_SIDEBAR_BREAKPOINT = '(max-width: 480px)'
-
   function isNarrowViewport() {
     try {
-      return window.matchMedia(NARROW_SIDEBAR_BREAKPOINT).matches
+      return window.matchMedia(SIDEBAR_ONE_PANE).matches
     } catch {
       return false
     }
@@ -125,12 +97,12 @@
 
   /** On a full-screen sidebar, picking an item should reveal it, not leave the list covering it. */
   function revealDetailOnNarrow(key: string) {
-    if (isNarrowViewport()) setSidebarCollapsed(key, true)
+    if (isNarrowViewport()) sidebars.setCollapsed(key, true)
   }
 
   /** …and going back to the list should bring it back, not leave an empty detail pane. */
   function revealListOnNarrow(key: string) {
-    if (isNarrowViewport()) setSidebarCollapsed(key, false)
+    if (isNarrowViewport()) sidebars.setCollapsed(key, false)
   }
   /** Bump to refresh the map after live events. */
   let graphNonce = $state(0)
@@ -243,6 +215,7 @@
     },
     getRefLabels: () => refLabels,
     openSecrets: (owner) => openSecrets(owner),
+    openGraph: (type, id) => openGraph(type, id),
     onGraphDirty: () => {
       if (nav.view === 'graph') graphNonce += 1
     },
@@ -606,8 +579,6 @@
     view={nav.view}
     {liveStatus}
     {health}
-    sidebarCollapsed={sidebarCollapsed[nav.view === 'notes' || nav.view === 'scripts' ? nav.view : 'journal']}
-    onToggleSidebar={() => toggleSidebar(nav.view === 'notes' || nav.view === 'scripts' ? nav.view : 'journal')}
     onViewChange={(v) => setView(v)}
     onOpenSettings={openSettings}
     onOpenTemplates={openTemplates}
@@ -646,11 +617,11 @@
         {questlines}
         selectedId={nav.selectedNoteId}
         labels={refLabels}
-        sidebarCollapsed={sidebarCollapsed.notes}
         onSelect={(id) => selectNoteFromUi(id)}
         onChanged={() => load({ silent: true })}
         onRef={onJournalRef}
         onOpenSecrets={(id) => openSecrets({ kind: 'note', id })}
+        onOpenGraph={openGraph}
       />
     </div>
   {:else if nav.view === 'graph'}
@@ -660,7 +631,7 @@
       <RunnersPage active={nav.view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
   {:else if nav.view === 'scripts'}
-    <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} sidebarCollapsed={sidebarCollapsed.scripts} /></div>
+    <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} /></div>
   {:else if nav.view === 'hooks'}
     <div class="journal__hooks">
       <HooksPage active={nav.view === 'hooks'} onOpenQuest={(id) => selectQuestFromUi(id)} />
@@ -682,6 +653,7 @@
         selectedId={nav.selectedAttachmentId}
         onSelect={(id) => selectAttachmentFromUi(id)}
         onOpenOwner={onJournalRef}
+        onOpenGraph={openGraph}
         onChanged={() => load({ silent: true })}
       />
     </div>
@@ -692,7 +664,6 @@
       {questlines}
       selectedId={nav.selectedId}
       {selected}
-      sidebarCollapsed={sidebarCollapsed.journal}
       {nowMs}
       labels={refLabels}
       kbStepId={desk.kbStepId}
@@ -706,6 +677,7 @@
       pickedIds={desk.multi.picked}
       onRowClick={(e, id, order) => desk.multi.click(e, id, order)}
       onClearPicked={() => desk.multi.clear()}
+      onSelectAll={(ids) => desk.multi.selectAll(ids)}
       onTogglePin={desk.togglePin}
       onQuestContextMenu={desk.menu.openQuest}
       onLineContextMenu={desk.menu.openLine}

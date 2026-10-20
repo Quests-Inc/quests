@@ -110,16 +110,17 @@
   {/if}
 
   <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready}>
-    <GraphEdges drawEdges={stage.drawEdges} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
+    <GraphEdges drawEdges={stage.drawEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
     <GraphGroups groups={stage.groups} collapseKey={stage.collapseKey} onGroupDown={gest.onGroupDown} {onGroupCtx} onCollapse={folds.collapse} />
     {#each stage.view?.nodes ?? [] as n (n.key)}
       <GraphCard
         {n}
         selected={n.key === stage.selectedKey}
+        lit={n.key === stage.lit?.from || n.key === stage.lit?.to}
         root={n.key === data?.root}
         done={isDone(n)}
         orphan={isOrphan(n)}
-        dim={!!lk.linking && n.key !== lk.linking.anchor && !lk.canPick(n)}
+        dim={(!!lk.linking && n.key !== lk.linking.anchor && !lk.canPick(n)) || (!!stage.lit && n.key !== stage.lit.from && n.key !== stage.lit.to)}
         pickable={!!lk.linking && lk.canPick(n)}
         anchor={lk.linking?.anchor === n.key}
         ownerless={stage.ownerless.has(n.key)}

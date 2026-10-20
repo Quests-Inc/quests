@@ -303,34 +303,7 @@
   color: var(--tone, var(--color-fg));
 }
 
-@media (max-width: 760px) {
-  /* Stay side-by-side and just shrink — no stacking, which pushed the
-       detail pane below a full-height sidebar and made it feel lost. */
-  .journal__body {
-    grid-template-columns: minmax(7rem, 30%) 1fr;
-  }
-}
-
 @media (max-width: 480px) {
-  /* Too narrow for a side-by-side list + detail — go one pane at a time,
-       full screen, toggled by the same sidebar-collapse state/button.
-       selectQuestFromUi/clearSelectedQuest (App.svelte) flip it on pick/back. */
-  .journal__body {
-    grid-template-columns: 1fr;
-  }
-
-  .journal__body .detail {
-    display: none;
-  }
-
-  .journal__body--sidebar-collapsed .sidebar {
-    display: none;
-  }
-
-  .journal__body--sidebar-collapsed .detail {
-    display: block;
-  }
-
   /* The desktop 2rem gutters and roomy step grid left step titles ~45%
        of a phone's width, wrapping a word per line. */
   .detail {
@@ -385,36 +358,15 @@
 
 @media (orientation: portrait) {
   .journal__header {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-bottom: 0;
   }
 
-  /* Centered on row 1 itself — level with the sidebar toggle and the
-       header-actions buttons, not dropped onto its own line below them.
-       top is row 1's vertical *center* (half its height), not its bottom
-       edge — that earlier attempt put health at the same top as
-       .view-tabs' own row (order: 3, which starts right at the full
-       row-1 height), one row too low. */
-  .health {
-    position: absolute;
-    left: 50%;
-    /* Row 1's actual center: header top padding + half a control. The old
-         header-height/2 assumed a single-row header and sat 4px high. */
-    top: calc(var(--space-3, 0.75rem) + var(--nav-control-h, 2rem) / 2);
-    transform: translate(-50%, -50%);
-  }
-
-  /* No room to float the tabs centered over one line — drop them onto
-       their own full-width row below brand/actions instead. */
+  /* The tabs get their own full-width row under the health and the actions. */
   .view-tabs {
-    position: static;
-    left: auto;
-    top: auto;
-    transform: none;
-    margin: 0;
-    order: 3;
-    flex: 1 1 100%;
-    display: flex;
-    width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 0.375rem 0;
     justify-content: center;
     border-top: 1px solid var(--color-border, #333);
   }

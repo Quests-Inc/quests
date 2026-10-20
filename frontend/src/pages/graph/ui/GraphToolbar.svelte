@@ -120,7 +120,7 @@
     <label class="graph__ctl graph__edge">
       <input type="checkbox" bind:checked={showEdge[k]} />
       <svg width="26" height="8" aria-hidden="true">
-        <line x1="0" y1="4" x2="26" y2="4" stroke={e.color} stroke-width="2" stroke-dasharray={e.dash} />
+        <line x1="0" y1="4" x2="26" y2="4" stroke={e.color} stroke-width="2" />
       </svg>
       {e.label}
     </label>

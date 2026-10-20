@@ -134,8 +134,9 @@ test('связь: нажать на выход, отпустить на вход
 
 test('клавиши: Delete убирает выбранное, Ctrl+Z отменяет, Esc сбрасывает незаконченную связь', async () => {
   const { ed, cv } = await rig()
+  const code = (k: string) => (k.length === 1 ? `Key${k.toUpperCase()}` : k)
   const key = (k: string, extra: object = {}) =>
-    cv.onKey({ key: k, target: document.createElement('div'), preventDefault() {}, ...extra } as any)
+    cv.onKey({ key: k, code: code(k), target: document.createElement('div'), preventDefault() {}, ...extra } as any)
 
   ed.select(2)
   key('Delete')
@@ -157,7 +158,7 @@ test('клавиши: Delete убирает выбранное, Ctrl+Z отме�
 
   // в поле ввода клавиши не перехватываются
   const input = document.createElement('input')
-  cv.onKey({ key: 'Delete', target: input, preventDefault() {} } as any)
+  cv.onKey({ key: 'Delete', code: 'Delete', target: input, preventDefault() {} } as any)
   expect(ed.graph.nodes).toHaveLength(3)
 })
 

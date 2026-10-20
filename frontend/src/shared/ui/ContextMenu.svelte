@@ -15,7 +15,7 @@
   }
 
 
-  let { open = false, x = 0, y = 0, items = [], onSelect, onClose }: { open: boolean, x: number, y: number, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
+  let { open = false, x = 0, y = 0, center = false, items = [], onSelect, onClose }: { open: boolean, x: number, y: number, /** x — середина якоря: меню встаёт по центру под ним, в пределах экрана. */ center?: boolean, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
 
   type Branch = { id: string, items: CtxItem[], search?: CtxItem[], left: number, right: number, top: number, query: string }
 
@@ -36,9 +36,9 @@
     const { width, height } = el.getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
-    let left = x
+    let left = center ? x - width / 2 : x
     let top = y
-    if (left + width > vw - PAD) left = x - width
+    if (!center && left + width > vw - PAD) left = x - width
     if (left < PAD) left = PAD
     if (left + width > vw - PAD) left = Math.max(PAD, vw - width - PAD)
     if (top + height > vh - PAD) top = y - height

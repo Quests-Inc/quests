@@ -145,6 +145,7 @@ export function noteMenuItems({
   if (noteId == null) return []
   return [
     { id: 'copy-id', label: `Копировать note=${noteId}` },
+    { id: 'graph', label: 'Открыть на карте' },
     { id: 'sep-copy', sep: true },
     ...(searchActive ? [] : [{ id: 'rename', label: 'Переименовать' }]),
     {
@@ -159,6 +160,7 @@ export function noteMenuItems({
       ],
     },
     { id: 'add-child', label: 'Добавить дочернюю' },
+    { id: 'duplicate', label: 'Дублировать' },
     { id: 'move', label: 'Переместить', children: moveTargets, search: moveSearch },
     {
       id: 'export',

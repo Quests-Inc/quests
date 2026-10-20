@@ -6,6 +6,9 @@
   import ScopePicker from '@/shared/ui/ScopePicker.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
+  import { isListSelectAll } from '@/shared/lib/listKeys.ts'
+  import SidebarTools from '@/shared/ui/SidebarTools.svelte'
+  import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
   import {
     isQuestInactive,
     periodBadge,
@@ -38,6 +41,7 @@
     pickedIds = new Set<number>(),
     onRowClick,
     onClearPicked,
+    onSelectAll,
     onTogglePin,
     onQuestContextMenu,
     onLineContextMenu,
@@ -78,6 +82,7 @@
     /** Ctrl/Shift-click goes here first: true = taken into the selection, the row is not opened. */
     onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean,
     onClearPicked?: () => void,
+    onSelectAll?: (ids: number[]) => void,
     onTogglePin: (quest: any, event: Event) => void,
     onQuestContextMenu: (event: MouseEvent, quest: any) => void,
     onLineContextMenu: (event: MouseEvent, line: any) => void,
@@ -107,6 +112,12 @@
   function visibleOrder() {
     const ids = [...(rootEl?.querySelectorAll<HTMLElement>('.quest-row[data-qid]') ?? [])].map((el) => Number(el.dataset.qid))
     return [...new Set(ids)]
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (!isListSelectAll(e)) return
+    e.preventDefault()
+    onSelectAll?.(visibleOrder())
   }
 
   /** The nearest ancestor that actually scrolls. */
@@ -150,16 +161,14 @@
   }
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 <aside class="sidebar" data-nav-root bind:this={rootEl}>
-  <div class="sidebar__tools">
-    <input
-      class="search"
-      type="search"
-      placeholder="Поиск…"
-      bind:value={searchQuery}
-      aria-label="Поиск по названию, разделу, квестлайну, описанию, шагам"
-      title={`Фильтры: ${helpLine(querySpec)}; -key:value — исключить`}
-    />
+  <SidebarTools
+    bind:value={searchQuery}
+    label="Поиск по названию, разделу, квестлайну, описанию, шагам"
+    hint={`Фильтры: ${helpLine(querySpec)}; -key:value — исключить`}
+  >
     <FlagHints value={searchQuery} spec={querySpec} parsed={parsedSearch} onPick={(v) => (searchQuery = v)} />
     <div class="sidebar__scope">
       <div class="sidebar__scope-pick">
@@ -183,13 +192,7 @@
         <Icon name={showAllQuests ? 'eye' : 'eye-off'} size={16} />
       </button>
     </div>
-  </div>
-  {#if pickedIds.size > 0}
-    <div class="sidebar__picked" role="status">
-      <span class="sidebar__picked-count">Выбрано: {pickedIds.size}</span>
-      <button type="button" class="sidebar__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}><Icon name="close" size={14} /></button>
-    </div>
-  {/if}
+  </SidebarTools>
   {#snippet questRow(q: any)}
     {@const rowTimer = questTimer(q, nowMs)}
     {@const frac = quantifiedProgress(q)}
@@ -402,4 +405,5 @@
       {/each}
     {/if}
   </div>
+  <SidebarPicked count={pickedIds.size} onClear={() => onClearPicked?.()} />
 </aside>

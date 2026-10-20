@@ -58,6 +58,10 @@ export function edgePath(a: Box, b: Box, oa = 0, ob = 0) {
       d: `M${x1} ${y1} C${x1 + dir * off} ${y1} ${ex - dir * off} ${y2} ${ex} ${y2} L${x2} ${y2}`,
       sx: x1,
       sy: y1,
+      ex: x2,
+      ey: y2,
+      fx: dir,
+      fy: 0,
     }
   }
   const x1 = a.x + oa
@@ -66,7 +70,31 @@ export function edgePath(a: Box, b: Box, oa = 0, ob = 0) {
   const y2 = b.y - (dir * b.h) / 2
   const ey = y2 - dir * STUB
   const off = Math.max(30, Math.abs(ey - y1) / 2)
-  return { d: `M${x1} ${y1} C${x1} ${y1 + dir * off} ${x2} ${ey - dir * off} ${x2} ${ey} L${x2} ${y2}`, sx: x1, sy: y1 }
+  return {
+    d: `M${x1} ${y1} C${x1} ${y1 + dir * off} ${x2} ${ey - dir * off} ${x2} ${ey} L${x2} ${y2}`,
+    sx: x1,
+    sy: y1,
+    ex: x2,
+    ey: y2,
+    fx: 0,
+    fy: dir,
+  }
+}
+
+/**
+ * The arrowhead at the end of an edge as a closed path (the same triangle the SVG marker drew: 7 line widths long, tip one
+ * tenth past the end), so a whole batch of edges needs no <marker> — those are slow to paint in bulk.
+ */
+export function arrowHead(e: { ex: number; ey: number; fx: number; fy: number }, lineWidth: number) {
+  const u = (lineWidth * 7) / 10
+  const tx = e.ex + e.fx * u
+  const ty = e.ey + e.fy * u
+  const bx = e.ex - e.fx * 9 * u
+  const by = e.ey - e.fy * 9 * u
+  const nx = -e.fy * 5 * u
+  const ny = e.fx * 5 * u
+  const r = (n: number) => Math.round(n * 100) / 100
+  return `M${r(tx)} ${r(ty)}L${r(bx + nx)} ${r(by + ny)}L${r(bx - nx)} ${r(by - ny)}Z`
 }
 
 /**

@@ -10,6 +10,8 @@
   import { groupScripts } from '../model/groups.ts'
   import { createCanvas } from '../model/canvas.svelte.ts'
   import { createScriptEditor } from '../model/editor.svelte.ts'
+  import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
+  import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import BakeModal from './BakeModal.svelte'
   import CodeNodeModal from './CodeNodeModal.svelte'
   import Inspector from './Inspector.svelte'
@@ -18,13 +20,15 @@
   import ProblemList from './ProblemList.svelte'
   import ScriptCanvas from './ScriptCanvas.svelte'
   import ScriptListMenu from './ScriptListMenu.svelte'
+  import { createScriptGroup } from '../model/scriptGroup.svelte.ts'
+  import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
 
   /**
    * The script library (ADR-0003): the workspace's scripts, and an editor for the chosen one: nodes on a field, links from
    * outputs to inputs, the parameters of a node on the right, what the validator finds below. The field is the map's own
    * (its gestures, its minimap); only the cards and the wires are the editor's.
    */
-  let { active = true, sidebarCollapsed = false }: { active?: boolean; sidebarCollapsed?: boolean } = $props()
+  let { active = true }: { active?: boolean } = $props()
 
   const USE_KINDS: Record<string, string> = { step: 'шаг', note: 'заметка', template: 'шаблон', template_step: 'шаг шаблона' }
 
@@ -38,7 +42,13 @@
   let bakeWhole = $state(false)
   let uses = $state<ScriptUse[]>([])
   let folded = $state<Set<string>>(new Set())
-  const groups = $derived(groupScripts(scriptsList.items, PURPOSES, PURPOSE_NONE))
+  let search = $state('')
+  const shown = $derived.by(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return scriptsList.items
+    return scriptsList.items.filter((s) => [s.title, s.description ?? '', ...(s.subjects ?? [])].some((t) => t.toLowerCase().includes(q)))
+  })
+  const groups = $derived(groupScripts(shown, PURPOSES, PURPOSE_NONE))
   function fold(key: string) {
     const next = new Set(folded)
     if (!next.delete(key)) next.add(key)
@@ -69,6 +79,21 @@
       busy = false
     }
   }
+
+  const grp = createScriptGroup({
+    scripts: () => scriptsList.items,
+    selectedId: () => selectedId,
+    api: { get: getScript, create: createScript as never, update: updateScript, remove: deleteScript },
+    reload: () => loadScripts(true),
+    onRemoved: (ids) => {
+      if (selectedId != null && ids.includes(selectedId)) {
+        selectedId = null
+        ed.reset()
+      }
+    },
+  })
+  /** Scripts on screen in their order (folded groups are not there). */
+  const visibleIds = () => groups.filter((g) => !folded.has(g.key)).flatMap((g) => g.items.map((s) => s.id))
 
   function pick(id: number) {
     if (id === selectedId) return
@@ -159,9 +184,15 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    const t = e.target
+    const inField = t instanceof Element && t.closest('input, textarea, select, .scv')
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && selectedId != null) {
       e.preventDefault()
       void save()
+    } else if (e.key === 'Escape' && grp.multi.size > 0 && !inField) grp.multi.clear()
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA' && !e.shiftKey && !inField) {
+      e.preventDefault()
+      grp.selectAll(visibleIds())
     }
   }
 
@@ -202,13 +233,10 @@
 
 <svelte:window onkeydown={active ? onKey : undefined} />
 
-<div class="scripts" class:scripts--collapsed={sidebarCollapsed}>
+<SidebarLayout key="scripts" class="scripts">
+  {#snippet sidebar()}
   <aside class="scripts__list" aria-label="Скрипты">
-    <div class="scripts__tools">
-      <button type="button" class="btn scripts__new" disabled={busy} onclick={() => void createEmpty()}>
-        <Icon name="add" /> Новый скрипт
-      </button>
-    </div>
+    <SidebarTools bind:value={search} label="Поиск по скриптам" hint="По названию, описанию и видам сущностей" createLabel="Новый скрипт" createBusy={busy} onCreate={() => void createEmpty()} />
     <div class="scripts__items">
       {#each groups as g (g.key)}
         <section class="sgroup" style:--c={g.color}>
@@ -225,9 +253,11 @@
                     type="button"
                     class="scripts__item"
                     class:scripts__item--on={s.id === selectedId}
-                    onclick={() => pick(s.id)}
+                    class:scripts__item--picked={grp.multi.has(s.id)}
+                    onclick={(e) => !grp.click(e, s.id, visibleIds()) && pick(s.id)}
                     oncontextmenu={(e) => {
                       e.preventDefault()
+                      if (grp.multi.targets(s.id).length < 2) grp.multi.clear()
                       scriptMenu = { open: true, x: e.clientX, y: e.clientY, id: s.id }
                     }}
                   >
@@ -240,10 +270,12 @@
           {/if}
         </section>
       {:else}
-        <p class="scripts__none">Скриптов пока нет. «Новый скрипт» создаёт пустой.</p>
+        <p class="empty">{search.trim() ? 'Ничего не найдено' : 'Скриптов пока нет. «+» создаёт пустой.'}</p>
       {/each}
     </div>
+    <SidebarPicked count={grp.multi.size} onClear={() => grp.multi.clear()} />
   </aside>
+  {/snippet}
 
   <section class="scripts__main formscope">
     {#if selectedId == null}
@@ -309,7 +341,7 @@
       {/if}
     {/if}
   </section>
-</div>
+</SidebarLayout>
 
 <CodeNodeModal
   open={codeModal.open}
@@ -326,6 +358,19 @@
   onPurpose={(id, purpose) => void patchScript(id, { purpose })}
   onBake={(id) => void bakeScript(id)}
   onDelete={(id) => (ask = { kind: 'delete', id })}
+  onCopy={(id) => void grp.copyRef(id)}
+  onDuplicate={(id) => void grp.duplicate(id).then((n) => n != null && openScript(n))}
+  group={scriptMenu.id != null ? grp.multi.targets(scriptMenu.id) : []}
+  groupItems={grp.items(grp.multi.list)}
+  onGroup={(action, ids) => grp.run(action, ids)}
+/>
+<ConfirmModal
+  open={grp.ask.length > 0}
+  title="Удалить скрипты?"
+  message={`Удалить выбранные скрипты (${grp.ask.length}) со всеми версиями? Если скрипт где-то подключён, сервер откажет.`}
+  busy={grp.busy}
+  onCancel={grp.cancelDelete}
+  onConfirm={grp.confirmDelete}
 />
 <BakeModal
   open={bakeOpen}
@@ -361,20 +406,6 @@
 />
 
 <style>
-  /* The same frame as the journal and the notes: a raised list on the left (it folds from the header), the work on the right. */
-  .scripts {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: minmax(14rem, var(--sidebar-width, 16.5rem)) 1fr;
-    overflow: hidden;
-  }
-  .scripts--collapsed {
-    grid-template-columns: 0 1fr;
-  }
-  .scripts--collapsed .scripts__list {
-    border-right: 0;
-  }
   .scripts__list {
     display: flex;
     flex-direction: column;
@@ -382,14 +413,6 @@
     overflow: hidden;
     border-right: 1px solid var(--color-border, #333);
     background: var(--color-bg-raised, #1a1a1a);
-  }
-  .scripts__tools {
-    flex: none;
-    padding: 0.55rem 0.6rem;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-  .scripts__new {
-    width: 100%;
   }
   .scripts__list ul {
     margin: 0;
@@ -463,15 +486,12 @@
   .scripts__item:hover {
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
   }
+  .scripts__item--picked,
+  .scripts__item--picked,
   .scripts__item--on,
   .scripts__item--on:hover {
     border-left-color: var(--color-accent, #c9a227);
     background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-raised, #1a1a1a));
-  }
-  .scripts__none {
-    padding: 1rem;
-    color: var(--color-fg-muted, #9a9a9a);
-    font-size: var(--text-sm, 0.875rem);
   }
   .scripts__main {
     min-width: 0;
@@ -547,14 +567,6 @@
     }
     .scripts__work {
       flex-direction: column;
-    }
-  }
-  @media (max-width: 720px) {
-    .scripts {
-      grid-template-columns: minmax(7rem, 30%) 1fr;
-    }
-    .scripts--collapsed {
-      grid-template-columns: 0 1fr;
     }
   }
 </style>

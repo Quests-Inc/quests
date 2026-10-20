@@ -578,6 +578,7 @@
       </header>
 
       <div class="day-load__body">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="day-board" aria-label="Доска дня" onmouseleave={() => (hoveredId = null)}>
           <div class="day-board__axis" aria-hidden="true">
             <div class="day-board__gutter"></div>

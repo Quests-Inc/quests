@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { clampK, edgePath, sidesOf, spreadEnds } from '../../src/entities/graph/model/geometry.ts'
+import { arrowHead, clampK, edgePath, sidesOf, spreadEnds } from '../../src/entities/graph/model/geometry.ts'
 
 const box = (x, y, key) => ({ x, y, w: 100, h: 40, key })
 
@@ -37,4 +37,13 @@ test('clampK: не выходит за пределы, но не прыгает 
   expect(clampK(10, 1)).toBe(2.5)
   expect(clampK(0.01, 1)).toBe(0.2)
   expect(clampK(0.1, 0.05)).toBe(0.1)
+})
+
+test('arrowHead: треугольник стрелки на конце ребра, как маркер (длина 7 толщин, кончик чуть за концом)', () => {
+  const right = edgePath(box(0, 0), box(300, 0))
+  expect(right).toMatchObject({ ex: 250, ey: 0, fx: 1, fy: 0 })
+  expect(arrowHead(right, 10)).toBe('M257 0L187 35L187 -35Z')
+  const down = edgePath(box(0, 0), box(0, 200))
+  expect(down).toMatchObject({ ex: 0, ey: 180, fx: 0, fy: 1 })
+  expect(arrowHead(down, 10)).toMatch(/^M0 187L/)
 })

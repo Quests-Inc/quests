@@ -10,9 +10,9 @@ export const TYPES: Record<string, any> = {
   cluster: { label: 'Вложения', glyph: '⎘', color: '#4f9fc7' },
 }
 export const EDGES: Record<string, any> = {
-  structure: { label: 'Принадлежность', color: '#6e6e6e', dash: '' },
-  reference: { label: 'Ссылка', color: '#c9a227', dash: '6 4' },
-  dependency: { label: 'Зависимость', color: '#d0699b', dash: '' },
+  structure: { label: 'Принадлежность', color: '#6e6e6e' },
+  reference: { label: 'Ссылка', color: '#c9a227' },
+  dependency: { label: 'Зависимость', color: '#d0699b' },
 }
 /** Attachments of one owner collapse into a cluster beyond this many. */
 export const CLUSTER_MIN = 6

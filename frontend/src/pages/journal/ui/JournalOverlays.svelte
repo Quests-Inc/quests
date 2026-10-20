@@ -80,6 +80,15 @@
 />
 
 <ConfirmModal
+  open={desk.del.manyIds.length > 0}
+  title="Удалить квесты?"
+  message={`Удалить выбранные квесты (${desk.del.manyIds.length})? Их можно вернуть из корзины.`}
+  busy={desk.del.manyBusy}
+  onCancel={desk.del.cancelMany}
+  onConfirm={desk.del.confirmMany}
+/>
+
+<ConfirmModal
   open={desk.del.stepOpen}
   title="Удалить шаг?"
   message={desk.del.step ? `Удалить шаг «${desk.del.step.title}»?` : ''}

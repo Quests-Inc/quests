@@ -5,7 +5,7 @@ import { QUEST_SIGNIFICANCES } from '@/shared/api/questConsts.ts'
 import { localTimeZone } from '@/shared/lib/time.ts'
 import { statusToastLabel, toast, toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
 
-type Quest = { id: number; status?: string; significance?: string }
+type Quest = { id: number; status?: string; significance?: string; pinned?: boolean; questline_id?: number | null }
 type QuestFull = Quest & Record<string, unknown>
 
 /** Что отправить, чтобы отложить квест: снова активен, срок через `minutes`, окно такой же длины (не короче минуты). */
@@ -86,6 +86,25 @@ export function createQuestActions(deps: {
         (q) => (significance === (q.significance || 'common') ? null : { significance }),
         (n) => `Значимость: ${QUEST_SIGNIFICANCES.find((s) => s.id === significance)?.label || significance} (${n})`
       ),
+    pinMany: (quests: Quest[], value: boolean) =>
+      many(
+        quests,
+        (q) => (Boolean(q.pinned) === value ? null : { pinned: value }),
+        (n) => `${value ? 'Закреплено' : 'Закреп снят'} (${n})`
+      ),
+    moveMany: (quests: Quest[], questlineId: number | null) =>
+      many(
+        quests,
+        (q) => ((q.questline_id ?? null) === questlineId ? null : { questline_id: questlineId }),
+        (n) => `Перенесено (${n})`
+      ),
+    async pin(quest: Quest, value: boolean) {
+      if (!quest) return
+      await guarded(async () => {
+        deps.applyQuest(await deps.updateQuest(quest.id, { pinned: value }), { select: false })
+        toast(value ? 'Закреплён' : 'Закреп снят', { kind: 'success' })
+      })
+    },
     async patchStatus(quest: Quest, status: string) {
       if (!quest) return
       await guarded(async () => {

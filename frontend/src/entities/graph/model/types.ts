@@ -44,6 +44,11 @@ export interface GraphEdgeView {
   d: string
   sx: number
   sy: number
+  /** End point and the direction the edge arrives in (for the arrowhead). */
+  ex: number
+  ey: number
+  fx: number
+  fy: number
 }
 
 export interface GraphNoteEditing {
