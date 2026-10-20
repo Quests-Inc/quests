@@ -100,6 +100,29 @@ test('a link gets the icon of its entity; the default icon is left out', () => {
   expect(links[0].querySelector('.md-ref__ico')).toBeNull()
 })
 
+test('the icon of a link keeps its own colour, not the link colour', () => {
+  expect(
+    buildRefIcons({
+      notes: [{ id: 1, icon: 'folder', color: '#7a9e3a' }],
+      quests: [{ id: 2, questline_icon: 'flag', questline_color: '#b54a3a' }],
+      questlines: [{ id: 3, icon: 'map', color: '#5a8a9a' }],
+    })
+  ).toEqual({
+    'note:1': { icon: 'folder', url: undefined, color: '#7a9e3a' },
+    'quest:2': { icon: 'flag', url: undefined, color: '#b54a3a' },
+    'questline:3': { icon: 'map', url: undefined, color: '#5a8a9a' },
+  })
+  refIconStore.map = {
+    'note:5': { url: '/api/notes/5/icon', color: '#7a9e3a' },
+    'note:6': { url: '/api/notes/6/icon' },
+  }
+  const links = [...body('note=5 и note=6', { labels: { 'note:5': 'А', 'note:6': 'Б' } }).querySelectorAll('a')]
+  expect((links[0].querySelector('.md-ref__ico') as HTMLElement).style.getPropertyValue('--ref-ico-color')).toBe(
+    '#7a9e3a'
+  )
+  expect((links[1].querySelector('.md-ref__ico') as HTMLElement).style.getPropertyValue('--ref-ico-color')).toBe('')
+})
+
 test('RefText gets icons and previews as well', async () => {
   refIconStore.map = { 'quest:2': { url: '/api/questlines/1/icon' } }
   const target = document.createElement('div')

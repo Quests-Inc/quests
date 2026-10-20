@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GraphMinimap, GraphTools, RASTER, type GraphNoteEditing } from '@/entities/graph'
+  import { GraphMinimap, GraphTools, RASTER, tintOf, type GraphNoteEditing } from '@/entities/graph'
   import type { Snippet } from 'svelte'
   import { createClusterFolds } from '../model/folds.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
@@ -69,6 +69,10 @@
     children?: Snippet
   } = $props()
 
+  /** A step's quest: its colour tints the step. */
+  const owners = $derived(
+    new Map(stage.edges.filter((e) => e.kind === 'structure' && e.to.startsWith('step:') && e.from.startsWith('quest:')).map((e) => [e.to, stage.nodeMap.get(e.from)]))
+  )
   const isDone = (n: { status?: string }) => n.status === 'completed' || n.status === 'done'
   const isOrphan = (n: { type: string; links: number }) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
   const rasterOf = (n: { type: string; mime?: string }) =>
@@ -117,6 +121,7 @@
         {n}
         selected={n.key === stage.selectedKey}
         lit={n.key === stage.lit?.from || n.key === stage.lit?.to}
+        tint={tintOf(n, owners.get(n.key))}
         root={n.key === data?.root}
         done={isDone(n)}
         orphan={isOrphan(n)}

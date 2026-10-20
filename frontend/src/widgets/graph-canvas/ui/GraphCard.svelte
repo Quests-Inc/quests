@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CARD, ENTITY_LABELS, SQUARE, TYPES, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
+  import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
   import { QuestlineIcon } from '@/entities/questline'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
@@ -11,6 +11,7 @@
   let {
     n,
     selected = false,
+    tint = '',
     lit = false,
     root = false,
     done = false,
@@ -40,6 +41,8 @@
   }: {
     n: GraphNodeView
     selected?: boolean
+    /** A light shade of the entity's own colour (questline, file type) mixed into the type colour. */
+    tint?: string
     lit?: boolean
     root?: boolean
     done?: boolean
@@ -110,7 +113,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         class:gcard--editing={editingHere}
         class:gcard--picked={picked}
         class:gcard--pill={!big && !square && !withText}
-        style:--c={ownerless ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
+        style:--c={ownerless ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : tinted(t.color, tint)}
         style:z-index={editingHere ? 1_000_000 : z}
         style:left="{n.x - n.w / 2}px"
         style:top="{n.y - n.h / 2}px"

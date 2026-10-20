@@ -33,7 +33,7 @@ export function buildRefLabels({
   return m
 }
 
-type Iconed = { id: number; icon?: string | null; icon_url?: string | null }
+type Iconed = { id: number; icon?: string | null; icon_url?: string | null; color?: string | null }
 
 /** Иконки ссылок по ключу kind:id: у заметки и квестлайна свои, квест показывает иконку своего квестлайна. */
 export function buildRefIcons({
@@ -42,13 +42,18 @@ export function buildRefIcons({
   questlines,
 }: {
   notes: Iconed[]
-  quests: (Iconed & { questline_icon?: string | null; questline_icon_url?: string | null })[]
+  quests: (Iconed & {
+    questline_icon?: string | null
+    questline_icon_url?: string | null
+    questline_color?: string | null
+  })[]
   questlines: Iconed[]
-}): Record<string, { icon?: string | null; url?: string | null }> {
-  const m: Record<string, { icon?: string | null; url?: string | null }> = {}
-  for (const n of notes) m[`note:${n.id}`] = { icon: n.icon, url: n.icon_url }
-  for (const l of questlines) m[`questline:${l.id}`] = { icon: l.icon, url: l.icon_url }
-  for (const q of quests) m[`quest:${q.id}`] = { icon: q.questline_icon, url: q.questline_icon_url }
+}): Record<string, { icon?: string | null; url?: string | null; color?: string | null }> {
+  const m: Record<string, { icon?: string | null; url?: string | null; color?: string | null }> = {}
+  for (const n of notes) m[`note:${n.id}`] = { icon: n.icon, url: n.icon_url, color: n.color }
+  for (const l of questlines) m[`questline:${l.id}`] = { icon: l.icon, url: l.icon_url, color: l.color }
+  for (const q of quests)
+    m[`quest:${q.id}`] = { icon: q.questline_icon, url: q.questline_icon_url, color: q.questline_color }
   return m
 }
 
