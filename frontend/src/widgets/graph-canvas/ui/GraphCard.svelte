@@ -41,7 +41,7 @@
   }: {
     n: GraphNodeView
     selected?: boolean
-    /** A light shade of the entity's own colour (questline, file type) mixed into the type colour. */
+    /** A light shade of the entity's own colour (questline, file type) mixed into the card's fill; the border keeps the type colour. */
     tint?: string
     lit?: boolean
     root?: boolean
@@ -113,7 +113,9 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         class:gcard--editing={editingHere}
         class:gcard--picked={picked}
         class:gcard--pill={!big && !square && !withText}
-        style:--c={ownerless ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : tinted(t.color, tint)}
+        style:--c={ownerless ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
+        style:--c-fill={tint && !ownerless ? tinted(t.color, tint) : undefined}
+        style:--fill-w={tint && !ownerless ? '17%' : undefined}
         style:z-index={editingHere ? 1_000_000 : z}
         style:left="{n.x - n.w / 2}px"
         style:top="{n.y - n.h / 2}px"
@@ -264,7 +266,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     border: 2.2px solid var(--c, #888);
     border-radius: 14px;
     /* Card tinted with its type colour, so kind reads at a glance. */
-    background: color-mix(in srgb, var(--c, #888) 11%, var(--color-bg-raised, #1a1a1a));
+    background: color-mix(in srgb, var(--c-fill, var(--c, #888)) var(--fill-w, 11%), var(--color-bg-raised, #1a1a1a));
     color: var(--color-fg, #e8e8e8);
     font-size: var(--text-sm, 0.875rem);
     cursor: default;
@@ -311,7 +313,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     padding: 0.15rem 0.35rem;
     border: 1px solid var(--color-border, #333);
     border-radius: 6px;
-    background: color-mix(in srgb, var(--c, #888) 14%, var(--color-bg, #121212));
+    background: color-mix(in srgb, var(--c-fill, var(--c, #888)) 14%, var(--color-bg, #121212));
     color: inherit;
     font: inherit;
     font-weight: 600;
@@ -324,7 +326,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--color-border, #333);
     border-radius: 6px;
-    background: color-mix(in srgb, var(--c, #888) 14%, var(--color-bg, #121212));
+    background: color-mix(in srgb, var(--c-fill, var(--c, #888)) 14%, var(--color-bg, #121212));
     color: var(--color-fg, #e8e8e8);
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
@@ -345,7 +347,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   }
 
   .gcard--sel {
-    background: color-mix(in srgb, var(--c, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+    background: color-mix(in srgb, var(--c-fill, var(--c, #c9a227)) 24%, var(--color-bg-raised, #1a1a1a));
   }
 
   .gcard__prog {
