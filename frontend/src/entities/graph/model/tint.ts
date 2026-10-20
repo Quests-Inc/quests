@@ -5,7 +5,7 @@ import { fileKind } from '@/shared/lib/fileKind.ts'
 /** Цвет иконки по умолчанию: он ничего не говорит о карточке, оттенка нет. */
 export const DEFAULT_ICON_COLOR = '#9a9a9a'
 /** Доля оттенка в итоговом цвете карточки, %. */
-export const TINT_SHARE = 30
+export const TINT_SHARE = 40
 
 const own = (c?: string | null) => (c && c.trim().toLowerCase() !== DEFAULT_ICON_COLOR ? c : '')
 
