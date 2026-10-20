@@ -4,6 +4,9 @@
   import { NOTE_SPEC } from '@/entities/note'
   import { QuestlineIcon } from '@/entities/questline'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
+  import SidebarTools from '@/shared/ui/SidebarTools.svelte'
+  import { isListSelectAll } from '@/shared/lib/listKeys.ts'
+  import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
   import { snippetHtml, WHERE_LABEL } from '@/shared/lib/searchSnippet.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -31,6 +34,7 @@
     pickedIds = new Set<number>(),
     onRowClick,
     onClearPicked,
+    onSelectAll,
     onAdd,
     onMenu,
     hasChildren,
@@ -70,6 +74,7 @@
     /** Ctrl/Shift-click goes here first: true = taken into the selection, the row is not opened. */
     onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean
     onClearPicked?: () => void
+    onSelectAll?: (ids: number[]) => void
     onAdd: () => void
     onMenu(e: MouseEvent, n: { id: number }): void
     hasChildren(id: number): boolean
@@ -96,36 +101,28 @@
     const els: HTMLElement[] = treeEl ? [...treeEl.querySelectorAll<HTMLElement>('[data-nid]')] : []
     return [...new Set(els.map((el) => Number(el.dataset.nid)))]
   }
+  function onKey(e: KeyboardEvent) {
+    if (!isListSelectAll(e)) return
+    e.preventDefault()
+    onSelectAll?.(visibleOrder())
+  }
   function rowClick(e: MouseEvent, id: number) {
     if (!onRowClick?.(e, id, visibleOrder())) onSelect(id)
   }
 </script>
 
+<svelte:window onkeydown={onKey} />
 <aside class="notes__tree" bind:this={treeEl}>
-  <div class="notes__tools">
-    <input
-      class="search"
-      type="search"
-      placeholder="Поиск…"
-      title={`Фильтры: ${helpLine(NOTE_SPEC)}; -flag:… — без флага`}
-      bind:value={search}
-    />
-    <button
-      type="button"
-      class="btn btn--accent notes__add"
-      aria-label="Новая заметка"
-      onclick={onAdd}
-    >
-      +
-    </button>
-  </div>
-  {#if pickedIds.size > 0}
-    <div class="notes__picked" role="status">
-      <span>Выбрано: {pickedIds.size}</span>
-      <button type="button" class="notes__picked-clear" title="Снять выделение (Esc)" aria-label="Снять выделение" onclick={() => onClearPicked?.()}><Icon name="close" size={14} /></button>
-    </div>
-  {/if}
-  <div class="notes__flaghints"><FlagHints value={search} spec={NOTE_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
+  <SidebarTools
+    bind:value={search}
+    label="Поиск по заметкам"
+    hint={`Фильтры: ${helpLine(NOTE_SPEC)}; -flag:… — без флага`}
+    createLabel="Новая заметка"
+    onCreate={onAdd}
+  >
+    <div class="notes__flaghints"><FlagHints value={search} spec={NOTE_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} /></div>
+  </SidebarTools>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="notes__list"
     data-nav-root
@@ -234,6 +231,7 @@
       {@render tree(roots, 0)}
     {/if}
   </div>
+  <SidebarPicked count={pickedIds.size} onClear={() => onClearPicked?.()} />
 </aside>
 
 <style>
@@ -246,13 +244,6 @@
     overflow: hidden;
     border-right: 1px solid var(--color-border, #333);
     background: var(--color-bg-raised, #1a1a1a);
-  }
-
-  .notes__tools {
-    display: flex;
-    gap: 0.4rem;
-    padding: 0.55rem 0.6rem;
-    border-bottom: 1px solid var(--color-border, #333);
   }
 
   .notes__flaghints:empty {
@@ -304,23 +295,10 @@
     border-radius: 2px;
   }
 
-  .notes__tools .search {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .notes__add {
-    flex: 0 0 auto;
-    min-width: 2rem;
-    padding-inline: 0.55rem;
-    font-size: 1.1rem;
-    line-height: 1;
-  }
-
   .notes__list {
     flex: 1 1 auto;
     overflow: auto;
-    padding: 0.25rem 0;
+    padding: 0.25rem 0 3rem;
   }
 
   .notes__node {
@@ -381,29 +359,6 @@
 
   .notes__fold--spacer {
     pointer-events: none;
-  }
-
-  .notes__picked {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.3rem 0.75rem;
-    border-bottom: 1px solid var(--color-border, #333);
-    font-size: var(--text-sm, 0.875rem);
-  }
-
-  .notes__picked-clear {
-    display: inline-flex;
-    padding: 0.15rem;
-    border: 0;
-    background: transparent;
-    color: var(--color-fg-muted, #9a9a9a);
-    cursor: pointer;
-  }
-
-  .notes__picked-clear:hover {
-    color: var(--color-fg, #e8e8e8);
   }
 
   .notes__row--picked,

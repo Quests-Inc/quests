@@ -4,9 +4,9 @@ import { contextMenuItems } from './contextMenu.ts'
 
 type Kind = 'line' | 'quest' | 'quests' | 'step'
 type Pt = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }
-type Quest = { id: number; status?: string; failure_inbox?: boolean }
+type Quest = { id: number; status?: string; failure_inbox?: boolean; pinned?: boolean }
 type Step = { id: number; title?: string; progress_total?: number }
-type Line = { id: number; category_id?: number | null }
+type Line = { id: number; title?: string; category_id?: number | null }
 
 export function createJournalMenu(deps: {
   quests: () => Quest[]
@@ -19,6 +19,11 @@ export function createJournalMenu(deps: {
   selectQuest: (id: number) => void
   selectedQuestId: () => number | null
   copyId: (kind: string, id: number) => void
+  /** «Открыть на карте». */
+  openGraph: (type: 'quest' | 'questline', id: number) => void
+  /** «Добавить шаг» в квест (открывает форму шага). */
+  addStep: (questId: number) => void
+  askDeleteMany: (ids: number[]) => void
   openSecrets: (owner: { kind: string; id: number }) => void
   openCreate: (defaults: { questline_id: number; category_id: number | null }) => void
   editQuest: (quest: Quest) => void
@@ -33,6 +38,9 @@ export function createJournalMenu(deps: {
     patchSignificance: (q: Quest, value: string) => unknown
     exportQuest: (q: Quest, mode: 'md' | 'rich' | 'simple') => unknown
     ackFailure?: (q: Quest) => unknown
+    pin?: (q: Quest, value: boolean) => unknown
+    pinMany?: (qs: Quest[], value: boolean) => unknown
+    moveMany?: (qs: Quest[], questlineId: number | null) => unknown
     postponeMany?: (qs: Quest[], minutes: number) => unknown
     patchStatusMany?: (qs: Quest[], status: string) => unknown
     patchSignificanceMany?: (qs: Quest[], value: string) => unknown
@@ -59,6 +67,13 @@ export function createJournalMenu(deps: {
       questId,
       stepId,
       count: groupIds.length,
+      lines: deps.questlines().map((l) => ({ id: l.id, title: l.title ?? `questline=${l.id}` })),
+      allPinned:
+        groupIds.length > 0 &&
+        deps
+          .quests()
+          .filter((q) => groupIds.includes(q.id))
+          .every((q) => q.pinned),
       step: stepId != null ? deps.findStep(stepId)?.step : undefined,
     })
   )
@@ -113,6 +128,7 @@ export function createJournalMenu(deps: {
 
   function selectLine(action: string) {
     if (action === 'copy-id') return deps.copyId('questline', lineId as number)
+    if (action === 'graph') return void (lineId != null && deps.openGraph('questline', lineId))
     if (action === 'secrets') return void (lineId != null && deps.openSecrets({ kind: 'questline', id: lineId }))
     const line = deps.questlines().find((l) => l.id === lineId)
     if (!line && action !== 'delete') return
@@ -123,10 +139,13 @@ export function createJournalMenu(deps: {
 
   function selectQuestAction(action: string) {
     if (action === 'copy-id') return deps.copyId('quest', questId as number)
+    if (action === 'graph') return void (questId != null && deps.openGraph('quest', questId))
+    if (action === 'add-step') return void (questId != null && deps.addStep(questId))
     if (action === 'secrets') return void (questId != null && deps.openSecrets({ kind: 'quest', id: questId }))
     const quest = deps.quests().find((q) => q.id === questId)
     if (!quest) return
     if (action === 'edit') return deps.editQuest(quest)
+    if (action === 'pin') return void deps.quest.pin?.(quest, !quest.pinned)
     if (action.startsWith('delay-')) {
       const minutes = Number(action.slice('delay-'.length))
       if (minutes > 0) deps.quest.postpone(quest, minutes)
@@ -143,6 +162,8 @@ export function createJournalMenu(deps: {
 
   async function selectStep(action: string) {
     if (action === 'copy-id') return deps.copyId('step', stepId as number)
+    if (action === 'graph') return void (questId != null && deps.openGraph('quest', questId))
+    if (action === 'add-step') return void (questId != null && deps.addStep(questId))
     if (action === 'secrets') return void (stepId != null && deps.openSecrets({ kind: 'step', id: stepId }))
     const found = stepId != null ? deps.findStep(stepId) : null
     if (!found) return
@@ -164,6 +185,13 @@ export function createJournalMenu(deps: {
         'quest',
         list.map((q) => q.id)
       )
+    if (action === 'clear-picked') return deps.clearPicked?.()
+    if (action === 'delete-many') return deps.askDeleteMany(list.map((q) => q.id))
+    if (action === 'pin') return void deps.quest.pinMany?.(list, !list.every((q) => q.pinned))
+    if (action.startsWith('move:')) {
+      const target = action.slice('move:'.length)
+      return void deps.quest.moveMany?.(list, target === 'none' ? null : Number(target))
+    }
     if (action.startsWith('delay-')) {
       const minutes = Number(action.slice('delay-'.length))
       if (minutes > 0) deps.quest.postponeMany?.(list, minutes)

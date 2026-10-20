@@ -167,9 +167,4 @@
     font-size: var(--text-xs, 0.75rem);
     line-height: 1.4;
   }
-  .err {
-    margin: 0 0 0.5rem;
-    color: var(--color-danger, #b54a3a);
-    font-size: var(--text-sm, 0.875rem);
-  }
 </style>

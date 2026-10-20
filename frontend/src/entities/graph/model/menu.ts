@@ -9,7 +9,7 @@ export interface MenuItem {
   children?: MenuItem[]
 }
 
-type Node = { key: string; type: string; draft?: boolean; op?: number }
+type Node = { key: string; type: string; id?: number | string; draft?: boolean; op?: number }
 
 export interface MenuContext {
   node: Node | null
@@ -21,9 +21,21 @@ export interface MenuContext {
 /** Things the map can be centred on. */
 export const CENTERABLE = new Set(['quest', 'note', 'questline'])
 
-/** What can be done to a line itself (nothing for plain ownership of steps and files). */
-export function edgeMenuItems(e: { draft?: string; from: string; to: string; kind: string }): MenuItem[] {
+/** What can be done to a line itself: light up its two ends, and (not for plain ownership of steps and files) change the link. */
+export function edgeMenuItems(
+  e: { draft?: string; from: string; to: string; kind: string },
+  lit?: { from: string; to: string; kind: string } | null
+): MenuItem[] {
   if (e.draft === 'remove' || !e.from || !e.to) return []
+  const own = ownEdgeItems(e)
+  const on = lit != null && lit.from === e.from && lit.to === e.to && lit.kind === e.kind
+  return [
+    { id: 'edge-light', label: on ? 'Снять подсветку' : 'Подсветить узлы' },
+    ...(own.length ? [{ id: 'sep-edge', sep: true }, ...own] : []),
+  ]
+}
+
+function ownEdgeItems(e: { draft?: string; from: string; to: string; kind: string }): MenuItem[] {
   if (e.kind === 'reference') return [{ id: 'edge-unref', label: 'Разорвать ссылку' }]
   if (e.kind === 'dependency' && e.from.startsWith('step:') && e.to.startsWith('step:')) {
     return [{ id: 'edge-nowait', label: 'Не ждать предыдущий шаг' }]
@@ -42,6 +54,7 @@ export function graphMenuItems(
   env: {
     selectMode: boolean
     pickedCount: number
+    lit?: { from: string; to: string; kind: string } | null
     rootKey?: string
     nodes: Node[]
     expandKeys: string[]
@@ -55,8 +68,12 @@ export function graphMenuItems(
   }
 ): MenuItem[] {
   const n = ctx.node
-  if (ctx.group) return [{ id: 'hide-picked', label: `Убрать с карты (${env.pickedCount})` }]
-  if (ctx.edge) return edgeMenuItems(ctx.edge)
+  if (ctx.group)
+    return [
+      { id: 'hide-picked', label: `Убрать с карты (${env.pickedCount})` },
+      { id: 'clear-picked', label: 'Снять выделение' },
+    ]
+  if (ctx.edge) return edgeMenuItems(ctx.edge, env.lit)
   if (ctx.cluster) {
     return [
       ctx.cluster.folded
@@ -83,10 +100,13 @@ export function graphMenuItems(
       { id: 'find', label: 'Добавить на карту…' },
       { id: 'sep-sel', sep: true },
       { id: 'select-mode', label: env.selectMode ? 'Выйти из режима выделения' : 'Режим выделения' },
+      { id: 'fit', label: 'Вписать в экран' },
     ]
   }
   const items: MenuItem[] = []
   if (!n.draft) {
+    if (['quest', 'note', 'step', 'attachment', 'questline'].includes(n.type) && typeof n.id === 'number')
+      items.push({ id: 'copy-ref', label: `Копировать ${n.type}=${n.id}` }, { id: 'sep-ref', sep: true })
     if (env.openTarget(n)) items.push({ id: 'open', label: 'Открыть' })
     if (CENTERABLE.has(n.type) && n.key !== env.rootKey) items.push({ id: 'center', label: 'Сделать центром' })
     if (n.key !== env.rootKey) items.push({ id: env.isExtraRoot(n) ? 'unroot' : 'hide', label: 'Убрать с карты' })

@@ -152,3 +152,30 @@ test('щипок двумя пальцами меняет масштаб', () =>
   g.onMove(ev(300, 100, { pointerId: 2 }))
   expect(g.cam.k).toBeCloseTo(2, 5)
 })
+
+test('Shift или Ctrl вне режима выделения: клик по карточке выбирает её и включает режим', () => {
+  for (const mod of [{ shiftKey: true }, { ctrlKey: true }]) {
+    let entered = 0
+    const { g, nodes, state, ev } = make({ enterSelect: () => entered++ })
+    g.onCardDown(ev(5, 5, mod), nodes[1] as any)
+    g.onUp(ev(5, 5))
+    expect([...state.picked]).toEqual(['quest:2'])
+    expect(entered).toBe(1)
+    expect(state.selected).toEqual([])
+  }
+})
+
+test('Shift+рамка по полю добавляет к выбранному и включает режим; Esc-путь без модификаторов — обычная панорама', () => {
+  let entered = 0
+  const { g, state, ev } = make({ enterSelect: () => entered++ })
+  g.onBgDown(ev(10, 20, { shiftKey: true }))
+  g.onMove(ev(200, 200))
+  g.onUp(ev(200, 200))
+  expect([...state.picked]).toEqual(['quest:1'])
+  expect(entered).toBe(1)
+  const plain = make({ enterSelect: () => entered++ })
+  plain.g.onBgDown(plain.ev(100, 100))
+  plain.g.onMove(plain.ev(130, 90))
+  plain.g.onUp(plain.ev(130, 90))
+  expect(entered).toBe(1)
+})

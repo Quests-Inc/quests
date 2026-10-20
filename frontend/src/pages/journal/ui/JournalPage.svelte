@@ -3,6 +3,7 @@
   import { noteCatalog } from '@/entities/note'
   import { QuestDetail } from '@/widgets/quest-detail'
   import { QuestSidebar } from '@/widgets/quest-sidebar'
+  import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
   import { questMatchesQuery } from '@/shared/lib/search.ts'
   import { parseQuery, passes, setToken, tokenValues } from '@/shared/lib/searchFlags.ts'
 
@@ -12,7 +13,6 @@
     questlines = [],
     selectedId = null,
     selected = null,
-    sidebarCollapsed = false,
     nowMs,
     labels = {},
     kbStepId = null,
@@ -26,6 +26,7 @@
     pickedIds = new Set<number>(),
     onRowClick,
     onClearPicked,
+    onSelectAll,
     onTogglePin,
     onQuestContextMenu,
     onLineContextMenu,
@@ -48,7 +49,6 @@
     questlines?: { id: number; title: string; category_id?: number | null; color?: string; icon?: string }[]
     selectedId?: number | null
     selected?: { id: number; questline_id?: number | null; steps?: unknown[] } | null
-    sidebarCollapsed?: boolean
     nowMs: number
     labels?: Record<string, string>
     kbStepId?: number | null
@@ -62,6 +62,7 @@
     pickedIds?: ReadonlySet<number>
     onRowClick?: (event: MouseEvent, id: number, order: number[]) => boolean
     onClearPicked?: () => void
+    onSelectAll?: (ids: number[]) => void
     onTogglePin: (quest: { id: number }, event: Event) => void
     onQuestContextMenu: (event: MouseEvent, quest: { id: number }) => void
     onLineContextMenu: (event: MouseEvent, line: { id: number }) => void
@@ -143,7 +144,8 @@
   }
 </script>
 
-<div class="journal__body" class:journal__body--sidebar-collapsed={sidebarCollapsed}>
+<SidebarLayout key="journal" class="journal__body">
+  {#snippet sidebar()}
   <QuestSidebar
     {loading}
     {quests}
@@ -175,6 +177,7 @@
     {pickedIds}
     {onRowClick}
     {onClearPicked}
+    {onSelectAll}
     {onTogglePin}
     {onQuestContextMenu}
     {onLineContextMenu}
@@ -183,6 +186,7 @@
     {labels}
     {onRef}
   />
+  {/snippet}
   <QuestDetail
     {onOpenGraph}
     {selected}
@@ -218,4 +222,4 @@
     {notes}
     {questlines}
   />
-</div>
+</SidebarLayout>

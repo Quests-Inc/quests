@@ -164,13 +164,10 @@
 <style>
 
 
-  .attpage__tool,
-  .attpage__pill,
   .attpage__btn,
   :global(.attpage__ico),
   .attpage__back,
-  .attpage__link,
-  .attpage__ghead {
+  .attpage__link {
     font: inherit;
     color: inherit;
     cursor: pointer;

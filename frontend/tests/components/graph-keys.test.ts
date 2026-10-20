@@ -99,3 +99,12 @@ test('V, F, R и Shift+Del доходят до карты, модификато�
   k.env.active = false
   expect(k.press({ code: 'KeyF' })).toBe(false)
 })
+
+test('Esc сначала снимает подсветку линии, потом идёт обычная цепочка', () => {
+  const k = key({ hasLit: true, clearLit: () => k.calls.push('unlit'), selectMode: true })
+  k.press({ key: 'Escape', code: 'Escape' })
+  expect(k.calls).toEqual(['unlit'])
+  k.env.hasLit = false
+  k.press({ key: 'Escape', code: 'Escape' })
+  expect(k.calls).toEqual(['unlit', 'select'])
+})

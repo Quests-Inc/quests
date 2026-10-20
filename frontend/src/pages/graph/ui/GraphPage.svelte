@@ -5,6 +5,8 @@
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
   import { FindEntityModal } from '@/features/find-entity'
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
+  import { copyText } from '@/shared/lib/clipboard.ts'
+  import { toast } from '@/shared/lib/toasts.svelte.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { GraphDraftLog, createGraphDraft, createGraphEdits } from '@/features/graph-draft'
@@ -77,6 +79,7 @@
       lk.cursor = p
     },
     selectMode: () => stage.selectMode,
+    enterSelect: () => stage.enterSelect(),
     getPicked: () => stage.picked,
     setPicked: (s) => stage.setPicked(s),
     getSaved: () => saved,
@@ -103,6 +106,7 @@
     onCenter: (type, id) => onCenter?.(type, id),
     onRetarget: () => {
       stage.selectedKey = null
+      stage.clearLit?.()
       folds.reset()
       prefs.setExpand([])
       folds.forgetPositions()
@@ -186,6 +190,12 @@
     titleOf: (key) => stage.titleOf(key),
     hidePicked,
     toggleSelectMode: () => stage.toggleSelectMode(),
+    copyRef: (n) =>
+      void copyText(`${n.type}=${n.id}`).then(() => toast(`Скопировано ${n.type}=${n.id}`, { kind: 'success', ttl: 1600 })),
+    highlightEdge: (edge) => stage.highlight(edge),
+    getLit: () => stage.lit,
+    fit: () => stage.fit(),
+    clearPicked: () => stage.clearPicked(),
     hideKeys,
     createNoteHere: (at, linkFrom) => edits.createNoteHere(at, linkFrom),
     openEntity: (kind, at, extra) => edits.openEntity(kind, at, extra),
@@ -283,6 +293,8 @@
       linking: !!linking,
       selectMode,
       full,
+      hasLit: stage.lit != null,
+      clearLit: () => stage.clearLit(),
       menuOpen: ctx.open,
       ownerless: ownerless.size,
       canClear,
@@ -295,6 +307,11 @@
         if (last) void gd.askDrop(last)
       },
       fit: () => fit(),
+      zoom: (dir) => gest.zoomStep(dir),
+      selectAll: () => stage.selectAll(),
+      remove: () => {
+        if (selectMode && stage.picked.size) void hidePicked()
+      },
       relayout: () => relayout(),
       clear: () => void clearMap(),
     })

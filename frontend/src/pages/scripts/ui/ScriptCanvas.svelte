@@ -80,10 +80,14 @@
     ...(onNewCode || (onBake && ed.picked.size > 1) ? [{ id: 'sep', sep: true }] : []),
     ...(onNewCode ? [{ id: 'code', label: 'Новая нода из кода…' }] : []),
     ...(onBake && ed.picked.size > 1 ? [{ id: 'bake', label: `Запечь выделенное (${ed.picked.size})…` }] : []),
+    { id: 'sep-view', sep: true },
+    { id: 'select-mode', label: cv.selectMode ? 'Выйти из режима выделения' : 'Режим выделения' },
+    { id: 'fit', label: 'Вписать в экран' },
   ])
 
   const nodeItems = $derived.by(() => {
-    if (target.length > 1) return [{ id: 'del', label: `Удалить выделенные (${target.length})`, danger: true }]
+    if (target.length > 1)
+      return [{ id: 'clear-picked', label: 'Снять выделение' }, { id: 'sep', sep: true }, { id: 'del', label: `Удалить выделенные (${target.length})`, danger: true }]
     const n = ed.graph.nodes.find((x) => x.id === menu.node)
     const custom = n ? customIdOf(n.type) != null : false
     return [
@@ -111,7 +115,10 @@
 
   async function onMenuSelect(id: string) {
     const at = { clientX: menu.x, clientY: menu.y }
-    if (id === 'code') onNewCode?.()
+    if (id === 'select-mode') cv.toggleSelect()
+    else if (id === 'fit') cv.fit()
+    else if (id === 'clear-picked') ed.picked = new Set()
+    else if (id === 'code') onNewCode?.()
     else if (id === 'bake') onBake?.()
     else if (id.startsWith('n:')) void cv.addAtPoint(id.slice(2), at)
     else if (id.startsWith('ins:')) {

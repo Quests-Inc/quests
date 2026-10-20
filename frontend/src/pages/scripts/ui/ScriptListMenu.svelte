@@ -18,6 +18,11 @@
     onPurpose,
     onBake,
     onDelete,
+    onCopy,
+    onDuplicate,
+    group = [],
+    groupItems = [],
+    onGroup,
   }: {
     menu: { open: boolean; x: number; y: number; id: number | null }
     scripts: Script[]
@@ -26,11 +31,20 @@
     onPurpose: (id: number, purpose: string) => void
     onBake: (id: number) => void
     onDelete: (id: number) => void
+    onCopy: (id: number) => void
+    onDuplicate: (id: number) => void
+    /** Picked scripts the menu is about when it was opened on one of them (more than one). */
+    group?: number[]
+    groupItems?: { id: string; label?: string; sep?: boolean; danger?: boolean; children?: { id: string; label?: string }[] }[]
+    onGroup?: (action: string, ids: number[]) => void
   } = $props()
 
   const current = $derived(scripts.find((s) => s.id === menu.id))
-  const items = $derived([
+  const items = $derived(group.length > 1 ? groupItems : [
+    { id: 'copy-id', label: `Копировать script=${menu.id}` },
+    { id: 'sep-ref', sep: true },
     { id: 'rename', label: 'Переименовать…' },
+    { id: 'duplicate', label: 'Дублировать' },
     {
       id: 'purpose',
       label: 'Принадлежность',
@@ -44,10 +58,13 @@
   let renaming = $state<{ id: number; title: string } | null>(null)
   let busy = $state(false)
 
-  function select(id: string) {
+  function select(id: string): void {
     const sid = menu.id
     if (sid == null) return
-    if (id === 'rename') renaming = { id: sid, title: current?.title ?? '' }
+    if (group.length > 1) return void onGroup?.(id, group)
+    if (id === 'copy-id') onCopy(sid)
+    else if (id === 'duplicate') onDuplicate(sid)
+    else if (id === 'rename') renaming = { id: sid, title: current?.title ?? '' }
     else if (id === 'bake') onBake(sid)
     else if (id === 'del') onDelete(sid)
     else if (id.startsWith('p:')) onPurpose(sid, id.slice(2))

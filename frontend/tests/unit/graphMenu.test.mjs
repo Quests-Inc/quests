@@ -21,24 +21,41 @@ const ctx = (extra = {}) => ({ node: null, group: false, cluster: null, edge: nu
 const ids = (items) => items.map((i) => i.id)
 
 test('edgeMenuItems: действия по виду линии', () => {
-  expect(ids(edgeMenuItems({ kind: 'reference', from: 'quest:1', to: 'note:2' }))).toEqual(['edge-unref'])
-  expect(ids(edgeMenuItems({ kind: 'dependency', from: 'step:1', to: 'step:2' }))).toEqual(['edge-nowait'])
-  expect(ids(edgeMenuItems({ kind: 'structure', from: 'questline:1', to: 'quest:2' }))).toEqual(['edge-unline'])
-  expect(ids(edgeMenuItems({ kind: 'structure', from: 'questline:1', to: 'quest:t2' }))).toEqual([])
-  expect(ids(edgeMenuItems({ kind: 'structure', from: 'note:1', to: 'note:2' }))).toEqual(['edge-unparent'])
+  expect(ids(edgeMenuItems({ kind: 'reference', from: 'quest:1', to: 'note:2' }))).toEqual([
+    'edge-light',
+    'sep-edge',
+    'edge-unref',
+  ])
+  expect(ids(edgeMenuItems({ kind: 'dependency', from: 'step:1', to: 'step:2' }))).toEqual([
+    'edge-light',
+    'sep-edge',
+    'edge-nowait',
+  ])
+  expect(ids(edgeMenuItems({ kind: 'structure', from: 'questline:1', to: 'quest:2' }))).toEqual([
+    'edge-light',
+    'sep-edge',
+    'edge-unline',
+  ])
+  expect(ids(edgeMenuItems({ kind: 'structure', from: 'questline:1', to: 'quest:t2' }))).toEqual(['edge-light'])
+  expect(ids(edgeMenuItems({ kind: 'structure', from: 'note:1', to: 'note:2' }))).toEqual([
+    'edge-light',
+    'sep-edge',
+    'edge-unparent',
+  ])
   expect(edgeMenuItems({ kind: 'reference', from: 'a:1', to: 'b:2', draft: 'remove' })).toEqual([])
 })
 
 test('меню поля: создать, загрузить, добавить на карту, режим выделения', () => {
   const items = graphMenuItems(ctx(), env())
-  expect(ids(items)).toEqual(['create', 'upload', 'find', 'sep-sel', 'select-mode'])
+  expect(ids(items)).toEqual(['create', 'upload', 'find', 'sep-sel', 'select-mode', 'fit'])
   expect(items[0].children.map((c) => c.id)).toEqual(['new-quest', 'new-note', 'new-step', 'new-questline'])
-  expect(graphMenuItems(ctx(), env({ selectMode: true })).at(-1).label).toBe('Выйти из режима выделения')
+  expect(graphMenuItems(ctx(), env({ selectMode: true })).at(-2).label).toBe('Выйти из режима выделения')
 })
 
 test('меню выделения, шара и линии', () => {
   expect(graphMenuItems(ctx({ group: true }), env({ pickedCount: 3 }))).toEqual([
     { id: 'hide-picked', label: 'Убрать с карты (3)' },
+    { id: 'clear-picked', label: 'Снять выделение' },
   ])
   expect(ids(graphMenuItems(ctx({ cluster: { folded: true, key: null } }), env()))).toEqual(['cl-open', 'cl-disband'])
   expect(ids(graphMenuItems(ctx({ cluster: { folded: false, key: 'cluster:x' } }), env()))).toEqual([
@@ -46,6 +63,8 @@ test('меню выделения, шара и линии', () => {
     'cl-disband',
   ])
   expect(ids(graphMenuItems(ctx({ edge: { kind: 'reference', from: 'a:1', to: 'b:2' } }), env()))).toEqual([
+    'edge-light',
+    'sep-edge',
     'edge-unref',
   ])
 })
@@ -84,4 +103,11 @@ test('меню карточки черновика: можно убрать из
   expect(items.at(-1)).toMatchObject({ id: 'drop', danger: true })
   const note = graphMenuItems(ctx({ node: { key: 'note:2', type: 'note' } }), env({ parentNote: () => 'note:1' }))
   expect(note.find((i) => i.id === 'detach-note').label).toBe('Открепить от «note:1»')
+})
+
+test('edgeMenuItems: у уже подсвеченной линии пункт — «Снять подсветку»', () => {
+  const e = { kind: 'reference', from: 'quest:1', to: 'note:2' }
+  expect(edgeMenuItems(e)[0].label).toBe('Подсветить узлы')
+  expect(edgeMenuItems(e, { ...e })[0].label).toBe('Снять подсветку')
+  expect(edgeMenuItems(e, { kind: 'reference', from: 'quest:1', to: 'note:3' })[0].label).toBe('Подсветить узлы')
 })

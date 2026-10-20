@@ -8,6 +8,13 @@ export interface MenuItem {
   danger?: boolean
   checked?: boolean
   children?: MenuItem[]
+  /** Подменю с полем поиска: полный список для запроса. */
+  search?: MenuItem[]
+}
+
+/** «Без квестлайна» и все линии: цели для переноса группы квестов. */
+function moveTargets(lines: { id: number; title: string }[]): MenuItem[] {
+  return [{ id: 'move:none', label: 'Без квестлайна' }, ...lines.map((l) => ({ id: `move:${l.id}`, label: l.title }))]
 }
 
 export function contextMenuItems({
@@ -18,19 +25,26 @@ export function contextMenuItems({
   stepId,
   step,
   count = 0,
+  lines = [],
+  allPinned = false,
 }: {
   kind: string
   lineId: number | null
-  quest?: { status?: string; significance?: string; failure_inbox?: boolean }
+  quest?: { status?: string; significance?: string; failure_inbox?: boolean; pinned?: boolean }
   questId: number | null
   stepId: number | null
   step?: { progress_total?: number }
   /** сколько квестов в группе (kind === 'quests') */
   count?: number
+  /** квестлайны для «Переместить» в меню группы */
+  lines?: { id: number; title: string }[]
+  /** все квесты группы уже закреплены */
+  allPinned?: boolean
 }): MenuItem[] {
   if (kind === 'quests') {
     return [
       { id: 'copy-ids', label: `Копировать ссылки (${count})` },
+      { id: 'clear-picked', label: 'Снять выделение' },
       { id: 'sep-copy', sep: true },
       {
         id: 'status',
@@ -47,11 +61,16 @@ export function contextMenuItems({
         label: 'Значимость',
         children: QUEST_SIGNIFICANCES.map((s) => ({ id: `sig:${s.id}`, label: s.label })),
       },
+      { id: 'pin', label: allPinned ? 'Снять закреп' : 'Закрепить' },
+      { id: 'move', label: 'Переместить в квестлайн', children: moveTargets(lines), search: moveTargets(lines) },
+      { id: 'sep-danger', sep: true },
+      { id: 'delete-many', label: `Удалить (${count})`, danger: true },
     ]
   }
   if (kind === 'line') {
     return [
       { id: 'copy-id', label: `Копировать questline=${lineId}` },
+      { id: 'graph', label: 'Открыть на карте' },
       { id: 'sep-copy', sep: true },
       { id: 'add', label: 'Добавить квест' },
       { id: 'edit', label: 'Редактировать' },
@@ -64,6 +83,7 @@ export function contextMenuItems({
   if (kind === 'quest') {
     const status = quest?.status
     const significance = quest?.significance || 'common'
+    const pinned = Boolean(quest?.pinned)
     const delayChildren: { id: string; label?: string; sep?: boolean; checked?: boolean }[] = [
       { id: 'delay-15', label: '15 мин' },
       { id: 'delay-30', label: '30 мин' },
@@ -76,8 +96,11 @@ export function contextMenuItems({
     }
     const items: MenuItem[] = [
       { id: 'copy-id', label: `Копировать quest=${questId}` },
+      { id: 'graph', label: 'Открыть на карте' },
       { id: 'sep-copy', sep: true },
       { id: 'edit', label: 'Редактировать' },
+      { id: 'add-step', label: 'Добавить шаг' },
+      { id: 'pin', label: pinned ? 'Снять закреп' : 'Закрепить' },
       { id: 'sep-groups', sep: true },
       {
         id: 'status',
@@ -123,7 +146,10 @@ export function contextMenuItems({
       sep?: boolean
       danger?: boolean
       children?: { id: string; label?: string; sep?: boolean }[]
-    }[] = [{ id: 'copy-id', label: `Копировать step=${stepId}` }]
+    }[] = [
+      { id: 'copy-id', label: `Копировать step=${stepId}` },
+      { id: 'graph', label: 'Открыть на карте' },
+    ]
     if (total > 1) {
       items.push({
         id: 'progress',
@@ -146,6 +172,7 @@ export function contextMenuItems({
     items.push(
       { id: 'sep-edit', sep: true },
       { id: 'edit', label: 'Редактировать' },
+      { id: 'add-step', label: 'Добавить шаг' },
       { id: 'secrets', label: 'Секреты' },
       { id: 'sep-danger', sep: true },
       { id: 'delete', label: 'Удалить шаг', danger: true }

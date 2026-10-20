@@ -36,6 +36,7 @@
   import NoteCanvas from './NoteCanvas.svelte'
   import './noteStatus.css'
   import NotesTree from './NotesTree.svelte'
+  import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
 import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
@@ -43,20 +44,20 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     selectedId = null,
     labels = {},
     questlines = [],
-    sidebarCollapsed = false,
     onSelect,
     onChanged,
     onRef,
     onOpenSecrets,
+    onOpenGraph,
   }: {
     selectedId: number | null,
     labels?: Record<string, string>,
     questlines?: any[],
-    sidebarCollapsed?: boolean,
     onSelect: (id: number | null) => void,
     onChanged: () => void,
     onRef?: (kind: string, id: number) => void,
     onOpenSecrets?: (id: number) => void,
+    onOpenGraph?: (type: 'note', id: number) => void,
   } = $props()
 
   let notes = $derived(noteCatalog.list)
@@ -538,6 +539,25 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     toast: (message, kind, action) => toast(message, { kind, action }),
   })
 
+  /** A copy next to the original: same text and colour, title marked, opened right away. */
+  async function duplicateNote(id: number) {
+    const row = noteById(id)
+    if (!row) return
+    try {
+      const created = await createNote({
+        title: `${row.title || `note=${id}`} (копия)`,
+        description: row.description ?? '',
+        parent_id: row.parent_id ?? null,
+        color: row.color,
+      })
+      await onChanged()
+      onSelect(created.id)
+      toast('Заметка продублирована', { kind: 'success' })
+    } catch (e) {
+      toast(e.message || String(e), { kind: 'error' })
+    }
+  }
+
   function requestDelete(id: number) {
     if (id == null) return
     deleteTargetId = id
@@ -553,6 +573,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     category: toggleCategoryNote,
     outdated: toggleOutdatedNote,
     'add-child': addNote,
+    duplicate: duplicateNote,
+    graph: (id) => onOpenGraph?.('note', id),
     'move-up': moveNoteUp,
     'export-md': (id) => exportNoteById(id, 'md'),
     'export-pdf': (id) => exportNoteById(id, 'pdf'),
@@ -587,7 +609,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
 <svelte:window onkeydown={onFindKey} />
 
-<div class="notes" class:notes--sidebar-collapsed={sidebarCollapsed}>
+<SidebarLayout key="notes" class="notes">
+  {#snippet sidebar()}
   <NotesTree
     bind:search
     {parsedSearch}
@@ -607,6 +630,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     pickedIds={grp.multi.picked}
     onRowClick={(e, id, order) => (grp.remember(order), grp.multi.click(e, id, order))}
     onClearPicked={() => grp.multi.clear()}
+    onSelectAll={(ids) => grp.multi.selectAll(ids)}
     onAdd={() => addNote(null)}
     onMenu={openNoteMenu}
     {hasChildren}
@@ -626,6 +650,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onRowDragLeave={dnd.onRowDragLeave}
     onRowDrop={dnd.onRowDrop}
   />
+  {/snippet}
 
   <section class="notes__page" bind:this={pageEl} onscroll={scroll.onScroll}>
     <NoteCanvas
@@ -674,7 +699,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     />
   </section>
   <NoteOutline scroller={pageEl} content={previewEl} enabled={viewMode === 'formatted'} dep={`${selectedId}:${ed.description}`} />
-</div>
+</SidebarLayout>
 
 <ContextMenu
   open={ctxOpen}
@@ -742,23 +767,6 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 />
 
 <style>
-  .notes {
-    position: relative;
-    flex: 1 1 auto;
-    display: grid;
-    grid-template-columns: minmax(14rem, var(--sidebar-width, 16.5rem)) 1fr;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .notes--sidebar-collapsed {
-    grid-template-columns: 0 1fr;
-  }
-
-  .notes--sidebar-collapsed :global(.notes__tree) {
-    border-right: 0;
-  }
-
   .notes__page {
     min-height: 0;
     overflow: auto;
@@ -769,32 +777,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   @media (max-width: 720px) {
-    .notes {
-      grid-template-columns: minmax(7rem, 30%) 1fr;
-    }
     .notes__page {
       padding: 1rem 1rem 2rem;
-    }
-  }
-
-  @media (max-width: 480px) {
-    /* Too narrow for a side-by-side tree + note — go one pane at a time,
-       full screen, toggled by the same sidebar-collapse state/button.
-       selectNoteFromUi (App.svelte) flips it on pick/back. */
-    .notes {
-      grid-template-columns: 1fr;
-    }
-
-    .notes .notes__page {
-      display: none;
-    }
-
-    .notes--sidebar-collapsed :global(.notes__tree) {
-      display: none;
-    }
-
-    .notes--sidebar-collapsed .notes__page {
-      display: flex;
     }
   }
 </style>

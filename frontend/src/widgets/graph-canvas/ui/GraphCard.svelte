@@ -11,6 +11,7 @@
   let {
     n,
     selected = false,
+    lit = false,
     root = false,
     done = false,
     orphan = false,
@@ -39,6 +40,7 @@
   }: {
     n: GraphNodeView
     selected?: boolean
+    lit?: boolean
     root?: boolean
     done?: boolean
     orphan?: boolean
@@ -96,6 +98,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
       <div
         class="gcard gcard--{n.type}"
         class:gcard--sel={selected}
+        class:gcard--lit={lit}
         class:gcard--root={root}
         class:gcard--done={done}
         class:gcard--orphan={orphan}
@@ -376,6 +379,15 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 
   .gcard--pickable:hover {
     box-shadow: 0 0 0 4px var(--c, #c9a227);
+  }
+
+  /* An end of the edge picked in its menu. */
+  .gcard--lit {
+    opacity: 1;
+    box-shadow:
+      0 0 0 4px var(--color-accent, #c9a227),
+      0 0 0 7px color-mix(in srgb, var(--color-bg, #121212) 80%, transparent),
+      0 0 32px 8px color-mix(in srgb, var(--color-accent, #c9a227) 70%, transparent);
   }
 
   .gcard--anchor {

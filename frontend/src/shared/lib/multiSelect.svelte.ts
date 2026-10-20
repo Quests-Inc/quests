@@ -34,6 +34,11 @@ export function createMultiSelect(deps: { current: () => number | null }) {
       if (picked.size) picked = new Set()
       anchor = null
     },
+    /** Ctrl+A: выбрать все видимые; повторно, когда выбраны ровно они, — снять. */
+    selectAll(ids: number[]) {
+      if (ids.length && picked.size === ids.length && ids.every((id) => picked.has(id))) this.clear()
+      else set(ids)
+    },
     /** Только существующие квесты (после перезагрузки списка или удаления). */
     prune(exists: (id: number) => boolean) {
       const keep = [...picked].filter(exists)
