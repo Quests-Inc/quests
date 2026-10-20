@@ -143,6 +143,18 @@
   border-left: 0;
 }
 
+.view-tab {
+  transition:
+    color 0.12s,
+    border-bottom-color 0.12s;
+}
+
+.view-tab:hover:not(.view-tab--on),
+.view-tab--open:not(.view-tab--on) {
+  color: var(--color-fg, #e8e8e8);
+  border-bottom-color: color-mix(in srgb, var(--color-fg, #e8e8e8) 35%, transparent);
+}
+
 .view-tab--on {
   background: transparent;
   color: var(--color-fg, #e8e8e8);
