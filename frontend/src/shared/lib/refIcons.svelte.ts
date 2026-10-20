@@ -3,7 +3,7 @@
 
 import { parseRefHref } from './refs.ts'
 
-export type RefIcon = { icon?: string | null; url?: string | null }
+export type RefIcon = { icon?: string | null; url?: string | null; color?: string | null }
 
 let builtin: Record<string, string> | null = null
 /** URL встроенной svg-иконки; вне vite (bun-тесты) glob недоступен — тогда иконок просто нет. */
@@ -39,7 +39,8 @@ export function refIcons(node: HTMLElement) {
     const map = refIconStore.map
     for (const a of node.querySelectorAll<HTMLAnchorElement>('a[href]')) {
       const ref = parseRefHref(a.getAttribute('href') || '')
-      const url = ref ? maskUrl(map[`${ref.kind}:${ref.id}`]) : null
+      const entry = ref ? map[`${ref.kind}:${ref.id}`] : undefined
+      const url = maskUrl(entry)
       const old = a.querySelector(':scope > .md-ref__ico')
       if (!url) {
         old?.remove()
@@ -49,6 +50,9 @@ export function refIcons(node: HTMLElement) {
       ico.className = 'md-ref__ico'
       ico.setAttribute('aria-hidden', 'true')
       ico.style.setProperty('--ref-ico', `url("${url}")`)
+      // The icon keeps its own colour (the entity's / its questline's), not the link's.
+      if (entry?.color) ico.style.setProperty('--ref-ico-color', entry.color)
+      else ico.style.removeProperty('--ref-ico-color')
       if (!old) a.prepend(ico)
     }
   }
