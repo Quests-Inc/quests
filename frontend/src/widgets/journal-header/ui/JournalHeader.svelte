@@ -77,11 +77,13 @@
     onViewChange(v)
   }
 
-  /** Keeps the list inside the window: shifted left when it would stick out on the right (the tabs sit mid-screen on a phone). */
+  /** Keeps the list inside the window: shifted when it would stick out on either side (the tabs sit mid-screen on a phone). */
   function fit(node: HTMLElement) {
     const r = node.getBoundingClientRect()
-    const over = r.right - (window.innerWidth - 8)
-    if (over > 0) node.style.setProperty('--drop-shift', `${-over}px`)
+    const right = r.right - (window.innerWidth - 8)
+    const left = 8 - r.left
+    if (right > 0) node.style.setProperty('--drop-shift', `${-right}px`)
+    else if (left > 0) node.style.setProperty('--drop-shift', `${left}px`)
   }
 
   function onGroupKey(e: KeyboardEvent, g: Group) {
@@ -189,7 +191,6 @@
           <div class="view-drop" role="menu" aria-label={g.label} use:fit>
             {#each g.tabs as t (t.view)}
               <button type="button" role="menuitem" class="view-drop__item" class:view-drop__item--on={view === t.view} onclick={() => pick(t.view)}>
-                <Icon name={t.icon} size={15} />
                 {t.label}
               </button>
             {/each}
@@ -241,11 +242,12 @@
   .view-drop {
     position: absolute;
     top: calc(100% + var(--drop-gap));
-    left: 0;
+    left: 50%;
     z-index: 30;
-    min-width: max(100%, 11rem);
+    min-width: max(100%, 9rem);
     margin-top: -1px;
-    transform: translateX(var(--drop-shift, 0));
+    /* Centred under its tab, the labels centred in it. */
+    transform: translateX(calc(-50% + var(--drop-shift, 0px)));
     padding: 0.25rem 0 0.35rem;
     border: 1px solid var(--color-border, #333);
     border-top: 0;
@@ -254,18 +256,16 @@
     box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.5);
   }
   .view-drop__item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    display: block;
     width: 100%;
-    padding: 0.45rem 0.9rem;
+    padding: 0.45rem 1.2rem;
     border: 0;
     background: transparent;
     color: var(--color-fg-muted, #9a9a9a);
     font-family: var(--font-display, Georgia, serif);
     font-size: var(--text-sm, 0.875rem);
     letter-spacing: 0.02em;
-    text-align: left;
+    text-align: center;
     white-space: nowrap;
     cursor: pointer;
   }
@@ -276,8 +276,7 @@
     outline: none;
   }
   .view-drop__item--on {
-    color: var(--color-fg, #e8e8e8);
-    box-shadow: inset 2px 0 0 var(--color-accent, #c9a227);
+    color: var(--color-accent, #c9a227);
   }
   @media (orientation: portrait) {
     .view-group {
