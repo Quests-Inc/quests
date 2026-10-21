@@ -34,13 +34,20 @@ func surfaceOf(win *gtk.Window) *gdk.Surface {
 	return gdk.BaseSurface(s)
 }
 
+// pinEmptyRegion reuses one empty region per surface: this runs several times
+// a second, and allocating a fresh native region each call leaked memory.
 func pinEmptyRegion(surface *gdk.Surface) {
-	empty, err := cairo.RegionCreate()
-	if err != nil || empty == nil {
-		return
-	}
 	inputRegionMu.Lock()
-	inputRegions[surface] = empty
+	empty := inputRegions[surface]
+	if empty == nil {
+		var err error
+		empty, err = cairo.RegionCreate()
+		if err != nil || empty == nil {
+			inputRegionMu.Unlock()
+			return
+		}
+		inputRegions[surface] = empty
+	}
 	inputRegionMu.Unlock()
 	surface.SetInputRegion(empty)
 }

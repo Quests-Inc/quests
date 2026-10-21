@@ -4,6 +4,7 @@ package hud
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,12 @@ import (
 	"github.com/quests-inc/quests/go/internal/overlay/shell"
 	"github.com/quests-inc/quests/go/internal/overlay/stylepack"
 )
+
+// dbg holds comma-separated QUESTS_DBG switches used to bisect the native
+// memory leak (quest=478): nopoll, norefresh, notick.
+var dbg = os.Getenv("QUESTS_DBG")
+
+func dbgOn(flag string) bool { return strings.Contains(dbg, flag) }
 
 const (
 	eventPollMS = 2500
@@ -45,6 +52,8 @@ type Host struct {
 	categories []api.Category
 	lastErr    string
 	refreshGen atomic.Uint64
+	panelSig   string // structure of the last rendered panel (timers excluded)
+	timers     []*timerRef
 	inputGen   atomic.Uint64
 	inputHooks bool
 	ipc        *ipc.Server
@@ -80,7 +89,8 @@ func Activate(app *gtk.Application) {
 	h.attachKeys()
 	h.applyMonitor()
 
-	win.SetChild(buildPanel(panelModel{ErrMsg: "загрузка…"}))
+	loading, _ := buildPanel(panelModel{ErrMsg: "загрузка…"})
+	win.SetChild(loading)
 	win.ConnectRealize(func() {
 		_ = shell.ApplyInputMode(&win.Window, false)
 		h.attachInputHooks()
@@ -116,18 +126,24 @@ func Activate(app *gtk.Application) {
 	}
 
 	h.refresh(true)
-	glib.TimeoutAdd(uint(eventPollMS), func() bool {
-		h.pollEvents()
-		return true
-	})
-	glib.TimeoutAdd(uint(dataSyncMS), func() bool {
-		h.refresh(true)
-		return true
-	})
-	glib.TimeoutAdd(uint(timerTickMS), func() bool {
-		h.tickTimers()
-		return true
-	})
+	if !dbgOn("nopoll") {
+		glib.TimeoutAdd(uint(eventPollMS), func() bool {
+			h.pollEvents()
+			return true
+		})
+	}
+	if !dbgOn("norefresh") {
+		glib.TimeoutAdd(uint(dataSyncMS), func() bool {
+			h.refresh(true)
+			return true
+		})
+	}
+	if !dbgOn("notick") {
+		glib.TimeoutAdd(uint(timerTickMS), func() bool {
+			h.tickTimers()
+			return true
+		})
+	}
 	go h.client.PostHeartbeat("go-hud")
 }
 

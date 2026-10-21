@@ -22,8 +22,16 @@ type panelModel struct {
 	Categories                  []api.Category
 }
 
+// timerRef is a countdown label that can be updated in place, so the 1s tick
+// does not rebuild (and leak native memory from) the whole widget tree.
+type timerRef struct {
+	label *gtk.Label
+	tone  string
+}
+
 // buildPanel renders quests list or keyboard-driven settings (no mouse targets).
-func buildPanel(m panelModel) gtk.Widgetter {
+func buildPanel(m panelModel) (gtk.Widgetter, []*timerRef) {
+	var timers []*timerRef
 	pack := stylepack.Active()
 	showSettings := m.Interactive && m.SettingsOpen && !m.Collapsed
 
@@ -84,19 +92,19 @@ func buildPanel(m panelModel) gtk.Widgetter {
 		empty.AddCSSClass("hud-step")
 		root.Append(hudRow(empty))
 	default:
-		appendLane(root, "Избранное", m.Favorites, pack, m.Interactive)
-		appendLane(root, "Срочные", m.Urgent, pack, m.Interactive)
+		appendLane(root, "Избранное", m.Favorites, pack, m.Interactive, &timers)
+		appendLane(root, "Срочные", m.Urgent, pack, m.Interactive, &timers)
 		title := "Категория"
 		if m.CatLabel != "" {
 			title = m.CatLabel
 		}
-		appendLane(root, title, m.Category, pack, m.Interactive)
+		appendLane(root, title, m.Category, pack, m.Interactive, &timers)
 	}
 
-	return root
+	return root, timers
 }
 
-func appendLane(root *gtk.Box, title string, items []model.QuestView, pack stylepack.Theme, interactive bool) {
+func appendLane(root *gtk.Box, title string, items []model.QuestView, pack stylepack.Theme, interactive bool, timers *[]*timerRef) {
 	if len(items) == 0 {
 		return
 	}
@@ -136,6 +144,7 @@ func appendLane(root *gtk.Box, title string, items []model.QuestView, pack style
 				tone = "green"
 			}
 			timer.AddCSSClass("hud-timer--" + tone)
+			*timers = append(*timers, &timerRef{label: timer, tone: tone})
 			titleKids = append(titleKids, timer)
 		}
 		section.Append(hudRow(titleKids...))

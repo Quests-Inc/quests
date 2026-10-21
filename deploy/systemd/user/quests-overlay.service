@@ -21,6 +21,12 @@ Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
 ExecStart=/usr/bin/env just run-overlay
 Restart=on-failure
 RestartSec=3
+# Leak guard (quest=478): kill+restart instead of throttling (MemoryHigh froze the HUD).
+MemoryMax=1G
+MemorySwapMax=512M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=quests-overlay
 
 [Install]
 WantedBy=graphical-session.target

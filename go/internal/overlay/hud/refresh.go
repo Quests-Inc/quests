@@ -3,6 +3,8 @@
 package hud
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
@@ -10,6 +12,7 @@ import (
 	"github.com/quests-inc/quests/go/internal/overlay/config"
 	"github.com/quests-inc/quests/go/internal/overlay/model"
 	"github.com/quests-inc/quests/go/internal/overlay/notices"
+	"github.com/quests-inc/quests/go/internal/overlay/stylepack"
 )
 
 func (h *Host) refresh(refetch bool) {
@@ -57,13 +60,24 @@ func (h *Host) apply(items []api.Quest, cats []api.Category, errMsg string) {
 	}
 	h.catLabel = label
 	fav, urg, cat := model.SplitQuests(items, slug, time.Now())
-	h.win.SetChild(buildPanel(panelModel{
+	pm := panelModel{
 		Favorites: fav, Urgent: urg, Category: cat,
 		CatLabel: label, ErrMsg: errMsg,
 		Collapsed: h.collapsed, Interactive: h.interactive,
 		SettingsOpen: h.settingsOpen, SettingsFocus: h.settingsFocus,
 		Cfg: h.cfg, Categories: cats,
-	}))
+	}
+	// The 1s timer tick must not rebuild the widget tree: each rebuild leaked
+	// native memory. Rebuild only when the structure changes; otherwise just
+	// update the countdown labels in place.
+	sig := panelSignature(pm)
+	if sig == h.panelSig && h.updateTimers(pm) {
+		return
+	}
+	h.panelSig = sig
+	child, timers := buildPanel(pm)
+	h.timers = timers
+	h.win.SetChild(child)
 	h.syncModeChrome()
 	// SetChild / layout often resets the Wayland input region.
 	h.scheduleInputSync()
@@ -129,4 +143,66 @@ func parseEvent(raw map[string]any) notices.Event {
 		ev.Toast = v
 	}
 	return ev
+}
+
+// panelSignature is a value-based fingerprint of the layout. It must not use
+// %v: QuestView holds pointers, whose addresses differ on every API refetch
+// and forced a full rebuild (and native memory leak) every refresh.
+func panelSignature(pm panelModel) string {
+	b, err := json.Marshal(structOnly(pm))
+	if err != nil {
+		return fmt.Sprintf("err:%v:%d", err, time.Now().UnixNano())
+	}
+	return stylepack.ActiveID() + string(b)
+}
+
+// structOnly blanks countdown text/tone (keeping their presence) so the
+// signature changes only when the layout does.
+func structOnly(pm panelModel) panelModel {
+	strip := func(in []model.QuestView) []model.QuestView {
+		out := make([]model.QuestView, len(in))
+		for i, q := range in {
+			if q.TimerLabel != "" {
+				q.TimerLabel = "*"
+			}
+			q.TimerTone = ""
+			out[i] = q
+		}
+		return out
+	}
+	pm.Favorites, pm.Urgent, pm.Category = strip(pm.Favorites), strip(pm.Urgent), strip(pm.Category)
+	return pm
+}
+
+// updateTimers rewrites countdown labels in place; false if the label set
+// does not match the built widgets (caller rebuilds).
+func (h *Host) updateTimers(pm panelModel) bool {
+	var views []model.QuestView
+	views = append(views, pm.Favorites...)
+	views = append(views, pm.Urgent...)
+	views = append(views, pm.Category...)
+	i := 0
+	for _, q := range views {
+		if q.TimerLabel == "" {
+			continue
+		}
+		if i >= len(h.timers) {
+			return false
+		}
+		t := h.timers[i]
+		i++
+		if t.label.Label() != q.TimerLabel {
+			t.label.SetLabel(q.TimerLabel)
+		}
+		tone := q.TimerTone
+		if tone == "" {
+			tone = "green"
+		}
+		if tone != t.tone {
+			t.label.RemoveCSSClass("hud-timer--" + t.tone)
+			t.label.AddCSSClass("hud-timer--" + tone)
+			t.tone = tone
+		}
+	}
+	return i == len(h.timers)
 }

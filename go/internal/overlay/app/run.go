@@ -24,7 +24,7 @@ func Run(osArgs []string) error {
 		return fmt.Errorf("wlr-layer-shell is not available (need niri/Hyprland/Sway/Plasma Wayland)")
 	}
 
-	gtkApp := gtk.NewApplication(appID, gio.ApplicationFlagsNone)
+	gtkApp := gtk.NewApplication(appID+os.Getenv("QUESTS_DBG_APPSUFFIX"), gio.ApplicationFlagsNone)
 	gtkApp.ConnectActivate(func() {
 		_ = idle.Get().Start()
 		hud.Activate(gtkApp)
