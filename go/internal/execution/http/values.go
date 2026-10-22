@@ -191,7 +191,7 @@ func (h *Handler) rollValue(segment string) http.HandlerFunc {
 			writeErr(w, http.StatusUnprocessableEntity, "значения «"+name+"» нет: сначала создайте его")
 			return
 		case cur.Formula != "":
-			writeErr(w, http.StatusUnprocessableEntity, "«"+name+"» — формула: бросок её не заменяет")
+			writeErr(w, http.StatusUnprocessableEntity, "«"+name+"» — формула: источник её не заменяет")
 			return
 		}
 		script, arg := body.Script, strings.TrimSpace(body.Arg)

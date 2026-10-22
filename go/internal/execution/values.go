@@ -218,7 +218,7 @@ func (s *Store) SetRolledValue(ctx context.Context, o SecretOwner, name, typ, ca
 		return StoredValue{}, err
 	}
 	if script < 1 || strings.TrimSpace(arg) == "" || len(arg) > 200 {
-		return StoredValue{}, &ValueError{Msg: "бросок: нужны скрипт и выражение до 200 символов"}
+		return StoredValue{}, &ValueError{Msg: "источник: нужны скрипт и выражение до 200 символов"}
 	}
 	canonical, err := normalizeValue(typ, canonical)
 	if err != nil {

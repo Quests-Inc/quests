@@ -201,8 +201,8 @@
                 type="button"
                 class="values-x"
                 disabled={busy}
-                aria-label="Перебросить {row.name}"
-                title="Перебросить: {row.roll.arg}"
+                aria-label="Обновить {row.name} из источника"
+                title="Обновить из источника: {row.roll.arg}"
                 onclick={() => void reroll(row.name)}
               >
                 <Icon name="repeat" size={14} />

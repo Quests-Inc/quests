@@ -25,11 +25,11 @@ export function valueTypeColor(type: string) {
   return TYPE_COLOR[type] ?? 'inherit'
 }
 
-/** The third hover line: the error, else the formula, else the text (with the roll that made it). */
+/** The third hover line: the error, else the formula, else the text (with the source that made it). */
 export function valueDetail(row: { formula?: string; text?: string; error?: string; roll?: string }) {
   if (row.error) return row.error
   if (row.formula) return row.formula
-  if (row.roll) return `${row.text ?? ''} · бросок ${row.roll}`
+  if (row.roll) return `${row.text ?? ''} · источник ${row.roll}`
   return row.text ?? ''
 }
 
