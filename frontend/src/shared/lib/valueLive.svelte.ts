@@ -28,6 +28,9 @@ export function readValue(host: string, name: string) {
 /** Bumped after a write so the owner's table and the open texts load again. */
 export const valueRev = $state({ n: 0, host: '' })
 
+/** The host a remote change names: every table and text reads again, since values are inherited from parents and the workspace. */
+export const ANY_HOST = '*'
+
 export function touchValues(host: string) {
   valueRev.host = host
   valueRev.n += 1

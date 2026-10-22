@@ -142,6 +142,7 @@ func (h *Handler) putValue(segment string) http.HandlerFunc {
 			valueWriteErr(w, err)
 			return
 		}
+		h.valuesChanged(r, o)
 		writeJSON(w, http.StatusOK, j)
 	}
 }
@@ -224,6 +225,7 @@ func (h *Handler) rollValue(segment string) http.HandlerFunc {
 			valueWriteErr(w, err)
 			return
 		}
+		h.valuesChanged(r, o)
 		writeJSON(w, http.StatusOK, j)
 	}
 }
@@ -241,6 +243,7 @@ func (h *Handler) deleteValue(segment string) http.HandlerFunc {
 			valueWriteErr(w, err)
 			return
 		}
+		h.valuesChanged(r, o)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -402,4 +405,10 @@ func (h *Handler) jobValues(ctx context.Context, j execution.RunnerJob) map[stri
 		return nil
 	}
 	return set.Env()
+}
+
+func (h *Handler) valuesChanged(r *http.Request, o execution.SecretOwner) {
+	if h.ValuesChanged != nil {
+		h.ValuesChanged(r.Context(), o.Kind, o.ID)
+	}
 }

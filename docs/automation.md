@@ -135,6 +135,7 @@ such runs waiting, and a run with no runner online fails after two minutes. `?on
 any command; whoever may open the text may click it. The node `Значение: записать` (`sink.value`, params `name` and `type`,
 inputs `ref` of any entity and `value`) writes what a script computed into a named value; a value that is a formula is not
 overwritten. Wire `source.note → code → parse → sink.value` for a check that keeps values fresh.
+A write of a value (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner, and open pages read the values again.
 `?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).
 A click throws again. Up to 16 `?auto` embeddings per text are computed; the rest stay click-only. The parameter is explicit —
 a formula is never guessed to be safe to run. The script is `Args → … → Result` made of

@@ -271,6 +271,11 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 }
 
 // PublishSilent wakes journal tabs (they reload on any quests_changed) without a HUD toast or sound.
+// ValuesChanged tells the open pages that a named value of an entity was written or removed, so they read it again.
+func (h *Hub) ValuesChanged(workspace int64, kind string, id int64) {
+	h.PublishSilent(workspace, "values_changed", "", map[string]any{"owner_kind": kind, "owner_id": id})
+}
+
 func (h *Hub) PublishSilent(workspace int64, kind, title string, extra map[string]any) {
 	silent := ""
 	h.Publish(kind, PublishOpts{

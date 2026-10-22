@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { deleteValue, listValues, putValue, rollValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
-  import { hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
+  import { ANY_HOST, hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
   import { readValueInput } from '@/shared/lib/valueInput.ts'
   import { valueDetail, valueTypeColor, valueTypeLabel } from '@/shared/lib/valueTip.ts'
   import { effectiveText, formatValue, valueSummary } from '../model/format.ts'
@@ -103,7 +103,7 @@
         void load()
         return
       }
-      if (revHost === key && rev) void load()
+      if ((revHost === key || revHost === ANY_HOST) && rev) void load()
     })
   })
 

@@ -13,6 +13,7 @@ import (
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // scriptHost is what the evaluator needs from the rest of the system for one run: what the source nodes read and what the
@@ -325,6 +326,9 @@ func (r *CheckRunner) sinkValue(ctx context.Context, n graph.Node, in map[string
 	}
 	if err := r.Store.Execution.WriteScriptValue(ctx, owner, p.Name, string(p.Type), text); err != nil {
 		return fmt.Errorf("значение %q: %w", p.Name, err)
+	}
+	if r.Hub != nil {
+		r.Hub.ValuesChanged(wsctx.From(ctx), owner.Kind, owner.ID)
 	}
 	return nil
 }
