@@ -19,12 +19,43 @@ export function getScripts() {
   return request<Script[]>('/api/scripts')
 }
 
-/** Run a script made of server nodes only (Args … Result) and get its value; nothing is saved. */
-export function evalScript(id: number, args: Record<string, string>, host?: { kind: string; id: number }) {
-  return request<{ value: string; version: number }>(`/api/scripts/${id}/eval`, {
+export type EvalOut = { value: string; version: number } | { run: number; state: string; version: number }
+
+/** Run a script with the values of `host` in scope. A script with a Code node needs `on` (a runner) and answers with a run to wait for. */
+export function evalScript(id: number, args: Record<string, string>, host?: { kind: string; id: number }, on = '') {
+  return request<EvalOut>(`/api/scripts/${id}/eval`, {
     method: 'POST',
-    body: JSON.stringify(host ? { args, host } : { args }),
+    body: JSON.stringify({ args, ...(host ? { host } : {}), ...(on ? { on } : {}) }),
   })
+}
+
+export type EmbeddedRun = { state: 'waiting' | 'done' | 'failed'; value?: string; error?: string }
+
+export function getEmbeddedRun(id: number) {
+  return request<EmbeddedRun>(`/api/script-runs/${id}`)
+}
+
+const WAIT_STEP_MS = 600
+const WAIT_MAX_MS = 100_000
+
+/** The text of Result: at once for a server script, after the runner has answered for one with code. */
+export async function evalScriptText(
+  id: number,
+  args: Record<string, string>,
+  host?: { kind: string; id: number },
+  on = '',
+  wait: { step: number; max: number } = { step: WAIT_STEP_MS, max: WAIT_MAX_MS },
+): Promise<string> {
+  const out = await evalScript(id, args, host, on)
+  if ('value' in out) return out.value
+  const until = Date.now() + wait.max
+  for (;;) {
+    await new Promise((r) => setTimeout(r, wait.step))
+    const run = await getEmbeddedRun(out.run)
+    if (run.state === 'done') return run.value ?? ''
+    if (run.state === 'failed') throw new Error(run.error || 'не вышло')
+    if (Date.now() > until) throw new Error('раннер не ответил вовремя')
+  }
 }
 
 export function getScript(id: number) {

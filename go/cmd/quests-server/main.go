@@ -155,6 +155,7 @@ func main() {
 	windows := schedule.NewWindowNotifier()
 	checks := schedule.NewCheckRunner(st, hub)
 	srv.RunnerDone = checks.JobFinished
+	srv.StartEmbedded = checks.StartEmbedded
 	hub.OnPublish(func(p events.Payload) { checks.DispatchHooks(p) })
 	go schedule.RunMaintenanceLoop(ctx, st, hub, windows, checks)
 	go srv.RunProbes(ctx)

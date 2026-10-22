@@ -127,6 +127,14 @@ and `?auto` adds the result (`2к4+2 = 7`); a click-only embedding is just the f
 computes and stores the number, the client never sends it). The value must already exist and must not be a formula; the result must fit
 its type. The value remembers the script and the expression, so the table can roll it again, and any formula over `hp` follows. `?set`
 never runs on show, so it overrides `?auto`. A hand-typed value forgets the roll. MCP: `list_values`, `set_value`, `delete_value`.
+`script=12{55.75,37.62}?on=stand` is an embedding whose script has a Code node: the click starts a run, the code goes to
+runner `stand` at once (a job queued wakes the runners' long polls, so pick-up takes milliseconds), and the page asks
+`GET /api/script-runs/{id}` until `Result` has its text (`POST /api/scripts/{id}/eval` with `on` answers 202 and the run). The
+text of the link is the formula, as for a server script. It never runs on show (`?on` beats `?auto`), a workspace has at most 6
+such runs waiting, and a run with no runner online fails after two minutes. `?on` needs the code to be written by an owner like
+any command; whoever may open the text may click it. The node `Значение: записать` (`sink.value`, params `name` and `type`,
+inputs `ref` of any entity and `value`) writes what a script computed into a named value; a value that is a formula is not
+overwritten. Wire `source.note → code → parse → sink.value` for a check that keeps values fresh.
 `?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).
 A click throws again. Up to 16 `?auto` embeddings per text are computed; the rest stay click-only. The parameter is explicit —
 a formula is never guessed to be safe to run. The script is `Args → … → Result` made of

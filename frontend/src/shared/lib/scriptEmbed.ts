@@ -1,7 +1,7 @@
 // `script=N{arg}` in a text: a link that computes on click. `script=N{arg}?auto` computes when the
 // text is shown. A click throws again. Nothing is stored (ADR-0003 §6b).
 import { rollValue } from '@/shared/api/client.ts'
-import { evalScript } from '@/shared/api/scripts.ts'
+import { evalScriptText } from '@/shared/api/scripts.ts'
 import { hostKey, touchValues } from './valueLive.svelte.ts'
 
 import { labelParts, MAX_AUTO_SCRIPTS, parseScriptHref } from './scriptRef.ts'
@@ -18,7 +18,7 @@ function valueHost(node: HTMLElement) {
 /** `label` is the formula shown with its values as chips, then `tail`; without a label `text` is shown as is. */
 type Row = { text: string; label?: string; tail?: string; err: boolean; title: string }
 
-type Parsed = { id: number; arg: string; auto: boolean; hide: boolean; set: string }
+type Parsed = { id: number; arg: string; auto: boolean; hide: boolean; set: string; on: string }
 
 function cacheKey(node: HTMLElement, parsed: Parsed) {
   return `${node.dataset.valueHost || ''}\u0000${node.dataset.valueSig || ''}\u0000${parsed.id}\u0000${parsed.arg}\u0000${parsed.hide ? '1' : '0'}`
@@ -81,7 +81,7 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
         value = String((await rollValue(host.kind, host.id, parsed.set, { script: parsed.id, arg: parsed.arg })).value ?? '')
         touchValues(hostKey(host.kind, host.id))
       } else {
-        value = (await evalScript(parsed.id, { _: parsed.arg }, host)).value
+        value = await evalScriptText(parsed.id, { _: parsed.arg }, host, parsed.on)
       }
       const out = { value }
       const row = rowFor(parsed, out.value)
@@ -107,7 +107,8 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       a.classList.add('md-script')
       const parsed = parseScriptHref(a.getAttribute('href') || '')
       if (parsed?.hide && !parsed.auto && !a.title) a.title = 'Посчитать'
-      if (parsed?.set && !a.title) a.title = `Бросить и записать в ${parsed.set}`
+      if (parsed?.set && !a.title) a.title = `Посчитать и записать в ${parsed.set}`
+      if (parsed?.on && !a.title) a.title = `Выполнить на раннере ${parsed.on}`
       if (parsed && !parsed.hide && !a.dataset.settled && a.dataset.lrev !== String(rev)) fillLabel(a, parsed.arg, '')
       if (!parsed?.auto) continue
       if (a.dataset.settled) {

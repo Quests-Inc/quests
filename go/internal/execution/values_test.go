@@ -233,3 +233,28 @@ func stMissing(t *testing.T) (bool, error) {
 	st := openSecretsDB(t)
 	return st.NotePrivate(valueCtx(), 999999)
 }
+
+func TestScriptValueWriteKeepsFormulas(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := valueCtx()
+	note := insertNote(t, st, "волк", nil, false)
+	o := SecretOwner{SecretOwnerNote, note}
+	mustValue(t, st, o, "str_score", "int", "12")
+	if err := st.WriteScriptValue(ctx, o, "hp", "int", "11"); err != nil {
+		t.Fatalf("a new value: %v", err)
+	}
+	if err := st.WriteScriptValue(ctx, o, "hp", "int", "9"); err != nil {
+		t.Fatalf("an existing literal: %v", err)
+	}
+	if _, err := st.SetNamedFormula(ctx, o, "str_mod", "int", "(str_score - 10) / 2"); err != nil {
+		t.Fatal(err)
+	}
+	err := st.WriteScriptValue(ctx, o, "str_mod", "int", "5")
+	var ve *ValueError
+	if !errors.As(err, &ve) || !strings.Contains(ve.Msg, "формула") {
+		t.Fatalf("a formula must not be overwritten by a script: %v", err)
+	}
+	if err := st.WriteScriptValue(ctx, o, "hp", "int", "not a number"); err == nil {
+		t.Fatal("a value that does not fit the type must be refused")
+	}
+}

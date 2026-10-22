@@ -108,7 +108,7 @@ func TestScriptValidateAndNodeCatalog(t *testing.T) {
 	}
 
 	code, nodes := secretReqList(t, h, "/api/script-nodes")
-	if code != http.StatusOK || len(nodes) != 24 || nodes[0]["kind"] != "source" {
+	if code != http.StatusOK || len(nodes) != 25 || nodes[0]["kind"] != "source" {
 		t.Fatalf("catalog: %d (%d types) %v", code, len(nodes), nodes)
 	}
 

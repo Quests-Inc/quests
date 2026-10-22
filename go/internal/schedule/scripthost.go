@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
@@ -96,6 +98,15 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		return h.r.sinkTemplate(ctx, h.subj, n, in)
 	case "sink.done":
 		return nil
+	case "sink.value":
+		return h.r.sinkValue(ctx, n, in)
+	case "sink.result":
+		// An embedded script that waited for a runner: what the link shows is kept on the run until the page asks.
+		if h.subj.RunID == 0 {
+			return nil
+		}
+		text, _ := in["value"].Value.(string)
+		return h.r.Store.Execution.SetRunResult(ctx, h.subj.RunID, text)
 	case "sink.http":
 		return h.r.sinkHTTP(ctx, n, in)
 	case "sink.socket":
@@ -281,6 +292,39 @@ func (r *CheckRunner) sinkStepResult(ctx context.Context, n graph.Node, in map[s
 		}
 	default:
 		return fmt.Errorf("неизвестный итог %q", p.Result)
+	}
+	return nil
+}
+
+// sinkValue writes what a script computed into a named value of the entity the reference points at.
+func (r *CheckRunner) sinkValue(ctx context.Context, n graph.Node, in map[string]graph.Token) error {
+	ref, err := refOf(in)
+	if err != nil {
+		return err
+	}
+	var p graph.ValueSinkParams
+	if err := json.Unmarshal(n.Params, &p); err != nil {
+		return err
+	}
+	var text string
+	switch v := in["value"].Value.(type) {
+	case string:
+		text = v
+	case int64:
+		text = strconv.FormatInt(v, 10)
+	case float64:
+		text = strconv.FormatFloat(v, 'f', -1, 64)
+	case bool:
+		text = strconv.FormatBool(v)
+	default:
+		return fmt.Errorf("значение %q: пусто", p.Name)
+	}
+	owner := execution.SecretOwner{Kind: ref.Kind, ID: ref.ID}
+	if ref.Kind == "workspace" {
+		owner = execution.WorkspaceSecretOwner(ctx)
+	}
+	if err := r.Store.Execution.WriteScriptValue(ctx, owner, p.Name, string(p.Type), text); err != nil {
+		return fmt.Errorf("значение %q: %w", p.Name, err)
 	}
 	return nil
 }

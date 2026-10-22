@@ -14,10 +14,10 @@ test('?auto and ?hide are parameters, not the start of a longer word', () => {
   expect(scriptEmbedRe().exec('script=12{8+pb+str}?automatic')?.[3]).toBeUndefined()
   expect(scriptEmbedRe().exec('script=12{8+pb+str}?hidden')?.[3]).toBeUndefined()
   expect(scriptEmbedRe().exec('script=12{8+pb+str}')?.[3]).toBeUndefined()
-  expect(scriptFlags('?auto&hide')).toEqual({ auto: true, hide: true, set: '' })
-  expect(scriptFlags('?hide&auto=1')).toEqual({ auto: true, hide: true, set: '' })
-  expect(scriptFlags('?hide')).toEqual({ auto: false, hide: true, set: '' })
-  expect(scriptFlags('?automatic')).toEqual({ auto: false, hide: false, set: '' })
+  expect(scriptFlags('?auto&hide')).toEqual({ auto: true, hide: true, set: '', on: '' })
+  expect(scriptFlags('?hide&auto=1')).toEqual({ auto: true, hide: true, set: '', on: '' })
+  expect(scriptFlags('?hide')).toEqual({ auto: false, hide: true, set: '', on: '' })
+  expect(scriptFlags('?automatic')).toEqual({ auto: false, hide: false, set: '', on: '' })
   expect(scriptLabel('8+pb+str', { hide: true })).toBe('?')
   expect(scriptLabel('8+pb+str', {})).toBe('8+pb+str')
 })
@@ -32,6 +32,7 @@ test('the link carries the argument and the flags', () => {
     auto: true,
     hide: true,
     set: '',
+    on: '',
   })
   expect(parseScriptHref('?script=12&_=8%2Bpb%2Bstr')?.hide).toBe(false)
   expect(parseScriptHref('?note=3')).toBeNull()
@@ -46,10 +47,21 @@ test('?set=name: a click writes the value, and it beats ?auto', async () => {
   const { scriptEmbedRe, scriptFlags, scriptHref, parseScriptHref } = await import('../../src/shared/lib/scriptRef.ts')
   const m = [...'script=7{2к8+2}?set=hp'.matchAll(scriptEmbedRe())][0]
   expect(m[3]).toBe('?set=hp')
-  expect(scriptFlags(m[3])).toEqual({ auto: false, hide: false, set: 'hp' })
+  expect(scriptFlags(m[3])).toEqual({ auto: false, hide: false, set: 'hp', on: '' })
   expect(scriptFlags('?auto&set=hp').auto).toBe(false)
-  expect(scriptFlags('?hide&auto&set=hp')).toEqual({ auto: false, hide: true, set: 'hp' })
+  expect(scriptFlags('?hide&auto&set=hp')).toEqual({ auto: false, hide: true, set: 'hp', on: '' })
   const href = scriptHref('7', '2к8+2', { set: 'hp' })
-  expect(parseScriptHref(href)).toEqual({ id: 7, arg: '2к8+2', auto: false, hide: false, set: 'hp' })
+  expect(parseScriptHref(href)).toEqual({ id: 7, arg: '2к8+2', auto: false, hide: false, set: 'hp', on: '' })
   expect(scriptFlags('?set=Hp').set).toBe('')
+})
+
+test('?on=label: code runs on a click only, never on show', async () => {
+  const { scriptEmbedRe, scriptFlags, scriptHref, parseScriptHref } = await import('../../src/shared/lib/scriptRef.ts')
+  const m = [...'script=9{55.75,37.62}?on=stand'.matchAll(scriptEmbedRe())][0]
+  expect(m[3]).toBe('?on=stand')
+  expect(scriptFlags(m[3])).toEqual({ auto: false, hide: false, set: '', on: 'stand' })
+  expect(scriptFlags('?auto&on=stand').auto).toBe(false)
+  expect(scriptFlags('?hide&on=main-pc&auto').on).toBe('main-pc')
+  expect(parseScriptHref(scriptHref('9', 'x', { on: 'stand' }))).toEqual({ id: 9, arg: 'x', auto: false, hide: false, set: '', on: 'stand' })
+  expect(scriptFlags('?on=Stand').on).toBe('')
 })

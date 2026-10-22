@@ -295,3 +295,30 @@ func TestSourceTakesAnEntityID(t *testing.T) {
 		t.Fatal("an unknown parameter passed")
 	}
 }
+
+func TestValueSinkTakesAnyRefAndTheTypeItNames(t *testing.T) {
+	ok := Graph{
+		Nodes: []Node{node(1, "source.note", ""), node(2, "code", codeEcho),
+			node(3, "parse", `{"schema":[{"name":"temp","type":"float","required":true}]}`),
+			node(4, "sink.value", `{"name":"temp","type":"float"}`)},
+		Edges: []Edge{link(2, "stdout", 3, "in"), link(1, "ref", 4, "ref"), link(3, "temp", 4, "value")},
+	}
+	if err := ok.Check(Builtin()); err != nil {
+		t.Fatalf("a note ref into sink.value: %v", err)
+	}
+	// An int feeds a float value, a string does not feed an int one.
+	bad := Graph{
+		Nodes: []Node{node(1, "source.step", ""), node(2, "code", codeEcho),
+			node(3, "parse", `{"schema":[{"name":"s","type":"str","required":true}]}`),
+			node(4, "sink.value", `{"name":"n","type":"int"}`)},
+		Edges: []Edge{link(2, "stdout", 3, "in"), link(1, "ref", 4, "ref"), link(3, "s", 4, "value")},
+	}
+	if err := bad.Check(Builtin()); err == nil {
+		t.Fatal("a string must not feed an int value")
+	}
+	for _, params := range []string{`{"name":"Temp","type":"int"}`, `{"name":"expr","type":"int"}`, `{"name":"t","type":"doc"}`, `{"name":"t"}`} {
+		if _, _, err := Builtin()["sink.value"].Ports(json.RawMessage(params)); err == nil {
+			t.Errorf("sink.value %s must be refused", params)
+		}
+	}
+}

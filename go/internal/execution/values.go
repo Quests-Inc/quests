@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
@@ -225,6 +226,22 @@ func (s *Store) SetRolledValue(ctx context.Context, o SecretOwner, name, typ, ca
 		return StoredValue{}, err
 	}
 	return s.writeValue(ctx, o, name, typ, canonical, "", script, arg)
+}
+
+// WriteScriptValue is what a script's sink.value does: the literal is written, a source it came from is forgotten, and a
+// value that is a formula stays untouched (the script is told so instead of silently replacing a stat's rule).
+func (s *Store) WriteScriptValue(ctx context.Context, o SecretOwner, name, typ, canonical string) error {
+	rows, err := s.listStored(ctx, o)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.Name == name && row.Formula != "" {
+			return &ValueError{Msg: "«" + name + "» — формула: запись её не заменяет"}
+		}
+	}
+	_, err = s.SetNamedValue(ctx, o, name, typ, canonical)
+	return err
 }
 
 // SetNamedFormula upserts a formula. It is checked against the values visible from o, including this name, so a
@@ -515,4 +532,20 @@ func finishSet(set ValueSet) ValueSet {
 		set.Effective = []ValuePlace{}
 	}
 	return set
+}
+
+// ExprScopeOf is what an expression of an embedded script reads: the effective numbers and the names that hold text.
+func ExprScopeOf(set ValueSet) *graph.ExprScope {
+	sc := &graph.ExprScope{Num: map[string]float64{}, Str: map[string]bool{}}
+	for _, p := range set.Effective {
+		if p.Error != "" {
+			continue
+		}
+		if n, ok := p.Number(); ok {
+			sc.Num[p.Name] = n
+		} else {
+			sc.Str[p.Name] = true
+		}
+	}
+	return sc
 }

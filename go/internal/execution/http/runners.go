@@ -202,6 +202,7 @@ func (h *Handler) runnerPoll(w http.ResponseWriter, r *http.Request) {
 	}
 	deadline := time.Now().Add(wait)
 	for {
+		wake := execution.JobsQueued() // before the look, so a job queued in between is not missed
 		job, err := h.Store.ClaimJob(r.Context(), run.Label, runnerLease)
 		if err != nil {
 			writeErr(w, 500, err.Error())
@@ -223,6 +224,8 @@ func (h *Handler) runnerPoll(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-wake:
+			continue
 		case <-time.After(runnerPollStep):
 			// Count the wait as a sign of life too.
 			if _, err := h.Store.AuthRunner(r.Context(), httpx.BearerToken(r)); err != nil {

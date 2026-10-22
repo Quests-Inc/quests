@@ -23,6 +23,8 @@ type Handler struct {
 	ClearCommand  func(ctx context.Context, kind string, id int64) error
 	// RunnerDone is called when a runner reports a job finished (the root reacts to its result).
 	RunnerDone func(ctx context.Context, job execution.RunnerJob)
+	// StartEmbedded starts the run of a script with a Code node that a text called (the scheduler's side owns runs).
+	StartEmbedded func(ctx context.Context, in execution.EmbedStart) (int64, error)
 }
 
 // Register mounts every route of the context.

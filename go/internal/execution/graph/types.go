@@ -3,6 +3,8 @@
 // nodes, decodes a stored graph and checks it. Running it is the evaluator's job.
 package graph
 
+import "strings"
+
 // PortType is the type of the value a port carries.
 type PortType string
 
@@ -22,6 +24,8 @@ const (
 	TRefTemplate  PortType = "ref<template>"
 	TRefQuest     PortType = "ref<quest>"
 	TRefWorkspace PortType = "ref<workspace>"
+	// TRef is for inputs only: a reference to any kind of entity (what sink.value writes to).
+	TRef PortType = "ref"
 )
 
 // Port is one input or output of a node.
@@ -59,6 +63,8 @@ func Assignable(from, to PortType) bool {
 		return from.scalar()
 	case TValue:
 		return from.value()
+	case TRef:
+		return strings.HasPrefix(string(from), "ref<")
 	}
 	return false
 }

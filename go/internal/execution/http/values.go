@@ -202,7 +202,15 @@ func (h *Handler) rollValue(segment string) http.HandlerFunc {
 			writeErr(w, http.StatusUnprocessableEntity, "у значения нет источника броска: укажите скрипт и выражение")
 			return
 		}
-		out, _, ok := h.runEmbedded(w, r, script, map[string]string{"_": arg}, scopeFrom(r, h, set, skip))
+		_, g, reg, ok := h.loadEmbedded(w, r, script)
+		if !ok {
+			return
+		}
+		if g.RunsOnRunnerIn(reg) {
+			writeErr(w, http.StatusUnprocessableEntity, "источнику нужен раннер: запишите значение нодой «Значение: записать» в скрипте")
+			return
+		}
+		out, ok := h.runEmbedded(w, r, g, reg, map[string]string{"_": arg}, scopeFrom(r, h, set, skip))
 		if !ok {
 			return
 		}

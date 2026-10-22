@@ -1,7 +1,7 @@
 // What a text looks like in an exported file: values filled in, scripts as the view shows them, `?auto` computed.
 // Nothing is stored.
 import { listValues } from '@/shared/api/client.ts'
-import { evalScript } from '@/shared/api/scripts.ts'
+import { evalScriptText } from '@/shared/api/scripts.ts'
 
 import { foreignValueRefs } from './markdown.ts'
 import { escapeMdInline, labelParts, MAX_AUTO_SCRIPTS, scriptEmbedRe, scriptFlags } from './scriptRef.ts'
@@ -56,8 +56,8 @@ async function bakeChunk(
     const label = plainLabel(arg, values)
     let text = hide ? '?' : `${label} — ошибка`
     try {
-      const out = await evalScript(Number(m[1]), { _: arg }, host)
-      text = hide ? escapeMdInline(out.value) : `${label} = ${escapeMdInline(out.value)}`
+      const value = await evalScriptText(Number(m[1]), { _: arg }, host)
+      text = hide ? escapeMdInline(value) : `${label} = ${escapeMdInline(value)}`
     } catch {
       /* a hidden formula stays hidden; the file is still written */
     }

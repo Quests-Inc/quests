@@ -490,6 +490,20 @@ func Evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string
 	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, nil)
 }
 
+// BeginEmbedded advances an embedded graph as far as the server goes: the arguments, the expressions, up to the Code nodes. The
+// caller stores the run and hands the requests to a runner; what Result already received comes back too.
+func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope) (*Run, []CodeRequest, string, error) {
+	run, err := NewRun(g, reg)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	var out string
+	run.budget = &budget{}
+	run.Scope = scope
+	reqs, err := run.Advance(ctx, &embedHost{args: withFirstArg(g, args), result: &out})
+	return run, reqs, out, err
+}
+
 // EvaluateScoped is Evaluate with the named values of the text the script was clicked in.
 func EvaluateScoped(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope) (string, error) {
 	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope)
