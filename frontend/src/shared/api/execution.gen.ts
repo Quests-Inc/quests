@@ -77,6 +77,40 @@ export interface CustomNodeInUse {
 }
 
 //////////
+// source: embed_run.go
+
+/**
+ * EmbedKeyPrefix marks the runs that a text started (`script=N{…}?on=label`): only those are readable by the page that waits.
+ */
+export const EmbedKeyPrefix = "embed:";
+/**
+ * MaxOpenEmbedded caps the runs of embedded scripts waiting for a runner at the same time, per workspace.
+ */
+export const MaxOpenEmbedded = 6;
+/**
+ * EmbedStart describes a click on an embedded script that has a Code node.
+ */
+export interface EmbedStart {
+  ScriptID: number /* int64 */;
+  Version: number /* int */;
+  Graph: Graph;
+  Args: { [key: string]: string};
+  /**
+   * HostKind and HostID name the entity whose text was clicked; its values are the scope of the formulas and its secrets
+   * and values go to the job like they would for its own check. Empty for a text with no owner.
+   */
+  HostKind: string;
+  HostID: number /* int64 */;
+  Label: string;
+  Scope?: any /* graph.ExprScope */;
+}
+/**
+ * RunnerValueName is the workspace value that names the default runner of embedded scripts: one label, or labels separated by
+ * commas, tried in turn (the first one online gets the job). Only the owner writes a workspace value.
+ */
+export const RunnerValueName = "runner";
+
+//////////
 // source: hooks.go
 
 export const MaxHookName = 200;
@@ -464,4 +498,55 @@ export interface SealedCounts {
   readable: number /* int */;
   unreadable: number /* int */;
   plain: number /* int */; // not sealed yet (secret values written before sealing existed)
+}
+
+//////////
+// source: valueform.go
+
+
+//////////
+// source: valueform_parse.go
+
+
+//////////
+// source: values.go
+
+/**
+ * ValueError is a rejected name or literal. The API answers 422.
+ */
+export interface ValueError {
+  Msg: string;
+}
+/**
+ * StoredValue is one value as it lies in the table. Formula is empty for a literal. Error is set when a formula
+ * cannot be computed; Value is then empty.
+ */
+export interface StoredValue {
+  Name: string;
+  Type: string;
+  Value: string;
+  Formula: string;
+  Error: string;
+  /**
+   * RollScript and RollArg name the embedded script that produced the literal; zero and empty for a typed-in one.
+   */
+  RollScript: number /* int64 */;
+  RollArg: string;
+}
+/**
+ * ValuePlace is a stored literal plus the owner it was inherited from.
+ */
+export interface ValuePlace {
+  StoredValue: StoredValue;
+  From: SecretOwner;
+  Title: string;
+}
+/**
+ * ValueSet is what a text or a command sees. Own is everything set on the owner itself. Effective is the inherited
+ * view, nearest first, capped.
+ */
+export interface ValueSet {
+  Own: StoredValue[];
+  Effective: ValuePlace[];
+  Truncated: boolean;
 }

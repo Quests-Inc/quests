@@ -180,6 +180,10 @@ export const TRefTemplate: PortType = "ref<template>";
 export const TRefQuest: PortType = "ref<quest>";
 export const TRefWorkspace: PortType = "ref<workspace>";
 /**
+ * TRef is for inputs only: a reference to any kind of entity (what sink.value writes to).
+ */
+export const TRef: PortType = "ref";
+/**
  * Port is one input or output of a node.
  */
 export interface Port {
