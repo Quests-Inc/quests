@@ -71,6 +71,7 @@
             text: row.value == null ? '' : proseValue(row.type, row.value),
             formula: row.formula ?? '',
             error: row.error ?? '',
+            roll: row.roll?.arg ?? '',
           })),
         )
       }

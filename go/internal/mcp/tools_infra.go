@@ -101,9 +101,12 @@ func parseOwner(s string) (string, int64, error) {
 	return strings.ToLower(strings.TrimSpace(kind)), id, nil
 }
 
-func secretPath(owner string) (string, error) {
+func secretPath(owner string) (string, error) { return ownerPath(owner, "secrets") }
+
+// ownerPath is the API path of an owner's collection (`secrets`, `values`).
+func ownerPath(owner, collection string) (string, error) {
 	if strings.EqualFold(strings.TrimSpace(owner), "workspace") {
-		return "/api/workspace/secrets", nil // the workspace has no id: it is the active one
+		return "/api/workspace/" + collection, nil // the workspace has no id: it is the active one
 	}
 	kind, id, err := parseOwner(owner)
 	if err != nil {
@@ -113,7 +116,7 @@ func secretPath(owner string) (string, error) {
 	if !ok {
 		return "", &Err{422, "owner must be one of: questline=N, template=N, quest=N, step=N, note=N, workspace"}
 	}
-	return fmt.Sprintf("/api/%s/%d/secrets", seg, id), nil
+	return fmt.Sprintf("/api/%s/%d/%s", seg, id, collection), nil
 }
 
 func secretTools(c *Client) []Tool {
@@ -163,6 +166,68 @@ func secretTools(c *Client) []Tool {
 				return nil, err
 			}
 			return map[string]any{"ok": true, "owner": a.Owner, "key": a.Key, "deleted": true, "workspace": c.Workspace(ctx)}, nil
+		})
+	return []Tool{list, set, del}
+}
+
+func valueTools(c *Client) []Tool {
+	type listArgs struct {
+		Owner string `json:"owner" desc:"questline=N | template=N | quest=N | step=N | note=N | workspace (the active one)"`
+	}
+	list := Typed("list_values", "Named values of an owner: own, inherited from parents and the workspace, and the effective set with formulas already computed. Values are readable data (unlike secrets); a private note answers 403.",
+		func(ctx context.Context, a listArgs) (any, error) {
+			p, err := ownerPath(a.Owner, "values")
+			if err != nil {
+				return nil, err
+			}
+			var res map[string]any
+			if err := c.Do(ctx, http.MethodGet, p, nil, nil, &res); err != nil {
+				return nil, err
+			}
+			res["workspace"] = c.Workspace(ctx)
+			return res, nil
+		})
+	type setArgs struct {
+		Owner   string `json:"owner"`
+		Name    string `json:"name" desc:"lower-case latin, digits, _, up to 24 chars, starts with a letter"`
+		Type    string `json:"type" desc:"int | float | str | bool"`
+		Value   any    `json:"value,omitempty" desc:"the literal: a number, a string or true/false"`
+		Formula string `json:"formula,omitempty" desc:"instead of value: an expression over other values, e.g. (str - 10) / 2; integer / and % round down; strings join with +"`
+	}
+	set := Typed("set_value", "Set a named value: a literal (value) or a formula over other values in scope. A note inherits the values of its parents and the workspace; text shows one as {{name}}, a formula or script=N{...} reads it by name. Put it on the narrowest owner.",
+		func(ctx context.Context, a setArgs) (any, error) {
+			p, err := ownerPath(a.Owner, "values")
+			if err != nil {
+				return nil, err
+			}
+			body := map[string]any{"type": a.Type}
+			if strings.TrimSpace(a.Formula) != "" {
+				body["formula"] = a.Formula
+			} else {
+				body["value"] = a.Value
+			}
+			var res map[string]any
+			if err := c.Do(ctx, http.MethodPut, p+"/"+url.PathEscape(a.Name), nil, body, &res); err != nil {
+				return nil, err
+			}
+			res["owner"] = a.Owner
+			res["workspace"] = c.Workspace(ctx)
+			return res, nil
+		})
+	type delArgs struct {
+		Owner string `json:"owner"`
+		Name  string `json:"name"`
+	}
+	del := Typed("delete_value", "Remove one named value from an owner.",
+		func(ctx context.Context, a delArgs) (any, error) {
+			p, err := ownerPath(a.Owner, "values")
+			if err != nil {
+				return nil, err
+			}
+			if err := c.Do(ctx, http.MethodDelete, p+"/"+url.PathEscape(a.Name), nil, nil, nil); err != nil {
+				return nil, err
+			}
+			return map[string]any{"ok": true, "owner": a.Owner, "name": a.Name, "deleted": true, "workspace": c.Workspace(ctx)}, nil
 		})
 	return []Tool{list, set, del}
 }

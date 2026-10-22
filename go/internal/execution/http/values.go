@@ -16,14 +16,21 @@ import (
 // A workspace value is written by the owner only: it enters every command. Any other value is document data.
 
 type valueJSON struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Value   any    `json:"value"`
-	Formula string `json:"formula,omitempty"`
-	Error   string `json:"error,omitempty"`
-	From    string `json:"from,omitempty"`
-	ID      int64  `json:"id,omitempty"`
-	Title   string `json:"title,omitempty"`
+	Name    string    `json:"name"`
+	Type    string    `json:"type"`
+	Value   any       `json:"value"`
+	Formula string    `json:"formula,omitempty"`
+	Roll    *rollJSON `json:"roll,omitempty"`
+	Error   string    `json:"error,omitempty"`
+	From    string    `json:"from,omitempty"`
+	ID      int64     `json:"id,omitempty"`
+	Title   string    `json:"title,omitempty"`
+}
+
+// rollJSON is the embedded script and argument that produced a literal.
+type rollJSON struct {
+	Script int64  `json:"script"`
+	Arg    string `json:"arg"`
 }
 
 type valueListJSON struct {
@@ -37,10 +44,12 @@ func (h *Handler) registerValueRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/workspace/values", h.listValues(workspaceSegment))
 	mux.HandleFunc("PUT /api/workspace/values/{name}", h.putValue(workspaceSegment))
 	mux.HandleFunc("DELETE /api/workspace/values/{name}", h.deleteValue(workspaceSegment))
+	mux.HandleFunc("POST /api/workspace/values/{name}/roll", h.rollValue(workspaceSegment))
 	for segment := range secretOwnerKinds {
 		mux.HandleFunc("GET /api/"+segment+"/{id}/values", h.listValues(segment))
 		mux.HandleFunc("PUT /api/"+segment+"/{id}/values/{name}", h.putValue(segment))
 		mux.HandleFunc("DELETE /api/"+segment+"/{id}/values/{name}", h.deleteValue(segment))
+		mux.HandleFunc("POST /api/"+segment+"/{id}/values/{name}/roll", h.rollValue(segment))
 	}
 }
 
@@ -137,6 +146,80 @@ func (h *Handler) putValue(segment string) http.HandlerFunc {
 	}
 }
 
+// rollValue computes an embedded script on the server and writes the result as the literal of a value that already
+// exists. The body may name the script and the argument (they are remembered); without a body the value's own source is
+// used again. A formula is never overwritten by a roll. The client never sends the number.
+func (h *Handler) rollValue(segment string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if segment == workspaceSegment && !h.RequireOwner(w, r, "set values") {
+			return
+		}
+		name := r.PathValue("name")
+		if err := execution.CheckValueName(name); err != nil {
+			valueWriteErr(w, err)
+			return
+		}
+		var body struct {
+			Script int64  `json:"script"`
+			Arg    string `json:"arg"`
+		}
+		if r.ContentLength != 0 {
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&body); err != nil {
+				writeErr(w, http.StatusBadRequest, "invalid JSON")
+				return
+			}
+		}
+		o, ok := h.secretOwner(w, r, segment)
+		if !ok {
+			return
+		}
+		skip := fromMCP(r)
+		set, err := h.Store.ResolveNamedValues(r.Context(), o, skip)
+		if err != nil {
+			valueWriteErr(w, err)
+			return
+		}
+		var cur *execution.StoredValue
+		for i := range set.Effective {
+			if set.Effective[i].Name == name {
+				cur = &set.Effective[i].StoredValue
+				break
+			}
+		}
+		switch {
+		case cur == nil:
+			writeErr(w, http.StatusUnprocessableEntity, "значения «"+name+"» нет: сначала создайте его")
+			return
+		case cur.Formula != "":
+			writeErr(w, http.StatusUnprocessableEntity, "«"+name+"» — формула: бросок её не заменяет")
+			return
+		}
+		script, arg := body.Script, strings.TrimSpace(body.Arg)
+		if script == 0 && arg == "" {
+			script, arg = cur.RollScript, cur.RollArg
+		}
+		if script < 1 || arg == "" || len(arg) > 200 {
+			writeErr(w, http.StatusUnprocessableEntity, "у значения нет источника броска: укажите скрипт и выражение")
+			return
+		}
+		out, _, ok := h.runEmbedded(w, r, script, map[string]string{"_": arg}, scopeFrom(r, h, set, skip))
+		if !ok {
+			return
+		}
+		stored, err := h.Store.SetRolledValue(r.Context(), o, name, cur.Type, out, script, arg)
+		if err != nil {
+			valueWriteErr(w, err)
+			return
+		}
+		j, err := oneValue(stored, execution.SecretOwner{}, "")
+		if err != nil {
+			valueWriteErr(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, j)
+	}
+}
+
 func (h *Handler) deleteValue(segment string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if segment == workspaceSegment && !h.RequireOwner(w, r, "remove values") {
@@ -188,6 +271,9 @@ func oneValue(v execution.StoredValue, from execution.SecretOwner, title string)
 			return valueJSON{}, err
 		}
 		j.Value = n
+	}
+	if v.RollScript > 0 && v.Formula == "" {
+		j.Roll = &rollJSON{Script: v.RollScript, Arg: v.RollArg}
 	}
 	if from.Kind != "" {
 		j.From = from.Kind

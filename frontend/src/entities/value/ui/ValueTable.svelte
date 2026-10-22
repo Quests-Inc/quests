@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { deleteValue, listValues, putValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
+  import { deleteValue, listValues, putValue, rollValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
   import { hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
   import { readValueInput } from '@/shared/lib/valueInput.ts'
   import { valueDetail, valueTypeColor, valueTypeLabel } from '@/shared/lib/valueTip.ts'
@@ -65,6 +65,7 @@
       text: row.value == null ? '' : formatValue(row.type, row.value),
       formula: row.formula ?? '',
       error: row.error ?? '',
+      roll: row.roll?.arg ?? '',
     }))
   }
 
@@ -136,6 +137,19 @@
     }
   }
 
+  async function reroll(rowName: string) {
+    busy = true
+    error = ''
+    try {
+      await rollValue(owner.kind, owner.id, rowName)
+      touchValues(hostKey(owner.kind, owner.id))
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+    } finally {
+      busy = false
+    }
+  }
+
   async function remove(rowName: string) {
     busy = true
     error = ''
@@ -178,10 +192,22 @@
             <button type="button" class="values-card__main" onclick={() => (editing = row.name)}>
               <span class="values-type">{valueTypeLabel(row.type)}</span>
               <code class="values-name">{row.name}</code>
-              <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}>
-                {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}
+              <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}>
+                {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}
               </span>
             </button>
+            {#if !readonly && row.roll}
+              <button
+                type="button"
+                class="values-x"
+                disabled={busy}
+                aria-label="Перебросить {row.name}"
+                title="Перебросить: {row.roll.arg}"
+                onclick={() => void reroll(row.name)}
+              >
+                <Icon name="repeat" size={14} />
+              </button>
+            {/if}
             {#if !readonly}
               <button
                 type="button"
@@ -204,8 +230,8 @@
                 <code>{row.name}</code>
                 <small>из {source(row)}</small>
               </span>
-              <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}>
-                {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}
+              <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}>
+                {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}
               </span>
             </button>
           </li>

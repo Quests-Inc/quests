@@ -123,6 +123,10 @@ text in braces and shows `5+3к8 = 19`; a next click throws again, nothing is st
 embedding with a parameter: the value is computed when the text is shown, and again when that text is exported (Markdown or PDF).
 An exported text is what the view shows: `{{name}}` is its value, a formula has the values it names in place of the names (`2к4+2`),
 and `?auto` adds the result (`2к4+2 = 7`); a click-only embedding is just the formula, since a file has no click.
+`script=12{2к8+2}?set=hp` writes the result of a click into the value `hp` of the text's owner (`POST …/values/hp/roll`: the server
+computes and stores the number, the client never sends it). The value must already exist and must not be a formula; the result must fit
+its type. The value remembers the script and the expression, so the table can roll it again, and any formula over `hp` follows. `?set`
+never runs on show, so it overrides `?auto`. A hand-typed value forgets the roll. MCP: `list_values`, `set_value`, `delete_value`.
 `?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).
 A click throws again. Up to 16 `?auto` embeddings per text are computed; the rest stay click-only. The parameter is explicit —
 a formula is never guessed to be safe to run. The script is `Args → … → Result` made of

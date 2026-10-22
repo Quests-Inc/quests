@@ -7,6 +7,7 @@ export type ValueRow = {
   type: ValueType
   value: number | string | boolean | null
   formula?: string
+  roll?: { script: number; arg: string }
   error?: string
   from?: string
   id?: number
@@ -54,4 +55,12 @@ export function putValue(
 
 export function deleteValue(kind: string, id: number, name: string) {
   return request(`${valuesPath(kind, id)}/${encodeURIComponent(name)}`, { method: 'DELETE' })
+}
+
+/** The server computes the embedded script and writes the result as the value's literal. Without a body it rolls the stored source again. */
+export function rollValue(kind: string, id: number, name: string, source?: { script: number; arg: string }) {
+  return request<ValueRow>(`${valuesPath(kind, id)}/${encodeURIComponent(name)}/roll`, {
+    method: 'POST',
+    body: source ? JSON.stringify(source) : undefined,
+  })
 }

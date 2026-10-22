@@ -128,6 +128,70 @@ func TestNamedFormulaFeedsScript(t *testing.T) {
 	}
 }
 
+func TestRollWritesLiteralAndFormulasFollow(t *testing.T) {
+	h, s := secretsServer(t)
+	ctx := wsctx.With(t.Context(), 1)
+	note, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "Волк"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := "/api/notes/" + strconv.FormatInt(note.ID, 10)
+	put := func(name string, body map[string]any) (int, map[string]any) {
+		return secretReq(h, http.MethodPut, base+"/values/"+name, body)
+	}
+	put("pb", map[string]any{"type": "int", "value": 2})
+	put("hp", map[string]any{"type": "int", "value": 1})
+	if code, out := put("half", map[string]any{"type": "int", "formula": "hp / 2"}); code != http.StatusOK {
+		t.Fatalf("half: %d %v", code, out)
+	}
+	const graph = `{"nodes":[
+		{"id":1,"type":"args","params":{"params":[{"name":"expr","type":"str"}]}},
+		{"id":2,"type":"expr","params":{}},
+		{"id":3,"type":"sink.result","params":{}}],
+		"edges":[
+		{"from":{"node":1,"port":"expr"},"to":{"node":2,"port":"expr"}},
+		{"from":{"node":2,"port":"text"},"to":{"node":3,"port":"value"}}]}`
+	code, sc := secretReq(h, http.MethodPost, "/api/scripts", map[string]any{"title": "бросок", "graph": jsonRaw(t, graph)})
+	if code != http.StatusCreated {
+		t.Fatalf("script: %d %v", code, sc)
+	}
+	script := int64(sc["id"].(float64))
+	roll := func(name string, body any) (int, map[string]any) {
+		return secretReq(h, http.MethodPost, base+"/values/"+name+"/roll", body)
+	}
+
+	if code, out := roll("hp", nil); code != http.StatusUnprocessableEntity {
+		t.Fatalf("no source: %d %v", code, out)
+	}
+	if code, out := roll("hpp", map[string]any{"script": script, "arg": "pb*3"}); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a typo must not create a value: %d %v", code, out)
+	}
+	if code, out := roll("half", map[string]any{"script": script, "arg": "pb*3"}); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a formula is not replaced: %d %v", code, out)
+	}
+	code, out := roll("hp", map[string]any{"script": script, "arg": "pb*3"})
+	roll1, _ := out["roll"].(map[string]any)
+	if code != http.StatusOK || out["value"] != float64(6) || roll1["arg"] != "pb*3" {
+		t.Fatalf("roll: %d %v", code, out)
+	}
+	_, list := secretReq(h, http.MethodGet, base+"/values", nil)
+	for _, row := range list["effective"].([]any) {
+		if r := row.(map[string]any); r["name"] == "half" && r["value"] != float64(3) {
+			t.Fatalf("a dependent formula must follow: %v", r)
+		}
+	}
+	put("pb", map[string]any{"type": "int", "value": 4})
+	if code, out = roll("hp", nil); code != http.StatusOK || out["value"] != float64(12) {
+		t.Fatalf("again from the stored source: %d %v", code, out)
+	}
+	if _, out = put("hp", map[string]any{"type": "int", "value": 9}); out["roll"] != nil {
+		t.Fatalf("a typed-in value forgets the roll: %v", out)
+	}
+	if code, out = roll("hp", map[string]any{"script": script, "arg": "pb*0.3"}); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a float result for an int: %d %v", code, out)
+	}
+}
+
 func jsonRaw(t *testing.T, s string) any {
 	t.Helper()
 	var v any

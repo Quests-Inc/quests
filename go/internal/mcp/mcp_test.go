@@ -142,7 +142,7 @@ func TestToolsListShape(t *testing.T) {
 		size += len(b)
 	}
 	for _, n := range []string{"list_quests", "get_quest", "get_step", "update_steps", "set_note_flag", "list_workspaces", "switch_workspace",
-		"icon", "get_attachment", "set_tags", "list_secrets", "dry_run_emit_pool", "script", "hook"} {
+		"icon", "get_attachment", "set_tags", "list_secrets", "list_values", "set_value", "delete_value", "dry_run_emit_pool", "script", "hook"} {
 		if byName[n] == nil {
 			t.Errorf("missing tool %s", n)
 		}

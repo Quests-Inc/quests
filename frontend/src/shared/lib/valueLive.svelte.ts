@@ -6,6 +6,7 @@ export type ValueLive = {
   text: string
   formula: string
   error: string
+  roll?: string
 }
 
 const buckets = new Map<string, Map<string, ValueLive>>()

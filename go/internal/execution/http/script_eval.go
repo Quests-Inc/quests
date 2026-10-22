@@ -45,52 +45,63 @@ func (h *Handler) evalScript(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusRequestEntityTooLarge, "аргументы длиннее 4 КБ")
 		return
 	}
-	select {
-	case evalSlots <- struct{}{}:
-		defer func() { <-evalSlots }()
-	default:
-		writeErr(w, http.StatusTooManyRequests, "слишком много расчётов сразу, попробуйте ещё раз")
-		return
-	}
-	sc, err := h.Store.GetScript(r.Context(), id)
-	if err != nil {
-		scriptErr(w, err)
-		return
-	}
-	g, err := graph.Decode(sc.Graph)
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	reg, customs, err := h.Store.Registry(r.Context())
-	if err != nil {
-		scriptErr(w, err)
-		return
-	}
-	if g.RunsOnRunnerIn(reg) {
-		writeErr(w, http.StatusUnprocessableEntity, "в скрипте есть нода кода: встроить в текст можно только скрипт без неё")
-		return
-	}
-	if len(g.CustomUses()) > 0 {
-		if g, err = graph.Expand(g, customs, reg); err != nil {
-			writeErr(w, http.StatusUnprocessableEntity, err.Error())
-			return
-		}
-	}
 	var scope *graph.ExprScope
 	if in.Host != nil {
+		var err error
 		scope, err = h.embedScope(r, in.Host.Kind, in.Host.ID)
 		if err != nil {
 			valueWriteErr(w, err)
 			return
 		}
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), evalTimeout)
-	defer cancel()
-	out, err := graph.EvaluateScoped(ctx, g, reg, in.Args, scope)
-	if err != nil {
-		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+	out, version, ok := h.runEmbedded(w, r, id, in.Args, scope)
+	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"value": out, "version": sc.Version})
+	writeJSON(w, http.StatusOK, map[string]any{"value": out, "version": version})
+}
+
+// runEmbedded computes a script made of server nodes only and answers the error itself, so ok=false means the response is
+// written. The caller has bounded the arguments and chosen the values the formulas read.
+func (h *Handler) runEmbedded(w http.ResponseWriter, r *http.Request, id int64, args map[string]string, scope *graph.ExprScope) (string, int, bool) {
+	select {
+	case evalSlots <- struct{}{}:
+		defer func() { <-evalSlots }()
+	default:
+		writeErr(w, http.StatusTooManyRequests, "слишком много расчётов сразу, попробуйте ещё раз")
+		return "", 0, false
+	}
+	sc, err := h.Store.GetScript(r.Context(), id)
+	if err != nil {
+		scriptErr(w, err)
+		return "", 0, false
+	}
+	g, err := graph.Decode(sc.Graph)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return "", 0, false
+	}
+	reg, customs, err := h.Store.Registry(r.Context())
+	if err != nil {
+		scriptErr(w, err)
+		return "", 0, false
+	}
+	if g.RunsOnRunnerIn(reg) {
+		writeErr(w, http.StatusUnprocessableEntity, "в скрипте есть нода кода: встроить в текст можно только скрипт без неё")
+		return "", 0, false
+	}
+	if len(g.CustomUses()) > 0 {
+		if g, err = graph.Expand(g, customs, reg); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return "", 0, false
+		}
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), evalTimeout)
+	defer cancel()
+	out, err := graph.EvaluateScoped(ctx, g, reg, args, scope)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
+		return "", 0, false
+	}
+	return out, sc.Version, true
 }

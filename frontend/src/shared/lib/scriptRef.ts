@@ -1,8 +1,9 @@
 // `script=N{arg}` in a text. Parameters are written by the author, nothing is inferred from the formula:
-// `?auto` computes when the text is shown, `?hide` hides the formula (`?` until a click, if it is not auto).
+// `?auto` computes when the text is shown, `?hide` hides the formula (`?` until a click, if it is not auto),
+// `?set=name` writes the result of a click into the value `name` of the text's owner (never on show, so it beats `?auto`).
 
-const FLAG = String.raw`auto(?:=1)?|hide(?:=1)?`
-const SCRIPT_EMBED_SOURCE = String.raw`\bscript=(\d+)\{([^{}\[\]\n]{1,200})\}(\?(?:${FLAG})(?:&(?:${FLAG}))?\b)?`
+const FLAG = String.raw`auto(?:=1)?|hide(?:=1)?|set=[a-z][a-z0-9_]{0,23}`
+const SCRIPT_EMBED_SOURCE = String.raw`\bscript=(\d+)\{([^{}\[\]\n]{1,200})\}(\?(?:${FLAG})(?:&(?:${FLAG})){0,2}\b)?`
 
 /** A fresh global regex. Callers must not share one instance across overlapping scans. */
 export function scriptEmbedRe() {
@@ -12,29 +13,33 @@ export function scriptEmbedRe() {
 /** How many `?auto` embeddings one text computes. The rest stay click links. */
 export const MAX_AUTO_SCRIPTS = 16
 
-export type ScriptFlags = { auto: boolean; hide: boolean }
+export type ScriptFlags = { auto: boolean; hide: boolean; set: string }
 
 /** `?auto`, `?hide`, `?auto&hide` — either order, `=1` optional. A longer word (`?automatic`) is not a flag. */
 export function scriptFlags(query: string | undefined): ScriptFlags {
   const q = String(query ?? '').replace(/^\?/, '')
   const on = (name: string) => new RegExp(`(?:^|&)${name}(?:=1)?(?:&|$)`).test(q)
-  return { auto: on('auto'), hide: on('hide') }
+  const set = /(?:^|&)set=([a-z][a-z0-9_]{0,23})(?:&|$)/.exec(q)?.[1] ?? ''
+  return { auto: on('auto') && !set, hide: on('hide'), set }
 }
 
-export function scriptHref(id: string, arg: string, flags: { auto?: boolean; hide?: boolean } = {}) {
+export function scriptHref(id: string, arg: string, flags: { auto?: boolean; hide?: boolean; set?: string } = {}) {
   let href = `?script=${id}&_=${encodeURIComponent(arg)}`
   if (flags.auto) href += '&auto=1'
   if (flags.hide) href += '&hide=1'
+  if (flags.set) href += `&set=${flags.set}`
   return href
 }
 
-export function parseScriptHref(href: string): { id: number; arg: string; auto: boolean; hide: boolean } | null {
+export function parseScriptHref(href: string): { id: number; arg: string; auto: boolean; hide: boolean; set: string } | null {
   if (!href.startsWith('?script=')) return null
   const q = new URLSearchParams(href.slice(1))
   const id = Number(q.get('script'))
   const arg = q.get('_')
   if (!Number.isInteger(id) || id <= 0 || arg == null || arg.length > 200) return null
-  return { id, arg, auto: q.get('auto') === '1', hide: q.get('hide') === '1' }
+  const set = q.get('set') ?? ''
+  if (set && !/^[a-z][a-z0-9_]{0,23}$/.test(set)) return null
+  return { id, arg, auto: q.get('auto') === '1' && !set, hide: q.get('hide') === '1', set }
 }
 
 /** What a reader sees before a roll: the formula, or `?` when it is hidden. */

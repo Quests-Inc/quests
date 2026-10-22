@@ -122,6 +122,9 @@ type StoredValue struct {
 	Value   string
 	Formula string
 	Error   string
+	// RollScript and RollArg name the embedded script that produced the literal; zero and empty for a typed-in one.
+	RollScript int64
+	RollArg    string
 }
 
 // Number is the value an expression can read. A string or a broken formula reports ok=false.
@@ -206,7 +209,22 @@ func (s *Store) SetNamedValue(ctx context.Context, o SecretOwner, name, typ, can
 	if err != nil {
 		return StoredValue{}, err
 	}
-	return s.writeValue(ctx, o, name, typ, canonical, "")
+	return s.writeValue(ctx, o, name, typ, canonical, "", 0, "")
+}
+
+// SetRolledValue writes the result of an embedded script as the literal and remembers where it came from.
+func (s *Store) SetRolledValue(ctx context.Context, o SecretOwner, name, typ, canonical string, script int64, arg string) (StoredValue, error) {
+	if err := CheckValueName(name); err != nil {
+		return StoredValue{}, err
+	}
+	if script < 1 || strings.TrimSpace(arg) == "" || len(arg) > 200 {
+		return StoredValue{}, &ValueError{Msg: "бросок: нужны скрипт и выражение до 200 символов"}
+	}
+	canonical, err := normalizeValue(typ, canonical)
+	if err != nil {
+		return StoredValue{}, err
+	}
+	return s.writeValue(ctx, o, name, typ, canonical, "", script, arg)
 }
 
 // SetNamedFormula upserts a formula. It is checked against the values visible from o, including this name, so a
@@ -251,10 +269,10 @@ func (s *Store) SetNamedFormula(ctx context.Context, o SecretOwner, name, typ, f
 	if got.Error != "" {
 		return StoredValue{}, &ValueError{Msg: got.Error}
 	}
-	return s.writeValue(ctx, o, name, typ, got.Value, formula)
+	return s.writeValue(ctx, o, name, typ, got.Value, formula, 0, "")
 }
 
-func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canonical, formula string) (StoredValue, error) {
+func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canonical, formula string, script int64, arg string) (StoredValue, error) {
 	rows, err := s.listStored(ctx, o)
 	if err != nil {
 		return StoredValue{}, err
@@ -262,7 +280,7 @@ func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canoni
 	total, old := 0, 0
 	exists := false
 	for _, row := range rows {
-		n := len(row.Name) + len(row.Value) + len(row.Formula)
+		n := len(row.Name) + len(row.Value) + len(row.Formula) + len(row.RollArg)
 		total += n
 		if row.Name == name {
 			exists = true
@@ -272,7 +290,7 @@ func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canoni
 	if !exists && len(rows) >= maxValuesPerOwner {
 		return StoredValue{}, &ValueError{Msg: "не больше 32 значений"}
 	}
-	if total-old+len(name)+len(canonical)+len(formula) > maxValueBytes {
+	if total-old+len(name)+len(canonical)+len(formula)+len(arg) > maxValueBytes {
 		return StoredValue{}, &ValueError{Msg: "значения больше 8 КБ"}
 	}
 	col, err := o.column()
@@ -280,6 +298,10 @@ func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canoni
 		return StoredValue{}, err
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
+	var rollScript any // NULL, not 0: the column is a foreign key
+	if script > 0 {
+		rollScript = script
+	}
 	owner, args := "?", []any{o.ID}
 	conflict := fmt.Sprintf("%[1]s, name) WHERE %[1]s IS NOT NULL", col)
 	if o.Kind == SecretOwnerWorkspace {
@@ -287,15 +309,16 @@ func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canoni
 		conflict = "workspace_id, name) WHERE workspace_scope = 1"
 	}
 	_, err = s.DB.ExecContext(ctx, fmt.Sprintf(`
-		INSERT INTO named_value (%[1]s, name, type, value, formula, created_at, updated_at)
-		VALUES (%[3]s, ?, ?, ?, ?, ?, ?)
+		INSERT INTO named_value (%[1]s, name, type, value, formula, roll_script, roll_arg, created_at, updated_at)
+		VALUES (%[3]s, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(%[2]s
-		DO UPDATE SET type = excluded.type, value = excluded.value, formula = excluded.formula, updated_at = excluded.updated_at`, col, conflict, owner),
-		append(args, name, typ, canonical, formula, now, now)...)
+		DO UPDATE SET type = excluded.type, value = excluded.value, formula = excluded.formula,
+			roll_script = excluded.roll_script, roll_arg = excluded.roll_arg, updated_at = excluded.updated_at`, col, conflict, owner),
+		append(args, name, typ, canonical, formula, rollScript, arg, now, now)...)
 	if err != nil {
 		return StoredValue{}, err
 	}
-	return StoredValue{Name: name, Type: typ, Value: canonical, Formula: formula}, nil
+	return StoredValue{Name: name, Type: typ, Value: canonical, Formula: formula, RollScript: script, RollArg: arg}, nil
 }
 
 // DeleteNamedValue removes one name. A missing name is not an error.
@@ -313,7 +336,7 @@ func (s *Store) listStored(ctx context.Context, o SecretOwner) ([]StoredValue, e
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT name, type, value, formula FROM named_value WHERE `+cond+` ORDER BY name`, args...)
+	rows, err := s.DB.QueryContext(ctx, `SELECT name, type, value, formula, COALESCE(roll_script, 0), roll_arg FROM named_value WHERE `+cond+` ORDER BY name`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +344,7 @@ func (s *Store) listStored(ctx context.Context, o SecretOwner) ([]StoredValue, e
 	out := []StoredValue{}
 	for rows.Next() {
 		var v StoredValue
-		if err := rows.Scan(&v.Name, &v.Type, &v.Value, &v.Formula); err != nil {
+		if err := rows.Scan(&v.Name, &v.Type, &v.Value, &v.Formula, &v.RollScript, &v.RollArg); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
