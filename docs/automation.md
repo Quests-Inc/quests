@@ -119,7 +119,28 @@ Jobs queued before runs existed have no `run_id` and are served by the older kin
 ### Computing inside a text: `script=N{…}`
 
 A markdown text (a note, a step, the map's cards) may hold `script=12{5+3к8}`: a live link that, on click, calls script 12 with the
-text in braces and shows `5+3к8 = 19`; a next click throws again, nothing is stored. The script is `Args → … → Result` made of
+text in braces and shows `5+3к8 = 19`; a next click throws again, nothing is stored. `script=12{8+pb+str}?auto` is the same
+embedding with a parameter: the value is computed when the text is shown, and again when that text is exported (Markdown or PDF).
+An exported text is what the view shows: `{{name}}` is its value, a formula has the values it names in place of the names (`2к4+2`),
+and `?auto` adds the result (`2к4+2 = 7`); a click-only embedding is just the formula, since a file has no click.
+`script=12{2к8+2}?set=hp` writes the result of a click into the value `hp` of the text's owner (`POST …/values/hp/roll`: the server
+computes and stores the number, the client never sends it). The value must already exist and must not be a formula; the result must fit
+its type. The value remembers the script and the expression, so the table can roll it again, and any formula over `hp` follows. `?set`
+never runs on show, so it overrides `?auto`. A hand-typed value forgets the roll. MCP: `list_values`, `set_value`, `delete_value`.
+`script=12{55.75,37.62}` whose script has a Code node: the click starts a run, the code goes to a runner at once. The runner is
+the workspace value `runner` (Settings → workspace → «Раннер по умолчанию»; only the owner writes it; one label or a chain
+`a,b` where the first one online gets the job), else the workspace's only runner; `?on=stand` or `?on=a,b` in the link overrides it,
+but only with labels of registered runners of the workspace (anything else is a 422 that lists them). The job goes out (a job queued wakes the runners' long polls, so pick-up takes milliseconds), and the page asks
+`GET /api/script-runs/{id}` until `Result` has its text (`POST /api/scripts/{id}/eval` with `on` answers 202 and the run). The
+text of the link is the formula, as for a server script. It never runs on show (`?on` beats `?auto`), a workspace has at most 6
+such runs waiting, and a run with no runner online fails after two minutes. `?on` needs the code to be written by an owner like
+any command; whoever may open the text may click it. The node `Значение: записать` (`sink.value`, params `name` and `type`,
+inputs `ref` of any entity and `value`) writes what a script computed into a named value; a value that is a formula is not
+overwritten. Wire `source.note → code → parse → sink.value` for a check that keeps values fresh.
+A write of a value (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner, and open pages read the values again.
+`?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).
+A click throws again. Up to 16 `?auto` embeddings per text are computed; the rest stay click-only. The parameter is explicit —
+a formula is never guessed to be safe to run. The script is `Args → … → Result` made of
 server nodes only (`expr`, `random`, `regex`, `compare`, `parse`…); a graph with a `Code` node is refused. The text goes to the first
 parameter of `Args` (`POST /api/scripts/{id}/eval {"args": {"_": "…"}}`, or named args; MCP `script` action `eval`).
 Dice are not a feature of the server: the example script is `Args → Expr → Result`, and the `Expr` node has a table of operators

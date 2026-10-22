@@ -2,6 +2,9 @@ package schedule
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -106,6 +109,102 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 		}
 	}
 	return true, nil
+}
+
+// embedTimeout is how long the code of a clicked embedding may run; embedValidFor is how long it may wait for its runner.
+const (
+	embedTimeout  = 60 * time.Second
+	embedValidFor = 2 * time.Minute
+)
+
+// StartEmbedded starts the run of a script a text called (`script=N{…}?on=label`) whose graph holds a Code node: the server
+// computes what it can, the code goes to the runner at once, and the run is read by its id until Result has its text.
+func (r *CheckRunner) StartEmbedded(ctx context.Context, in execution.EmbedStart) (int64, error) {
+	g, reg, err := r.expand(ctx, in.Graph)
+	if err != nil {
+		return 0, err
+	}
+	open, err := r.Store.Execution.CountOpenEmbedded(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if open >= execution.MaxOpenEmbedded {
+		return 0, execution.ErrTooManyEmbedded
+	}
+	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope)
+	if err != nil {
+		return 0, err
+	}
+	if len(reqs) == 0 {
+		return 0, errors.New("код в скрипте не дошёл до запуска: на пути оказался сигнал выхода")
+	}
+	snap, err := run.Snapshot()
+	if err != nil {
+		return 0, err
+	}
+	var salt [8]byte
+	_, _ = rand.Read(salt[:])
+	kind := in.HostKind
+	if kind == "" {
+		kind = "text"
+	}
+	sid := in.ScriptID
+	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{
+		GraphRef: fmt.Sprintf("script:%d:%d", in.ScriptID, in.Version), ScriptID: &sid,
+		SubjectType: kind, SubjectID: in.HostID, Snapshot: snap, Key: execution.EmbedKeyPrefix + hex.EncodeToString(salt[:]),
+	})
+	if err != nil {
+		return 0, err
+	}
+	if out != "" {
+		_ = r.Store.Execution.SetRunResult(ctx, id, out)
+	}
+	b := runBinding{
+		Label: in.Label, Kind: execution.JobKindOnce, Title: fmt.Sprintf("Вставка · script=%d", in.ScriptID),
+		Dedupe: "embed:" + strconv.FormatInt(id, 10), Timeout: embedTimeout, ValidFor: embedValidFor,
+	}
+	hid := in.HostID
+	switch in.HostKind {
+	case "note":
+		b.NoteID = &hid
+	case "step":
+		b.StepID = &hid
+	case "quest":
+		b.QuestID = &hid
+	case "template":
+		b.TemplateID = &hid
+	}
+	for i, req := range reqs {
+		if _, err := r.enqueueCode(ctx, id, req, b, len(reqs) > 1, i); err != nil {
+			_ = r.Store.Execution.SaveRun(ctx, id, execution.RunFailed, snap, err.Error())
+			return 0, err
+		}
+	}
+	return id, nil
+}
+
+// embedScopeOf rebuilds what the formulas of an embedded run read, from the values of the entity whose text started it.
+func (r *CheckRunner) embedScopeOf(ctx context.Context, run execution.ScriptRun) *graph.ExprScope {
+	o := execution.SecretOwner{Kind: run.SubjectType, ID: run.SubjectID}
+	if run.SubjectType == "text" || run.SubjectID == 0 {
+		return nil
+	}
+	set, err := r.Store.Execution.ResolveNamedValues(ctx, o, false)
+	if err != nil {
+		return nil
+	}
+	return execution.ExprScopeOf(set)
+}
+
+// failureMessage is the reason a Code node left by `failed`, as the page shows it.
+func failureMessage(o graph.CodeOutcome) string {
+	var f struct {
+		Message string `json:"message"`
+	}
+	if o.Port == "failed" && json.Unmarshal([]byte(o.Text), &f) == nil && f.Message != "" {
+		return f.Message
+	}
+	return "результата нет: скрипт не дошёл до Результата"
 }
 
 // enqueueCode turns a ready Code node into a job.
@@ -254,6 +353,10 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		log.Printf("script run %d: %v", run.ID, err)
 		return
 	}
+	embedded := strings.HasPrefix(run.Key, execution.EmbedKeyPrefix)
+	if embedded {
+		rn.Scope = r.embedScopeOf(ctx, run)
+	}
 	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID, Now: now, Stderr: truncate(j.Stderr, 4000)}
 	if j.StartedAt != nil && j.FinishedAt != nil {
 		subj.Took = j.FinishedAt.Sub(*j.StartedAt)
@@ -272,6 +375,12 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		return
 	}
 	state, errText := runState(rn, advErr)
+	if embedded && state == execution.RunDone {
+		// The page waits for Result; a run that ended without it (the code failed and nothing took the failure) says why.
+		if got, err := r.Store.Execution.GetRun(ctx, run.ID); err == nil && got.Result == "" {
+			state, errText = execution.RunFailed, failureMessage(outcome)
+		}
+	}
 	if err := r.Store.Execution.SaveRun(ctx, run.ID, state, snap, errText); err != nil {
 		log.Printf("script run %d: %v", run.ID, err)
 	}

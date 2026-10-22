@@ -146,7 +146,7 @@ export function createQuestActions(deps: {
     async exportQuest(quest: QuestFull, mode: string) {
       if (!quest || pdfBusy) return
       if (mode === 'md') {
-        downloadQuestMarkdown(quest)
+        await downloadQuestMarkdown(quest)
         toast('Markdown сохранён', { kind: 'success' })
         return
       }

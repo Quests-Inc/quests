@@ -74,6 +74,8 @@ type Server struct {
 	// RunnerDone is called once for every runner job that reaches a final state
 	// (result delivered, lease lost, never picked up): the scheduler applies it to the step.
 	RunnerDone func(ctx context.Context, j execution.RunnerJob)
+	// StartEmbedded starts the run of an embedded script that has a Code node; the scheduler's runner owns it.
+	StartEmbedded func(ctx context.Context, in execution.EmbedStart) (int64, error)
 	// WebDAV stores attachment bytes. Nil/unconfigured disables uploads.
 	WebDAV *webdav.Client
 	// ClamAV scans uploads. Unconfigured refuses uploads rather than storing

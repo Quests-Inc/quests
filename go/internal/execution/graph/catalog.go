@@ -80,6 +80,9 @@ func Builtin() Registry {
 	sink("sink.template_create", "Шаблон: создать квест", nil,
 		req("ref", TRefTemplate), req("doc", TDoc))
 	add(NodeType{Name: "sink.template_error", Title: "Шаблон: ошибка попытки", Kind: KindSink, Trusted: true, Ports: templateErrorPorts})
+	// A named value of an entity (a note, a step, a quest, a template, the workspace) takes what the script computed. The name
+	// and type are fixed in the graph; a value that is a formula is not overwritten.
+	add(NodeType{Name: "sink.value", Title: "Значение: записать", Kind: KindSink, Trusted: true, Ports: valueSinkPorts})
 	// Done: the run finished (a hook's Code node already did the work on the runner).
 	sink("sink.done", "Готово", nil, req("trigger", TAny))
 	// HTTP / Socket: delivery for event hooks (quest=438). Trusted server nodes; body is JSON or text.
@@ -130,6 +133,26 @@ func httpSinkPorts(raw json.RawMessage) ([]Port, []Port, error) {
 		return nil, nil, fmt.Errorf("параметр %q: GET, POST, PUT, PATCH или DELETE", "method")
 	}
 	return []Port{req("body", TDoc), opt("trigger", TAny)}, nil, nil
+}
+
+// ValueSinkParams are the parameters of sink.value.
+type ValueSinkParams struct {
+	Name string   `json:"name"`
+	Type PortType `json:"type"`
+}
+
+func valueSinkPorts(raw json.RawMessage) ([]Port, []Port, error) {
+	var p ValueSinkParams
+	if err := strictParams(raw, &p); err != nil {
+		return nil, nil, err
+	}
+	if !embedName.MatchString(p.Name) || p.Name == "expr" || p.Name == "true" || p.Name == "false" {
+		return nil, nil, fmt.Errorf("параметр %q: имя значения из строчных латинских букв, цифр и _, до 24 символов", "name")
+	}
+	if !p.Type.scalar() {
+		return nil, nil, fmt.Errorf("параметр %q: int, float, str или bool", "type")
+	}
+	return []Port{req("ref", TRef), req("value", p.Type)}, nil, nil
 }
 
 func socketSinkPorts(raw json.RawMessage) ([]Port, []Port, error) {

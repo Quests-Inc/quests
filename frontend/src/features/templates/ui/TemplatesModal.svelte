@@ -17,6 +17,7 @@
     unbindScript,
   } from '@/shared/api/client.ts'
   import { ScriptPicker } from '@/entities/script'
+  import { ValueTable } from '@/entities/value'
   import { rowMeta, templateMenuItems } from '../model/rowInfo.ts'
   import { createTemplateActions } from '../model/templateActions.ts'
   import { defaultLocalDeadlineParts, localTimeZone } from '@/shared/lib/time.ts'
@@ -46,7 +47,6 @@
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '@/entities/runner'
-
   /**
    * `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
@@ -513,13 +513,13 @@
     icon="repeat"
     {onClose}
   />
-
   {#if view === 'list'}
     <TemplateList {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
   {:else}
     {#if formError}
       <p class="modal__error">{formError}</p>
     {/if}
+    {#if view === 'edit' && editing?.id}<ValueTable owner={{ kind: 'template', id: editing.id }} />{/if}
     <form class="modal__form" onsubmit={onSubmit}>
       <label class="field">
         <span class="label">Заголовок</span>

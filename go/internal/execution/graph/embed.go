@@ -101,7 +101,7 @@ func exprPorts(raw json.RawMessage) ([]Port, []Port, error) {
 	return in, []Port{req("value", TFloat), req("text", TStr)}, nil
 }
 
-func runExpr(rs *resolved, ins map[string][]Token, b *budget) (map[string]Token, error) {
+func runExpr(rs *resolved, ins map[string][]Token, b *budget, scope *ExprScope) (map[string]Token, error) {
 	var p exprParams
 	if err := strictParams(rs.node.Params, &p); err != nil {
 		return nil, err
@@ -110,19 +110,84 @@ func runExpr(rs *resolved, ins map[string][]Token, b *budget) (map[string]Token,
 	if strings.TrimSpace(src) == "" {
 		src, _ = ins["expr"][0].Value.(string)
 	}
+	src, err := rewriteForeign(src, scope)
+	if err != nil {
+		return nil, err
+	}
 	vars := map[string]float64{}
 	for _, name := range p.Vars {
-		vars[name], _ = ins[name][0].Value.(float64)
+		if t := ins[name]; len(t) == 1 && !t[0].Exit {
+			switch n := t[0].Value.(type) {
+			case float64:
+				vars[name] = n
+			case int64:
+				vars[name] = float64(n)
+			}
+		}
+	}
+	strs := map[string]bool{}
+	if scope != nil {
+		for name, n := range scope.Num {
+			if _, set := vars[name]; !set {
+				vars[name] = n
+			}
+		}
+		for name := range scope.Str {
+			if _, set := vars[name]; !set {
+				strs[name] = true
+			}
+		}
 	}
 	ops, err := compileOperators(p.Operators)
 	if err != nil {
 		return nil, err
 	}
-	v, err := evalExprWith(src, vars, ops, b)
+	v, err := evalExprWith(src, vars, ops, b, strs)
 	if err != nil {
 		return nil, err
 	}
 	return map[string]Token{"value": {Type: TFloat, Value: v}, "text": {Type: TStr, Value: FormatNumber(v)}}, nil
+}
+
+var foreignValue = regexp.MustCompile(`\b(note|quest|questline|step|template)=(\d+)\.([a-z][a-z0-9_]{0,23})\b`)
+
+// rewriteForeign turns note=12.str into the number that note's formulas would see. Eight lookups per expression.
+func rewriteForeign(src string, scope *ExprScope) (string, error) {
+	if scope == nil || scope.Foreign == nil || !foreignValue.MatchString(src) {
+		return src, nil
+	}
+	n := 0
+	var fail error
+	out := foreignValue.ReplaceAllStringFunc(src, func(tok string) string {
+		if fail != nil {
+			return tok
+		}
+		n++
+		if n > 8 {
+			fail = errors.New("слишком много чужих значений (больше 8)")
+			return tok
+		}
+		m := foreignValue.FindStringSubmatch(tok)
+		id, _ := strconv.ParseInt(m[2], 10, 64)
+		num, isStr, ok, err := scope.Foreign(m[1], id, m[3])
+		if err != nil {
+			fail = err
+			return tok
+		}
+		if !ok {
+			fail = fmt.Errorf("нет значения %s", tok)
+			return tok
+		}
+		if isStr {
+			fail = fmt.Errorf("значение %q — строка, в выражение не подставляется", m[3])
+			return tok
+		}
+		return FormatNumber(num)
+	})
+	if fail != nil {
+		return "", fail
+	}
+	return out, nil
 }
 
 // ---- Random
@@ -422,10 +487,29 @@ func (h *embedHost) Sink(_ context.Context, n Node, in map[string]Token) error {
 // Evaluate runs a graph that holds only trusted nodes (Args … Result) on the server and returns what Result received.
 // The graph must be expanded (no custom nodes). Arguments are given as text and read as the types Args declares.
 func Evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string) (string, error) {
-	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{})
+	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, nil)
 }
 
-func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string, b *budget) (string, error) {
+// BeginEmbedded advances an embedded graph as far as the server goes: the arguments, the expressions, up to the Code nodes. The
+// caller stores the run and hands the requests to a runner; what Result already received comes back too.
+func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope) (*Run, []CodeRequest, string, error) {
+	run, err := NewRun(g, reg)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	var out string
+	run.budget = &budget{}
+	run.Scope = scope
+	reqs, err := run.Advance(ctx, &embedHost{args: withFirstArg(g, args), result: &out})
+	return run, reqs, out, err
+}
+
+// EvaluateScoped is Evaluate with the named values of the text the script was clicked in.
+func EvaluateScoped(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope) (string, error) {
+	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope)
+}
+
+func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string, b *budget, scope *ExprScope) (string, error) {
 	if g.RunsOnRunner() {
 		return "", errors.New("в графе есть нода кода: встроить можно только скрипт без неё")
 	}
@@ -437,6 +521,7 @@ func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string
 	got := false
 	h := &embedHost{args: args, result: &out}
 	run.budget = b
+	run.Scope = scope
 	reqs, err := run.Advance(ctx, h)
 	if err != nil {
 		return "", err

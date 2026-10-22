@@ -1,4 +1,5 @@
 import { downloadPdf, exportedAtLabel } from '@/shared/lib/pdfExport.ts'
+import { bakeAutoScripts } from '@/shared/lib/scriptBake.ts'
 
 export function noteExportFilename(note: { id?: number | null; title?: string }, ext: 'md' | 'pdf') {
   const id = note?.id != null ? String(note.id) : 'x'
@@ -10,10 +11,15 @@ export function noteExportFilename(note: { id?: number | null; title?: string },
   return `note-${id}${raw ? `-${raw}` : ''}.${ext}`
 }
 
-export function downloadNoteMarkdown(note: { id?: number | null; title?: string; description?: string }) {
+function noteHost(note: { id?: number | null }) {
+  const id = note?.id
+  return typeof id === 'number' && id > 0 ? { kind: 'note', id } : undefined
+}
+
+export async function downloadNoteMarkdown(note: { id?: number | null; title?: string; description?: string }) {
   if (!note) return
   const title = String(note.title || '').trim() || `note=${note.id ?? ''}`
-  const body = String(note.description || '')
+  const body = await bakeAutoScripts(String(note.description || ''), noteHost(note))
   const text = body.trimStart().startsWith('#') ? body : `# ${title}\n\n${body}`
   const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -36,7 +42,13 @@ export async function downloadNotePdf(note: any, opts: { labels?: Record<string,
       title,
       footnote: exportedAtLabel(),
       labels: opts.labels || {},
-      blocks: [{ type: 'markdown', markdown: String(note.description || ''), empty: '(пусто)' }],
+      blocks: [
+        {
+          type: 'markdown',
+          markdown: await bakeAutoScripts(String(note.description || ''), noteHost(note)),
+          empty: '(пусто)',
+        },
+      ],
     },
     noteExportFilename(note, 'pdf')
   )

@@ -30,6 +30,7 @@
     setUnauthorizedHandler,
   } from '@/shared/api/client.ts'
   import { subscribeQuestEvents } from '@/shared/lib/live.ts'
+  import { ANY_HOST, touchValues } from '@/shared/lib/valueLive.svelte.ts'
   import { attachmentCatalog, clearAttachmentIndex, flattenAttachmentIndex, invalidateAttachmentLiveFlags, seedAttachmentIndex, setAttachmentIndex } from '@/entities/attachment'
   import { clearNotes, noteCatalog, setNotes } from '@/entities/note'
   import { clearQuests, questCatalog, setQuests } from '@/entities/quest'
@@ -290,6 +291,11 @@
           selectQuestFromUi(msg.quest_id)
           return
         }
+        if (msg?.type === 'quests_changed' && msg.kind === 'values_changed') {
+          // A runner, a script or another tab wrote a value: the open tables and texts read again; nothing else moved.
+          touchValues(ANY_HOST)
+          return
+        }
         if (msg?.type === 'quests_changed') {
           if (msg.quest_id != null && msg.source && msg.source !== 'web') {
             desk.noteRemote(msg.quest_id)
@@ -306,6 +312,7 @@
           void load({ silent: true })
           void refreshTemplates()
           void refreshHealth()
+          touchValues(ANY_HOST)
           if (nav.view === 'history') historyNonce += 1
           if (nav.view === 'graph') graphNonce += 1
         },

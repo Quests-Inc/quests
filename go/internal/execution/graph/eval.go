@@ -92,6 +92,8 @@ type Run struct {
 	outcomes map[int]CodeOutcome
 	// budget: set for an embedded evaluation (Random counts its rolls, Regex its handlers' depth).
 	budget *budget
+	// Scope is the named values of the text that called an embedded script. Nil means an expression only sees its inputs.
+	Scope *ExprScope
 }
 
 // NewRun prepares a run of the graph; a graph that does not validate cannot run.
@@ -389,7 +391,7 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 		case "all_of":
 			out = map[string]Token{"out": {Type: TAny, Value: true}}
 		case "expr":
-			out, err = runExpr(rs, ins, r.budgetOrNew())
+			out, err = runExpr(rs, ins, r.budgetOrNew(), r.Scope)
 		case "random":
 			out, err = runRandom(rs, ins, r.budgetOrNew())
 		case "regex":

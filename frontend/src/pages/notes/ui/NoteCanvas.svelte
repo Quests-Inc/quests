@@ -1,5 +1,6 @@
 <script lang="ts">
   import { AttachmentsBlock } from '@/entities/attachment'
+  import { ValueTable } from '@/entities/value'
   import { EntityHistory } from '@/entities/history'
   import { NoteCheck, NoteFind } from '@/entities/note'
   import { MentionTextarea } from '@/entities/template'
@@ -11,6 +12,8 @@
 
   type Ref = { kind: string; id: number; title?: string }
   type Crumb = { id: number | null; title: string }
+
+  let noteValues = $state({} as Record<string, string>)
 
   /** Тело открытой заметки: шапка, редактор, предпросмотр, ссылки и вложения. Раскладка страницы остаётся у NotesPage. */
   let {
@@ -158,7 +161,13 @@
     {onCrumb}
     {onParentPicker}
     {onViewMode}
-  />
+  >
+    {#snippet tools()}
+      {#if selectedId && !(ed.isPrivate && !ed.privateRevealed)}
+        <ValueTable variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text) => (noteValues = text)} />
+      {/if}
+    {/snippet}
+  </NoteHead>
   {#if ed.isPrivate && !ed.privateRevealed}
     <div class="notes__private-gate">
       <Icon name="lock" size={20} />
@@ -201,7 +210,7 @@
           bind:this={previewEl}
           ondblclick={onStartBodyEdit}
         >
-          <MarkdownBody source={ed.description} {labels} {onRef} />
+          <MarkdownBody source={ed.description} {labels} {onRef} values={noteValues} host={selectedId ? { kind: 'note', id: selectedId } : undefined} />
         </div>
       {/if}
     </div>

@@ -50,6 +50,9 @@ test('plainExcerpt keeps the text and drops the markup', () => {
   const md =
     '# Заголовок\n**жирный** и `код`, 2*(2к6)+4, [ссылка](http://x) script=2{5+3к8} ![рис](attachment=1)\n```js\nskip()\n```'
   expect(plainExcerpt(md)).toBe('Заголовок жирный и код, 2*(2к6)+4, ссылка 5+3к8')
+  expect(plainExcerpt('script=2{8+pb+str}?auto')).toBe('8+pb+str')
+  expect(plainExcerpt('script=2{8+pb+str}?hide')).toBe('?')
+  expect(plainExcerpt('script=2{8+pb+str}?auto&hide')).toBe('?')
   expect(plainExcerpt('a'.repeat(400), 10)).toBe('aaaaaaaaaa…')
 })
 
@@ -240,4 +243,72 @@ test('script=N{…} is a live link: a click computes, a second click throws agai
   expect(a.textContent).toBe('5+3к8 — ошибка')
   expect(a.classList.contains('md-script--err')).toBe(true)
   expect(a.title).toContain('деление на ноль')
+})
+
+test('script=N{…}?auto считает при показе и по клику бросает ещё раз', async () => {
+  const calls: string[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    calls.push(`${url} ${init.body}`)
+    return new Response(JSON.stringify({ value: String(10 + calls.length), version: 1 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }) as any
+  cleanup.push(() => {
+    globalThis.fetch = realFetch
+  })
+  const el = body('КД script=2{8+pb+str}?auto.', { host: { kind: 'note', id: 3 } })
+  const a = el.querySelector('a.md-script') as HTMLAnchorElement
+  expect(a.getAttribute('href')).toContain('auto=1')
+  expect(a.textContent).toBe('8+pb+str')
+  await sleep(50)
+  expect(a.textContent).toBe('8+pb+str = 11')
+  expect(a.title).toBe('Пересчитать')
+  expect(calls[0]).toBe('/api/scripts/2/eval {"args":{"_":"8+pb+str"},"host":{"kind":"note","id":3}}')
+  a.click()
+  await sleep(50)
+  expect(a.textContent).toBe('8+pb+str = 12')
+})
+
+test('?hide без auto показывает вопрос, клик подставляет только число', async () => {
+  const calls: string[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    calls.push(`${url} ${init.body}`)
+    return new Response(JSON.stringify({ value: '7', version: 1 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }) as any
+  cleanup.push(() => {
+    globalThis.fetch = realFetch
+  })
+  const el = body('Урон script=2{2к4+dex}?hide.')
+  const a = el.querySelector('a.md-script') as HTMLAnchorElement
+  expect(a.textContent).toBe('?')
+  expect(a.title).toBe('Посчитать')
+  expect(calls).toHaveLength(0)
+  a.click()
+  await sleep(50)
+  expect(a.textContent).toBe('7')
+  expect(a.title).toBe('Пересчитать')
+  expect(calls).toHaveLength(1)
+})
+
+test('?auto&hide показывает только число', async () => {
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ value: '4', version: 1 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })) as any
+  cleanup.push(() => {
+    globalThis.fetch = realFetch
+  })
+  const el = body('Бонус script=2{dex+pb}?hide&auto.', { host: { kind: 'note', id: 3 } })
+  const a = el.querySelector('a.md-script') as HTMLAnchorElement
+  expect(a.textContent).toBe('?')
+  await sleep(50)
+  expect(a.textContent).toBe('4')
 })

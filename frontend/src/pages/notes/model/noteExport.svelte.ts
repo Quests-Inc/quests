@@ -8,7 +8,7 @@ export interface ExportPayload {
 }
 
 export function createNoteExport(deps: {
-  downloadMarkdown: (payload: ExportPayload) => void
+  downloadMarkdown: (payload: ExportPayload) => void | Promise<void>
   downloadPdf: (payload: ExportPayload) => Promise<unknown>
   /** Сообщение об ошибке для страницы ('' — очистить). */
   setError: (message: string) => void
@@ -24,7 +24,7 @@ export function createNoteExport(deps: {
     deps.setError('')
     try {
       if (action === 'md') {
-        deps.downloadMarkdown(payload)
+        await deps.downloadMarkdown(payload)
         toast('Markdown сохранён', { kind: 'success' })
       } else if (action === 'pdf') {
         const tid = 'pdf-note'

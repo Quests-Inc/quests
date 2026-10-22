@@ -45,6 +45,8 @@ export function defaultParams(type: string): unknown {
       return { result: 'done' }
     case 'sink.template_error':
       return { kind: 'error' }
+    case 'sink.value':
+      return { name: 'value', type: 'str' }
   }
   return undefined
 }

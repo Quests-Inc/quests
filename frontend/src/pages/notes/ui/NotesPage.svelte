@@ -342,6 +342,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   async function startBodyEdit(event?: MouseEvent) {
     if (viewMode !== 'formatted') return
+    // A double click on a roll is two rolls, not an edit.
+    if (event?.target instanceof Element && event.target.closest('a.md-script')) return
     event?.preventDefault?.()
     let offset = ed.description.length
     const mdRoot = previewMdRoot()

@@ -66,6 +66,10 @@
   font-size: var(--text-sm, 0.875rem);
 }
 
+.modal > .values {
+  margin: 0 var(--space-4, 1rem);
+}
+
 .modal .modal__form,
 .modal .modal__body {
   display: grid;

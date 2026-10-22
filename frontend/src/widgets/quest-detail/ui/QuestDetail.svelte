@@ -7,6 +7,8 @@
   import { AttachmentsBlock } from '@/entities/attachment'
   import { EntityHistory } from '@/entities/history'
   import { TemplateStreak } from '@/entities/template'
+  import { ValueTable } from '@/entities/value'
+  import StepValues from './StepValues.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { formatLocal, localTimeZone } from '@/shared/lib/time.ts'
   import { parseRefs } from '@/shared/lib/refs.ts'
@@ -126,6 +128,8 @@
 
   /** Блок «Заметки» свёрнут по умолчанию (рисуется, только если есть заметки). */
   let notesOpen = $state(false)
+  let questValues = $state({} as Record<string, string>)
+  let lineValues = $state({} as Record<string, string>)
 
   let linkedNotes = $derived.by(() => {
     if (!selected) return []
@@ -364,6 +368,7 @@
     >
       <Icon name="edit" />
     </button>
+    <ValueTable variant="icon" owner={{ kind: 'quest', id: q.id }} onEffective={(text) => (questValues = text)} />
     <button
       type="button"
       class="btn btn--icon"
@@ -536,9 +541,7 @@
               <span class="step__btn-slot" aria-hidden="true"></span>
             {/if}
           </div>
-          {#if step.description || stepDesc}
-            <MarkdownBody class="step__desc" source={stepDesc} {labels} {onRef} typing={typingSteps.has(step.id)} />
-          {/if}
+          <StepValues stepId={step.id} source={stepDesc} show={Boolean(step.description || stepDesc)} class="step__desc" {labels} {onRef} typing={typingSteps.has(step.id)} />
         </li>
       {/each}
     </ol>
@@ -551,7 +554,7 @@
   {@const timer = questTimer(q, nowMs)}
   {#if q.description || displayDescription}
     <div class="block block--prose">
-      <MarkdownBody class="block__body" source={displayDescription} {labels} {onRef} typing={typingDesc} />
+      <MarkdownBody class="block__body" source={displayDescription} {labels} {onRef} typing={typingDesc} values={questValues} host={{ kind: 'quest', id: q.id }} />
     </div>
   {/if}
 
@@ -668,9 +671,14 @@
         <span class="detail__line-count">{lineQuests.length}</span>
       </header>
 
+      {#if selected.questline_id}
+        {#key selected.questline_id}
+          <ValueTable owner={{ kind: 'questline', id: Number(selected.questline_id) }} onEffective={(text) => (lineValues = text)} />
+        {/key}
+      {/if}
       {#if lineMeta.description}
         <div class="detail__line-desc block block--prose">
-          <MarkdownBody class="block__body" source={lineMeta.description} {labels} {onRef} />
+          <MarkdownBody class="block__body" source={lineMeta.description} {labels} {onRef} values={lineValues} host={{ kind: 'questline', id: Number(selected.questline_id) }} />
         </div>
       {/if}
 

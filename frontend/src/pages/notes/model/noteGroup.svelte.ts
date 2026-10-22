@@ -1,6 +1,7 @@
 // Несколько выделенных заметок в дереве: Ctrl/Shift-выбор, меню группы и его действия.
 // Флаги и перенос идут по одной заметке без перечитывания списка, список обновляется один раз в конце.
 import { allHave, moveSearchItems, noteGroupMenuItems, topLevelIds, type MenuItem } from '@/entities/note'
+import { bakeAutoScripts } from '@/shared/lib/scriptBake.ts'
 import { createMultiSelect } from '@/shared/lib/multiSelect.svelte.ts'
 import type { ToastAction } from '@/shared/lib/toasts.svelte.ts'
 import { trashUndo } from '@/shared/lib/trashUndo.ts'
@@ -35,7 +36,7 @@ export function createNoteGroup(deps: {
   afterDelete: (ids: number[]) => void
   onChanged: () => void
   copy: (text: string) => Promise<void>
-  downloadMarkdown: (note: { title: string; description: string }) => void
+  downloadMarkdown: (note: { title: string; description: string }) => void | Promise<void>
   toast: (message: string, kind: 'success' | 'error', action?: ToastAction) => void
 }) {
   const multi = createMultiSelect({ current: () => deps.selectedId() })
@@ -100,17 +101,19 @@ export function createNoteGroup(deps: {
     )
   }
 
-  function exportMarkdown() {
+  async function exportMarkdown() {
     const list = rows()
     const rank = (id: number) => (order.includes(id) ? order.indexOf(id) : order.length)
-    const parts = [...topLevelIds(deps.notes(), ids)]
+    const chosen = [...topLevelIds(deps.notes(), ids)]
       .sort((a, b) => rank(a) - rank(b))
       .map((id) => list.find((r) => r.id === id))
       .filter((r): r is Row => !!r)
-      .map((r) =>
-        r.description?.trimStart().startsWith('#') ? r.description : `# ${rowTitle(r)}\n\n${r.description || ''}`
-      )
-    deps.downloadMarkdown({ title: `Заметки (${parts.length})`, description: parts.join('\n\n---\n\n') })
+    const parts: string[] = []
+    for (const r of chosen) {
+      const body = await bakeAutoScripts(r.description || '', { kind: 'note', id: r.id })
+      parts.push(body.trimStart().startsWith('#') ? body : `# ${rowTitle(r)}\n\n${body}`)
+    }
+    await deps.downloadMarkdown({ title: `Заметки (${parts.length})`, description: parts.join('\n\n---\n\n') })
   }
 
   function askDelete() {
@@ -201,7 +204,7 @@ export function createNoteGroup(deps: {
       else if (action === 'private') {
         if (allHave(rows(), 'is_private')) askUnprivate()
         else await flag('is_private')
-      } else if (action === 'export-md') exportMarkdown()
+      } else if (action === 'export-md') await exportMarkdown()
       else if (action === 'delete') askDelete()
       else if (action.startsWith('move:')) {
         const raw = action.slice('move:'.length)

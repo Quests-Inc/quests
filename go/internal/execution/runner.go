@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/kernel"
@@ -313,6 +314,26 @@ func (s *Store) scanJob(sc interface{ Scan(...any) error }) (RunnerJob, error) {
 
 // EnqueueJob queues a job. With a DedupeKey that already has an unfinished job,
 // that job is returned instead and created is false.
+// jobWake wakes the long-polling runners the moment a job is queued, so a click does not wait for the next look at the queue.
+var jobWake = struct {
+	mu sync.Mutex
+	ch chan struct{}
+}{ch: make(chan struct{})}
+
+// JobsQueued returns a channel that is closed when the next job is queued. Ask before looking at the queue, not after.
+func JobsQueued() <-chan struct{} {
+	jobWake.mu.Lock()
+	defer jobWake.mu.Unlock()
+	return jobWake.ch
+}
+
+func notifyJobsQueued() {
+	jobWake.mu.Lock()
+	defer jobWake.mu.Unlock()
+	close(jobWake.ch)
+	jobWake.ch = make(chan struct{})
+}
+
 func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, created bool, err error) {
 	labels := kernel.SplitRunOn(sp.RunnerLabel)
 	if len(labels) == 0 || strings.TrimSpace(sp.Command) == "" {
@@ -353,6 +374,7 @@ func (s *Store) EnqueueJob(ctx context.Context, sp JobSpec) (job RunnerJob, crea
 		}
 		return RunnerJob{}, false, err
 	}
+	notifyJobsQueued()
 	id, _ := res.LastInsertId()
 	j, err := s.GetRunnerJob(ctx, id)
 	return j, true, err

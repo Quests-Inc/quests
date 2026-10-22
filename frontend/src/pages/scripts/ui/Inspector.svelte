@@ -12,6 +12,7 @@
   import CustomParams from './params/CustomParams.svelte'
   import ParseParams from './params/ParseParams.svelte'
   import SourceParams from './params/SourceParams.svelte'
+  import ValueSinkParams from './params/ValueSinkParams.svelte'
 
   /** What the selected node or link is made of, and its parameters. */
   let { ed, onEditCustom }: { ed: ScriptEditor; onEditCustom?: (type: string) => void } = $props()
@@ -80,6 +81,8 @@
         <ChoiceParams params={node.params as never} field="result" options={RESULTS} label="Итог" onChange={set} />
       {:else if node.type === 'sink.template_error'}
         <ChoiceParams params={node.params as never} field="kind" options={KINDS} label="Вид ошибки" onChange={set} />
+      {:else if node.type === 'sink.value'}
+        <ValueSinkParams params={node.params as never} onChange={set} />
       {:else if node.type === 'args'}
         <ArgsParams params={node.params as never} onChange={set} />
       {:else if node.type === 'expr'}

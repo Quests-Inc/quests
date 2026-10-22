@@ -23,11 +23,16 @@ type Handler struct {
 	ClearCommand  func(ctx context.Context, kind string, id int64) error
 	// RunnerDone is called when a runner reports a job finished (the root reacts to its result).
 	RunnerDone func(ctx context.Context, job execution.RunnerJob)
+	// ValuesChanged tells open pages that the values of an entity changed (kind "workspace" has id 0).
+	ValuesChanged func(ctx context.Context, kind string, id int64)
+	// StartEmbedded starts the run of a script with a Code node that a text called (the scheduler's side owns runs).
+	StartEmbedded func(ctx context.Context, in execution.EmbedStart) (int64, error)
 }
 
 // Register mounts every route of the context.
 func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerSecretRoutes(mux)
+	h.registerValueRoutes(mux)
 	h.registerRunner(mux)
 	h.registerScripts(mux)
 	h.registerScriptEval(mux)

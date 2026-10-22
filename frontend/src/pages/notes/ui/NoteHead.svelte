@@ -40,6 +40,7 @@
     onCrumb,
     onParentPicker,
     onViewMode,
+    tools,
   }: {
     title?: string
     titleEl?: HTMLInputElement | null
@@ -76,6 +77,7 @@
     onCrumb: (id: number | null) => void
     onParentPicker: (e: MouseEvent) => void
     onViewMode: (id: string) => void
+    tools?: import('svelte').Snippet
   } = $props()
 </script>
 
@@ -171,6 +173,7 @@
           >
             <Icon name="search" />
           </button>
+          {@render tools?.()}
           {#if dirty}
             <button
               type="button"

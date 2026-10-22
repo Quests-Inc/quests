@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"errors"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"time"
 
 	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
@@ -62,6 +64,17 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 					return s.Store.Automation.ClearEmitCommand(ctx, id)
 				}
 				return s.Store.Knowledge.ClearNoteCommand(ctx, id)
+			},
+			ValuesChanged: func(ctx context.Context, kind string, id int64) {
+				if s.Hub != nil {
+					s.Hub.ValuesChanged(wsctx.From(ctx), kind, id)
+				}
+			},
+			StartEmbedded: func(ctx context.Context, in execution.EmbedStart) (int64, error) {
+				if s.StartEmbedded == nil {
+					return 0, errors.New("раннеры здесь не подключены")
+				}
+				return s.StartEmbedded(ctx, in)
 			},
 			RunnerDone: func(ctx context.Context, j execution.RunnerJob) {
 				if s.RunnerDone != nil {

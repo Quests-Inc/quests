@@ -81,6 +81,7 @@ var ExportTables = []TableSpec{
 	{Name: "templateemitroll", HasID: true, FK: map[string]string{"template_id": "questtemplate"}, Text: []string{"picked_refs"}},
 	{Name: "questchangelog", HasID: true, Where: `quest_id IS NULL OR quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest"}, Poly: []polyFK{{"entity_type", "entity_id"}, {"parent_type", "parent_id"}}, Text: []string{"title", "detail", "comment"}},
 	{Name: "secret", HasID: true, Where: `(quest_id IS NULL OR quest_id IN ` + liveQuest + `) AND (note_id IS NULL OR note_id IN ` + liveNote + `) AND (step_id IS NULL OR step_id IN ` + liveStep + `)`, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note"}, Secret: true},
+	{Name: "named_value", HasID: true, Where: `(quest_id IS NULL OR quest_id IN ` + liveQuest + `) AND (note_id IS NULL OR note_id IN ` + liveNote + `) AND (step_id IS NULL OR step_id IN ` + liveStep + `)`, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note", "roll_script": "script"}},
 }
 
 var identRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
@@ -551,6 +552,8 @@ var nullableFK = map[string]struct{}{
 	"quest.category_id": {}, "quest.questline_id": {}, "quest.template_id": {},
 	"questchangelog.quest_id": {}, "secret.questline_id": {}, "secret.template_id": {},
 	"secret.quest_id": {}, "secret.step_id": {}, "secret.note_id": {},
+	"named_value.questline_id": {}, "named_value.template_id": {}, "named_value.quest_id": {},
+	"named_value.step_id": {}, "named_value.note_id": {}, "named_value.roll_script": {},
 }
 
 func isEmptyStr(v any) bool {
