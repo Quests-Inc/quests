@@ -121,6 +121,8 @@ Jobs queued before runs existed have no `run_id` and are served by the older kin
 A markdown text (a note, a step, the map's cards) may hold `script=12{5+3к8}`: a live link that, on click, calls script 12 with the
 text in braces and shows `5+3к8 = 19`; a next click throws again, nothing is stored. `script=12{8+pb+str}?auto` is the same
 embedding with a parameter: the value is computed when the text is shown, and again when that text is exported (Markdown or PDF).
+An exported text is what the view shows: `{{name}}` is its value, a formula has the values it names in place of the names (`2к4+2`),
+and `?auto` adds the result (`2к4+2 = 7`); a click-only embedding is just the formula, since a file has no click.
 `?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).
 A click throws again. Up to 16 `?auto` embeddings per text are computed; the rest stay click-only. The parameter is explicit —
 a formula is never guessed to be safe to run. The script is `Args → … → Result` made of

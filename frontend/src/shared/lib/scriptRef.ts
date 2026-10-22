@@ -46,3 +46,21 @@ export function scriptLabel(arg: string, flags: { hide?: boolean }) {
 export function escapeMdInline(s: string) {
   return s.replace(/[\\`*_{}\[\]]/g, (ch) => `\\${ch}`)
 }
+
+export type LabelPart = { text: string; name?: string }
+
+/** A formula split into plain text and the named values it reads. `2к4+bite_dmg` → `2к4+`, then the value of `bite_dmg`. */
+export function labelParts(arg: string, values: Record<string, string>): LabelPart[] {
+  const out: LabelPart[] = []
+  let last = 0
+  for (const m of arg.matchAll(/(?<![a-z0-9_])[a-z][a-z0-9_]*/g)) {
+    const name = m[0]
+    if (!Object.prototype.hasOwnProperty.call(values, name)) continue
+    const at = m.index ?? 0
+    if (at > last) out.push({ text: arg.slice(last, at) })
+    out.push({ text: values[name], name })
+    last = at + name.length
+  }
+  if (last < arg.length) out.push({ text: arg.slice(last) })
+  return out
+}

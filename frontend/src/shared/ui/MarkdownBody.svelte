@@ -183,7 +183,7 @@
     onclick={onClick}
     use:captureImgErrors
     use:refIcons
-    use:scriptEmbed
+    use:scriptEmbed={merged}
     use:refPreview={onRef}
     use:tailFade={typing}
     use:valueHover={hoverOpts}

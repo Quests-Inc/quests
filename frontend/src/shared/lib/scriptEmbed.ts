@@ -2,7 +2,7 @@
 // text is shown. A click throws again. Nothing is stored (ADR-0003 §6b).
 import { evalScript } from '@/shared/api/scripts.ts'
 
-import { MAX_AUTO_SCRIPTS, parseScriptHref } from './scriptRef.ts'
+import { labelParts, MAX_AUTO_SCRIPTS, parseScriptHref } from './scriptRef.ts'
 
 function valueHost(node: HTMLElement) {
   const raw = node.dataset.valueHost
@@ -13,7 +13,8 @@ function valueHost(node: HTMLElement) {
   return { kind: raw.slice(0, cut), id }
 }
 
-type Row = { text: string; err: boolean; title: string }
+/** `label` is the formula shown with its values as chips, then `tail`; without a label `text` is shown as is. */
+type Row = { text: string; label?: string; tail?: string; err: boolean; title: string }
 
 type Parsed = { id: number; arg: string; auto: boolean; hide: boolean }
 
@@ -24,12 +25,15 @@ function cacheKey(node: HTMLElement, parsed: Parsed) {
 function rowFor(parsed: Parsed, value: string | null, errTitle = ''): Row {
   if (errTitle) return { text: parsed.hide ? '?' : `${parsed.arg} — ошибка`, err: true, title: errTitle }
   if (value == null) return { text: parsed.hide ? '?' : parsed.arg, err: false, title: '' }
-  const text = parsed.hide ? value : `${parsed.arg} = ${value}`
-  return { text, err: false, title: parsed.auto || parsed.hide ? 'Пересчитать' : '' }
+  const title = parsed.auto || parsed.hide ? 'Пересчитать' : ''
+  if (parsed.hide) return { text: value, err: false, title }
+  return { text: `${parsed.arg} = ${value}`, label: parsed.arg, tail: ` = ${value}`, err: false, title }
 }
 
 /** Svelte action: makes the embedded-script links inside a rendered text live. */
-export function scriptEmbed(node: HTMLElement) {
+export function scriptEmbed(node: HTMLElement, initial: Record<string, string> = {}) {
+  let names = initial
+  let rev = 0
   const cache = new Map<string, Row>()
   let timer = 0
   let armed = false
@@ -39,9 +43,25 @@ export function scriptEmbed(node: HTMLElement) {
     cache.set(key, row)
   }
 
+  /** The formula with each named value as a chip, like a `{{name}}` in prose; the chip keeps the name for hover and edit. */
+  const fillLabel = (a: HTMLAnchorElement, label: string, tail: string) => {
+    const kids: Node[] = labelParts(label, names).map((part) => {
+      if (!part.name) return document.createTextNode(part.text)
+      const chip = document.createElement('span')
+      chip.className = 'md-value'
+      chip.dataset.value = part.name
+      chip.textContent = part.text
+      return chip
+    })
+    if (tail) kids.push(document.createTextNode(tail))
+    a.replaceChildren(...kids)
+    a.dataset.lrev = String(rev)
+  }
+
   const apply = (a: HTMLAnchorElement, row: Row) => {
     if (!node.contains(a)) return
-    a.textContent = row.text
+    if (row.label != null) fillLabel(a, row.label, row.tail ?? '')
+    else a.textContent = row.text
     a.classList.toggle('md-script--err', row.err)
     if (row.title) a.title = row.title
     else a.removeAttribute('title')
@@ -77,6 +97,7 @@ export function scriptEmbed(node: HTMLElement) {
       a.classList.add('md-script')
       const parsed = parseScriptHref(a.getAttribute('href') || '')
       if (parsed?.hide && !parsed.auto && !a.title) a.title = 'Посчитать'
+      if (parsed && !parsed.hide && !a.dataset.settled && a.dataset.lrev !== String(rev)) fillLabel(a, parsed.arg, '')
       if (!parsed?.auto) continue
       if (a.dataset.settled) {
         used++
@@ -154,6 +175,11 @@ export function scriptEmbed(node: HTMLElement) {
   }
   node.addEventListener('click', onClick, true)
   return {
+    update(next: Record<string, string> = {}) {
+      names = next
+      rev++
+      kick()
+    },
     destroy() {
       mo.disconnect()
       window.clearTimeout(timer)

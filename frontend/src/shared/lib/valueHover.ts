@@ -12,6 +12,7 @@ type HoverOpts = {
 export function valueHover(node: HTMLElement, get: () => HoverOpts, delay = VALUE_HOVER_MS) {
   let timer = 0
   let tip: HTMLDivElement | null = null
+  let cursorX = 0
 
   function hide() {
     window.clearTimeout(timer)
@@ -44,9 +45,10 @@ export function valueHover(node: HTMLElement, get: () => HoverOpts, delay = VALU
     document.body.append(tip)
     const rect = chip.getBoundingClientRect()
     const box = tip.getBoundingClientRect()
-    const left = Math.min(Math.max(8, rect.left), window.innerWidth - box.width - 8)
-    const below = rect.bottom + 6
-    const top = below + box.height > window.innerHeight - 8 ? Math.max(8, rect.top - box.height - 6) : below
+    const centre = cursorX || rect.left + rect.width / 2
+    const left = Math.min(Math.max(8, centre - box.width / 2), window.innerWidth - box.width - 8)
+    const above = rect.top - box.height - 6
+    const top = above >= 8 ? above : rect.bottom + 6
     tip.style.left = `${left}px`
     tip.style.top = `${top}px`
   }
@@ -55,7 +57,12 @@ export function valueHover(node: HTMLElement, get: () => HoverOpts, delay = VALU
     const chip = event.target instanceof Element ? event.target.closest('.md-value') : null
     if (!(chip instanceof HTMLElement) || !node.contains(chip)) return
     hide()
+    if (event instanceof MouseEvent) cursorX = event.clientX
     timer = window.setTimeout(() => show(chip), delay)
+  }
+
+  function onMove(event: Event) {
+    if (event instanceof MouseEvent) cursorX = event.clientX
   }
 
   function onOut(event: Event) {
@@ -79,12 +86,14 @@ export function valueHover(node: HTMLElement, get: () => HoverOpts, delay = VALU
   }
 
   node.addEventListener('mouseover', onOver)
+  node.addEventListener('mousemove', onMove)
   node.addEventListener('mouseout', onOut)
   node.addEventListener('contextmenu', onMenu)
   return {
     destroy() {
       hide()
       node.removeEventListener('mouseover', onOver)
+      node.removeEventListener('mousemove', onMove)
       node.removeEventListener('mouseout', onOut)
       node.removeEventListener('contextmenu', onMenu)
     },

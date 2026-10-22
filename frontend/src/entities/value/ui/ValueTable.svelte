@@ -2,12 +2,12 @@
   import { untrack } from 'svelte'
   import { deleteValue, listValues, putValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
   import { hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
+  import { readValueInput } from '@/shared/lib/valueInput.ts'
   import { valueDetail, valueTypeColor, valueTypeLabel } from '@/shared/lib/valueTip.ts'
   import { effectiveText, formatValue, valueSummary } from '../model/format.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
-  import Toggle from '@/shared/ui/Toggle.svelte'
   import ValueEditDialog from '@/shared/ui/ValueEditDialog.svelte'
 
   let {
@@ -40,8 +40,6 @@
   let name = $state('')
   let type = $state('int' as ValueType)
   let raw = $state('')
-  let flag = $state(false)
-  let asFormula = $state(false)
   let editing = $state('')
   let seenKey = ''
 
@@ -58,13 +56,6 @@
   function source(row: ValueRow) {
     if (row.from === 'workspace') return 'пространство'
     return row.title || `${row.from}=${row.id}`
-  }
-
-  function literal(): number | string | boolean | null {
-    if (type === 'bool') return flag
-    if (type === 'str') return raw
-    if (raw.trim() === '' || Number.isNaN(Number(raw))) return null
-    return type === 'int' ? Math.trunc(Number(raw)) : Number(raw)
   }
 
   function liveOf(rows: ValueRow[]) {
@@ -120,25 +111,15 @@
       error = 'имя: строчные латинские, цифры и _, не expr, true, false'
       return
     }
-    if (asFormula) {
-      if (!raw.trim()) {
-        error = 'нужна формула'
-        return
-      }
-      await write(name, type, '', raw.trim())
-    } else {
-      const value = literal()
-      if (value == null) {
-        error = 'нужно значение'
-        return
-      }
-      await write(name, type, value, '')
+    const read = readValueInput(type, raw)
+    if ('error' in read) {
+      error = read.error
+      return
     }
+    await write(name, type, read.value, read.formula)
     if (!error) {
       name = ''
       raw = ''
-      flag = false
-      asFormula = false
     }
   }
 
@@ -245,14 +226,7 @@
           {/each}
         </select>
         <input type="text" bind:value={name} placeholder="имя" aria-label="Имя" maxlength="24" />
-        {#if asFormula}
-          <input type="text" bind:value={raw} placeholder={HINT[type]} aria-label="Формула" maxlength="1024" />
-        {:else if type === 'bool'}
-          <span class="values-add__bool"><Toggle label="да" bind:checked={flag} /></span>
-        {:else}
-          <input type="text" bind:value={raw} placeholder="значение" aria-label="Значение" />
-        {/if}
-        <span class="values-add__switch"><Toggle label="формула" bind:checked={asFormula} /></span>
+        <input type="text" bind:value={raw} placeholder={HINT[type]} aria-label="Значение или формула" maxlength="1024" />
         <button type="submit" class="values-x values-x--add" disabled={busy} aria-label="Добавить" title="Добавить">
           <Icon name="add" size={14} />
         </button>
@@ -397,9 +371,5 @@
     flex: 1 1 0;
     width: 0;
     min-width: 0;
-  }
-  .values-add__switch,
-  .values-add__bool {
-    flex: none;
   }
 </style>
