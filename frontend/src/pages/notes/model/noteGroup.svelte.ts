@@ -1,8 +1,8 @@
 // Несколько выделенных заметок в дереве: Ctrl/Shift-выбор, меню группы и его действия.
 // Флаги и перенос идут по одной заметке без перечитывания списка, список обновляется один раз в конце.
 import { allHave, moveSearchItems, noteGroupMenuItems, topLevelIds, type MenuItem } from '@/entities/note'
-import { bakeAutoScripts } from '@/shared/lib/scriptBake.ts'
 import { createMultiSelect } from '@/shared/lib/multiSelect.svelte.ts'
+import { bakeAutoScripts } from '@/shared/lib/scriptBake.ts'
 import type { ToastAction } from '@/shared/lib/toasts.svelte.ts'
 import { trashUndo } from '@/shared/lib/trashUndo.ts'
 

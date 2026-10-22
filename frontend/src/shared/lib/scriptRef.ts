@@ -28,7 +28,11 @@ export function scriptFlags(query: string | undefined): ScriptFlags {
   return { auto: on('auto') && !set && !runner, hide: on('hide'), set, on: runner }
 }
 
-export function scriptHref(id: string, arg: string, flags: { auto?: boolean; hide?: boolean; set?: string; on?: string } = {}) {
+export function scriptHref(
+  id: string,
+  arg: string,
+  flags: { auto?: boolean; hide?: boolean; set?: string; on?: string } = {}
+) {
   let href = `?script=${id}&_=${encodeURIComponent(arg)}`
   if (flags.auto) href += '&auto=1'
   if (flags.hide) href += '&hide=1'
@@ -37,7 +41,9 @@ export function scriptHref(id: string, arg: string, flags: { auto?: boolean; hid
   return href
 }
 
-export function parseScriptHref(href: string): { id: number; arg: string; auto: boolean; hide: boolean; set: string; on: string } | null {
+export function parseScriptHref(
+  href: string
+): { id: number; arg: string; auto: boolean; hide: boolean; set: string; on: string } | null {
   if (!href.startsWith('?script=')) return null
   const q = new URLSearchParams(href.slice(1))
   const id = Number(q.get('script'))
@@ -57,7 +63,7 @@ export function scriptLabel(arg: string, flags: { hide?: boolean }) {
 
 /** `*` and `_` in a formula must stay characters, not markdown emphasis. */
 export function escapeMdInline(s: string) {
-  return s.replace(/[\\`*_{}\[\]]/g, (ch) => `\\${ch}`)
+  return s.replace(/[\\`*_{}[\]]/g, (ch) => `\\${ch}`)
 }
 
 export type LabelPart = { text: string; name?: string }

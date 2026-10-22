@@ -33,7 +33,11 @@ function fillValues(text: string, values: Record<string, string>) {
 
 /** The formula as a reader sees it: each named value replaced by its text. */
 function plainLabel(arg: string, values: Record<string, string>) {
-  return escapeMdInline(labelParts(arg, values).map((part) => part.text).join(''))
+  return escapeMdInline(
+    labelParts(arg, values)
+      .map((part) => part.text)
+      .join('')
+  )
 }
 
 async function bakeChunk(

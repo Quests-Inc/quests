@@ -299,7 +299,11 @@ function shieldScripts(chunk: string) {
   return { text, saved }
 }
 
-function linkifyRefs(source: string, opts: { labels?: Record<string, string>; values?: Record<string, string> } = {}, bag: string[] = []) {
+function linkifyRefs(
+  source: string,
+  opts: { labels?: Record<string, string>; values?: Record<string, string> } = {},
+  bag: string[] = []
+) {
   const labels = opts.labels || {}
   const values = opts.values || {}
   const withMdLinks = splitCode(source)
@@ -360,7 +364,10 @@ function renderKey(text: string, labels: Record<string, string>, values: Record<
 }
 
 /** Render markdown to sanitized HTML. Journal refs become in-app `?kind=id` links. `{{name}}` becomes a value. */
-export function renderMarkdown(source: any, opts: { labels?: Record<string, string>; values?: Record<string, string> } = {}) {
+export function renderMarkdown(
+  source: any,
+  opts: { labels?: Record<string, string>; values?: Record<string, string> } = {}
+) {
   const text = String(source ?? '')
   if (!text.trim()) return ''
   const values = opts.values ?? {}

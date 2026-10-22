@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test'
 
-import { escapeMdInline, parseScriptHref, scriptEmbedRe, scriptFlags, scriptHref, scriptLabel } from '../../src/shared/lib/scriptRef.ts'
+import {
+  escapeMdInline,
+  parseScriptHref,
+  scriptEmbedRe,
+  scriptFlags,
+  scriptHref,
+  scriptLabel,
+} from '../../src/shared/lib/scriptRef.ts'
 
 test('?auto and ?hide are parameters, not the start of a longer word', () => {
   const re = scriptEmbedRe()
@@ -62,7 +69,14 @@ test('?on=label: code runs on a click only, never on show', async () => {
   expect(scriptFlags(m[3])).toEqual({ auto: false, hide: false, set: '', on: 'stand' })
   expect(scriptFlags('?auto&on=stand').auto).toBe(false)
   expect(scriptFlags('?hide&on=main-pc&auto').on).toBe('main-pc')
-  expect(parseScriptHref(scriptHref('9', 'x', { on: 'stand' }))).toEqual({ id: 9, arg: 'x', auto: false, hide: false, set: '', on: 'stand' })
+  expect(parseScriptHref(scriptHref('9', 'x', { on: 'stand' }))).toEqual({
+    id: 9,
+    arg: 'x',
+    auto: false,
+    hide: false,
+    set: '',
+    on: 'stand',
+  })
   expect(scriptFlags('?on=Stand').on).toBe('')
 })
 

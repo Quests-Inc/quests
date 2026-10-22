@@ -21,7 +21,10 @@ function mockEval(value: (arg: string) => string, fail = false, owned: unknown[]
     calls.push(`${url} ${init?.body}`)
     const arg = JSON.parse(String(init?.body)).args._ as string
     if (fail)
-      return new Response(JSON.stringify({ detail: 'нет' }), { status: 422, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ detail: 'нет' }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      })
     return new Response(JSON.stringify({ value: value(arg), version: 1 }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -49,10 +52,13 @@ test('values fill {{name}} and the names inside a formula; the script still gets
     { name: 'dex_mod', type: 'int', value: 2, formula: 'x' },
     { name: 'bad', type: 'int', value: null, error: 'нет' },
   ])
-  const out = await bakeAutoScripts('урон {{bite_dmg}}, {{nope}}: script=1{2к4+bite_dmg}?auto, бросок script=1{к20+dex_mod}', {
-    kind: 'note',
-    id: 3,
-  })
+  const out = await bakeAutoScripts(
+    'урон {{bite_dmg}}, {{nope}}: script=1{2к4+bite_dmg}?auto, бросок script=1{к20+dex_mod}',
+    {
+      kind: 'note',
+      id: 3,
+    }
+  )
   expect(out).toBe('урон 2, {{nope}}: 2к4+2 = 7, бросок к20+2')
   expect(calls).toEqual(['/api/scripts/1/eval {"args":{"_":"2к4+bite_dmg"},"host":{"kind":"note","id":3}}'])
 })

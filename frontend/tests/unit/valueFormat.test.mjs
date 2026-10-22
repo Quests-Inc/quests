@@ -17,7 +17,12 @@ test('effectiveText and the summary line', () => {
     { name: 'flag', type: 'bool', value: true },
   ])
   expect(text).toEqual({ str: '3', flag: 'да' })
-  expect(valueSummary([{ name: 'str', text: '3' }, { name: 'dc', text: '15' }])).toBe('str 3 · dc 15')
+  expect(
+    valueSummary([
+      { name: 'str', text: '3' },
+      { name: 'dc', text: '15' },
+    ])
+  ).toBe('str 3 · dc 15')
   expect(
     valueSummary(
       [
@@ -25,7 +30,7 @@ test('effectiveText and the summary line', () => {
         { name: 'b', text: '2' },
         { name: 'c', text: '3' },
       ],
-      2,
-    ),
+      2
+    )
   ).toBe('a 1 · b 2 · ещё 1')
 })

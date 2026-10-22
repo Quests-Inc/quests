@@ -44,7 +44,7 @@ export function putValue(
   name: string,
   type: ValueType,
   value: number | string | boolean,
-  formula = '',
+  formula = ''
 ) {
   const body = formula.trim() ? { type, formula: formula.trim() } : { type, value }
   return request<ValueRow>(`${valuesPath(kind, id)}/${encodeURIComponent(name)}`, {

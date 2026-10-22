@@ -2,9 +2,9 @@
 // text is shown. A click throws again. Nothing is stored (ADR-0003 §6b).
 import { rollValue } from '@/shared/api/client.ts'
 import { evalScriptText } from '@/shared/api/scripts.ts'
-import { hostKey, touchValues } from './valueLive.svelte.ts'
 
 import { labelParts, MAX_AUTO_SCRIPTS, parseScriptHref } from './scriptRef.ts'
+import { hostKey, touchValues } from './valueLive.svelte.ts'
 
 function valueHost(node: HTMLElement) {
   const raw = node.dataset.valueHost
@@ -78,7 +78,9 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       const host = valueHost(node)
       let value: string
       if (parsed.set && host && !parsed.auto) {
-        value = String((await rollValue(host.kind, host.id, parsed.set, { script: parsed.id, arg: parsed.arg })).value ?? '')
+        value = String(
+          (await rollValue(host.kind, host.id, parsed.set, { script: parsed.id, arg: parsed.arg })).value ?? ''
+        )
         touchValues(hostKey(host.kind, host.id))
       } else {
         value = await evalScriptText(parsed.id, { _: parsed.arg }, host, parsed.on)

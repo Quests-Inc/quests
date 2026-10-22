@@ -44,7 +44,7 @@ export async function evalScriptText(
   args: Record<string, string>,
   host?: { kind: string; id: number },
   on = '',
-  wait: { step: number; max: number } = { step: WAIT_STEP_MS, max: WAIT_MAX_MS },
+  wait: { step: number; max: number } = { step: WAIT_STEP_MS, max: WAIT_MAX_MS }
 ): Promise<string> {
   const out = await evalScript(id, args, host, on)
   if ('value' in out) return out.value

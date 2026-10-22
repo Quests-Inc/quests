@@ -20,7 +20,11 @@ test('hover waits, then shows type, name and formula; a right click asks to edit
   document.body.innerHTML = '<div id="host"><span class="md-value" data-value="str">1</span></div>'
   const root = document.getElementById('host')!
   let edited = ''
-  const action = valueHover(root, () => ({ host: { kind: 'note', id: 3 }, onEdit: (target) => (edited = target.name) }), 20)
+  const action = valueHover(
+    root,
+    () => ({ host: { kind: 'note', id: 3 }, onEdit: (target) => (edited = target.name) }),
+    20
+  )
   root.querySelector('.md-value')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
   expect(document.querySelector('.md-value-tip')).toBeNull()
   await new Promise((resolve) => setTimeout(resolve, 40))
