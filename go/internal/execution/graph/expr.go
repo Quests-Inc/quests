@@ -163,7 +163,13 @@ func (p *exprParser) expr(minPrec int) (*ast, error) {
 }
 
 func isIdentStart(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' }
-func isDigit(c byte) bool      { return c >= '0' && c <= '9' }
+
+// identFollows reports whether the bytes after a prefix operator continue a name.
+func (p *exprParser) identFollows(n int) bool {
+	i := p.pos + n
+	return i < len(p.s) && isIdentStart(p.s[i])
+}
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
 func (p *exprParser) operand() (*ast, error) {
 	c := p.peek()
@@ -178,7 +184,8 @@ func (p *exprParser) operand() (*ast, error) {
 	case 0:
 		return nil, errors.New("выражение оборвано")
 	}
-	if o := p.userOp(1); o != nil {
+	// A prefix like `d` is a die (`d20`), not the start of a name (`dex`).
+	if o := p.userOp(1); o != nil && !p.identFollows(len(o.Symbol)) {
 		p.pos += len(o.Symbol)
 		v, err := p.expr(o.Prec)
 		if err != nil {
@@ -266,8 +273,17 @@ func (p *exprParser) call(name string) (*ast, error) {
 
 // ---- evaluation
 
+// ExprScope is the named values of the text an embedded script runs in. A wired input of the same name wins.
+// Foreign resolves note=12.str (and the other entity kinds) to a number; a string value is reported with str=true.
+type ExprScope struct {
+	Num     map[string]float64
+	Str     map[string]bool
+	Foreign func(kind string, id int64, name string) (num float64, str bool, ok bool, err error)
+}
+
 type evalEnv struct {
 	vars map[string]float64
+	strs map[string]bool
 	b    *budget
 }
 
@@ -281,6 +297,9 @@ func (a *ast) eval(env *evalEnv) (float64, error) {
 	case kVar:
 		v, ok := env.vars[a.name]
 		if !ok {
+			if env.strs[a.name] {
+				return 0, fmt.Errorf("значение %q — строка, в выражение не подставляется", a.name)
+			}
 			return 0, fmt.Errorf("неизвестная переменная %q", a.name)
 		}
 		return v, nil
@@ -472,15 +491,15 @@ func DiceOperators() []Operator {
 
 // EvalExpr computes an expression over the given variables, with no operators of its own.
 func EvalExpr(s string, vars map[string]float64) (float64, error) {
-	return evalExprWith(s, vars, nil, &budget{})
+	return evalExprWith(s, vars, nil, &budget{}, nil)
 }
 
-func evalExprWith(s string, vars map[string]float64, ops []compiledOp, b *budget) (float64, error) {
+func evalExprWith(s string, vars map[string]float64, ops []compiledOp, b *budget, strs map[string]bool) (float64, error) {
 	a, err := parseExpr(s, ops)
 	if err != nil {
 		return 0, err
 	}
-	v, err := a.eval(&evalEnv{vars: vars, b: b})
+	v, err := a.eval(&evalEnv{vars: vars, strs: strs, b: b})
 	if err != nil {
 		return 0, err
 	}

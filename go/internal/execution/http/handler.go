@@ -28,6 +28,7 @@ type Handler struct {
 // Register mounts every route of the context.
 func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerSecretRoutes(mux)
+	h.registerValueRoutes(mux)
 	h.registerRunner(mux)
 	h.registerScripts(mux)
 	h.registerScriptEval(mux)

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { renderMarkdown } from '@/shared/lib/markdown.ts'
+  import { listValues, type ValueRow } from '@/shared/api/client.ts'
+  import { foreignValueRefs, renderMarkdown } from '@/shared/lib/markdown.ts'
+  import { hostKey, publishValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
+  import { valueHover, type ValueEditTarget } from '@/shared/lib/valueHover.ts'
+  import { proseValue } from '@/shared/lib/valueText.ts'
+  import ValueEditDialog from './ValueEditDialog.svelte'
   import { parseRefHref } from '@/shared/lib/refs.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { tailFade } from '@/shared/lib/typewriter.ts'
@@ -14,17 +19,81 @@
     source = '',
     class: className = '',
     labels = {},
+    values = {},
+    host,
     onRef,
     typing = false,
   }: {
     source?: string,
     class?: string,
     labels?: Record<string, string>,
+    values?: Record<string, string>,
+    host?: { kind: string; id: number },
     onRef?: (kind: string, id: number) => void,
     typing?: boolean,
   } = $props()
 
-  let html = $derived(renderMarkdown(source, { labels }))
+  let foreign = $state({} as Record<string, string>)
+  let edit = $state(null as ValueEditTarget | null)
+
+  function hoverOpts() {
+    return { host, onEdit: (target: ValueEditTarget) => (edit = target) }
+  }
+
+  $effect(() => {
+    void valueRev.n
+    const refs = foreignValueRefs(source)
+    if (!refs.length) {
+      foreign = {}
+      return
+    }
+    const owners = new Map<string, { kind: string; id: number }>()
+    for (const ref of refs) owners.set(`${ref.kind}:${ref.id}`, { kind: ref.kind, id: ref.id })
+    let dead = false
+    Promise.all(
+      [...owners.values()].map(async (owner) => {
+        try {
+          const list = await listValues(owner.kind, owner.id)
+          return { owner, rows: list.effective ?? [] }
+        } catch {
+          return { owner, rows: [] as ValueRow[] }
+        }
+      }),
+    ).then((groups) => {
+      if (dead) return
+      const next: Record<string, string> = {}
+      for (const group of groups) {
+        publishValues(
+          hostKey(group.owner.kind, group.owner.id),
+          group.rows.map((row) => ({
+            name: row.name,
+            type: row.type,
+            text: row.value == null ? '' : proseValue(row.type, row.value),
+            formula: row.formula ?? '',
+            error: row.error ?? '',
+          })),
+        )
+      }
+      for (const ref of refs) {
+        const group = groups.find((g) => g.owner.kind === ref.kind && g.owner.id === ref.id)
+        const row = group?.rows.find((r) => r.name === ref.name)
+        if (row) next[ref.key] = proseValue(row.type, row.value)
+      }
+      foreign = next
+    })
+    return () => {
+      dead = true
+    }
+  })
+
+  let merged = $derived({ ...foreign, ...values })
+  let html = $derived(renderMarkdown(source, { labels, values: merged }))
+  let valueSig = $derived(
+    Object.keys(merged)
+      .sort()
+      .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(merged[name])}`)
+      .join('&')
+  )
   let root: HTMLDivElement | undefined = $state()
 
   $effect(() => {
@@ -108,6 +177,8 @@
 {#if html}
   <div
     class={['md', className]}
+    data-value-host={host ? `${host.kind}:${host.id}` : undefined}
+    data-value-sig={valueSig}
     bind:this={root}
     onclick={onClick}
     use:captureImgErrors
@@ -115,5 +186,9 @@
     use:scriptEmbed
     use:refPreview={onRef}
     use:tailFade={typing}
+    use:valueHover={hoverOpts}
   >{@html html}</div>
+{/if}
+{#if edit}
+  <ValueEditDialog open owner={{ kind: edit.kind, id: edit.id }} name={edit.name} onClose={() => (edit = null)} />
 {/if}

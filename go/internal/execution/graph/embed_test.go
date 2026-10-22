@@ -52,6 +52,27 @@ func TestDiceScript(t *testing.T) {
 	}
 }
 
+func TestDicePrefixLeavesNames(t *testing.T) {
+	ops, err := compileOperators(DiceOperators())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := evalExprWith("8+pb+str", map[string]float64{"pb": 2, "str": 1, "dex": 2}, ops, &budget{}, nil)
+	if err != nil || got != 11 {
+		t.Fatalf("8+pb+str = %v, %v", got, err)
+	}
+	for i := 0; i < 30; i++ {
+		got, err = evalExprWith("1к20+dex+pb", map[string]float64{"dex": 2, "pb": 2}, ops, &budget{}, nil)
+		if err != nil || got < 4 || got > 24 {
+			t.Fatalf("1к20+dex+pb = %v, %v", got, err)
+		}
+		got, err = evalExprWith("d20", nil, ops, &budget{}, nil)
+		if err != nil || got < 1 || got > 20 {
+			t.Fatalf("d20 = %v, %v", got, err)
+		}
+	}
+}
+
 func TestOperatorPrecedenceAndAssociativity(t *testing.T) {
 	c, err := compileOperators([]Operator{
 		{Symbol: "#", Arity: 2, Prec: 4, Def: "a-b"},              // left-associative, tighter than * and +
@@ -71,7 +92,7 @@ func TestOperatorPrecedenceAndAssociativity(t *testing.T) {
 		"-~2":    -20,
 		"~2#1":   19, // the operand of a prefix operator takes in only what binds tighter: (~2)#1
 	} {
-		got, err := evalExprWith(expr, nil, c, &budget{})
+		got, err := evalExprWith(expr, nil, c, &budget{}, nil)
 		if err != nil {
 			t.Fatalf("%s: %v", expr, err)
 		}

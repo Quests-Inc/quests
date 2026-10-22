@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ValueTable } from '@/entities/value'
   import SettingsBlock from './SettingsBlock.svelte'
   import {
     wsx,
@@ -131,6 +132,14 @@
       {/if}
     {/if}
   </SettingsBlock>
+
+  {#if wsx.current}
+    <SettingsBlock title="Значения" hint="Имена для формул и команд этого пространства. Видны всем участникам, меняет владелец.">
+      {#key wsx.current}
+        <ValueTable owner={{ kind: 'workspace', id: wsx.current }} readonly={!isOwner} />
+      {/key}
+    </SettingsBlock>
+  {/if}
 
   {#if isOwner}
     <SettingsBlock

@@ -338,7 +338,52 @@
   text-decoration: underline;
 }
 
-/* Живая вставка script=N{…} (shared/lib/scriptEmbed.ts): клик считает и подставляет значение. */
+/* Подставленное {{имя}}: чип, чтобы значение не читалось как набранный текст. */
+.md-value {
+  padding: 0 0.28em;
+  border-radius: 0.25em;
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 22%, transparent);
+  font-variant-numeric: tabular-nums;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.md-value-tip {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(22rem, calc(100vw - 16px));
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 8px;
+  background: var(--color-surface, #1c1c1c);
+  color: var(--color-text, inherit);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+.md-value-tip p {
+  margin: 0;
+}
+.md-value-tip__type {
+  color: var(--color-fg-muted, #9a9a9a);
+  font-size: 0.75rem;
+}
+.md-value-tip__name,
+.md-value-tip__detail {
+  font-family: var(--font-mono, monospace);
+}
+.md-value-tip__detail {
+  margin-top: 0.2rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.md-value-tip__detail--err {
+  color: var(--color-danger, #b54a3a);
+  font-family: inherit;
+}
+
+/* Живая вставка script=N{…}: клик считает. ?auto — сразу число, ?hide — без формулы (? до клика). */
 .md-script {
   border-bottom: 1px dashed currentColor;
   text-decoration: none;

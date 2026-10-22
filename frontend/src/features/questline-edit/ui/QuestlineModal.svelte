@@ -9,6 +9,7 @@
   } from '@/shared/api/client.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import { MentionTextarea } from '@/entities/template'
+  import { ValueTable } from '@/entities/value'
   import Picker from '@/shared/ui/Picker.svelte'
   import { ColorIconPicker } from '@/entities/questline'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
@@ -147,6 +148,12 @@
 
   {#if formError}
     <p class="modal__error">{formError}</p>
+  {/if}
+
+  {#if mode === 'edit' && line?.id}
+    <div class="modal__body">
+      <ValueTable owner={{ kind: 'questline', id: line.id }} />
+    </div>
   {/if}
 
   <form class="modal__form" onsubmit={onSubmit}>

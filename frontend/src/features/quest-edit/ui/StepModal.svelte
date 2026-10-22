@@ -3,6 +3,7 @@
   import { checkPayload, questStepDraft, StepAutoCheck } from '@/entities/quest'
   import { HooksField } from '@/entities/hook/@x/quest'
   import { MentionTextarea } from '@/entities/template'
+  import { ValueTable } from '@/entities/value'
   import FormSection from '@/shared/ui/FormSection.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
@@ -94,6 +95,12 @@
 
   {#if formError}
     <p class="modal__error">{formError}</p>
+  {/if}
+
+  {#if step?.id}
+    <div class="modal__body">
+      <ValueTable owner={{ kind: 'step', id: step.id }} />
+    </div>
   {/if}
 
   <form class="modal__form" onsubmit={onSubmit}>

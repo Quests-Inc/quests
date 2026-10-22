@@ -1,0 +1,405 @@
+<script lang="ts">
+  import { untrack } from 'svelte'
+  import { deleteValue, listValues, putValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
+  import { hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
+  import { valueDetail, valueTypeColor, valueTypeLabel } from '@/shared/lib/valueTip.ts'
+  import { effectiveText, formatValue, valueSummary } from '../model/format.ts'
+  import Icon from '@/shared/ui/Icon.svelte'
+  import ModalShell from '@/shared/ui/ModalShell.svelte'
+  import ModalHead from '@/shared/ui/ModalHead.svelte'
+  import Toggle from '@/shared/ui/Toggle.svelte'
+  import ValueEditDialog from '@/shared/ui/ValueEditDialog.svelte'
+
+  let {
+    owner,
+    readonly = false,
+    variant = 'text',
+    onEffective,
+  }: {
+    owner: { kind: string; id: number }
+    readonly?: boolean
+    variant?: 'text' | 'icon'
+    onEffective?: (text: Record<string, string>) => void
+  } = $props()
+
+  const NAME = /^[a-z][a-z0-9_]{0,23}$/
+  const HINT: Record<ValueType, string> = {
+    int: '(str_score - 10) / 2',
+    float: 'hp / 2.0',
+    str: 'name + " волка"',
+    bool: 'hp < 10',
+  }
+  const TYPES: ValueType[] = ['int', 'float', 'str', 'bool']
+
+  let own = $state([] as ValueRow[])
+  let inherited = $state([] as ValueRow[])
+  let open = $state(false)
+  let error = $state('')
+  let busy = $state(false)
+  let truncated = $state(false)
+  let name = $state('')
+  let type = $state('int' as ValueType)
+  let raw = $state('')
+  let flag = $state(false)
+  let asFormula = $state(false)
+  let editing = $state('')
+  let seenKey = ''
+
+  const summary = $derived(
+    valueSummary(
+      [...own, ...inherited]
+        .filter((row) => !row.error && row.value != null)
+        .map((row) => ({ name: row.name, text: formatValue(row.type, row.value) })),
+    ),
+  )
+  const label = $derived(own.length ? `Значения · ${own.length}` : 'Значения')
+  const title = $derived(summary ? `Значения: ${summary}` : 'Значения')
+
+  function source(row: ValueRow) {
+    if (row.from === 'workspace') return 'пространство'
+    return row.title || `${row.from}=${row.id}`
+  }
+
+  function literal(): number | string | boolean | null {
+    if (type === 'bool') return flag
+    if (type === 'str') return raw
+    if (raw.trim() === '' || Number.isNaN(Number(raw))) return null
+    return type === 'int' ? Math.trunc(Number(raw)) : Number(raw)
+  }
+
+  function liveOf(rows: ValueRow[]) {
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type,
+      text: row.value == null ? '' : formatValue(row.type, row.value),
+      formula: row.formula ?? '',
+      error: row.error ?? '',
+    }))
+  }
+
+  async function load() {
+    const kind = owner.kind
+    const id = owner.id
+    const key = hostKey(kind, id)
+    onEffective?.({})
+    error = ''
+    try {
+      const list = await listValues(kind, id)
+      if (hostKey(owner.kind, owner.id) !== key) return
+      own = list.own ?? []
+      inherited = list.inherited ?? []
+      truncated = !!list.truncated
+      const effective = (list.effective ?? []).filter((row) => !row.error && row.value != null)
+      onEffective?.(effectiveText(effective))
+      publishValues(key, liveOf(list.effective ?? []))
+    } catch (e) {
+      if (hostKey(owner.kind, owner.id) !== key) return
+      error = e instanceof Error ? e.message : String(e)
+      own = []
+      inherited = []
+      publishValues(key, [])
+    }
+  }
+
+  $effect(() => {
+    const key = hostKey(owner.kind, owner.id)
+    const rev = valueRev.n
+    const revHost = valueRev.host
+    untrack(() => {
+      if (key !== seenKey) {
+        seenKey = key
+        void load()
+        return
+      }
+      if (revHost === key && rev) void load()
+    })
+  })
+
+  async function add() {
+    if (!NAME.test(name) || name === 'expr' || name === 'true' || name === 'false') {
+      error = 'имя: строчные латинские, цифры и _, не expr, true, false'
+      return
+    }
+    if (asFormula) {
+      if (!raw.trim()) {
+        error = 'нужна формула'
+        return
+      }
+      await write(name, type, '', raw.trim())
+    } else {
+      const value = literal()
+      if (value == null) {
+        error = 'нужно значение'
+        return
+      }
+      await write(name, type, value, '')
+    }
+    if (!error) {
+      name = ''
+      raw = ''
+      flag = false
+      asFormula = false
+    }
+  }
+
+  async function write(rowName: string, rowType: ValueType, value: number | string | boolean, formula: string) {
+    busy = true
+    error = ''
+    try {
+      await putValue(owner.kind, owner.id, rowName, rowType, value, formula)
+      touchValues(hostKey(owner.kind, owner.id))
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+    } finally {
+      busy = false
+    }
+  }
+
+  async function remove(rowName: string) {
+    busy = true
+    error = ''
+    try {
+      await deleteValue(owner.kind, owner.id, rowName)
+      touchValues(hostKey(owner.kind, owner.id))
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+    } finally {
+      busy = false
+    }
+  }
+</script>
+
+<button
+  type="button"
+  class={variant === 'icon' ? 'btn btn--icon values-open values-open--icon' : 'values-open'}
+  {title}
+  aria-label="Значения"
+  aria-haspopup="dialog"
+  onclick={() => (open = true)}
+>
+  {#if variant === 'icon'}
+    <span aria-hidden="true">{'{}'}</span>
+  {:else}
+    {label}
+  {/if}
+</button>
+
+<ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="40rem">
+  <ModalHead id="values-modal-title" title="Значения" onClose={() => (open = false)} />
+  {#if error}<p class="modal__error">{error}</p>{/if}
+  <div class="modal__body">
+    <p class="values-hint">Имя пишется как здесь (str). В команде оно заглавное (STR).</p>
+    {#if truncated}<p class="values-hint">Дальние значения не влезли в область видимости.</p>{/if}
+    {#if own.length || inherited.length}
+      <ul class="values-list">
+        {#each own as row (row.name)}
+          <li class="values-card" data-type={row.type}>
+            <button type="button" class="values-card__main" onclick={() => (editing = row.name)}>
+              <span class="values-type">{valueTypeLabel(row.type)}</span>
+              <code class="values-name">{row.name}</code>
+              <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}>
+                {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}
+              </span>
+            </button>
+            {#if !readonly}
+              <button
+                type="button"
+                class="values-x"
+                disabled={busy}
+                aria-label="Удалить {row.name}"
+                title="Удалить"
+                onclick={() => void remove(row.name)}
+              >
+                <Icon name="close" size={14} />
+              </button>
+            {/if}
+          </li>
+        {/each}
+        {#each inherited as row (row.name)}
+          <li class="values-card values-card--inherited" data-type={row.type}>
+            <button type="button" class="values-card__main" onclick={() => (editing = row.name)}>
+              <span class="values-type">{valueTypeLabel(row.type)}</span>
+              <span class="values-name">
+                <code>{row.name}</code>
+                <small>из {source(row)}</small>
+              </span>
+              <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}>
+                {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error })}
+              </span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    {#if !readonly}
+      <form
+        class="values-add"
+        onsubmit={(e) => {
+          e.preventDefault()
+          void add()
+        }}
+      >
+        <select bind:value={type} aria-label="Тип">
+          {#each TYPES as item (item)}
+            <option value={item} style:color={valueTypeColor(item)}>{valueTypeLabel(item)}</option>
+          {/each}
+        </select>
+        <input type="text" bind:value={name} placeholder="имя" aria-label="Имя" maxlength="24" />
+        {#if asFormula}
+          <input type="text" bind:value={raw} placeholder={HINT[type]} aria-label="Формула" maxlength="1024" />
+        {:else if type === 'bool'}
+          <span class="values-add__bool"><Toggle label="да" bind:checked={flag} /></span>
+        {:else}
+          <input type="text" bind:value={raw} placeholder="значение" aria-label="Значение" />
+        {/if}
+        <span class="values-add__switch"><Toggle label="формула" bind:checked={asFormula} /></span>
+        <button type="submit" class="values-x values-x--add" disabled={busy} aria-label="Добавить" title="Добавить">
+          <Icon name="add" size={14} />
+        </button>
+      </form>
+    {/if}
+  </div>
+</ModalShell>
+
+{#if editing}
+  <ValueEditDialog
+    open
+    {owner}
+    {readonly}
+    name={editing}
+    onClose={() => (editing = '')}
+  />
+{/if}
+
+<style>
+  .values-open {
+    height: 2rem;
+    padding: 0 0.7rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .values-open:hover {
+    color: var(--color-accent, #c9a227);
+  }
+  .values-open--icon {
+    width: 2rem;
+    min-width: 2rem;
+    padding: 0;
+    font-family: var(--font-mono, monospace);
+  }
+  .values-hint {
+    margin: 0;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: 0.85rem;
+  }
+  .values-list {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .values-card {
+    --vt: var(--color-fg-muted, #9a9a9a);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.35rem 0.35rem 0.35rem 0.55rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: 8px;
+    background: transparent;
+  }
+  .values-card:hover {
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 6%, transparent);
+  }
+  .values-card[data-type='int'] { --vt: #4aa3df; }
+  .values-card[data-type='float'] { --vt: #5cc4c4; }
+  .values-card[data-type='str'] { --vt: #c9a227; }
+  .values-card[data-type='bool'] { --vt: #b06ad8; }
+  .values-card__main {
+    display: grid;
+    grid-template-columns: 5.2rem minmax(5.5rem, max-content) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.55rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .values-type {
+    color: var(--vt);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .values-name {
+    min-width: 0;
+    font-family: var(--font-mono, monospace);
+  }
+  .values-name small {
+    display: block;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 0.72rem;
+  }
+  .values-card--inherited .values-name,
+  .values-card--inherited .values-detail {
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+  .values-detail {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .values-formula {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85em;
+  }
+  .values-bad {
+    color: var(--color-danger, #b54a3a);
+  }
+  .values-x {
+    display: inline-flex;
+    flex: none;
+    padding: 0.15rem;
+    border: 0;
+    background: none;
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: pointer;
+  }
+  .values-x:hover {
+    color: var(--color-danger, #b54a3a);
+  }
+  .values-x--add:hover {
+    color: var(--color-accent, #c9a227);
+  }
+  .values-add {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .values-add select {
+    flex: 0 0 6.6rem;
+    width: 6.6rem;
+  }
+  .values-add input[type='text'] {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+  }
+  .values-add__switch,
+  .values-add__bool {
+    flex: none;
+  }
+</style>

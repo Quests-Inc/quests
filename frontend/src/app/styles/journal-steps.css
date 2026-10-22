@@ -215,6 +215,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.step__values {
+  grid-column: 2 / -1;
+  min-width: 0;
+}
+
 .step__desc {
   grid-column: 2 / -1;
   justify-self: start;

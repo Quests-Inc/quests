@@ -1,6 +1,7 @@
 // Wiki-превью при наведении на реф note=/quest=/questline=. Один попап на документ, рефы внутри него — не ссылки (без каскада).
 // Данные берутся из каталогов в памяти через provider (App), поэтому лишних запросов нет.
 import { parseRefHref, REF_RE } from './refs.ts'
+import { scriptEmbedRe, scriptFlags } from './scriptRef.ts'
 
 export type RefPreview = {
   kind: string
@@ -30,7 +31,7 @@ export function plainExcerpt(md: string, max = 320) {
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/\bscript=\d+\{([^{}\n]*)\}/g, '$1')
+    .replace(scriptEmbedRe(), (_, _id, arg, query) => (scriptFlags(query).hide ? '?' : arg))
     .replace(/(\*\*|__)(.+?)\1/g, '$2')
     .replace(/^[>#\s]+/gm, '')
     .replace(/[`~|]/g, '')

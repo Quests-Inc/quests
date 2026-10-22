@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/execution"
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/kernel"
 	"github.com/quests-inc/quests/go/internal/platform/httpx"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -129,20 +131,41 @@ func subjectEnv(j execution.RunnerJob, env map[string]string) map[string]string 
 	return out
 }
 
-// jobEnv is the environment a runner gets: the secrets, and the values that came over links into a script's Code node
-// (their names are QUESTS_IN_…, which a secret may not take, so the two never clash).
-func jobEnv(secrets, links map[string]string) map[string]string {
-	if len(links) == 0 {
-		return secrets
-	}
-	env := make(map[string]string, len(secrets)+len(links))
-	for k, v := range secrets {
-		env[k] = v
-	}
+// jobEnv is the environment a runner gets. Link inputs and the code node's own variables go in first. Named values
+// override those variables (so one script can read a note's REF). Secrets override values: a credential keeps the name.
+// Values are dropped, newest name last, when the whole environment would pass 32 KiB; secrets and QUESTS_* stay.
+func jobEnv(secrets, links, values map[string]string) map[string]string {
+	env := make(map[string]string, len(secrets)+len(links)+len(values))
 	for k, v := range links {
 		env[k] = v
 	}
+	droppable := make([]string, 0, len(values))
+	for k, v := range values {
+		if strings.HasPrefix(k, "QUESTS_") {
+			continue
+		}
+		env[k] = v
+		droppable = append(droppable, k)
+	}
+	for k, v := range secrets {
+		env[k] = v
+	}
+	if envBytes(env) <= graph.MaxEnvBytes {
+		return env
+	}
+	sort.Strings(droppable)
+	for i := len(droppable) - 1; i >= 0 && envBytes(env) > graph.MaxEnvBytes; i-- {
+		delete(env, droppable[i])
+	}
 	return env
+}
+
+func envBytes(env map[string]string) int {
+	n := 0
+	for k, v := range env {
+		n += len(k) + len(v)
+	}
+	return n
 }
 
 // jobSecrets resolves the secrets of what the job belongs to (step, else template).
@@ -189,7 +212,7 @@ func (h *Handler) runnerPoll(w http.ResponseWriter, r *http.Request) {
 				ID: job.ID, LeaseID: job.LeaseID, LeaseSeconds: int(runnerLease / time.Second),
 				Kind: job.Kind, Title: job.Title, Command: job.Command, TimeoutSeconds: job.TimeoutSeconds,
 				AttemptNo: job.AttemptNo, QuestID: job.QuestID, StepID: job.StepID, TemplateID: job.TemplateID, NoteID: job.NoteID,
-				Env: subjectEnv(*job, jobEnv(h.jobSecrets(r.Context(), *job), job.Env)),
+				Env: subjectEnv(*job, jobEnv(h.jobSecrets(r.Context(), *job), job.Env, h.jobValues(r.Context(), *job))),
 			})
 			return
 		}

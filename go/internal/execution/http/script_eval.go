@@ -29,6 +29,10 @@ func (h *Handler) evalScript(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		Args map[string]string `json:"args"`
+		Host *struct {
+			Kind string `json:"kind"`
+			ID   int64  `json:"id"`
+		} `json:"host"`
 	}
 	if !decodeScriptBody(w, r, &in) {
 		return
@@ -73,9 +77,17 @@ func (h *Handler) evalScript(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var scope *graph.ExprScope
+	if in.Host != nil {
+		scope, err = h.embedScope(r, in.Host.Kind, in.Host.ID)
+		if err != nil {
+			valueWriteErr(w, err)
+			return
+		}
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), evalTimeout)
 	defer cancel()
-	out, err := graph.Evaluate(ctx, g, reg, in.Args)
+	out, err := graph.EvaluateScoped(ctx, g, reg, in.Args, scope)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
