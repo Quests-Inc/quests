@@ -1,9 +1,12 @@
 // `script=N{arg}` in a text. Parameters are written by the author, nothing is inferred from the formula:
 // `?auto` computes when the text is shown, `?hide` hides the formula (`?` until a click, if it is not auto),
-// `?on=label` runs a script with code on that runner and waits for it (never on show: the code runs only on a click),
+// `?on=label` (or `a,b`: the first one online) sends the code of a script to that runner instead of the workspace default, and
+// waits for it (never on show: the code runs only on a click),
 // `?set=name` writes the result of a click into the value `name` of the text's owner (never on show, so it beats `?auto`).
 
-const FLAG = String.raw`auto(?:=1)?|hide(?:=1)?|set=[a-z][a-z0-9_]{0,23}|on=[a-z0-9][a-z0-9_-]{0,31}`
+const LABEL = String.raw`[a-z0-9][a-z0-9_-]{0,31}`
+const LABELS = String.raw`${LABEL}(?:,${LABEL}){0,7}`
+const FLAG = String.raw`auto(?:=1)?|hide(?:=1)?|set=[a-z][a-z0-9_]{0,23}|on=${LABELS}`
 const SCRIPT_EMBED_SOURCE = String.raw`\bscript=(\d+)\{([^{}\[\]\n]{1,200})\}(\?(?:${FLAG})(?:&(?:${FLAG})){0,2}\b)?`
 
 /** A fresh global regex. Callers must not share one instance across overlapping scans. */
@@ -21,7 +24,7 @@ export function scriptFlags(query: string | undefined): ScriptFlags {
   const q = String(query ?? '').replace(/^\?/, '')
   const on = (name: string) => new RegExp(`(?:^|&)${name}(?:=1)?(?:&|$)`).test(q)
   const set = /(?:^|&)set=([a-z][a-z0-9_]{0,23})(?:&|$)/.exec(q)?.[1] ?? ''
-  const runner = /(?:^|&)on=([a-z0-9][a-z0-9_-]{0,31})(?:&|$)/.exec(q)?.[1] ?? ''
+  const runner = new RegExp(String.raw`(?:^|&)on=(${LABELS})(?:&|$)`).exec(q)?.[1] ?? ''
   return { auto: on('auto') && !set && !runner, hide: on('hide'), set, on: runner }
 }
 
@@ -43,7 +46,7 @@ export function parseScriptHref(href: string): { id: number; arg: string; auto: 
   const set = q.get('set') ?? ''
   if (set && !/^[a-z][a-z0-9_]{0,23}$/.test(set)) return null
   const on = q.get('on') ?? ''
-  if (on && !/^[a-z0-9][a-z0-9_-]{0,31}$/.test(on)) return null
+  if (on && !new RegExp(`^${LABELS}$`).test(on)) return null
   return { id, arg, auto: q.get('auto') === '1' && !set && !on, hide: q.get('hide') === '1', set, on }
 }
 

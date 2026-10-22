@@ -127,8 +127,10 @@ and `?auto` adds the result (`2к4+2 = 7`); a click-only embedding is just the f
 computes and stores the number, the client never sends it). The value must already exist and must not be a formula; the result must fit
 its type. The value remembers the script and the expression, so the table can roll it again, and any formula over `hp` follows. `?set`
 never runs on show, so it overrides `?auto`. A hand-typed value forgets the roll. MCP: `list_values`, `set_value`, `delete_value`.
-`script=12{55.75,37.62}?on=stand` is an embedding whose script has a Code node: the click starts a run, the code goes to
-runner `stand` at once (a job queued wakes the runners' long polls, so pick-up takes milliseconds), and the page asks
+`script=12{55.75,37.62}` whose script has a Code node: the click starts a run, the code goes to a runner at once. The runner is
+the workspace value `runner` (Settings → workspace → «Раннер по умолчанию»; only the owner writes it; one label or a chain
+`a,b` where the first one online gets the job), else the workspace's only runner; `?on=stand` or `?on=a,b` in the link overrides it,
+but only with labels of registered runners of the workspace (anything else is a 422 that lists them). The job goes out (a job queued wakes the runners' long polls, so pick-up takes milliseconds), and the page asks
 `GET /api/script-runs/{id}` until `Result` has its text (`POST /api/scripts/{id}/eval` with `on` answers 202 and the run). The
 text of the link is the formula, as for a server script. It never runs on show (`?on` beats `?auto`), a workspace has at most 6
 such runs waiting, and a run with no runner online fails after two minutes. `?on` needs the code to be written by an owner like

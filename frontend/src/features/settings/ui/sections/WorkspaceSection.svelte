@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ValueTable } from '@/entities/value'
   import SettingsBlock from './SettingsBlock.svelte'
+  import DefaultRunner from './DefaultRunner.svelte'
   import {
     wsx,
     currentWorkspaceName,
@@ -137,6 +138,14 @@
     <SettingsBlock title="Значения" hint="Имена для формул и команд этого пространства. Видны всем участникам, меняет владелец.">
       {#key wsx.current}
         <ValueTable owner={{ kind: 'workspace', id: wsx.current }} readonly={!isOwner} />
+      {/key}
+    </SettingsBlock>
+  {/if}
+
+  {#if wsx.current}
+    <SettingsBlock title="Раннер по умолчанию" hint="Куда уходит код вставки script=N, если в ссылке нет ?on=. Несколько через запятую: берётся первый в сети. Пусто — единственный раннер пространства.">
+      {#key wsx.current}
+        <DefaultRunner readonly={!isOwner} />
       {/key}
     </SettingsBlock>
   {/if}

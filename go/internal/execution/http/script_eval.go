@@ -10,7 +10,6 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
-	"github.com/quests-inc/quests/go/internal/kernel"
 )
 
 // Embedded evaluation (ADR-0003 §6b): a script called from a text (`script=N`) computes a value at once, with no job and no
@@ -128,16 +127,13 @@ func (h *Handler) startEmbedded(w http.ResponseWriter, r *http.Request, sc execu
 	Kind string `json:"kind"`
 	ID   int64  `json:"id"`
 }, on string, scope *graph.ExprScope) {
-	on = strings.TrimSpace(on)
-	switch {
-	case h.StartEmbedded == nil:
+	if h.StartEmbedded == nil {
 		writeErr(w, http.StatusUnprocessableEntity, "раннеры здесь не подключены")
 		return
-	case on == "":
-		writeErr(w, http.StatusUnprocessableEntity, "в скрипте есть нода кода: укажите раннер, например script="+strconv.FormatInt(sc.ID, 10)+"{…}?on=метка")
-		return
-	case !kernel.ValidRunnerLabel(on):
-		writeErr(w, http.StatusUnprocessableEntity, kernel.ErrBadRunnerLabel.Error())
+	}
+	on, err := h.Store.ResolveEmbedRunner(r.Context(), on)
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	start := execution.EmbedStart{ScriptID: sc.ID, Version: sc.Version, Graph: g, Args: args, Label: on, Scope: scope}

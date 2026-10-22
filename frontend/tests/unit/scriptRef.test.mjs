@@ -65,3 +65,11 @@ test('?on=label: code runs on a click only, never on show', async () => {
   expect(parseScriptHref(scriptHref('9', 'x', { on: 'stand' }))).toEqual({ id: 9, arg: 'x', auto: false, hide: false, set: '', on: 'stand' })
   expect(scriptFlags('?on=Stand').on).toBe('')
 })
+
+test('?on takes a chain of runners, the first online goes first', () => {
+  const m = [...'script=9{x}?on=main-pc,laptop'.matchAll(scriptEmbedRe())][0]
+  expect(m[3]).toBe('?on=main-pc,laptop')
+  expect(scriptFlags(m[3]).on).toBe('main-pc,laptop')
+  expect(parseScriptHref(scriptHref('9', 'x', { on: 'a,b' }))?.on).toBe('a,b')
+  expect(scriptFlags('?on=a,').on).toBe('')
+})

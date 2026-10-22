@@ -258,3 +258,52 @@ func TestScriptValueWriteKeepsFormulas(t *testing.T) {
 		t.Fatal("a value that does not fit the type must be refused")
 	}
 }
+
+func addRunner(t *testing.T, st *Store, label string) {
+	t.Helper()
+	reg, err := st.CreateRunner(valueCtx(), label)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.RegisterRunner(valueCtx(), reg, "host", "test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEmbedRunnerChoice(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := valueCtx()
+	ws := SecretOwner{SecretOwnerWorkspace, 1}
+	if _, err := st.ResolveEmbedRunner(ctx, ""); err == nil {
+		t.Fatal("no runner at all must be said")
+	}
+	addRunner(t, st, "main-pc")
+	if got, err := st.ResolveEmbedRunner(ctx, ""); err != nil || got != "main-pc" {
+		t.Fatalf("the only runner: %q %v", got, err)
+	}
+	addRunner(t, st, "laptop")
+	addRunner(t, st, "vps")
+	if _, err := st.ResolveEmbedRunner(ctx, ""); err == nil || !strings.Contains(err.Error(), "несколько") {
+		t.Fatalf("several runners and no default: %v", err)
+	}
+	mustValue(t, st, ws, "runner", "str", "laptop, main-pc")
+	if got, err := st.ResolveEmbedRunner(ctx, ""); err != nil || got != "laptop,main-pc" {
+		t.Fatalf("the workspace chain keeps its order: %q %v", got, err)
+	}
+	if got, err := st.ResolveEmbedRunner(ctx, "vps"); err != nil || got != "vps" {
+		t.Fatalf("the link overrides: %q %v", got, err)
+	}
+	if _, err := st.ResolveEmbedRunner(ctx, "prod-db"); err == nil || !strings.Contains(err.Error(), "не зарегистрирован") {
+		t.Fatalf("a runner that is not ours: %v", err)
+	}
+	mustValue(t, st, ws, "runner", "str", "ghost")
+	if _, err := st.ResolveEmbedRunner(ctx, ""); err == nil {
+		t.Fatal("a default that names no runner must be refused")
+	}
+	if err := st.RevokeRunner(ctx, "vps"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.ResolveEmbedRunner(ctx, "vps"); err == nil {
+		t.Fatal("a revoked runner is not available")
+	}
+}
