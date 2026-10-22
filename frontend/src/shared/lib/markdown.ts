@@ -133,9 +133,71 @@ const PURIFY_OPTS = {
     'div',
     'span',
   ],
-  ALLOWED_ATTR: ['href', 'rel', 'target', 'src', 'alt', 'align', 'class'],
+  ALLOWED_ATTR: ['href', 'rel', 'target', 'src', 'alt', 'align', 'class', 'scope'],
   ADD_ATTR: ['data-lang'],
   ALLOW_DATA_ATTR: false,
+}
+
+const TABLE_SIDE_RE = /^\s*table:\s*(top|left|both|none)\s*$/i
+
+/** Which cells of a table are headers. */
+export type TableSide = 'top' | 'left' | 'both' | 'none'
+
+function asCell(from: Element, tag: 'td' | 'th', scope = ''): HTMLElement {
+  const cell = from.ownerDocument.createElement(tag)
+  cell.innerHTML = from.innerHTML
+  const align = from.getAttribute('align')
+  if (align) cell.setAttribute('align', align)
+  if (scope) cell.setAttribute('scope', scope)
+  return cell
+}
+
+/**
+ * Pipe tables put the header on top, always. `<!-- table: left -->` on the line above a table says where the headers are:
+ * `top` (the default), `left` (the first column; the top row is an ordinary row), `both`, or `none`. A table whose header
+ * row is empty (`| | |`) has no top header, so it reads as `left` unless the line says otherwise. Other viewers show the
+ * comment as nothing and the table as a normal one.
+ */
+export function shapeTables(dirty: string): string {
+  if (!dirty.includes('<table')) return dirty
+  const doc = window.document.implementation.createHTMLDocument('')
+  doc.body.innerHTML = dirty
+  for (const table of Array.from(doc.querySelectorAll('table'))) {
+    let side: TableSide | '' = ''
+    let prev = table.previousSibling
+    while (prev && prev.nodeType === 3 && !(prev.textContent || '').trim()) prev = prev.previousSibling
+    if (prev && prev.nodeType === 8) {
+      const m = TABLE_SIDE_RE.exec(prev.textContent || '')
+      if (m) {
+        side = m[1].toLowerCase() as TableSide
+        prev.remove()
+      }
+    }
+    const head = table.tHead
+    const headRow = head?.rows[0]
+    const headCells = headRow ? Array.from(headRow.cells) : []
+    const emptyHead = headCells.length > 0 && headCells.every((c) => !(c.textContent || '').trim())
+    const use: TableSide = side || (emptyHead ? 'left' : 'top')
+    const body = table.tBodies[0] ?? table.appendChild(doc.createElement('tbody'))
+    if (head && (use === 'left' || use === 'none' || (use === 'both' && emptyHead))) {
+      if (!emptyHead && headRow) {
+        const row = doc.createElement('tr')
+        for (const c of headCells) row.append(asCell(c, 'td'))
+        body.insertBefore(row, body.firstChild)
+      }
+      head.remove()
+    }
+    if (use === 'top' || use === 'both') {
+      for (const th of Array.from(table.querySelectorAll('thead th'))) th.setAttribute('scope', 'col')
+    }
+    if (use === 'left' || use === 'both') {
+      for (const row of Array.from(body.rows)) {
+        const first = row.cells[0]
+        if (first && first.tagName === 'TD') first.replaceWith(asCell(first, 'th', 'row'))
+      }
+    }
+  }
+  return doc.body.innerHTML
 }
 
 /** The only `<img src>` the sanitizer lets through: an attachment's inline view. */
@@ -310,9 +372,10 @@ export function renderMarkdown(source: any, opts: { labels?: Record<string, stri
     return hit
   }
   const bag: string[] = []
-  const dirty = marked.parse(linkifyRefs(text, opts, bag), { async: false })
+  let dirty = marked.parse(linkifyRefs(text, opts, bag), { async: false })
   if (typeof dirty !== 'string' || typeof window === 'undefined') return ''
   ensureLinkHook()
+  dirty = shapeTables(dirty)
   let html = DOMPurify.sanitize(dirty, PURIFY_OPTS)
   if (bag.length) html = html.replace(/⟦V(\d+)⟧/g, (_, n) => bag[Number(n)] ?? '')
   renderCache.set(key, html)
