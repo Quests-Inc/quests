@@ -18,7 +18,7 @@
   }: {
     owner: { kind: string; id: number }
     readonly?: boolean
-    variant?: 'text' | 'icon'
+    variant?: 'text' | 'icon' | 'hidden'
     onEffective?: (text: Record<string, string>) => void
   } = $props()
 
@@ -164,6 +164,7 @@
   }
 </script>
 
+{#if variant !== 'hidden'}
 <button
   type="button"
   class={variant === 'icon' ? 'btn btn--icon values-open values-open--icon' : 'values-open'}
@@ -178,6 +179,7 @@
     {label}
   {/if}
 </button>
+{/if}
 
 <ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="40rem">
   <ModalHead id="values-modal-title" title="Значения" onClose={() => (open = false)} />

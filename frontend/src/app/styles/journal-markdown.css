@@ -229,13 +229,19 @@
   text-decoration: underline;
 }
 
-/* Иконка сущности перед именем ссылки (см. shared/lib/refIcons.svelte.ts); цвет — свой (`--ref-ico-color`), без него — цвет ссылки. */
+/* Иконка сущности перед именем ссылки (см. shared/lib/refIcons.svelte.ts); цвет — свой (`--ref-ico-color`), без него — цвет ссылки.
+   Иконка не стоит в потоке строки, а лежит в левом поле первого фрагмента ссылки: переноса между значком и началом названия
+   не бывает, а само название переноситься может как обычно. */
+a:has(> .md-ref__ico) {
+  position: relative;
+  padding-left: 1.25em;
+}
 .md-ref__ico {
-  display: inline-block;
+  position: absolute;
+  left: 0;
+  top: 0.12em;
   width: 1em;
   height: 1em;
-  margin-right: 0.25em;
-  vertical-align: -0.12em;
   background-color: var(--ref-ico-color, currentColor);
   -webkit-mask: var(--ref-ico) center / contain no-repeat;
   mask: var(--ref-ico) center / contain no-repeat;

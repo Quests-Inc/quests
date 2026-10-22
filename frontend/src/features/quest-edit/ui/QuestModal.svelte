@@ -36,6 +36,7 @@
   import DurationInput from '@/shared/ui/DurationInput.svelte'
   import SuggestChip from '@/shared/ui/SuggestChip.svelte'
   import { TagField } from '@/entities/tag'
+  import { ValueTable } from '@/entities/value'
   import { buildSuggestIndex } from '@/shared/lib/suggest.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
@@ -374,6 +375,12 @@
 
   {#if formError}
     <p class="modal__error">{formError}</p>
+  {/if}
+
+  {#if mode === 'edit' && quest?.id}
+    <div class="modal__body">
+      <ValueTable owner={{ kind: 'quest', id: quest.id }} />
+    </div>
   {/if}
 
   <form class="modal__form" onsubmit={onSubmit}>

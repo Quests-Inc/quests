@@ -24,7 +24,7 @@
 </script>
 
 <div class="step__values">
-  <ValueTable variant="icon" owner={{ kind: 'step', id: stepId }} onEffective={(text) => (values = text)} />
+  <ValueTable variant="hidden" owner={{ kind: 'step', id: stepId }} onEffective={(text) => (values = text)} />
 </div>
 {#if show}
   <MarkdownBody class={className} {source} {labels} {onRef} {typing} {values} host={{ kind: 'step', id: stepId }} />
