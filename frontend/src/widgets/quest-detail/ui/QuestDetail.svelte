@@ -368,7 +368,7 @@
     >
       <Icon name="edit" />
     </button>
-    <ValueTable variant="hidden" owner={{ kind: 'quest', id: q.id }} onEffective={(text) => (questValues = text)} />
+    <ValueTable variant="icon" owner={{ kind: 'quest', id: q.id }} onEffective={(text) => (questValues = text)} />
     <button
       type="button"
       class="btn btn--icon"
