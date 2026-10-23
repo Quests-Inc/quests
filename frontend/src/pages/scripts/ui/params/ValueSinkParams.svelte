@@ -22,14 +22,14 @@
 </script>
 
 <label class="field">
-  <span class="label">Имя значения</span>
-  <input type="text" bind:value={name} onchange={commit} maxlength="24" placeholder="hp" aria-label="Имя значения" />
+  <span class="label">Имя переменной</span>
+  <input type="text" bind:value={name} onchange={commit} maxlength="24" placeholder="hp" aria-label="Имя переменной" />
 </label>
 {#if bad}<p class="insp__err">Строчные латинские, цифры и _, до 24 символов, не expr, true, false.</p>{/if}
 <label class="field">
   <span class="label">Тип</span>
-  <select bind:value={type} onchange={commit} aria-label="Тип значения">
+  <select bind:value={type} onchange={commit} aria-label="Тип переменной">
     {#each TYPES as o (o.id)}<option value={o.id}>{o.label}</option>{/each}
   </select>
 </label>
-<p class="explain">Пишет в значения сущности из входа «ref». Значение-формулу не затирает: нода сообщит ошибку.</p>
+<p class="explain">Пишет в переменные сущности из входа «ref». Значение-формулу не затирает: нода сообщит ошибку.</p>

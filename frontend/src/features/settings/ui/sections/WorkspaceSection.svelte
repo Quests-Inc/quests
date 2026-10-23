@@ -135,7 +135,7 @@
   </SettingsBlock>
 
   {#if wsx.current}
-    <SettingsBlock title="Значения" hint="Имена для формул и команд этого пространства. Видны всем участникам, меняет владелец.">
+    <SettingsBlock title="Переменные" hint="Имена для формул и команд этого пространства. Видны всем участникам, меняет владелец.">
       {#key wsx.current}
         <ValueTable owner={{ kind: 'workspace', id: wsx.current }} readonly={!isOwner} />
       {/key}

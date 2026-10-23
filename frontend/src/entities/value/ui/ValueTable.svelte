@@ -52,8 +52,8 @@
         .map((row) => ({ name: row.name, text: formatValue(row.type, row.value) })),
     ),
   )
-  const label = $derived(own.length ? `Значения · ${own.length}` : 'Значения')
-  const title = $derived(summary ? `Значения: ${summary}` : 'Значения')
+  const label = $derived(own.length ? `Переменные · ${own.length}` : 'Переменные')
+  const title = $derived(summary ? `Переменные: ${summary}` : 'Переменные')
 
   function source(row: ValueRow) {
     if (row.from === 'workspace') return 'пространство'
@@ -176,19 +176,20 @@
 
 {#snippet panel()}
     <p class="values-hint">Имя пишется как здесь (str). В команде оно заглавное (STR).</p>
-    {#if truncated}<p class="values-hint">Дальние значения не влезли в область видимости.</p>{/if}
+    {#if truncated}<p class="values-hint">Дальние переменные не влезли в область видимости.</p>{/if}
     {#if own.length || inherited.length}
       <ul class="values-list">
         {#each own as row (row.name)}
           <li class="values-card" data-type={row.type}>
             <button type="button" class="values-card__main" onclick={() => (editing = row.name)}>
               <span class="values-type">{valueTypeLabel(row.type)}</span>
-              <code class="values-name">{row.name}</code>
+              <span class="values-name"><code>{row.name}</code></span>
               <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}>
                 {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}
               </span>
             </button>
-            {#if !readonly && row.roll}
+            <span class="values-actions">
+{#if !readonly && row.roll}
               <button
                 type="button"
                 class="values-x"
@@ -212,6 +213,7 @@
                 <Icon name="close" size={14} />
               </button>
             {/if}
+            </span>
           </li>
         {/each}
         {#each inherited as row (row.name)}
@@ -220,18 +222,19 @@
               <span class="values-type">{valueTypeLabel(row.type)}</span>
               <span class="values-name">
                 <code>{row.name}</code>
-                <small>из {source(row)}</small>
+                <small title="Из: {source(row)}">· {source(row)}</small>
               </span>
               <span class="values-detail" class:values-formula={!!row.formula} class:values-bad={!!row.error} title={valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}>
                 {valueDetail({ formula: row.formula, text: formatValue(row.type, row.value), error: row.error, roll: row.roll?.arg })}
               </span>
             </button>
+            <span class="values-actions"></span>
           </li>
         {/each}
       </ul>
     {/if}
     {#if !readonly}
-      <div class="values-add" role="group" aria-label="Новое значение">
+      <div class="values-add" role="group" aria-label="Новая переменная">
         <select bind:value={type} aria-label="Тип">
           {#each TYPES as item (item)}
             <option value={item} style:color={valueTypeColor(item)}>{valueTypeLabel(item)}</option>
@@ -247,7 +250,7 @@
 {/snippet}
 
 {#if variant === 'inline'}
-  <FormSection title="Значения" summary={own.length ? `${own.length} · ${summary}` : ''} bind:open={sectionOpen}>
+  <FormSection title="Переменные" summary={own.length ? `${own.length} · ${summary}` : ''} bind:open={sectionOpen}>
     {#if error}<p class="modal__error">{error}</p>{/if}
     <div class="values-inline">{@render panel()}</div>
   </FormSection>
@@ -257,7 +260,7 @@
   type="button"
   class={variant === 'icon' ? 'btn btn--icon values-open values-open--icon' : 'values-open'}
   {title}
-  aria-label="Значения"
+  aria-label="Переменные"
   aria-haspopup="dialog"
   onclick={() => (open = true)}
 >
@@ -269,8 +272,8 @@
 </button>
 {/if}
 
-<ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="40rem">
-  <ModalHead id="values-modal-title" title="Значения" onClose={() => (open = false)} />
+<ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="36rem">
+  <ModalHead id="values-modal-title" title="Переменные" onClose={() => (open = false)} />
   {#if error}<p class="modal__error">{error}</p>{/if}
   <div class="modal__body">
     {@render panel()}
@@ -339,7 +342,7 @@
   .values-card[data-type='bool'] { --vt: #b06ad8; }
   .values-card__main {
     display: grid;
-    grid-template-columns: 5.2rem minmax(5.5rem, max-content) minmax(0, 1fr);
+    grid-template-columns: 5rem minmax(5.5rem, 36%) minmax(0, 1fr);
     align-items: center;
     gap: 0.55rem;
     flex: 1;
@@ -360,14 +363,34 @@
     white-space: nowrap;
   }
   .values-name {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
     min-width: 0;
+    overflow: hidden;
     font-family: var(--font-mono, monospace);
+    white-space: nowrap;
+  }
+  .values-name code {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .values-name small {
-    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--color-fg-muted, #9a9a9a);
     font-family: var(--font-ui, sans-serif);
     font-size: 0.72rem;
+  }
+  /* The same slot in every card, with or without buttons, so the values end on one line. */
+  .values-actions {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    width: 3.1rem;
   }
   .values-card--inherited .values-name,
   .values-card--inherited .values-detail {
@@ -375,6 +398,7 @@
   }
   .values-detail {
     overflow: hidden;
+    text-align: right;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

@@ -82,7 +82,7 @@ func Builtin() Registry {
 	add(NodeType{Name: "sink.template_error", Title: "Шаблон: ошибка попытки", Kind: KindSink, Trusted: true, Ports: templateErrorPorts})
 	// A named value of an entity (a note, a step, a quest, a template, the workspace) takes what the script computed. The name
 	// and type are fixed in the graph; a value that is a formula is not overwritten.
-	add(NodeType{Name: "sink.value", Title: "Значение: записать", Kind: KindSink, Trusted: true, Ports: valueSinkPorts})
+	add(NodeType{Name: "sink.value", Title: "Переменная: записать", Kind: KindSink, Trusted: true, Ports: valueSinkPorts})
 	// Done: the run finished (a hook's Code node already did the work on the runner).
 	sink("sink.done", "Готово", nil, req("trigger", TAny))
 	// HTTP / Socket: delivery for event hooks (quest=438). Trusted server nodes; body is JSON or text.

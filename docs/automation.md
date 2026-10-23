@@ -134,7 +134,7 @@ but only with labels of registered runners of the workspace (anything else is a 
 `GET /api/script-runs/{id}` until `Result` has its text (`POST /api/scripts/{id}/eval` with `on` answers 202 and the run). The
 text of the link is the formula, as for a server script. It never runs on show (`?on` beats `?auto`), a workspace has at most 6
 such runs waiting, and a run with no runner online fails after two minutes. `?on` needs the code to be written by an owner like
-any command; whoever may open the text may click it. The node `Значение: записать` (`sink.value`, params `name` and `type`,
+any command; whoever may open the text may click it. The node `Переменная: записать` (`sink.value`, params `name` and `type`,
 inputs `ref` of any entity and `value`) writes what a script computed into a named value; a value that is a formula is not
 overwritten. Wire `source.note → code → parse → sink.value` for a check that keeps values fresh.
 A write of a value (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner, and open pages read the values again.
