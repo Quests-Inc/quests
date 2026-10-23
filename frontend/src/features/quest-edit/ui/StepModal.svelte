@@ -97,12 +97,6 @@
     <p class="modal__error">{formError}</p>
   {/if}
 
-  {#if step?.id}
-    <div class="modal__body">
-      <ValueTable owner={{ kind: 'step', id: step.id }} />
-    </div>
-  {/if}
-
   <form class="modal__form" onsubmit={onSubmit}>
     <label class="field">
       <span class="label">Название</span>
@@ -154,6 +148,10 @@
           open={secHooks}
         />
       </FormSection>
+    {/if}
+
+    {#if step?.id && !onDraft}
+      <ValueTable variant="inline" owner={{ kind: 'step', id: step.id }} />
     {/if}
 
     <ModalFoot onCancel={onClose} submitLabel={onDraft ? "В черновик" : "Сохранить"} submitIcon="save" busy={saving} />

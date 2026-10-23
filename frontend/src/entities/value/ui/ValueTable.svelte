@@ -5,6 +5,7 @@
   import { readValueInput } from '@/shared/lib/valueInput.ts'
   import { valueDetail, valueTypeColor, valueTypeLabel } from '@/shared/lib/valueTip.ts'
   import { effectiveText, formatValue, valueSummary } from '../model/format.ts'
+  import FormSection from '@/shared/ui/FormSection.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
@@ -18,7 +19,7 @@
   }: {
     owner: { kind: string; id: number }
     readonly?: boolean
-    variant?: 'text' | 'icon' | 'hidden'
+    variant?: 'text' | 'icon' | 'hidden' | 'inline'
     onEffective?: (text: Record<string, string>) => void
   } = $props()
 
@@ -34,6 +35,7 @@
   let own = $state([] as ValueRow[])
   let inherited = $state([] as ValueRow[])
   let open = $state(false)
+  let sectionOpen = $state(false)
   let error = $state('')
   let busy = $state(false)
   let truncated = $state(false)
@@ -137,6 +139,14 @@
     }
   }
 
+  /** The add row is not a form: it may sit inside another one (a quest's edit form), where Enter must not save that. */
+  function onAddKey(e: KeyboardEvent) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    e.stopPropagation()
+    void add()
+  }
+
   async function reroll(rowName: string) {
     busy = true
     error = ''
@@ -164,27 +174,7 @@
   }
 </script>
 
-{#if variant !== 'hidden'}
-<button
-  type="button"
-  class={variant === 'icon' ? 'btn btn--icon values-open values-open--icon' : 'values-open'}
-  {title}
-  aria-label="Значения"
-  aria-haspopup="dialog"
-  onclick={() => (open = true)}
->
-  {#if variant === 'icon'}
-    <span aria-hidden="true">{'{}'}</span>
-  {:else}
-    {label}
-  {/if}
-</button>
-{/if}
-
-<ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="40rem">
-  <ModalHead id="values-modal-title" title="Значения" onClose={() => (open = false)} />
-  {#if error}<p class="modal__error">{error}</p>{/if}
-  <div class="modal__body">
+{#snippet panel()}
     <p class="values-hint">Имя пишется как здесь (str). В команде оно заглавное (STR).</p>
     {#if truncated}<p class="values-hint">Дальние значения не влезли в область видимости.</p>{/if}
     {#if own.length || inherited.length}
@@ -241,27 +231,52 @@
       </ul>
     {/if}
     {#if !readonly}
-      <form
-        class="values-add"
-        onsubmit={(e) => {
-          e.preventDefault()
-          void add()
-        }}
-      >
+      <div class="values-add" role="group" aria-label="Новое значение">
         <select bind:value={type} aria-label="Тип">
           {#each TYPES as item (item)}
             <option value={item} style:color={valueTypeColor(item)}>{valueTypeLabel(item)}</option>
           {/each}
         </select>
-        <input type="text" bind:value={name} placeholder="имя" aria-label="Имя" maxlength="24" />
-        <input type="text" bind:value={raw} placeholder={HINT[type]} aria-label="Значение или формула" maxlength="1024" />
-        <button type="submit" class="values-x values-x--add" disabled={busy} aria-label="Добавить" title="Добавить">
+        <input type="text" bind:value={name} placeholder="имя" aria-label="Имя" maxlength="24" onkeydown={onAddKey} />
+        <input type="text" bind:value={raw} placeholder={HINT[type]} aria-label="Значение или формула" maxlength="1024" onkeydown={onAddKey} />
+        <button type="button" class="values-x values-x--add" disabled={busy} aria-label="Добавить" title="Добавить" onclick={() => void add()}>
           <Icon name="add" size={14} />
         </button>
-      </form>
+      </div>
     {/if}
+{/snippet}
+
+{#if variant === 'inline'}
+  <FormSection title="Значения" summary={own.length ? `${own.length} · ${summary}` : ''} bind:open={sectionOpen}>
+    {#if error}<p class="modal__error">{error}</p>{/if}
+    <div class="values-inline">{@render panel()}</div>
+  </FormSection>
+{:else}
+{#if variant !== 'hidden'}
+<button
+  type="button"
+  class={variant === 'icon' ? 'btn btn--icon values-open values-open--icon' : 'values-open'}
+  {title}
+  aria-label="Значения"
+  aria-haspopup="dialog"
+  onclick={() => (open = true)}
+>
+  {#if variant === 'icon'}
+    <span aria-hidden="true">{'{}'}</span>
+  {:else}
+    {label}
+  {/if}
+</button>
+{/if}
+
+<ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="40rem">
+  <ModalHead id="values-modal-title" title="Значения" onClose={() => (open = false)} />
+  {#if error}<p class="modal__error">{error}</p>{/if}
+  <div class="modal__body">
+    {@render panel()}
   </div>
 </ModalShell>
+{/if}
 
 {#if editing}
   <ValueEditDialog
@@ -384,6 +399,12 @@
   }
   .values-x--add:hover {
     color: var(--color-accent, #c9a227);
+  }
+  .values-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.25rem 0 0.5rem;
   }
   .values-add {
     display: flex;

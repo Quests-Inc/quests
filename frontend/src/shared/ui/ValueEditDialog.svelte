@@ -87,6 +87,7 @@
     class="modal__form"
     onsubmit={(e) => {
       e.preventDefault()
+      e.stopPropagation() // the table may sit inside a quest's form
       void save()
     }}
   >

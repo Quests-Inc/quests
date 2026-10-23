@@ -377,12 +377,6 @@
     <p class="modal__error">{formError}</p>
   {/if}
 
-  {#if mode === 'edit' && quest?.id}
-    <div class="modal__body">
-      <ValueTable owner={{ kind: 'quest', id: quest.id }} />
-    </div>
-  {/if}
-
   <form class="modal__form" onsubmit={onSubmit}>
     <label class="field">
       <span class="label">Заголовок</span>
@@ -538,6 +532,10 @@
           open={secHooks}
         />
       </FormSection>
+    {/if}
+
+    {#if mode === 'edit' && quest?.id && !onDraft}
+      <ValueTable variant="inline" owner={{ kind: 'quest', id: quest.id }} />
     {/if}
 
     <ModalFoot
