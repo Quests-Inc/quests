@@ -621,6 +621,34 @@ func TestAttachmentImageInline(t *testing.T) {
 		t.Fatalf("body mismatch")
 	}
 
+	// The address never names a revision, so the answer carries a tag: unchanged is a 304, a new revision is not.
+	tag := w.Header().Get("ETag")
+	if tag == "" || w.Header().Get("Cache-Control") != "private, no-cache" {
+		t.Fatalf("ETag %q, Cache-Control %q", tag, w.Header().Get("Cache-Control"))
+	}
+	cond := func(path, match string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("If-None-Match", match)
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	imgPath := fmt.Sprintf("/api/attachments/%d/image", png)
+	if c := cond(imgPath, tag); c.Code != http.StatusNotModified || c.Body.Len() != 0 {
+		t.Fatalf("unchanged image = %d with %d bytes, want an empty 304", c.Code, c.Body.Len())
+	}
+	v2 := postFile(t, h, fmt.Sprintf("/api/quests/%d/attachments/%d/revisions", qid, png), "pic.png", "v2", append(append([]byte{}, tinyPNG...), 0))
+	if v2.Code != http.StatusCreated {
+		t.Fatalf("revision upload = %d %s", v2.Code, v2.Body.String())
+	}
+	next := cond(imgPath, tag)
+	if next.Code != 200 || next.Header().Get("ETag") == tag {
+		t.Fatalf("after a new revision: %d, ETag %q (was %q)", next.Code, next.Header().Get("ETag"), tag)
+	}
+	if old := cond(imgPath+"?revision=1", tag); old.Code != http.StatusNotModified {
+		t.Fatalf("revision 1 still has the old tag: %d", old.Code)
+	}
+
 	// Type comes from the sniff, not the filename: a text file named .png is refused.
 	fake := up("fake.png", []byte("just text pretending"))
 	if w := get(fake, ""); w.Code != http.StatusUnsupportedMediaType {

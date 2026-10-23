@@ -111,6 +111,7 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	pathToGet := a.WebDAVPath
 	detected := a.ContentTypeDetected
 	size := a.SizeBytes
+	revision, uploaded := a.CurrentRevision, a.UploadedAt
 	if revStr := strings.TrimSpace(r.URL.Query().Get("revision")); revStr != "" {
 		revN, err := strconv.Atoi(revStr)
 		if err != nil || revN < 1 {
@@ -129,6 +130,16 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 		pathToGet = rev.WebDAVPath
 		detected = rev.ContentTypeDetected
 		size = rev.SizeBytes
+		revision, uploaded = rev.Revision, rev.UploadedAt
+	}
+	// The address of an image in a text never names a revision, so a cached copy could not tell that a newer one was
+	// uploaded. The tag does: it is the card, the revision and its upload time, and a browser asks again each time.
+	etag := fmt.Sprintf(`"att-%d-r%d-%d-%d"`, a.ID, revision, size, uploaded.Unix())
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "private, no-cache")
+	if match := r.Header.Get("If-None-Match"); match != "" && strings.Contains(match, etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
 	}
 	// mimetype may append parameters ("image/png; charset=…"); compare the bare type.
 	ctype, _, _ := strings.Cut(detected, ";")
@@ -153,7 +164,6 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	// Even opened directly in a tab the response can't run anything.
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.Header().Set("Content-Disposition", "inline")
-	w.Header().Set("Cache-Control", "private, max-age=300")
 	if size > 0 {
 		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	}
