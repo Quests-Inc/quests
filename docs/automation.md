@@ -138,6 +138,11 @@ any command; whoever may open the text may click it. The node `Переменн�
 inputs `ref` of any entity and `value`) writes what a script computed into a named value; a value that is a formula is not
 overwritten. Wire `source.note → code → parse → sink.value` for a check that keeps values fresh.
 A write of a value (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner, and open pages read the values again.
+A graph may also read the outside on the server, with no runner: `HTTP: запрос` (`http.get`: the owner fixes the host, the inputs fill only the
+path and the query values) and `JSON: достать` (`json.get`). Whether a workspace may do it is the administrator's decision
+(`QUESTS_EGRESS_*`, `quests-server egress enable <id>`; ADR-0004, `docs/security.md`). A hook can wait for any of the events in
+`GET /api/hook-events` (quest, step, note, variable, file), has an area (`scope_kind`: workspace, quest, step, note, note_tree)
+and limits (`cooldown_sec`, `max_per_hour`, `include_private`), and a hook script reads the event through `source.event`.
 `?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).
 A click throws again. Up to 16 `?auto` embeddings per text are computed; the rest stay click-only. The parameter is explicit —
 a formula is never guessed to be safe to run. The script is `Args → … → Result` made of
