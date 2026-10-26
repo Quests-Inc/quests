@@ -10,21 +10,42 @@ import (
 // runner (or the server's own HTTP/socket nodes) carries out. Owner-only to change.
 func hookTools(c *Client) []Tool {
 	type args struct {
-		Action     string   `json:"action" enum:"list,get,create,update,delete,events"`
-		ID         int64    `json:"id,omitempty" desc:"hook id (get/update/delete)"`
-		Name       *string  `json:"name,omitempty" desc:"create/update"`
-		Enabled    *bool    `json:"enabled,omitempty" desc:"create (default true) / update"`
-		Events     []string `json:"events,omitempty" desc:"create (required) / update: aliases or kinds from action=events, e.g. complete, step, fail, quest_started"`
-		ScriptID   int64    `json:"script_id,omitempty" desc:"create (required) / update: a library script (see the script tool)"`
-		QuestID    *int64   `json:"quest_id,omitempty" desc:"create/update: limit the hook to one quest; 0 on update detaches it (whole journal)"`
-		RunOn      *string  `json:"run_on,omitempty" desc:"create/update: runner label for the script's code, or '' when it has none"`
-		TimeoutSec *int     `json:"timeout_sec,omitempty" desc:"create/update: 1..600, default 30"`
-		Limit      int      `json:"limit,omitempty" desc:"list: default 30, max 100"`
+		Action         string   `json:"action" enum:"list,get,create,update,delete,events"`
+		ID             int64    `json:"id,omitempty" desc:"hook id (get/update/delete)"`
+		Name           *string  `json:"name,omitempty" desc:"create/update"`
+		Enabled        *bool    `json:"enabled,omitempty" desc:"create (default true) / update"`
+		Events         []string `json:"events,omitempty" desc:"create (required) / update: aliases or kinds from action=events, e.g. complete, step, fail, quest_started"`
+		ScriptID       int64    `json:"script_id,omitempty" desc:"create (required) / update: a library script (see the script tool)"`
+		QuestID        *int64   `json:"quest_id,omitempty" desc:"create/update: limit the hook to one quest; 0 on update detaches it (whole journal)"`
+		RunOn          *string  `json:"run_on,omitempty" desc:"create/update: runner label for the script's code, or '' when it has none"`
+		TimeoutSec     *int     `json:"timeout_sec,omitempty" desc:"create/update: 1..600, default 30"`
+		ScopeKind      *string  `json:"scope_kind,omitempty" desc:"create/update: the area of the hook: workspace (default) | quest | step | note | note_tree (a note and everything under it)"`
+		ScopeID        *int64   `json:"scope_id,omitempty" desc:"create/update: the id of the quest, step or note of the area (not for workspace)"`
+		CooldownSec    *int     `json:"cooldown_sec,omitempty" desc:"create/update: least seconds between two runs for the same event and entity (default 5; note_updated is never faster than 30)"`
+		MaxPerHour     *int     `json:"max_per_hour,omitempty" desc:"create/update: cap on runs per hour (default 120); a hook that goes over is switched off with a reason"`
+		IncludePrivate *bool    `json:"include_private,omitempty" desc:"create/update: let the events of private notes in (default false)"`
+		Limit          int      `json:"limit,omitempty" desc:"list: default 30, max 100"`
 	}
-	s := Typed("hook", "Workspace event hooks: an event (quest completed, step progress, failed, …) runs a library script. Actions: list, get, create (events + script_id), update (any field; quest_id=0 detaches from the quest), delete, events (the aliases and kinds you can use). Owner-only for create/update/delete.",
+	s := Typed("hook", "Workspace event hooks: an event (a quest, a step, a note, a variable, an attachment changed) runs a library script. Actions: list, get, create (events + script_id), update (any field; quest_id=0 detaches from the quest), delete, events (the catalog: aliases, kinds, the fields each event carries). The area (scope_kind/scope_id) and the limits keep a hook from storms. Owner-only for create/update/delete.",
 		func(ctx context.Context, a args) (any, error) {
+			extra := map[string]any{}
+			if a.ScopeKind != nil {
+				extra["scope_kind"] = *a.ScopeKind
+				if a.ScopeID != nil {
+					extra["scope_id"] = *a.ScopeID
+				}
+			}
+			if a.CooldownSec != nil {
+				extra["cooldown_sec"] = *a.CooldownSec
+			}
+			if a.MaxPerHour != nil {
+				extra["max_per_hour"] = *a.MaxPerHour
+			}
+			if a.IncludePrivate != nil {
+				extra["include_private"] = *a.IncludePrivate
+			}
 			return hookAction(ctx, c, "hook_"+a.Action, hookArgs{ID: a.ID, Name: a.Name, Enabled: a.Enabled, Events: a.Events, ScriptID: a.ScriptID,
-				QuestID: a.QuestID, RunOn: a.RunOn, TimeoutSec: a.TimeoutSec, Limit: a.Limit})
+				QuestID: a.QuestID, RunOn: a.RunOn, TimeoutSec: a.TimeoutSec, Limit: a.Limit, Extra: extra})
 		})
 	return []Tool{s}
 }
@@ -39,6 +60,8 @@ type hookArgs struct {
 	RunOn      *string
 	TimeoutSec *int
 	Limit      int
+	// Extra are the fields of hooks 2.0 that were given (area, limits), sent as they are.
+	Extra map[string]any
 }
 
 func hookAction(ctx context.Context, c *Client, action string, a hookArgs) (any, error) {
@@ -80,7 +103,7 @@ func hookAction(ctx context.Context, c *Client, action string, a hookArgs) (any,
 			return nil, &Err{422, "create needs events and script_id"}
 		}
 		var h map[string]any
-		if err := c.Do(ctx, http.MethodPost, "/api/hooks", nil, hookBody(a.Name, a.Enabled, a.Events, a.ScriptID, a.QuestID, a.RunOn, a.TimeoutSec), &h); err != nil {
+		if err := c.Do(ctx, http.MethodPost, "/api/hooks", nil, hookBody(a.Name, a.Enabled, a.Events, a.ScriptID, a.QuestID, a.RunOn, a.TimeoutSec, a.Extra), &h); err != nil {
 			return nil, err
 		}
 		return h, nil
@@ -88,7 +111,7 @@ func hookAction(ctx context.Context, c *Client, action string, a hookArgs) (any,
 		if a.ID < 1 {
 			return nil, &Err{422, "update needs id"}
 		}
-		body := hookBody(a.Name, a.Enabled, a.Events, a.ScriptID, a.QuestID, a.RunOn, a.TimeoutSec)
+		body := hookBody(a.Name, a.Enabled, a.Events, a.ScriptID, a.QuestID, a.RunOn, a.TimeoutSec, a.Extra)
 		if len(body) == 0 {
 			return nil, &Err{422, "provide at least one field to change"}
 		}
@@ -110,7 +133,7 @@ func hookAction(ctx context.Context, c *Client, action string, a hookArgs) (any,
 }
 
 // hookBody is the request body from the fields that were given; quest_id 0 is sent as null (detach).
-func hookBody(name *string, enabled *bool, events []string, scriptID int64, questID *int64, runOn *string, timeout *int) map[string]any {
+func hookBody(name *string, enabled *bool, events []string, scriptID int64, questID *int64, runOn *string, timeout *int, extra map[string]any) map[string]any {
 	body := map[string]any{}
 	if name != nil {
 		body["name"] = *name
@@ -136,6 +159,9 @@ func hookBody(name *string, enabled *bool, events []string, scriptID int64, ques
 	}
 	if timeout != nil {
 		body["timeout_sec"] = *timeout
+	}
+	for k, v := range extra {
+		body[k] = v
 	}
 	return body
 }

@@ -39,10 +39,11 @@ type CheckRunner struct {
 	mu       sync.Mutex
 	inFlight map[int64]struct{}
 	wg       sync.WaitGroup
+	hookGate *hookGate
 }
 
 func NewCheckRunner(st *store.Store, hub *events.Hub) *CheckRunner {
-	return &CheckRunner{Store: st, Hub: hub, inFlight: map[int64]struct{}{}}
+	return &CheckRunner{Store: st, Hub: hub, inFlight: map[int64]struct{}{}, hookGate: newHookGate()}
 }
 
 func (r *CheckRunner) tryLock(id int64) bool {

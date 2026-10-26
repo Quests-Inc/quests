@@ -9,6 +9,7 @@ import (
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/kernel"
 	"github.com/quests-inc/quests/go/internal/platform/egress"
+	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/httpx"
 )
 
@@ -25,7 +26,7 @@ type Handler struct {
 	// RunnerDone is called when a runner reports a job finished (the root reacts to its result).
 	RunnerDone func(ctx context.Context, job execution.RunnerJob)
 	// ValuesChanged tells open pages that the values of an entity changed (kind "workspace" has id 0).
-	ValuesChanged func(ctx context.Context, kind string, id int64)
+	ValuesChanged func(ctx context.Context, c events.ValueChange)
 	// Egress sends the outgoing requests of scripts under the administrator's policy; nil means none is allowed.
 	Egress *egress.Client
 	// StartEmbedded starts the run of a script with a Code node that a text called (the scheduler's side owns runs).

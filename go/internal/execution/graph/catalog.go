@@ -53,6 +53,8 @@ func Builtin() Registry {
 	source("quest", TRefQuest, req("title", TStr), req("status", TStr), req("description", TStr))
 	source("workspace", TRefWorkspace, req("name", TStr))
 
+	// What woke a hook: the event, with the fields of its family as ports.
+	add(NodeType{Name: "source.event", Title: "Источник: событие", Kind: KindSource, Trusted: true, Ports: eventSourcePorts})
 	add(NodeType{Name: codeType, Title: "Код (раннер)", Kind: KindCode, Trusted: false, Ports: codePorts})
 	add(NodeType{Name: "parse", Title: "Разбор", Kind: KindParse, Trusted: true, Ports: parsePorts})
 	add(NodeType{Name: "compare", Title: "Сравнить", Kind: KindControl, Trusted: true, Ports: comparePorts})

@@ -328,3 +328,49 @@ func (g Graph) UsesNetwork(reg Registry) []string {
 	sort.Strings(out)
 	return out
 }
+
+// EventFamilies are the kinds of event `source.event` can be set to read; `any` gives the common ports only.
+var EventFamilies = map[string]bool{"any": true, "quest": true, "step": true, "note": true, "value": true, "attachment": true}
+
+// EventSourceParams are the parameters of `source.event`: which family of events the ports are shaped for (a hook script knows
+// what its hook waits for), and, for a variable, the kind of owner the `ref` output points at.
+type EventSourceParams struct {
+	Family string `json:"family,omitempty"`
+	Owner  string `json:"owner,omitempty"`
+}
+
+var ownerRefTypes = map[string]PortType{"quest": TRefQuest, "step": TRefStep, "note": TRefNote, "template": TRefTemplate}
+
+func eventSourcePorts(raw json.RawMessage) ([]Port, []Port, error) {
+	var p EventSourceParams
+	if err := strictParams(raw, &p); err != nil {
+		return nil, nil, err
+	}
+	if p.Family == "" {
+		p.Family = "any"
+	}
+	if !EventFamilies[p.Family] {
+		return nil, nil, fmt.Errorf("параметр %q: any, quest, step, note, value или attachment", "family")
+	}
+	out := []Port{req("kind", TStr), req("title", TStr), req("detail", TStr), req("event", TDoc)}
+	switch p.Family {
+	case "quest":
+		out = append(out, req("ref", TRefQuest), req("secrets", TSecret), req("quest_id", TInt))
+	case "step":
+		out = append(out, req("ref", TRefStep), req("secrets", TSecret), req("step_id", TInt), req("quest_id", TInt), req("step_title", TStr))
+	case "note":
+		out = append(out, req("ref", TRefNote), req("secrets", TSecret), req("note_id", TInt))
+	case "value":
+		if p.Owner == "" {
+			p.Owner = "note"
+		}
+		t, ok := ownerRefTypes[p.Owner]
+		if !ok {
+			return nil, nil, fmt.Errorf("параметр %q: quest, step, note или template", "owner")
+		}
+		out = append(out, req("ref", t), req("secrets", TSecret), req("owner_kind", TStr), req("owner_id", TInt), req("name", TStr), req("type", TStr), req("value", TDoc))
+	case "attachment":
+		out = append(out, req("attachment_id", TInt), req("owner_type", TStr), req("owner_id", TInt))
+	}
+	return nil, out, nil
+}

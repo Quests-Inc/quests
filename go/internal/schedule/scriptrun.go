@@ -32,6 +32,9 @@ type runSubject struct {
 	Period string
 	// Event is the payload that started a hook run (source.*.event).
 	Event map[string]any
+	// Origin is the chain of hooks this run descends from ("hook:3>hook:7"): what it writes tells it to the dispatcher, so a hook
+	// is not woken by its own work.
+	Origin string
 	// Now, Took and Stderr are what an emit sink records on the attempt: the tick's clock, how long the job ran, and its stderr.
 	Now    time.Time
 	Took   time.Duration
@@ -77,7 +80,11 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	if err != nil {
 		return false, err
 	}
-	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: initial, Key: b.Key})
+	key := b.Key
+	if key == "" && subj.Origin != "" {
+		key = originKeyPrefix + subj.Origin
+	}
+	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: initial, Key: key})
 	if err != nil {
 		return false, err
 	}
@@ -369,6 +376,9 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		rn.Scope = r.embedScopeOf(ctx, run)
 	}
 	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID, Now: now, Stderr: truncate(j.Stderr, 4000)}
+	if chain, ok := strings.CutPrefix(run.Key, originKeyPrefix); ok {
+		subj.Origin = chain
+	}
 	if j.StartedAt != nil && j.FinishedAt != nil {
 		subj.Took = j.FinishedAt.Sub(*j.StartedAt)
 	}

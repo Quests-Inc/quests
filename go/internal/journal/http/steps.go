@@ -248,7 +248,7 @@ func (h *Handler) patchStep(w http.ResponseWriter, r *http.Request) {
 		Workspace: wsctx.From(r.Context()),
 		QuestID:   &id, Title: updated.Title, Detail: detail,
 		Toast: !quiet && toast, Source: source, Significance: string(updated.Significance),
-		StepTitle: st.Title, Automated: updated.Automated,
+		StepTitle: st.Title, Automated: updated.Automated, Extra: map[string]any{"step_id": st.ID},
 	})
 	writeJSON(w, http.StatusOK, journal.ToQuestRead(updated, timeutil.NowUTC()))
 }

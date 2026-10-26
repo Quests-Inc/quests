@@ -12,6 +12,7 @@ import (
 	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
@@ -27,6 +28,9 @@ func (r *CheckRunner) hostFor(s runSubject) graph.Host { return scriptHost{r: r,
 
 func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, error) {
 	kind := strings.TrimPrefix(n.Type, "source.")
+	if kind == "event" {
+		return h.eventSource(n)
+	}
 	// The source names its entity; without an id it reads the one the run was triggered for (the script's binding).
 	var sp graph.SourceParams
 	if len(n.Params) > 0 {
@@ -100,7 +104,7 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 	case "sink.done":
 		return nil
 	case "sink.value":
-		return h.r.sinkValue(ctx, n, in)
+		return h.r.sinkValue(ctx, n, in, h.subj.Origin)
 	case "sink.result":
 		// An embedded script that waited for a runner: what the link shows is kept on the run until the page asks.
 		if h.subj.RunID == 0 {
@@ -298,7 +302,7 @@ func (r *CheckRunner) sinkStepResult(ctx context.Context, n graph.Node, in map[s
 }
 
 // sinkValue writes what a script computed into a named value of the entity the reference points at.
-func (r *CheckRunner) sinkValue(ctx context.Context, n graph.Node, in map[string]graph.Token) error {
+func (r *CheckRunner) sinkValue(ctx context.Context, n graph.Node, in map[string]graph.Token, origin string) error {
 	ref, err := refOf(in)
 	if err != nil {
 		return err
@@ -328,7 +332,60 @@ func (r *CheckRunner) sinkValue(ctx context.Context, n graph.Node, in map[string
 		return fmt.Errorf("значение %q: %w", p.Name, err)
 	}
 	if r.Hub != nil {
-		r.Hub.ValuesChanged(wsctx.From(ctx), owner.Kind, owner.ID)
+		r.Hub.ValuesChanged(wsctx.From(ctx), events.ValueChange{
+			OwnerKind: owner.Kind, OwnerID: owner.ID, Name: p.Name, Type: string(p.Type), Value: in["value"].Value, Origin: origin,
+		})
 	}
 	return nil
+}
+
+// eventSource gives a hook script the event that woke it: the common fields, and the ones of its family.
+func (h scriptHost) eventSource(n graph.Node) (map[string]any, error) {
+	var p graph.EventSourceParams
+	if len(n.Params) > 0 {
+		if err := json.Unmarshal(n.Params, &p); err != nil {
+			return nil, fmt.Errorf("параметры источника: %w", err)
+		}
+	}
+	ev := h.subj.Event
+	if ev == nil {
+		ev = map[string]any{}
+	}
+	str := func(k string) string { s, _ := ev[k].(string); return s }
+	num := func(k string) int64 { return eventInt(ev, k) }
+	raw, _ := json.Marshal(ev)
+	out := map[string]any{"kind": str("kind"), "title": str("title"), "detail": str("detail"), "event": json.RawMessage(raw)}
+	ref := func(kind string, id int64) {
+		if id > 0 {
+			r := graph.Ref{Kind: kind, ID: id}
+			out["ref"], out["secrets"] = r, graph.Secrets{Of: r}
+		}
+	}
+	switch p.Family {
+	case "quest":
+		out["quest_id"] = num("quest_id")
+		ref("quest", num("quest_id"))
+	case "step":
+		out["step_id"], out["quest_id"], out["step_title"] = num("step_id"), num("quest_id"), str("step_title")
+		ref("step", num("step_id"))
+	case "note":
+		out["note_id"] = num("note_id")
+		ref("note", num("note_id"))
+	case "value":
+		owner := p.Owner
+		if owner == "" {
+			owner = "note"
+		}
+		out["owner_kind"], out["owner_id"], out["name"], out["type"] = str("owner_kind"), num("owner_id"), str("name"), str("type")
+		if v, ok := ev["value"]; ok {
+			b, _ := json.Marshal(v)
+			out["value"] = json.RawMessage(b)
+		}
+		if str("owner_kind") == owner {
+			ref(owner, num("owner_id"))
+		}
+	case "attachment":
+		out["attachment_id"], out["owner_type"], out["owner_id"] = num("attachment_id"), str("owner_type"), num("owner_id")
+	}
+	return out, nil
 }

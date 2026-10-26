@@ -24,6 +24,12 @@ var eventAliases = map[string][]string{
 	"start":            {"quest_started"},
 	"window":           {"quest_started"},
 	"expire":           {"quest_expired"},
+	"note":             {"note_created", "note_updated", "note_deleted"},
+	"notes":            {"note_created", "note_updated", "note_deleted"},
+	"value":            {"values_changed"},
+	"variable":         {"values_changed"},
+	"variables":        {"values_changed"},
+	"attachment":       {"attachment_added", "attachment_revision"},
 }
 
 // DefaultWorkspace is where a hook lives when its file entry names none (everything that
