@@ -126,6 +126,10 @@ export interface NodeInfo {
   kind: Kind;
   trusted: boolean;
   /**
+   * Network: the node sends a request out (the administrator must allow it).
+   */
+  network?: boolean;
+  /**
    * Description and Fields: of a custom node; Fields are what the inspector offers to edit.
    */
   description?: string;
