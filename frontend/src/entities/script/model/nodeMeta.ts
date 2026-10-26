@@ -47,6 +47,10 @@ export function defaultParams(type: string): unknown {
       return { kind: 'error' }
     case 'sink.value':
       return { name: 'value', type: 'str' }
+    case 'http.get':
+      return { host: 'api.example.org' }
+    case 'json.get':
+      return { path: 'value', type: 'str' }
   }
   return undefined
 }
