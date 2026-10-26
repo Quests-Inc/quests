@@ -22,7 +22,8 @@ import (
 )
 
 // dbg holds comma-separated QUESTS_DBG switches used to bisect the native
-// memory leak (quest=478): nopoll, norefresh, notick.
+// memory leak (quest=478): nopoll, norefresh, notick, logrebuild,
+// forcerebuild (rebuild the panel every tick to reproduce the leak fast).
 var dbg = os.Getenv("QUESTS_DBG")
 
 func dbgOn(flag string) bool { return strings.Contains(dbg, flag) }

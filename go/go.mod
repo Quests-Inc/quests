@@ -6,7 +6,7 @@ require (
 	github.com/MatthiasKunnen/go-wayland/wayland v0.1.0
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/diamondburned/gotk4-layer-shell/pkg v0.0.0-20240109211357-6efa9f6dc438
-	github.com/diamondburned/gotk4/pkg v0.3.1
+	github.com/diamondburned/gotk4/pkg v0.4.1
 	github.com/gabriel-vasile/mimetype v1.4.15
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/google/uuid v1.6.0

@@ -72,7 +72,7 @@ func (h *Host) apply(items []api.Quest, cats []api.Category, errMsg string) {
 	// native memory. Rebuild only when the structure changes; otherwise just
 	// update the countdown labels in place.
 	sig := panelSignature(pm)
-	if sig == h.panelSig && h.updateTimers(pm) {
+	if sig == h.panelSig && !dbgOn("forcerebuild") && h.updateTimers(pm) {
 		return
 	}
 	if dbgOn("logrebuild") {
