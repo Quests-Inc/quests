@@ -15,6 +15,9 @@ type NodeType struct {
 	// Trusted: the node is our own code and runs on the server. Everything built in is trusted but Code, which is a
 	// user's text that only a runner may execute. Letting an admin trust more is later (ADR-0003).
 	Trusted bool
+	// Network: the node sends a request out. The administrator's policy and the workspace's grant decide whether a graph with it
+	// may be saved or run (ADR-0004).
+	Network bool
 	// Contains: what a custom node holds inside (kind → number of nodes), so the outer graph still sees its source or sink.
 	Contains map[Kind]int
 	// Description and Fields describe a custom node to an editor.
@@ -50,6 +53,8 @@ func Builtin() Registry {
 	source("quest", TRefQuest, req("title", TStr), req("status", TStr), req("description", TStr))
 	source("workspace", TRefWorkspace, req("name", TStr))
 
+	// What woke a hook: the event, with the fields of its family as ports.
+	add(NodeType{Name: "source.event", Title: "Источник: событие", Kind: KindSource, Trusted: true, Ports: eventSourcePorts})
 	add(NodeType{Name: codeType, Title: "Код (раннер)", Kind: KindCode, Trusted: false, Ports: codePorts})
 	add(NodeType{Name: "parse", Title: "Разбор", Kind: KindParse, Trusted: true, Ports: parsePorts})
 	add(NodeType{Name: "compare", Title: "Сравнить", Kind: KindControl, Trusted: true, Ports: comparePorts})
@@ -57,6 +62,8 @@ func Builtin() Registry {
 	add(NodeType{Name: "all_of", Title: "Каждый из", Kind: KindControl, Trusted: true, Ports: allOfPorts})
 
 	registerEmbed(add)
+	add(NodeType{Name: "http.get", Title: "HTTP: запрос", Kind: KindControl, Trusted: true, Network: true, Ports: httpPorts})
+	add(NodeType{Name: "json.get", Title: "JSON: достать", Kind: KindControl, Trusted: true, Ports: jsonGetPorts})
 
 	sink := func(name, title string, params func(json.RawMessage) error, in ...Port) {
 		ports := func(p json.RawMessage) ([]Port, []Port, error) {
@@ -223,7 +230,7 @@ func oneOf(key string, allowed ...string) func(json.RawMessage) error {
 func (r Registry) Infos() []NodeInfo {
 	out := make([]NodeInfo, 0, len(r))
 	for _, t := range r {
-		out = append(out, NodeInfo{Name: t.Name, Title: t.Title, Kind: t.Kind, Trusted: t.Trusted, Description: t.Description, Fields: t.Fields})
+		out = append(out, NodeInfo{Name: t.Name, Title: t.Title, Kind: t.Kind, Trusted: t.Trusted, Network: t.Network, Description: t.Description, Fields: t.Fields})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Kind != out[j].Kind {

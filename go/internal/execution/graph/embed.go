@@ -487,12 +487,12 @@ func (h *embedHost) Sink(_ context.Context, n Node, in map[string]Token) error {
 // Evaluate runs a graph that holds only trusted nodes (Args … Result) on the server and returns what Result received.
 // The graph must be expanded (no custom nodes). Arguments are given as text and read as the types Args declares.
 func Evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string) (string, error) {
-	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, nil)
+	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, nil, nil)
 }
 
 // BeginEmbedded advances an embedded graph as far as the server goes: the arguments, the expressions, up to the Code nodes. The
 // caller stores the run and hands the requests to a runner; what Result already received comes back too.
-func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope) (*Run, []CodeRequest, string, error) {
+func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope, fetch Fetcher) (*Run, []CodeRequest, string, error) {
 	run, err := NewRun(g, reg)
 	if err != nil {
 		return nil, nil, "", err
@@ -500,16 +500,22 @@ func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]s
 	var out string
 	run.budget = &budget{}
 	run.Scope = scope
+	run.Fetch = fetch
 	reqs, err := run.Advance(ctx, &embedHost{args: withFirstArg(g, args), result: &out})
 	return run, reqs, out, err
 }
 
 // EvaluateScoped is Evaluate with the named values of the text the script was clicked in.
 func EvaluateScoped(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope) (string, error) {
-	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope)
+	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope, nil)
 }
 
-func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string, b *budget, scope *ExprScope) (string, error) {
+// EvaluateFetch is EvaluateScoped for a graph that may hold `http.get` nodes: fetch sends their requests.
+func EvaluateFetch(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope, fetch Fetcher) (string, error) {
+	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope, fetch)
+}
+
+func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string, b *budget, scope *ExprScope, fetch Fetcher) (string, error) {
 	if g.RunsOnRunner() {
 		return "", errors.New("в графе есть нода кода: встроить можно только скрипт без неё")
 	}
@@ -522,6 +528,7 @@ func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string
 	h := &embedHost{args: args, result: &out}
 	run.budget = b
 	run.Scope = scope
+	run.Fetch = fetch
 	reqs, err := run.Advance(ctx, h)
 	if err != nil {
 		return "", err

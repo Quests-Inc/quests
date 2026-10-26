@@ -47,6 +47,10 @@ const adminUsage = `quests-server admin commands (run on the host with access to
                                          PostgreSQL: in workspace $QUESTS_WORKSPACE, default 1)
   quests-server runner ls                list runners and when they were last seen
   quests-server runner rm <label>        revoke a runner and cancel its queued jobs
+  quests-server egress status            the policy of outgoing HTTP of scripts (QUESTS_EGRESS_*) and which workspaces may use it
+  quests-server egress enable <id>       let workspace <id> use the nodes that go out (it is off for everyone by default)
+  quests-server egress disable <id>      take it back
+  quests-server egress log [<id> [n]]    the last n outgoing requests (default 50), of one workspace or of all
   quests-server backup-now               run one DB+attachments backup tick now
   quests-server backups                  list the backups (newest first: file, size, where it went, errors)
   quests-server schema                   print the database's schema revision and the one this binary expects
@@ -65,7 +69,7 @@ func runAdmin(args []string) bool {
 	case "schema":
 		runSchema()
 		return true
-	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "backup-now", "backups", "workspace":
+	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "egress", "backup-now", "backups", "workspace":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -93,6 +97,11 @@ func runAdmin(args []string) bool {
 	}
 	if args[0] == "backups" {
 		runBackups(sqlDB, cfg.DatabaseURL)
+		return true
+	}
+
+	if args[0] == "egress" {
+		runEgressCmd(store.New(sqlDB, cfg.DatabaseURL, nil), args[1:])
 		return true
 	}
 

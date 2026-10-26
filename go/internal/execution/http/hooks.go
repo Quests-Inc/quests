@@ -81,6 +81,11 @@ func (h *Handler) createHook(w http.ResponseWriter, r *http.Request) {
 		QuestID    *int64   `json:"quest_id"`
 		RunOn      string   `json:"run_on"`
 		TimeoutSec int      `json:"timeout_sec"`
+		ScopeKind  *string  `json:"scope_kind"`
+		ScopeID    *int64   `json:"scope_id"`
+		Cooldown   *int     `json:"cooldown_sec"`
+		MaxPerHour *int     `json:"max_per_hour"`
+		Private    *bool    `json:"include_private"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON")
@@ -94,7 +99,9 @@ func (h *Handler) createHook(w http.ResponseWriter, r *http.Request) {
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
-	hk, err := h.Store.CreateHook(r.Context(), in.Name, in.Events, in.ScriptID, in.QuestID, in.RunOn, in.TimeoutSec, enabled)
+	hk, err := h.Store.CreateHookIn(r.Context(), in.Name, in.Events, in.ScriptID, in.QuestID, in.RunOn, in.TimeoutSec, enabled, execution.HookIn{
+		ScopeKind: in.ScopeKind, ScopeID: in.ScopeID, CooldownSec: in.Cooldown, MaxPerHour: in.MaxPerHour, IncludePrivate: in.Private,
+	})
 	if err != nil {
 		hookErr(w, err)
 		return
@@ -179,6 +186,40 @@ func (h *Handler) patchHook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		in.TimeoutSec = &n
+	}
+	if v, ok := raw["scope_kind"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			writeErr(w, http.StatusBadRequest, "scope_kind: string")
+			return
+		}
+		in.ScopeKind = &s
+		if v, ok := raw["scope_id"]; ok && string(v) != "null" {
+			var n int64
+			if err := json.Unmarshal(v, &n); err != nil {
+				writeErr(w, http.StatusBadRequest, "scope_id: integer or null")
+				return
+			}
+			in.ScopeID = &n
+		}
+	}
+	for field, dst := range map[string]**int{"cooldown_sec": &in.CooldownSec, "max_per_hour": &in.MaxPerHour} {
+		if v, ok := raw[field]; ok {
+			var n int
+			if err := json.Unmarshal(v, &n); err != nil {
+				writeErr(w, http.StatusBadRequest, field+": integer")
+				return
+			}
+			*dst = &n
+		}
+	}
+	if v, ok := raw["include_private"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			writeErr(w, http.StatusBadRequest, "include_private: bool")
+			return
+		}
+		in.IncludePrivate = &b
 	}
 	hk, err := h.Store.UpdateHook(r.Context(), id, in)
 	if err != nil {

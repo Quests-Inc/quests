@@ -77,6 +77,24 @@ export interface CustomNodeInUse {
 }
 
 //////////
+// source: egress.go
+
+/**
+ * EgressLine is a row of the log.
+ */
+export interface EgressLine {
+  at: string;
+  workspace_id: number /* int64 */;
+  script_id?: number /* int64 */;
+  host: string;
+  method: string;
+  status: number /* int */;
+  bytes: number /* int64 */;
+  millis: number /* int64 */;
+  result: string;
+}
+
+//////////
 // source: embed_run.go
 
 /**
@@ -132,6 +150,20 @@ export interface Hook {
   created_at: string;
   updated_at: string;
   /**
+   * ScopeKind and ScopeID are the area of the hook: `workspace` (ScopeID nil), `quest`, `step`, `note`, or `note_tree` (a note
+   * and everything under it). QuestID mirrors a quest area for the old API.
+   */
+  scope_kind: string;
+  scope_id?: number /* int64 */;
+  /**
+   * CooldownSec is the least time between two runs for the same entity and event; MaxPerHour caps the runs of the hook, and a
+   * hook that goes over is switched off (DisabledReason says why). IncludePrivate lets the events of private notes in.
+   */
+  cooldown_sec: number /* int */;
+  max_per_hour: number /* int */;
+  include_private: boolean;
+  disabled_reason?: string;
+  /**
    * ScriptTitle is filled on list/get for the UI.
    */
   script_title?: string;
@@ -144,6 +176,14 @@ export interface HookIn {
   Name?: string;
   Enabled?: boolean;
   Events: string[]; // required on create
+  /**
+   * Area and limits (hooks 2.0). ScopeKind "" leaves the area as it is; ScopeID is ignored for `workspace`.
+   */
+  ScopeKind?: string;
+  ScopeID?: number /* int64 */;
+  CooldownSec?: number /* int */;
+  MaxPerHour?: number /* int */;
+  IncludePrivate?: boolean;
   ScriptID?: number /* int64 */;
   QuestID?: number /* int64 */; // nil = leave; pointer to 0 / use ClearQuest
   ClearQuest: boolean;

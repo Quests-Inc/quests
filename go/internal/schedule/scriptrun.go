@@ -32,6 +32,9 @@ type runSubject struct {
 	Period string
 	// Event is the payload that started a hook run (source.*.event).
 	Event map[string]any
+	// Origin is the chain of hooks this run descends from ("hook:3>hook:7"): what it writes tells it to the dispatcher, so a hook
+	// is not woken by its own work.
+	Origin string
 	// Now, Took and Stderr are what an emit sink records on the attempt: the tick's clock, how long the job ran, and its stderr.
 	Now    time.Time
 	Took   time.Duration
@@ -71,12 +74,17 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	if err != nil {
 		return false, err
 	}
+	run.Fetch = r.fetcher(scriptID)
 	// The run is stored before it advances: its sinks may hand a result back through it.
 	initial, err := run.Snapshot()
 	if err != nil {
 		return false, err
 	}
-	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: initial, Key: b.Key})
+	key := b.Key
+	if key == "" && subj.Origin != "" {
+		key = originKeyPrefix + subj.Origin
+	}
+	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: initial, Key: key})
 	if err != nil {
 		return false, err
 	}
@@ -111,6 +119,15 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	return true, nil
 }
 
+// fetcher is what an `http.get` node of a run of this script sends its request with.
+func (r *CheckRunner) fetcher(script *int64) graph.Fetcher {
+	var id int64
+	if script != nil {
+		id = *script
+	}
+	return r.Store.Execution.NewFetcher(r.Egress, id)
+}
+
 // embedTimeout is how long the code of a clicked embedding may run; embedValidFor is how long it may wait for its runner.
 const (
 	embedTimeout  = 60 * time.Second
@@ -131,7 +148,7 @@ func (r *CheckRunner) StartEmbedded(ctx context.Context, in execution.EmbedStart
 	if open >= execution.MaxOpenEmbedded {
 		return 0, execution.ErrTooManyEmbedded
 	}
-	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope)
+	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope, r.fetcher(&in.ScriptID))
 	if err != nil {
 		return 0, err
 	}
@@ -353,11 +370,15 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		log.Printf("script run %d: %v", run.ID, err)
 		return
 	}
+	rn.Fetch = r.fetcher(run.ScriptID)
 	embedded := strings.HasPrefix(run.Key, execution.EmbedKeyPrefix)
 	if embedded {
 		rn.Scope = r.embedScopeOf(ctx, run)
 	}
 	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID, Now: now, Stderr: truncate(j.Stderr, 4000)}
+	if chain, ok := strings.CutPrefix(run.Key, originKeyPrefix); ok {
+		subj.Origin = chain
+	}
 	if j.StartedAt != nil && j.FinishedAt != nil {
 		subj.Took = j.FinishedAt.Sub(*j.StartedAt)
 	}

@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 	"github.com/quests-inc/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 func (h *Handler) RegisterAttachments(mux *http.ServeMux) {
@@ -75,6 +77,28 @@ func (h *Handler) LogAttachment(ctx context.Context, kind string, a knowledge.At
 	h.LogEvent(context.WithoutCancel(ctx), ChangeEvent{
 		Kind: kind, EntityType: "attachment", EntityID: a.ID,
 		ParentType: a.OwnerType, ParentID: a.OwnerID, Title: a.Filename, Detail: detail,
+	})
+	switch {
+	case kind == "attachment_added":
+		h.publishAttachment(ctx, "attachment_added", a)
+	case kind == "attachment_version" && strings.HasPrefix(detail, "новая версия"):
+		h.publishAttachment(ctx, "attachment_revision", a)
+	}
+}
+
+// publishAttachment tells the hooks that a file was added or got a new revision. A file of a note is also about that note, so
+// a hook with the note as its area sees it.
+func (h *Handler) publishAttachment(ctx context.Context, kind string, a knowledge.Attachment) {
+	if h.Hub == nil {
+		return
+	}
+	silent := ""
+	extra := map[string]any{"attachment_id": a.ID, "owner_type": a.OwnerType, "owner_id": a.OwnerID, "revision": a.CurrentRevision}
+	if a.OwnerType == "note" {
+		extra["note_id"] = a.OwnerID
+	}
+	h.Hub.Publish(kind, events.PublishOpts{
+		Workspace: wsctx.From(ctx), Title: a.Filename, Toast: false, Source: "api", Sound: &silent, Extra: extra,
 	})
 }
 

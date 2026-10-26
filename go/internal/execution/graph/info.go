@@ -20,6 +20,8 @@ type NodeInfo struct {
 	Title   string `json:"title"`
 	Kind    Kind   `json:"kind"`
 	Trusted bool   `json:"trusted"`
+	// Network: the node sends a request out (the administrator must allow it).
+	Network bool `json:"network,omitempty"`
 	// Description and Fields: of a custom node; Fields are what the inspector offers to edit.
 	Description string        `json:"description,omitempty"`
 	Fields      []CustomField `json:"fields,omitempty"`

@@ -101,8 +101,8 @@ func (g Graph) RunsOnRunnerIn(reg Registry) bool {
 func (g Graph) Subjects() []string {
 	seen := map[string]bool{}
 	for _, n := range g.Nodes {
-		if kind, ok := strings.CutPrefix(n.Type, "source."); ok {
-			seen[kind] = true
+		if kind, ok := strings.CutPrefix(n.Type, "source."); ok && kind != "event" {
+			seen[kind] = true // an event reads no entity of its own
 		}
 	}
 	out := make([]string, 0, len(seen))

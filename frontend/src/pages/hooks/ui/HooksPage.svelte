@@ -48,8 +48,8 @@
   let filtered = $derived.by(() => {
     const q = search.trim().toLowerCase()
     return hooks.filter((h) => {
-      if (scope === 'quest' && h.quest_id == null) return false
-      if (scope === 'workspace' && h.quest_id != null) return false
+      if (scope === 'quest' && h.scope_kind === 'workspace') return false
+      if (scope === 'workspace' && h.scope_kind !== 'workspace') return false
       if (stateFilter === 'on' && !h.enabled) return false
       if (stateFilter === 'off' && h.enabled) return false
       if (!q) return true
@@ -59,7 +59,7 @@
         h.script_title,
         String(h.script_id),
         h.run_on,
-        h.quest_id != null ? `quest ${h.quest_id}` : 'журнал',
+        h.scope_kind === 'workspace' ? 'журнал пространство' : `${h.scope_kind} ${h.scope_id}`,
         ...displayEvents(h),
       ]
         .filter(Boolean)
@@ -92,6 +92,11 @@
     }
   }
 
+  const AREA_WORD: Record<string, string> = { step: 'шаг', note: 'заметка', note_tree: 'заметка и вложенные' }
+  function areaLabel(h: Hook) {
+    return `${AREA_WORD[h.scope_kind] ?? h.scope_kind} ${h.scope_id ?? ''}`.trim()
+  }
+
   function openForm(h: Hook | null) {
     editing = h
     formOpen = true
@@ -116,8 +121,8 @@
       <div class="hookpage__seg" role="group" aria-label="Область">
         {#each [
           { id: 'all', label: 'Все' },
-          { id: 'quest', label: 'Квест' },
-          { id: 'workspace', label: 'Журнал' },
+          { id: 'quest', label: 'С областью' },
+          { id: 'workspace', label: 'Всё пространство' },
         ] as s}
           <button
             type="button"
@@ -173,18 +178,23 @@
               {#if !h.enabled}
                 <span class="hookpage__chip">выкл</span>
               {/if}
-              {#if h.quest_id == null}
-                <span class="hookpage__chip">журнал</span>
-              {:else}
+              {#if h.scope_kind === 'workspace'}
+                <span class="hookpage__chip">всё пространство</span>
+              {:else if h.scope_kind === 'quest'}
                 <button
                   type="button"
                   class="hookpage__chip hookpage__chip--link"
                   title="Открыть квест"
                   onclick={(e) => {
                     e.stopPropagation()
-                    onOpenQuest?.(h.quest_id as number)
-                  }}>квест {h.quest_id}</button
+                    onOpenQuest?.(h.scope_id as number)
+                  }}>квест {h.scope_id}</button
                 >
+              {:else}
+                <span class="hookpage__chip">{areaLabel(h)}</span>
+              {/if}
+              {#if h.disabled_reason}
+                <span class="hookpage__chip hookpage__chip--warn" title={h.disabled_reason}>выключен сам</span>
               {/if}
             </div>
             <div class="hookpage__meta">
@@ -412,6 +422,10 @@
     flex-shrink: 0;
   }
 
+  .hookpage__chip--warn {
+    color: var(--color-danger, #b54a3a);
+    border-color: currentColor;
+  }
   .hookpage__chip--link {
     background: transparent;
     cursor: pointer;

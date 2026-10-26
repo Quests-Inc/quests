@@ -3,12 +3,13 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"time"
 
 	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
 	"github.com/quests-inc/quests/go/internal/execution"
 	executionhttp "github.com/quests-inc/quests/go/internal/execution/http"
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/schedule"
 )
 
@@ -65,11 +66,12 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 				}
 				return s.Store.Knowledge.ClearNoteCommand(ctx, id)
 			},
-			ValuesChanged: func(ctx context.Context, kind string, id int64) {
+			ValuesChanged: func(ctx context.Context, c events.ValueChange) {
 				if s.Hub != nil {
-					s.Hub.ValuesChanged(wsctx.From(ctx), kind, id)
+					s.Hub.ValuesChanged(wsctx.From(ctx), c)
 				}
 			},
+			Egress: s.Egress,
 			StartEmbedded: func(ctx context.Context, in execution.EmbedStart) (int64, error) {
 				if s.StartEmbedded == nil {
 					return 0, errors.New("раннеры здесь не подключены")

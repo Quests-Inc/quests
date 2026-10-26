@@ -271,9 +271,33 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 }
 
 // PublishSilent wakes journal tabs (they reload on any quests_changed) without a HUD toast or sound.
-// ValuesChanged tells the open pages that a named value of an entity was written or removed, so they read it again.
-func (h *Hub) ValuesChanged(workspace int64, kind string, id int64) {
-	h.PublishSilent(workspace, "values_changed", "", map[string]any{"owner_kind": kind, "owner_id": id})
+// ValueChange is what a write of a named value tells: the owner, the name, and for a number or a yes/no the new value (a text is
+// not put in an event, it may be long and the event goes to every listener). Origin is the chain of hooks that caused the write.
+type ValueChange struct {
+	OwnerKind string
+	OwnerID   int64
+	Name      string
+	Type      string
+	Value     any
+	Origin    string
+}
+
+// ValuesChanged tells the open pages and the hooks that a named value of an entity was written or removed.
+func (h *Hub) ValuesChanged(workspace int64, c ValueChange) {
+	extra := map[string]any{"owner_kind": c.OwnerKind, "owner_id": c.OwnerID}
+	if c.Name != "" {
+		extra["name"] = c.Name
+	}
+	if c.Type != "" {
+		extra["type"] = c.Type
+	}
+	if c.Value != nil && c.Type != "str" {
+		extra["value"] = c.Value
+	}
+	if c.Origin != "" {
+		extra["origin"] = c.Origin
+	}
+	h.PublishSilent(workspace, "values_changed", c.Name, extra)
 }
 
 func (h *Hub) PublishSilent(workspace int64, kind, title string, extra map[string]any) {

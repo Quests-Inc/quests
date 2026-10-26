@@ -10,6 +10,7 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
+	"github.com/quests-inc/quests/go/internal/platform/events"
 )
 
 // Named values (a note, a quest, a step, a template, a questline, the workspace). Readable, unlike secrets.
@@ -142,7 +143,7 @@ func (h *Handler) putValue(segment string) http.HandlerFunc {
 			valueWriteErr(w, err)
 			return
 		}
-		h.valuesChanged(r, o)
+		h.valuesChanged(r, o, name, stored.Type, j.Value)
 		writeJSON(w, http.StatusOK, j)
 	}
 }
@@ -211,7 +212,7 @@ func (h *Handler) rollValue(segment string) http.HandlerFunc {
 			writeErr(w, http.StatusUnprocessableEntity, "источнику нужен раннер: запишите значение нодой «Переменная: записать» в скрипте")
 			return
 		}
-		out, ok := h.runEmbedded(w, r, g, reg, map[string]string{"_": arg}, scopeFrom(r, h, set, skip))
+		out, ok := h.runEmbedded(w, r, script, g, reg, map[string]string{"_": arg}, scopeFrom(r, h, set, skip))
 		if !ok {
 			return
 		}
@@ -225,7 +226,7 @@ func (h *Handler) rollValue(segment string) http.HandlerFunc {
 			valueWriteErr(w, err)
 			return
 		}
-		h.valuesChanged(r, o)
+		h.valuesChanged(r, o, name, stored.Type, j.Value)
 		writeJSON(w, http.StatusOK, j)
 	}
 }
@@ -243,7 +244,7 @@ func (h *Handler) deleteValue(segment string) http.HandlerFunc {
 			valueWriteErr(w, err)
 			return
 		}
-		h.valuesChanged(r, o)
+		h.valuesChanged(r, o, r.PathValue("name"), "", nil)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -407,8 +408,8 @@ func (h *Handler) jobValues(ctx context.Context, j execution.RunnerJob) map[stri
 	return set.Env()
 }
 
-func (h *Handler) valuesChanged(r *http.Request, o execution.SecretOwner) {
+func (h *Handler) valuesChanged(r *http.Request, o execution.SecretOwner, name, typ string, value any) {
 	if h.ValuesChanged != nil {
-		h.ValuesChanged(r.Context(), o.Kind, o.ID)
+		h.ValuesChanged(r.Context(), events.ValueChange{OwnerKind: o.Kind, OwnerID: o.ID, Name: name, Type: typ, Value: value})
 	}
 }

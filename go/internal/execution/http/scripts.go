@@ -1,10 +1,12 @@
 package executionhttp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
@@ -134,6 +136,10 @@ func (h *Handler) createScript(w http.ResponseWriter, r *http.Request) {
 	if !decodeScriptBody(w, r, &in) {
 		return
 	}
+	if msg := h.networkProblem(r.Context(), in.Graph); msg != "" {
+		writeErr(w, http.StatusUnprocessableEntity, msg)
+		return
+	}
 	sc, err := h.Store.CreateScriptFor(r.Context(), in.Title, in.Description, in.Purpose, in.Graph)
 	if err != nil {
 		scriptErr(w, err)
@@ -163,6 +169,10 @@ func (h *Handler) updateScript(w http.ResponseWriter, r *http.Request) {
 	upd := execution.ScriptUpdate{Title: in.Title, Description: in.Description, Purpose: in.Purpose, ExpectedVersion: in.Version}
 	if len(in.Graph) > 0 && string(in.Graph) != "null" {
 		upd.Graph = in.Graph
+	}
+	if msg := h.networkProblem(r.Context(), upd.Graph); msg != "" {
+		writeErr(w, http.StatusUnprocessableEntity, msg)
+		return
 	}
 	sc, err := h.Store.UpdateScript(r.Context(), id, upd)
 	if err != nil {
@@ -208,6 +218,9 @@ func (h *Handler) validateScript(w http.ResponseWriter, r *http.Request) {
 	ps := g.Validate(reg)
 	if ps == nil {
 		ps = []graph.Problem{}
+	}
+	if msg := h.networkProblem(r.Context(), in.Graph); msg != "" {
+		ps = append(ps, graph.Problem{Message: msg})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": len(ps) == 0, "problems": ps, "needs_runner": g.RunsOnRunnerIn(reg), "subjects": g.Subjects()})
 }
@@ -422,4 +435,36 @@ func (h *Handler) installStarters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"created": made})
+}
+
+// networkProblem is the reason a graph with a node that goes out may not be saved here, or "". Whether a workspace may send
+// requests is the administrator's decision (ADR-0004): the policy of the server and the grant of the workspace.
+func (h *Handler) networkProblem(ctx context.Context, raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	g, err := graph.Decode(raw)
+	if err != nil {
+		return ""
+	}
+	reg, customs, err := h.Store.Registry(ctx)
+	if err != nil {
+		return ""
+	}
+	if len(g.CustomUses()) > 0 {
+		if g, err = graph.Expand(g, customs, reg); err != nil {
+			return ""
+		}
+	}
+	nodes := g.UsesNetwork(reg)
+	if len(nodes) == 0 {
+		return ""
+	}
+	if h.Egress == nil || !h.Egress.Policy().Enabled() {
+		return "в графе есть нода, которая ходит в сеть (" + strings.Join(nodes, ", ") + "): администратор сервера не разрешил исходящие запросы"
+	}
+	if !h.Store.EgressEnabled(ctx) {
+		return "в графе есть нода, которая ходит в сеть (" + strings.Join(nodes, ", ") + "): для этого пространства администратор не включил исходящие запросы"
+	}
+	return ""
 }

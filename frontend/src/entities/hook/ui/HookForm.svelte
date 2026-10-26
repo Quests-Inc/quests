@@ -13,6 +13,7 @@
     runOn = $bindable(''),
     thisQuest = $bindable(true),
     aliases = {} as Record<string, string[]>,
+    catalog = [] as { kind: string; family: string; title: string }[],
     showScope = false,
     disabled = false,
   }: {
@@ -23,14 +24,23 @@
     runOn?: string
     thisQuest?: boolean
     aliases?: Record<string, string[]>
+    catalog?: { kind: string; family: string; title: string }[]
     showScope?: boolean
     disabled?: boolean
   } = $props()
 
+  // The short names first; the plural and `on_` spellings mean the same and only crowd the list.
   const eventOptions = $derived(
     Object.keys(aliases)
+      .filter((id) => !id.startsWith('on_') && id !== 'notes' && id !== 'variables' && id !== 'variable')
       .sort((a, b) => a.localeCompare(b))
       .map((id) => ({ id, label: id, title: (aliases[id] || []).join(', ') })),
+  )
+  const FAMILIES: Record<string, string> = { quest: 'Квест', step: 'Шаг', note: 'Заметка', value: 'Переменная', attachment: 'Вложение' }
+  const kindGroups = $derived(
+    Object.keys(FAMILIES)
+      .map((family) => ({ family, label: FAMILIES[family], items: catalog.filter((e) => e.family === family) }))
+      .filter((g) => g.items.length),
   )
 
   $effect(() => {
@@ -67,6 +77,31 @@
   </div>
 </div>
 
+{#if kindGroups.length}
+  <div class="field">
+    <span class="label">Или точнее</span>
+    {#each kindGroups as g (g.family)}
+      <div class="hookform__group">
+        <span class="hookform__fam">{g.label}</span>
+        <div class="hookform__events" role="group" aria-label={g.label}>
+          {#each g.items as e (e.kind)}
+            <button
+              type="button"
+              class="hookform__ev"
+              class:hookform__ev--on={events.includes(e.kind)}
+              title={e.kind}
+              {disabled}
+              onclick={() => toggleEvent(e.kind)}
+            >
+              {e.title}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/each}
+  </div>
+{/if}
+
 <div class="field">
   <ScriptPicker bind:value={scriptId} kind="quest" label="Скрипт" />
 </div>
@@ -98,6 +133,17 @@
 </label>
 
 <style>
+  .hookform__group {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.3rem;
+  }
+
+  .hookform__fam {
+    color: var(--color-fg-subtle, #6e6e6e);
+    font-size: var(--text-xs, 0.75rem);
+  }
+
   .hookform__events {
     display: flex;
     flex-wrap: wrap;

@@ -83,6 +83,16 @@ python3 tools/security_probe.py --base http://127.0.0.1:8765 --owner <user>   # 
 
 Run it against a **scratch** instance: it creates a workspace, an attacker account and a few rows (it removes what it can).
 
+## Outgoing requests of scripts (ADR-0004)
+
+The server runs no user code, but a node that fetches an address is our code with a user's address in it. Everything a script
+sends from the server goes through `platform/egress` under the **administrator's** policy (`QUESTS_EGRESS_*` in the
+environment of the server, `off` by default) and a per-workspace grant that only the admin CLI writes (`quests-server egress
+enable <id>`). The address is judged at the connection, after the name is resolved, so rebinding and redirects meet the same
+check; internal ranges are refused unless the administrator names them in `QUESTS_EGRESS_ALLOW_NETS`. Size, time, rate and
+concurrency are limited; every attempt is in `egress_log`. As a second line, run the `api` container without a route into
+the local network (`deploy/README.md`).
+
 ## Known gaps (accepted for now)
 
 - Tables without row-level security (`appuser`, `usersession`, `apitoken`, `workspace*`, `backuplog`) are readable by the

@@ -1,12 +1,14 @@
 package httpapi
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"testing"
 
 	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
@@ -199,4 +201,63 @@ func jsonRaw(t *testing.T, s string) any {
 		t.Fatal(err)
 	}
 	return v
+}
+
+func TestNetworkNodeNeedsThePolicyAndTheGrant(t *testing.T) {
+	const g = `{"nodes":[
+		{"id":1,"type":"args","params":{"params":[{"name":"q","type":"str"}]}},
+		{"id":2,"type":"http.get","params":{"host":"api.example.org"}},
+		{"id":3,"type":"json.get","params":{"path":"a","type":"str"}},
+		{"id":4,"type":"sink.result","params":{}}],
+		"edges":[
+		{"from":{"node":1,"port":"q"},"to":{"node":2,"port":"path"}},
+		{"from":{"node":2,"port":"body"},"to":{"node":3,"port":"in"}},
+		{"from":{"node":3,"port":"value"},"to":{"node":4,"port":"value"}}]}`
+	save := func(h http.Handler) (int, map[string]any) {
+		return secretReq(h, http.MethodPost, "/api/scripts", map[string]any{"title": "сеть", "graph": jsonRaw(t, g)})
+	}
+	// No policy: the node cannot be saved, and a check says so without saving.
+	h, _ := secretsServer(t)
+	if code, out := save(h); code != http.StatusUnprocessableEntity || out["detail"] == nil {
+		t.Fatalf("no policy: %d %v", code, out)
+	}
+	code, v := secretReq(h, http.MethodPost, "/api/scripts/validate", map[string]any{"graph": jsonRaw(t, g)})
+	if code != http.StatusOK || v["ok"] != false {
+		t.Fatalf("validate without policy: %d %v", code, v)
+	}
+
+	// The policy is open but the workspace has no grant: still refused, and the grant is the administrator's alone. The execution
+	// handler is built on the first request, so this server gets the policy before it.
+	pol, err := egress.PolicyFromEnv(func(k string) string {
+		if k == "QUESTS_EGRESS_MODE" {
+			return "public"
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h2, s2 := secretsServerWith(t, func(s *Server) { s.Egress = egress.New(pol, nil) })
+	ctx := wsctx.With(t.Context(), 1)
+	if code, _ := save(h2); code != http.StatusUnprocessableEntity {
+		t.Fatalf("no grant: %d", code)
+	}
+	// The API role reads the grant but cannot write it: the administrator does, with the CLI, as the database owner.
+	if err := s2.Store.Execution.SetEgressGrant(ctx, 1, true); err == nil {
+		t.Fatal("the API role must not be able to grant itself outgoing HTTP")
+	}
+	owner, err := sql.Open("pgx", s2.Store.DatabaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	if _, err := owner.Exec(`INSERT INTO egress_grant (workspace_id, enabled, updated_at) VALUES (1, 1, now())`); err != nil {
+		t.Fatal(err)
+	}
+	if !s2.Store.Execution.EgressEnabled(ctx) {
+		t.Fatal("the grant is read back")
+	}
+	if code, out := save(h2); code != http.StatusCreated {
+		t.Fatalf("granted: %d %v", code, out)
+	}
 }
