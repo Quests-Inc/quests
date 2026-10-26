@@ -71,6 +71,7 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	if err != nil {
 		return false, err
 	}
+	run.Fetch = r.fetcher(scriptID)
 	// The run is stored before it advances: its sinks may hand a result back through it.
 	initial, err := run.Snapshot()
 	if err != nil {
@@ -111,6 +112,15 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	return true, nil
 }
 
+// fetcher is what an `http.get` node of a run of this script sends its request with.
+func (r *CheckRunner) fetcher(script *int64) graph.Fetcher {
+	var id int64
+	if script != nil {
+		id = *script
+	}
+	return r.Store.Execution.NewFetcher(r.Egress, id)
+}
+
 // embedTimeout is how long the code of a clicked embedding may run; embedValidFor is how long it may wait for its runner.
 const (
 	embedTimeout  = 60 * time.Second
@@ -131,7 +141,7 @@ func (r *CheckRunner) StartEmbedded(ctx context.Context, in execution.EmbedStart
 	if open >= execution.MaxOpenEmbedded {
 		return 0, execution.ErrTooManyEmbedded
 	}
-	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope)
+	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope, r.fetcher(&in.ScriptID))
 	if err != nil {
 		return 0, err
 	}
@@ -353,6 +363,7 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		log.Printf("script run %d: %v", run.ID, err)
 		return
 	}
+	rn.Fetch = r.fetcher(run.ScriptID)
 	embedded := strings.HasPrefix(run.Key, execution.EmbedKeyPrefix)
 	if embedded {
 		rn.Scope = r.embedScopeOf(ctx, run)

@@ -13,6 +13,7 @@ import (
 	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
@@ -32,6 +33,8 @@ var intToken = regexp.MustCompile(`-?\d+`)
 type CheckRunner struct {
 	Store *store.Store
 	Hub   *events.Hub
+	// Egress sends the outgoing HTTP of scripts under the administrator's policy; nil means none is allowed.
+	Egress *egress.Client
 
 	mu       sync.Mutex
 	inFlight map[int64]struct{}
@@ -464,6 +467,9 @@ func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
 		log.Printf("checks: purge script bindings: %v", err)
 	}
 	// Runs of scripts are a log, not an archive: the finished ones go after three days (a waiting run is never touched).
+	if _, err := r.Store.Execution.PurgeEgress(ctx, timeutil.NowUTC().Add(-30*24*time.Hour)); err != nil {
+		log.Printf("checks: purge egress log: %v", err)
+	}
 	if _, err := r.Store.Execution.PurgeRuns(ctx, timeutil.NowUTC().Add(-3*24*time.Hour)); err != nil {
 		log.Printf("checks: purge script runs: %v", err)
 	}

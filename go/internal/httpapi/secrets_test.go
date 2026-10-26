@@ -11,9 +11,15 @@ import (
 	"github.com/quests-inc/quests/go/internal/platform/pgtest"
 )
 
-func secretsServer(t *testing.T) (http.Handler, *Server) {
+func secretsServer(t *testing.T) (http.Handler, *Server) { return secretsServerWith(t, nil) }
+
+// secretsServerWith is secretsServer with a change to the server before its handler is built.
+func secretsServerWith(t *testing.T, tweak func(*Server)) (http.Handler, *Server) {
 	t.Helper()
 	s := newAttachmentServer(t, "", "", 0)
+	if tweak != nil {
+		tweak(s)
+	}
 	pgtest.Seed(t, s.Store.DB, `
 		INSERT INTO questline (id, title, created_at, updated_at) VALUES (7, 'line', now(), now());
 		INSERT INTO questtemplate (id, title, questline_id, created_at, updated_at) VALUES (5, 'tmpl', 7, now(), now())`)

@@ -94,6 +94,8 @@ type Run struct {
 	budget *budget
 	// Scope is the named values of the text that called an embedded script. Nil means an expression only sees its inputs.
 	Scope *ExprScope
+	// Fetch sends the requests of `http.get` nodes. Nil means the host lets the graph go nowhere.
+	Fetch Fetcher
 }
 
 // NewRun prepares a run of the graph; a graph that does not validate cannot run.
@@ -396,6 +398,10 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 			out, err = runRandom(rs, ins, r.budgetOrNew())
 		case "regex":
 			out, err = runRegex(rs, ins["in"][0])
+		case "http.get":
+			out, err = r.runHTTP(ctx, rs, ins)
+		case "json.get":
+			out, err = runJSONGet(rs, ins["in"][0])
 		}
 		if err != nil {
 			return nil, err

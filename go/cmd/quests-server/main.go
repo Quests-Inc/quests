@@ -15,12 +15,14 @@ import (
 	"github.com/quests-inc/quests/go/internal/platform/clamav"
 	"github.com/quests-inc/quests/go/internal/platform/config"
 	"github.com/quests-inc/quests/go/internal/platform/db"
+	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/health"
 	"github.com/quests-inc/quests/go/internal/platform/metrics"
 	"github.com/quests-inc/quests/go/internal/platform/secretbox"
 	"github.com/quests-inc/quests/go/internal/platform/tokens"
 	"github.com/quests-inc/quests/go/internal/platform/webdav"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/schedule"
 	"github.com/quests-inc/quests/go/internal/store"
 )
@@ -154,6 +156,15 @@ func main() {
 
 	windows := schedule.NewWindowNotifier()
 	checks := schedule.NewCheckRunner(st, hub)
+	policy, perr := egress.PolicyFromEnv(os.Getenv)
+	if perr != nil {
+		log.Fatalf("egress: %v", perr)
+	}
+	eg := egress.New(policy, func(e egress.Entry) {
+		st.Execution.LogEgress(wsctx.With(context.Background(), e.Workspace), e)
+	})
+	log.Printf("egress: mode=%s", policy.Mode)
+	checks.Egress, srv.Egress = eg, eg
 	srv.RunnerDone = checks.JobFinished
 	srv.StartEmbedded = checks.StartEmbedded
 	hub.OnPublish(func(p events.Payload) { checks.DispatchHooks(p) })

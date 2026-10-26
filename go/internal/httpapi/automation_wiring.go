@@ -70,6 +70,7 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 					s.Hub.ValuesChanged(wsctx.From(ctx), kind, id)
 				}
 			},
+			Egress: s.Egress,
 			StartEmbedded: func(ctx context.Context, in execution.EmbedStart) (int64, error) {
 				if s.StartEmbedded == nil {
 					return 0, errors.New("раннеры здесь не подключены")
