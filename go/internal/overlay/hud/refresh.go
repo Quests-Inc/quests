@@ -5,6 +5,7 @@ package hud
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
@@ -73,6 +74,14 @@ func (h *Host) apply(items []api.Quest, cats []api.Category, errMsg string) {
 	sig := panelSignature(pm)
 	if sig == h.panelSig && h.updateTimers(pm) {
 		return
+	}
+	if dbgOn("logrebuild") {
+		i := 0
+		for i < len(sig) && i < len(h.panelSig) && sig[i] == h.panelSig[i] {
+			i++
+		}
+		lo, hi := max(i-40, 0), min(i+60, len(sig))
+		log.Printf("hud: rebuild panel, first diff at %d: ...%s", i, sig[lo:hi])
 	}
 	h.panelSig = sig
 	child, timers := buildPanel(pm)
