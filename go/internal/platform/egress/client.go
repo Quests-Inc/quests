@@ -89,6 +89,7 @@ func New(p Policy, log func(Entry)) *Client {
 		p.Concurrency = DefaultConcurrency
 	}
 	c.sem = make(chan struct{}, p.Concurrency)
+	proxyAddrs := proxyAddresses(p.Proxy)
 	dialer := &net.Dialer{
 		Timeout: 5 * time.Second,
 		// Control runs for every address the connection is about to use, after the name was resolved: a name that answers with a
@@ -99,6 +100,9 @@ func New(p Policy, log func(Entry)) *Client {
 				return &Denied{Reason: "адрес соединения"}
 			}
 			a, err := netip.ParseAddr(host)
+			if err == nil && proxyAddrs[address] {
+				return nil // the administrator's own proxy, which may well be on this machine
+			}
 			if err != nil || Blocked(a, p.AllowNets) {
 				return &Denied{Reason: "внутренний адрес"}
 			}
@@ -106,7 +110,7 @@ func New(p Policy, log func(Entry)) *Client {
 		},
 	}
 	tr := &http.Transport{
-		Proxy:                 nil, // never the environment's: a proxy would resolve the name where we cannot look
+		Proxy:                 proxyFunc(p.Proxy), // the administrator's, or none: never the environment's
 		DialContext:           dialer.DialContext,
 		TLSHandshakeTimeout:   5 * time.Second,
 		ResponseHeaderTimeout: p.Timeout,
@@ -270,4 +274,35 @@ func unwrapURLError(err error) error {
 		return ue.Err
 	}
 	return err
+}
+
+func proxyFunc(u *url.URL) func(*http.Request) (*url.URL, error) {
+	if u == nil {
+		return nil
+	}
+	return http.ProxyURL(u)
+}
+
+// proxyAddresses are the addresses (ip:port) the connection to the administrator's proxy may use.
+func proxyAddresses(u *url.URL) map[string]bool {
+	out := map[string]bool{}
+	if u == nil {
+		return out
+	}
+	port := u.Port()
+	if port == "" {
+		port = "80"
+		if u.Scheme == "https" {
+			port = "443"
+		}
+	}
+	host := u.Hostname()
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return out
+	}
+	for _, ip := range ips {
+		out[net.JoinHostPort(ip.String(), port)] = true
+	}
+	return out
 }

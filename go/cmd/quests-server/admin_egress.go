@@ -41,6 +41,9 @@ func runEgressCmd(st *store.Store, args []string) {
 		for _, n := range p.AllowNets {
 			fmt.Printf("internal exception: %s\n", n)
 		}
+		if p.Proxy != nil {
+			fmt.Printf("proxy: %s\n", p.Proxy.Redacted())
+		}
 		fmt.Printf("limits: %d B per answer, %s, %d per hour per workspace, %d at once\n", p.MaxBody, p.Timeout, p.RatePerHour, p.Concurrency)
 		grants, err := st.Execution.EgressGrants(ctx)
 		if err != nil {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +33,11 @@ type Policy struct {
 	Allow []string
 	// AllowNets are the only way to reach an address that is not public (a service in the local network). Explicit, by the
 	// administrator.
-	AllowNets   []netip.Prefix
+	AllowNets []netip.Prefix
+	// Proxy is the one proxy every request goes through (a machine that reaches the outside only through one). It is the
+	// administrator's address and is allowed to be internal. The proxy resolves the names, where we cannot look, so a proxy needs
+	// ModeAllowlist: only hosts the administrator named.
+	Proxy       *url.URL
 	Ports       map[int]bool
 	MaxBody     int64
 	Timeout     time.Duration
@@ -86,6 +91,13 @@ func PolicyFromEnv(get func(string) string) (Policy, error) {
 		}
 	}
 	var err error
+	if raw := strings.TrimSpace(get("QUESTS_EGRESS_PROXY")); raw != "" {
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil {
+			return Policy{}, fmt.Errorf("QUESTS_EGRESS_PROXY: an http(s) address without a login (got %q)", raw)
+		}
+		p.Proxy = u
+	}
 	if p.MaxBody, err = positive(get("QUESTS_EGRESS_MAX_BODY"), p.MaxBody, "QUESTS_EGRESS_MAX_BODY"); err != nil {
 		return Policy{}, err
 	}
@@ -106,6 +118,9 @@ func PolicyFromEnv(get func(string) string) (Policy, error) {
 	p.Concurrency = int(conc)
 	if p.Mode == ModeAllowlist && len(p.Allow) == 0 {
 		return Policy{}, errors.New("QUESTS_EGRESS_MODE=allowlist needs QUESTS_EGRESS_ALLOW")
+	}
+	if p.Proxy != nil && p.Mode == ModePublic {
+		return Policy{}, errors.New("QUESTS_EGRESS_PROXY: a proxy resolves names where the server cannot check them, so it goes with QUESTS_EGRESS_MODE=allowlist")
 	}
 	return p, nil
 }

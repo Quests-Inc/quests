@@ -112,7 +112,11 @@ func (h *Handler) runEmbedded(w http.ResponseWriter, r *http.Request, scriptID i
 		writeErr(w, http.StatusTooManyRequests, "слишком много расчётов сразу, попробуйте ещё раз")
 		return "", false
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), evalTimeout)
+	timeout := evalTimeout
+	if len(g.UsesNetwork(reg)) > 0 && h.Egress != nil {
+		timeout = h.Egress.Policy().Timeout + evalTimeout // waiting for an answer from outside is not computing
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	out, err := graph.EvaluateFetch(ctx, g, reg, args, scope, h.Store.NewFetcher(h.Egress, scriptID))
 	if err != nil {

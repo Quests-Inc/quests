@@ -229,3 +229,35 @@ func TestClientRateAndConcurrency(t *testing.T) {
 		t.Errorf("another workspace has its own hour: %v", err)
 	}
 }
+
+func TestProxyIsTheAdministratorsAndNeedsAnAllowlist(t *testing.T) {
+	if _, err := PolicyFromEnv(env(map[string]string{"QUESTS_EGRESS_MODE": "public", "QUESTS_EGRESS_PROXY": "http://127.0.0.1:2080"})); err == nil {
+		t.Fatal("a proxy with public mode must be refused: it resolves names where the server cannot look")
+	}
+	for _, bad := range []string{"socks5://127.0.0.1:1080", "http://user:pw@127.0.0.1:2080", "not a url", "http://"} {
+		if _, err := PolicyFromEnv(env(map[string]string{"QUESTS_EGRESS_MODE": "allowlist", "QUESTS_EGRESS_ALLOW": "api.example.org", "QUESTS_EGRESS_PROXY": bad})); err == nil {
+			t.Errorf("proxy %q must be refused", bad)
+		}
+	}
+	var gotHost string
+	proxy := listen(t, "127.0.0.1", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHost = r.Host
+		_, _ = w.Write([]byte("via proxy"))
+	}))
+	p, err := PolicyFromEnv(env(map[string]string{
+		"QUESTS_EGRESS_MODE": "allowlist", "QUESTS_EGRESS_ALLOW": "api.example.org", "QUESTS_EGRESS_PROXY": proxy.URL,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := New(p, nil)
+	// The name is the administrator's; the proxy, on this very machine, is let through, and nothing else on it is.
+	res, err := c.Do(context.Background(), Request{Workspace: 1, URL: "http://api.example.org/x"})
+	if err != nil || string(res.Body) != "via proxy" || gotHost != "api.example.org" {
+		t.Fatalf("through the proxy: %v %v host=%q", res, err, gotHost)
+	}
+	var d *Denied
+	if _, err := c.Do(context.Background(), Request{Workspace: 1, URL: "http://evil.example.com/"}); !errors.As(err, &d) {
+		t.Fatalf("a host not in the list: %v", err)
+	}
+}
