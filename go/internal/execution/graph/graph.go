@@ -79,7 +79,7 @@ const codeType = "code"
 // server alone, at once.
 func (g Graph) RunsOnRunner() bool {
 	for _, n := range g.Nodes {
-		if n.Type == codeType {
+		if n.Type == codeType || n.Type == runnerHTTPType {
 			return true
 		}
 	}
@@ -89,7 +89,7 @@ func (g Graph) RunsOnRunner() bool {
 // RunsOnRunnerIn is RunsOnRunner for a graph that may hold custom nodes: one that holds code needs a runner too.
 func (g Graph) RunsOnRunnerIn(reg Registry) bool {
 	for _, n := range g.Nodes {
-		if n.Type == codeType || reg[n.Type].Contains[KindCode] > 0 {
+		if n.Type == codeType || n.Type == runnerHTTPType || reg[n.Type].Contains[KindCode] > 0 {
 			return true
 		}
 	}

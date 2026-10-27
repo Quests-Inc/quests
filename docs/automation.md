@@ -140,7 +140,14 @@ overwritten. Wire `source.note → code → parse → sink.value` for a check th
 A write of a value (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner, and open pages read the values again.
 A graph may also read the outside on the server, with no runner: `HTTP: запрос` (`http.get`: the owner fixes the host, the inputs fill only the
 path and the query values) and `JSON: достать` (`json.get`). Whether a workspace may do it is the administrator's decision
-(`QUESTS_EGRESS_*`, `quests-server egress enable <id>`; ADR-0004, `docs/security.md`). A hook can wait for any of the events in
+(`QUESTS_EGRESS_*`, `quests-server egress enable <id>`; ADR-0004, `docs/security.md`). The same request can be sent by a runner instead: `HTTP: запрос (раннер)` (`http.runner`, the second node of the «Код на раннере» group
+next to Code). It goes out from the runner's machine, so the server's policy and the workspace grant do not apply and it reaches a local network;
+what limits it is set in the node: `allow` (hosts the request and its redirects may touch, empty means no limit), `timeout_sec`
+(20, up to 300), `max_bytes` (256 KiB, up to 400 KiB), `no_redirect`, `headers`, `scheme` (https or http). The job's command is the marker
+line `#!quests-http` and a JSON request; a runner without this node's support would run it as a shell command and fail. Outputs and
+`failed` are as in `http.get`. The palette groups are Sources, Code on a runner, Parse, Control (compare, any/all of), Logic (expression,
+random, regex, JSON, HTTP), Sinks, Custom; a group folds into its head, and so does a node in the editor (kept in the browser, not in the script).
+A hook can wait for any of the events in
 `GET /api/hook-events` (quest, step, note, variable, file), has an area (`scope_kind`: workspace, quest, step, note, note_tree)
 and limits (`cooldown_sec`, `max_per_hour`, `include_private`), and a hook script reads the event through `source.event`.
 `?hide` hides the formula. With `?auto` the reader sees only the value (`script=12{8+pb+str}?auto&hide`); without it the link shows `?` until a click, then only the value. Either order works (`?hide&auto`).

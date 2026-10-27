@@ -7,7 +7,8 @@ const (
 	KindSource  Kind = "source"
 	KindCode    Kind = "code"
 	KindParse   Kind = "parse"
-	KindControl Kind = "control"
+	KindControl Kind = "control" // routing: which way the token goes (compare, any of, all of)
+	KindLogic   Kind = "logic"   // computing and reading values (expression, random, regex, JSON, HTTP)
 	KindSink    Kind = "sink"
 	// KindCustom is a node the workspace's owner made (quest=458): baked from other nodes or written as code. It is
 	// expanded into its own nodes before a run, so the evaluator never sees it.

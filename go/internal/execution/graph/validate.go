@@ -127,8 +127,8 @@ func (g Graph) validate(reg Registry, fragment bool) []Problem {
 			add(e.To.Node, "вход %q (%s) не принимает %s из ноды %d, выход %q", ip.Name, ip.Type, op.Type, e.From.Node, op.Name)
 			continue
 		}
-		if op.Type == TSecret && to.typ.Name != codeType && to.typ.Kind != KindCustom {
-			add(e.To.Node, "секреты принимает только нода кода")
+		if op.Type == TSecret && !takesSecrets(to.typ) {
+			add(e.To.Node, "секреты принимает только нода кода или запроса")
 			continue
 		}
 		if to.typ.Name == codeType && ip.Name == "in" && (e.Alias != "" && !aliasRe.MatchString(e.Alias)) {
@@ -251,4 +251,9 @@ func groupNames(m map[string]Port, group string) string {
 		}
 	}
 	return strings.Join(names, ", ")
+}
+
+// takesSecrets: the nodes whose `secrets` input exists to be wired to a source (a Code node, a request with a header, a custom node).
+func takesSecrets(t NodeType) bool {
+	return t.Name == codeType || t.Name == runnerHTTPType || t.Name == "http.get" || t.Kind == KindCustom
 }

@@ -169,7 +169,13 @@ func (a *agent) execute(ctx context.Context, j *job) {
 		}
 	}()
 
-	exit, timedOut, canceled := runCommand(runCtx, j.Command, env, timeout, stdout, stderr)
+	var exit int
+	var timedOut, canceled bool
+	if isHTTPJob(j.Command) {
+		exit, timedOut, canceled = runHTTPJob(runCtx, j.Command, env, timeout, stdout, stderr)
+	} else {
+		exit, timedOut, canceled = runCommand(runCtx, j.Command, env, timeout, stdout, stderr)
+	}
 	close(hbStop)
 	<-hbDone
 

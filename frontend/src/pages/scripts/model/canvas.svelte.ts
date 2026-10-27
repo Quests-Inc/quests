@@ -57,7 +57,7 @@ export function createCanvas(ed: ScriptEditor) {
    * What it writes is read without being tracked, or the effect would re-run on its own result.
    */
   function sync() {
-    const next = viewNodes(ed.graph, ed.portsOf, ed.meta)
+    const next = viewNodes(ed.graph, ed.portsOf, ed.meta, ed.collapsed)
     const sized = size.w > 0
     untrack(() => {
       views = next

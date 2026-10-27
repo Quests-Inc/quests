@@ -231,7 +231,9 @@ func (r *Run) Resume(ctx context.Context, h Host, node int, o CodeOutcome) ([]Co
 	if r.states[node] != StateWaiting {
 		return nil, fmt.Errorf("нода %d не ждёт результата", node)
 	}
-	if _, ok := r.nodes[node].out[o.Port]; !ok {
+	// A request node of the runner leaves by what the job ended with (`stdout`, `failed`), not by its own outputs.
+	_, known := r.nodes[node].out[o.Port]
+	if !known && (r.nodes[node].typ.Name != runnerHTTPType || (o.Port != "stdout" && o.Port != "failed")) {
 		return nil, fmt.Errorf("у ноды кода нет выхода %q", o.Port)
 	}
 	r.outcomes[node] = o
@@ -239,6 +241,18 @@ func (r *Run) Resume(ctx context.Context, h Host, node int, o CodeOutcome) ([]Co
 }
 
 func (r *Run) finishCode(rs *resolved, o CodeOutcome) {
+	if rs.typ.Name == runnerHTTPType {
+		out := finishRunnerHTTP(o)
+		for _, p := range rs.outList {
+			if t, ok := out[p.Name]; ok {
+				r.tokens[End{rs.node.ID, p.Name}] = t
+			} else {
+				r.tokens[End{rs.node.ID, p.Name}] = exitToken()
+			}
+		}
+		r.states[rs.node.ID] = StateRan
+		return
+	}
 	for _, p := range rs.outList {
 		if p.Name == o.Port {
 			var v any = o.Text
@@ -370,6 +384,9 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 		}
 		set(out)
 	case KindCode:
+		if rs.typ.Name == runnerHTTPType {
+			return r.runnerHTTPRequest(rs, ins)
+		}
 		return r.codeRequest(rs, ins)
 	case KindParse:
 		out, err := runParse(rs, ins["in"][0])
@@ -377,7 +394,7 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 			return nil, err
 		}
 		set(out)
-	case KindControl:
+	case KindControl, KindLogic:
 		var out map[string]Token
 		var err error
 		switch rs.typ.Name {

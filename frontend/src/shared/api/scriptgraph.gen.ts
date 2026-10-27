@@ -110,7 +110,8 @@ export type Kind = string;
 export const KindSource: Kind = "source";
 export const KindCode: Kind = "code";
 export const KindParse: Kind = "parse";
-export const KindControl: Kind = "control";
+export const KindControl: Kind = "control"; // routing: which way the token goes (compare, any of, all of)
+export const KindLogic: Kind = "logic"; // computing and reading values (expression, random, regex, JSON, HTTP)
 export const KindSink: Kind = "sink";
 /**
  * KindCustom is a node the workspace's owner made (quest=458): baked from other nodes or written as code. It is

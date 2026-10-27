@@ -14,6 +14,7 @@
   import SourceParams from './params/SourceParams.svelte'
   import ValueSinkParams from './params/ValueSinkParams.svelte'
   import HttpGetParams from './params/HttpGetParams.svelte'
+  import HttpRunnerParams from './params/HttpRunnerParams.svelte'
   import JsonGetParams from './params/JsonGetParams.svelte'
 
   /** What the selected node or link is made of, and its parameters. */
@@ -85,6 +86,8 @@
         <ChoiceParams params={node.params as never} field="kind" options={KINDS} label="Вид ошибки" onChange={set} />
       {:else if node.type === 'http.get'}
         <HttpGetParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'http.runner'}
+        <HttpRunnerParams params={node.params as never} onChange={set} />
       {:else if node.type === 'json.get'}
         <JsonGetParams params={node.params as never} onChange={set} />
       {:else if node.type === 'sink.value'}

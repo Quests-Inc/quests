@@ -130,6 +130,30 @@ func (r *Run) runHTTP(ctx context.Context, rs *resolved, ins map[string][]Token)
 	if r.Fetch == nil {
 		return nil, errors.New("исходящие запросы здесь недоступны")
 	}
+	u, err := buildFetchURL("https", p, ins)
+	if err != nil {
+		return nil, err
+	}
+	fr := FetchRequest{URL: u, Auth: p.Auth}
+	if toks := ins["secrets"]; len(toks) == 1 && !toks[0].Exit {
+		if sec, ok := toks[0].Value.(Secrets); ok {
+			fr.SecretsOf = sec.Of
+		}
+	}
+	res, err := r.Fetch(ctx, fr)
+	if err != nil {
+		var ff *FetchFailure
+		if !errors.As(err, &ff) {
+			ff = &FetchFailure{Kind: FetchError, Message: err.Error()}
+		}
+		return map[string]Token{"failed": failedDoc(ff.Kind, ff.Message, ff.Status)}, nil
+	}
+	return answerTokens(res.Status, res.Body), nil
+}
+
+// buildFetchURL is the address a request goes to: what the owner fixed (host, path, query) and what arrived over links (one path
+// piece, escaped, and query values), so what came from outside cannot move the request to another host.
+func buildFetchURL(scheme string, p httpParams, ins map[string][]Token) (string, error) {
 	p.Host = strings.ToLower(strings.TrimSpace(p.Host))
 	path := p.Path
 	piece := ""
@@ -149,7 +173,7 @@ func (r *Run) runHTTP(ctx context.Context, rs *resolved, ins map[string][]Token)
 		if raw, ok := toks[0].Value.(json.RawMessage); ok {
 			var m map[string]any
 			if err := json.Unmarshal(raw, &m); err != nil {
-				return nil, errors.New("query: нужен JSON-объект со скалярами")
+				return "", errors.New("query: нужен JSON-объект со скалярами")
 			}
 			for k, v := range m {
 				switch s := v.(type) {
@@ -158,45 +182,37 @@ func (r *Run) runHTTP(ctx context.Context, rs *resolved, ins map[string][]Token)
 				case float64, bool:
 					q.Set(k, fmt.Sprint(s))
 				default:
-					return nil, fmt.Errorf("query.%s: нужен скаляр", k)
+					return "", fmt.Errorf("query.%s: нужен скаляр", k)
 				}
 			}
 		}
 	}
 	if len(q) > maxFetchQuery {
-		return nil, fmt.Errorf("в запросе не больше %d параметров", maxFetchQuery)
+		return "", fmt.Errorf("в запросе не больше %d параметров", maxFetchQuery)
 	}
-	u := "https://" + p.Host + path
+	u := scheme + "://" + p.Host + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
-	fr := FetchRequest{URL: u, Auth: p.Auth}
-	if toks := ins["secrets"]; len(toks) == 1 && !toks[0].Exit {
-		if sec, ok := toks[0].Value.(Secrets); ok {
-			fr.SecretsOf = sec.Of
-		}
+	return u, nil
+}
+
+// answerTokens puts an answer on the outputs of a request node: the status always, an error answer on `failed`, a text one
+// as `text` and, when it is JSON, as `body`.
+func answerTokens(status int, data []byte) map[string]Token {
+	out := map[string]Token{"status": {Type: TInt, Value: int64(status)}}
+	if status >= 400 {
+		out["failed"] = failedDoc(FetchStatus, "ответ "+strconv.Itoa(status), status)
+		return out
 	}
-	res, err := r.Fetch(ctx, fr)
-	if err != nil {
-		var ff *FetchFailure
-		if !errors.As(err, &ff) {
-			ff = &FetchFailure{Kind: FetchError, Message: err.Error()}
-		}
-		return map[string]Token{"failed": failedDoc(ff.Kind, ff.Message, ff.Status)}, nil
+	if !utf8.Valid(data) {
+		return map[string]Token{"failed": failedDoc(FetchBadContent, "ответ не текст", status)}
 	}
-	out := map[string]Token{"status": {Type: TInt, Value: int64(res.Status)}}
-	if res.Status >= 400 {
-		out["failed"] = failedDoc(FetchStatus, "ответ "+strconv.Itoa(res.Status), res.Status)
-		return out, nil
-	}
-	if !utf8.Valid(res.Body) {
-		return map[string]Token{"failed": failedDoc(FetchBadContent, "ответ не текст", res.Status)}, nil
-	}
-	out["text"] = Token{Type: TStr, Value: string(res.Body)}
-	if trimmed := strings.TrimSpace(string(res.Body)); trimmed != "" && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid([]byte(trimmed)) {
+	out["text"] = Token{Type: TStr, Value: string(data)}
+	if trimmed := strings.TrimSpace(string(data)); trimmed != "" && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid([]byte(trimmed)) {
 		out["body"] = Token{Type: TDoc, Value: json.RawMessage(trimmed)}
 	}
-	return out, nil
+	return out
 }
 
 func failedDoc(kind, message string, status int) Token {

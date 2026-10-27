@@ -6,6 +6,29 @@
   /** The node types, grouped by what they do. A click puts a node in the middle of the field. */
   let { ed, cv, onNewCode }: { ed: ScriptEditor; cv: Canvas; onNewCode?: () => void } = $props()
 
+  const KEY = 'quests.script.palette.folded'
+  function load(): Set<string> {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY) ?? '[]')
+      return new Set(Array.isArray(raw) ? raw.filter((k): k is string => typeof k === 'string') : [])
+    } catch {
+      return new Set()
+    }
+  }
+  // Groups folded into their head: a convenience of this browser.
+  let folded = $state(load())
+
+  function toggle(kind: string) {
+    const next = new Set(folded)
+    if (!next.delete(kind)) next.add(kind)
+    folded = next
+    try {
+      localStorage.setItem(KEY, JSON.stringify([...next]))
+    } catch {
+      /* no storage: stays folded until the page is closed */
+    }
+  }
+
   const groups = $derived(
     KIND_ORDER.map((kind) => ({ kind, items: ed.infos.filter((i) => i.kind === kind) })).filter((g) => g.items.length)
   )
@@ -17,7 +40,14 @@
   {/if}
   {#each groups as g (g.kind)}
     <section class="pal__group" style:--c={KIND_COLORS[g.kind]}>
-    <h3>{KIND_TITLES[g.kind] ?? g.kind}</h3>
+    <h3>
+      <button type="button" class="pal__head" aria-expanded={!folded.has(g.kind)} onclick={() => toggle(g.kind)}>
+        <span class="pal__chev" aria-hidden="true">{folded.has(g.kind) ? '▸' : '▾'}</span>
+        {KIND_TITLES[g.kind] ?? g.kind}
+        <small>{g.items.length}</small>
+      </button>
+    </h3>
+    {#if !folded.has(g.kind)}
     <ul>
       {#each g.items as i (i.name)}
         <li>
@@ -28,6 +58,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
     </section>
   {/each}
 </aside>
@@ -48,7 +79,7 @@
     background: color-mix(in srgb, var(--c) 11%, var(--pill-bg, #0f0f0f));
   }
   h3 {
-    margin: 0 0 0.4rem;
+    margin: 0;
     padding-left: 0.1rem;
     font-size: var(--text-xs, 0.75rem);
     font-weight: 600;
@@ -56,8 +87,31 @@
     text-transform: uppercase;
     color: color-mix(in srgb, var(--c) 60%, var(--color-fg-muted, #9a9a9a));
   }
+  .pal__head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+  .pal__head small {
+    margin-left: auto;
+    opacity: 0.6;
+    font-weight: 400;
+  }
+  .pal__chev {
+    width: 0.8rem;
+  }
   ul {
-    margin: 0;
+    margin: 0.4rem 0 0;
     padding: 0;
     list-style: none;
     display: grid;
