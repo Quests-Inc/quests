@@ -70,7 +70,7 @@
   }
 </script>
 
-<p class="hint">Значения скрыты после записи. Секреты доступны только командам и заголовкам HTTP, в текст и формулы не подставляются.</p>
+<p class="explain">Значения скрыты после записи. Секреты доступны только командам и заголовкам HTTP, в текст и формулы не подставляются.</p>
 {#if error}<p class="modal__error" role="alert">{error}</p>{/if}
 {#if loading}
   <p class="hint">Загрузка секретов…</p>
@@ -93,7 +93,7 @@
       <input type="password" aria-label="Новое значение секрета" placeholder="Новое значение" bind:value autocomplete="new-password" onkeydown={enter} />
       <button type="button" class="btn" disabled={busy} onclick={() => void write()}>Записать</button>
     </div>
-    <p class="hint">Чтобы заменить или переопределить секрет, запишите новое значение с тем же именем. Имена PATH, LD_*, QUESTS_* и другие служебные имена запрещены.</p>
+    <p class="explain">Чтобы заменить или переопределить секрет, запишите новое значение с тем же именем. Имена PATH, LD_*, QUESTS_* и другие служебные имена запрещены.</p>
   {:else}<p class="hint">Секреты записывает только владелец пространства.</p>{/if}
 {/if}
 
