@@ -22,7 +22,7 @@ export function newHookDraft(partial: Partial<HookDraft> = {}): HookDraft {
     localId: localSeq--,
     name: '',
     enabled: true,
-    events: ['complete'],
+    events: ['quest_completed'],
     script_id: '',
     run_on: '',
     thisQuest: true,

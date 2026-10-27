@@ -103,7 +103,7 @@ func Samples() []Sample {
 		},
 		{
 			ID: "event-webhook", Title: "Хук: webhook", Subject: "quest", NeedsRunner: false,
-			Description: "Шлёт JSON события POST-ом на URL (параметр ноды «HTTP-запрос»). Без раннера: сервер сам делает запрос.",
+			Description: "Шлёт JSON события POST-ом на URL (параметр ноды «HTTP: отправить»). Без раннера: сервер сам делает запрос.",
 			Graph: buildGraph([]nodeSpec{
 				{1, "source.quest", nil},
 				{2, "sink.http", kv{"url": "https://example.com/hook", "method": "POST"}},

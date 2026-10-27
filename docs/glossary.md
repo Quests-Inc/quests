@@ -6,7 +6,7 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 |---|---|---|---|
 | Журнал (Journal) | journal | journal | The main screen: the list of quests with a detail view |
 | Квест (Quest) | quest | journal | A task with a status, significance, deadline and steps |
-| Шаг (Step) | step | journal | A part of a quest with progress; may have a check command |
+| Шаг (Step) | step | journal | A part of a quest with progress; may have a check (a command or a script) |
 | Квестлайн (Questline) | questline | journal | A group of related quests with a shared colour and icon |
 | Раздел (Category) | category | journal | A category of quests |
 | Тег (Tag) | tag | journal | A cross-cutting label of a quest or template |
@@ -25,5 +25,14 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 | Токен (Token) | token | identity | A bearer token for clients without a session (CLI, HUD, bot, MCP) |
 | Карта (Map) | graph | cross-cutting | The map of relations between entities |
 | Черновик карты (Map draft) | graph draft | cross-cutting | Edits on the map not applied until saved |
-| Хук (Hook) | hook | execution | Workspace event → library script (`script_id`); owners write, runners / trusted sinks deliver |
+| Хук (Hook) | hook | execution | An event (quest, step, note, variable, file) in an area → a library script; limits against storms ([hooks.md](hooks.md)) |
+| Скрипт (Script) | script | execution | A graph of typed nodes, versioned; runs as a check, an emit, a hook or an embedding ([scripts.md](scripts.md)) |
+| Нода (Node) | node | execution | One step of a script: source, code, parse, control, logic, sink |
+| Своя нода (Custom node) | custom node | execution | A node baked from other nodes or from one Code node, with editable fields |
+| Запуск (Run) | script run | execution | One pass of a script over an entity: what started it, what each node did ([scripts.md](scripts.md#the-run-log)) |
+| Проверка из редактора (Test run) | try | execution | «Запустить на…»: a run over a chosen entity or event; its sinks write nothing unless asked |
+| Вставка (Embedding) | embed | execution | `script=N{…}` in a text: computed on click or on show ([embeds.md](embeds.md)) |
+| Переменная (Variable) | value, named value | execution | A readable named value of an entity, inherited, maybe a formula ([variables.md](variables.md)) |
+| Исходящий запрос (Egress) | egress | execution | What a script sends out from the server; allowed by the administrator ([ADR-0004](adr/0004-egress-and-hooks.md)) |
+| Корзина (Trash) | trash | cross-cutting | Deleted quests, notes, scripts and hooks for 30 days ([trash.md](trash.md)) |
 | HUD / оверлей (Overlay) | overlay | outside the core | A Wayland panel with pinned quests and toasts |

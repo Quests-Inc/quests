@@ -7,7 +7,7 @@
     updateHook,
     type Hook,
   } from '@/shared/api/client.ts'
-  import { displayEvents } from '@/entities/hook'
+  import { displayEvents, eventWords, expandEvents, hookCatalog, loadHookCatalog } from '@/entities/hook'
   import HookModal from './HookModal.svelte'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { toastTrashed } from '@/shared/lib/trashUndo.ts'
@@ -57,6 +57,7 @@
   $effect(() => {
     if (!active) return
     void load()
+    void loadHookCatalog()
     void openFromUrl()
     const onRoute = (): void => void openFromUrl()
     window.addEventListener('quests:route', onRoute)
@@ -154,7 +155,7 @@
       </div>
       <div class="hookpage__seg" role="group" aria-label="Состояние">
         {#each [
-          { id: 'all', label: 'Любые' },
+          { id: 'all', label: 'Все' },
           { id: 'on', label: 'Вкл' },
           { id: 'off', label: 'Выкл' },
         ] as s}
@@ -218,7 +219,7 @@
               {/if}
             </div>
             <div class="hookpage__meta">
-              <span>{displayEvents(h).join(', ')}</span>
+              <span>{eventWords(h.events?.length ? h.events : expandEvents(displayEvents(h), hookCatalog.aliases), hookCatalog.events).join(', ')}</span>
               <span>{h.script_title || `скрипт ${h.script_id}`}</span>
               {#if h.run_on}<span>{h.run_on}</span>{/if}
             </div>

@@ -9,6 +9,7 @@
   import { TemplateStreak } from '@/entities/template'
   import { ValueTable } from '@/entities/value'
   import StepValues from './StepValues.svelte'
+  import { statusWord } from '@/shared/lib/questStatus.ts'
   import StepAutoChip from './StepAutoChip.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { formatLocal, localTimeZone } from '@/shared/lib/time.ts'
@@ -428,7 +429,7 @@
 {#snippet questEyebrow(q: any)}
   {@const frac = quantifiedProgress(q)}
   <p class="detail__colophon">
-    <span class="status" style:color={statusColor(q.status)}>{q.status}</span>
+    <span class="status" style:color={statusColor(q.status)} title={q.status}>{statusWord(q.status)}</span>
     {#if q.automated}
       <span title="Автоквест: создание и старт без полноэкранного тоста">авто</span>
     {/if}
@@ -702,7 +703,7 @@
                   <span class="detail__toc-num">{i + 1}</span>
                   <RefText class="detail__toc-title" source={q.title} {labels} {onRef} />
                   {#if q.status !== 'active'}
-                    <span class="status" style:color={statusColor(q.status)}>{q.status}</span>
+                    <span class="status" style:color={statusColor(q.status)} title={q.status}>{statusWord(q.status)}</span>
                   {/if}
                 </button>
               </li>

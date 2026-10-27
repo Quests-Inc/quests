@@ -7,7 +7,7 @@
   import { noteCatalog } from '@/entities/note'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import { HookForm } from '@/entities/hook'
-  import { createHook, getHookEvents, updateHook, type Hook, type HookEventInfo } from '@/shared/api/client.ts'
+  import { createHook, updateHook, type Hook } from '@/shared/api/client.ts'
 
   /** One hook, created or edited: events, script, runner, its area, the limits against storms, the time it may take. */
   let {
@@ -17,13 +17,11 @@
     onSaved,
   }: { open: boolean; hook: Hook | null; onClose: () => void; onSaved: () => void } = $props()
 
-  let aliases = $state<Record<string, string[]>>({})
   let name = $state('')
   let enabled = $state(true)
   let events = $state<string[]>([])
   let scriptId = $state('')
   let runOn = $state('')
-  let catalog = $state<HookEventInfo[]>([])
   /** the area: the whole workspace, one quest / step / note, or a note with everything under it */
   let scopeKind = $state('workspace')
   /** the id of the quest, step or note of the area */
@@ -56,7 +54,7 @@
     if (!open) return
     name = hook?.name ?? ''
     enabled = hook?.enabled ?? true
-    events = [...(hook?.events_raw?.length ? hook.events_raw : (hook?.events ?? ['complete']))]
+    events = [...(hook?.events?.length ? hook.events : ['quest_completed'])]
     scriptId = hook ? String(hook.script_id) : ''
     runOn = hook?.run_on ?? ''
     scopeKind = hook?.scope_kind || 'workspace'
@@ -66,13 +64,6 @@
     includePrivate = hook?.include_private ?? false
     timeout = String(hook?.timeout_sec ?? 30)
     formError = ''
-    if (!Object.keys(aliases).length)
-      void getHookEvents()
-        .then((c) => {
-          aliases = c.aliases ?? {}
-          catalog = c.events ?? []
-        })
-        .catch(() => {})
   })
 
   async function onSubmit(e: { preventDefault: () => void }): Promise<void> {
@@ -113,25 +104,28 @@
   <ModalHead id="hook-modal-title" title={hook ? 'Редактировать хук' : 'Новый хук'} icon="flag" {onClose} />
   {#if formError}<p class="modal__error">{formError}</p>{/if}
   <form class="modal__form" onsubmit={onSubmit}>
-    <HookForm bind:name bind:enabled bind:events bind:scriptId bind:runOn {aliases} {catalog} disabled={saving} />
-    <div class="field">
-      <span class="label">Область</span>
-      <OptionPills options={AREAS} value={scopeKind} label="Область хука" disabled={saving} onToggle={(id) => ((scopeKind = id), (scopeId = ''))} />
-    </div>
-    {#if scopeKind === 'quest'}
-      <div class="field">
-        <Picker options={questOptions} bind:value={scopeId} noneLabel="Выберите квест" label="Квест области" disabled={saving} />
-      </div>
-    {:else if scopeKind === 'note' || scopeKind === 'note_tree'}
-      <div class="field">
-        <Picker options={noteOptions} bind:value={scopeId} noneLabel="Выберите заметку" label="Заметка области" disabled={saving} />
-      </div>
-    {:else if scopeKind === 'step'}
-      <label class="field">
-        <span class="label">Номер шага</span>
-        <input type="number" min="1" bind:value={scopeId} aria-label="Номер шага" />
-      </label>
-    {/if}
+    <HookForm bind:name bind:enabled bind:events bind:scriptId bind:runOn disabled={saving}>
+      {#snippet area()}
+        <div class="field">
+          <span class="label">Где слушать</span>
+          <OptionPills options={AREAS} value={scopeKind} label="Область хука" disabled={saving} onToggle={(id) => ((scopeKind = id), (scopeId = ''))} />
+        </div>
+        {#if scopeKind === 'quest'}
+          <div class="field">
+            <Picker options={questOptions} bind:value={scopeId} noneLabel="Выберите квест" label="Квест области" disabled={saving} />
+          </div>
+        {:else if scopeKind === 'note' || scopeKind === 'note_tree'}
+          <div class="field">
+            <Picker options={noteOptions} bind:value={scopeId} noneLabel="Выберите заметку" label="Заметка области" disabled={saving} />
+          </div>
+        {:else if scopeKind === 'step'}
+          <label class="field">
+            <span class="label">Номер шага</span>
+            <input type="number" min="1" bind:value={scopeId} aria-label="Номер шага" />
+          </label>
+        {/if}
+      {/snippet}
+    </HookForm>
     <div class="hookmodal__limits">
       <label class="field">
         <span class="label">Пауза между запусками, с</span>

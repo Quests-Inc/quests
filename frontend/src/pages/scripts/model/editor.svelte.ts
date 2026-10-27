@@ -51,6 +51,8 @@ export function createScriptEditor() {
   let subjects = $state<string[]>([])
   let graph = $state.raw<Graph>(EMPTY)
   let savedKey = $state('')
+  /** A script is being read in: the field is not empty and nothing is unsaved yet, it is just not there. */
+  let loading = $state(false)
   // Nodes folded into their head. A convenience of this browser, kept per script, not part of the script.
   let collapsed = $state<ReadonlySet<number>>(new Set())
 
@@ -188,6 +190,8 @@ export function createScriptEditor() {
   /** Load a script into the editor. */
   async function open(s: ScriptFull) {
     const mine = ++openSeq
+    loading = true
+    graph = { nodes: [], edges: [] } // the script that was open does not linger under the new one's title
     scriptId = s.id
     collapsed = loadFolded(s.id)
     title = s.title
@@ -202,17 +206,22 @@ export function createScriptEditor() {
     picked = new Set()
     problems = []
     error = ''
-    await Promise.all([ensureInfos(), ensurePorts(s.graph)])
-    if (mine !== openSeq) return
-    graph = s.graph // portsOf looks nodes up in the current graph, so it must hold this one before it is laid out
-    graph = layout(s.graph, portsOf)
-    savedKey = stamp(graph, s.title, s.description, s.purpose)
+    try {
+      await Promise.all([ensureInfos(), ensurePorts(s.graph)])
+      if (mine !== openSeq) return
+      graph = s.graph // portsOf looks nodes up in the current graph, so it must hold this one before it is laid out
+      graph = layout(s.graph, portsOf)
+      savedKey = stamp(graph, s.title, s.description, s.purpose)
+    } finally {
+      if (mine === openSeq) loading = false
+    }
     void checkNow()
   }
 
   /** Leave the script (it was deleted, or none is chosen). */
   function reset() {
     openSeq++
+    loading = false
     scriptId = null
     collapsed = new Set()
     title = description = purpose = ''
@@ -441,7 +450,10 @@ export function createScriptEditor() {
       error = v
     },
     get dirty() {
-      return scriptId != null && stamp(graph) !== savedKey
+      return scriptId != null && !loading && stamp(graph) !== savedKey
+    },
+    get loading() {
+      return loading
     },
     get selectedNode() {
       return selectedNode

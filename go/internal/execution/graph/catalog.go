@@ -42,10 +42,11 @@ func Builtin() Registry {
 	add := func(t NodeType) { r[t.Name] = t }
 
 	// Sources: the reference to the entity, its secrets and its fields; a run started by an event also has the event.
+	sourceTitles := map[string]string{"step": "шаг", "note": "заметка", "template": "шаблон", "quest": "квест", "workspace": "пространство"}
 	source := func(entity string, ref PortType, fields ...Port) {
 		out := append([]Port{req("ref", ref), req("secrets", TSecret)}, fields...)
 		out = append(out, req("event", TDoc))
-		add(NodeType{Name: "source." + entity, Title: "Источник: " + entity, Kind: KindSource, Trusted: true, Ports: sourcePorts(out)})
+		add(NodeType{Name: "source." + entity, Title: "Источник: " + sourceTitles[entity], Kind: KindSource, Trusted: true, Ports: sourcePorts(out)})
 	}
 	source("step", TRefStep, req("title", TStr), req("description", TStr), req("progress", TInt), req("total", TInt), req("done", TBool))
 	source("note", TRefNote, req("title", TStr))
@@ -94,7 +95,7 @@ func Builtin() Registry {
 	// Done: the run finished (a hook's Code node already did the work on the runner).
 	sink("sink.done", "Готово", nil, req("trigger", TAny))
 	// HTTP / Socket: delivery for event hooks (quest=438). Trusted server nodes; body is JSON or text.
-	add(NodeType{Name: "sink.http", Title: "HTTP-запрос", Kind: KindSink, Trusted: true, Ports: httpSinkPorts})
+	add(NodeType{Name: "sink.http", Title: "HTTP: отправить", Kind: KindSink, Trusted: true, Ports: httpSinkPorts})
 	add(NodeType{Name: "sink.socket", Title: "Сокет (unix)", Kind: KindSink, Trusted: true, Ports: socketSinkPorts})
 	return r
 }
