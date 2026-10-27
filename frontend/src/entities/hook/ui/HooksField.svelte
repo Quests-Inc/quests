@@ -3,16 +3,15 @@
   import {
     createHook,
     deleteHook,
-    getHookEvents,
     getHooks,
     updateHook,
     type Hook,
-    type HookEventsCatalog,
   } from '@/shared/api/client.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { toastTrashed } from '@/shared/lib/trashUndo.ts'
   import HookForm from './HookForm.svelte'
   import { displayEvents, newHookDraft, type HookDraft } from '../model/events.ts'
+  import { eventWords, expandEvents, hookCatalog, loadHookCatalog } from '../model/catalog.svelte.ts'
 
   /**
    * Hooks for a quest (or drafts while creating). Owners add/edit; members see the list.
@@ -35,7 +34,6 @@
     open?: boolean
   } = $props()
 
-  let catalog: HookEventsCatalog | null = $state(null)
   let hooks: Hook[] = $state([])
   let loaded = $state(false)
   let editingId: number | null = $state(null)
@@ -49,7 +47,6 @@
   let runOn = $state('')
   let thisQuest = $state(true)
 
-  const aliases = $derived(catalog?.aliases ?? {})
   const live = $derived(questId != null && questId > 0)
   const rows = $derived(live ? hooks : drafts.map(draftAsRow))
 
@@ -70,14 +67,6 @@
     }
   }
 
-  async function ensureCatalog() {
-    if (catalog) return
-    try {
-      catalog = await getHookEvents()
-    } catch {
-      /* toast */
-    }
-  }
 
   async function loadLive() {
     if (!live) return
@@ -93,7 +82,7 @@
 
   $effect(() => {
     if (!open) return
-    void ensureCatalog()
+    void loadHookCatalog()
     if (live) void loadLive()
     else loaded = true
   })
@@ -121,7 +110,7 @@
     editingId = row.id
     name = row.name || ''
     enabled = row.enabled
-    events = [...displayEvents(row)]
+    events = [...(row.events?.length ? row.events : displayEvents(row))]
     scriptId = row.script_id ? String(row.script_id) : ''
     runOn = row.run_on || ''
     thisQuest = row.quest_id != null
@@ -234,7 +223,7 @@
           <button type="button" class="hooksfield__main" disabled={!canEdit} onclick={() => startEdit(row)}>
             <span class="hooksfield__title">{row.name || `хук #${Math.abs(row.id)}`}</span>
             <span class="hooksfield__meta">
-              {displayEvents(row).join(', ')}
+              {eventWords(expandEvents(displayEvents(row), hookCatalog.aliases), hookCatalog.events).join(', ')}
               · {row.script_title || (row.script_id ? `скрипт ${row.script_id}` : 'без скрипта')}
               {#if row.run_on}· {row.run_on}{/if}
               {#if live && row.quest_id == null}· весь журнал{/if}
@@ -266,7 +255,6 @@
         bind:scriptId
         bind:runOn
         bind:thisQuest
-        {aliases}
         {showScope}
         disabled={busy}
       />

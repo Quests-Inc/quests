@@ -174,7 +174,7 @@ func valueTools(c *Client) []Tool {
 	type listArgs struct {
 		Owner string `json:"owner" desc:"questline=N | template=N | quest=N | step=N | note=N | workspace (the active one)"`
 	}
-	list := Typed("list_values", "Named values of an owner: own, inherited from parents and the workspace, and the effective set with formulas already computed. Values are readable data (unlike secrets); a private note answers 403.",
+	list := Typed("list_values", "Variables («переменные» in the interface; `values` in the API) of an owner: own, inherited from parents and the workspace, and the effective set with formulas already computed. Variables are readable data (unlike secrets); a private note answers 403.",
 		func(ctx context.Context, a listArgs) (any, error) {
 			p, err := ownerPath(a.Owner, "values")
 			if err != nil {
@@ -192,9 +192,9 @@ func valueTools(c *Client) []Tool {
 		Name    string `json:"name" desc:"lower-case latin, digits, _, up to 24 chars, starts with a letter"`
 		Type    string `json:"type" desc:"int | float | str | bool"`
 		Value   any    `json:"value,omitempty" desc:"the literal: a number, a string or true/false"`
-		Formula string `json:"formula,omitempty" desc:"instead of value: an expression over other values, e.g. (str - 10) / 2; integer / and % round down; strings join with +"`
+		Formula string `json:"formula,omitempty" desc:"instead of value: an expression over other variables, e.g. (str - 10) / 2; integer / and % round down; strings join with +"`
 	}
-	set := Typed("set_value", "Set a named value: a literal (value) or a formula over other values in scope. A note inherits the values of its parents and the workspace; text shows one as {{name}}, a formula or script=N{...} reads it by name. Put it on the narrowest owner.",
+	set := Typed("set_value", "Set a variable («переменная» in the interface): a literal (value) or a formula over other variables in scope. A note inherits the variables of its parents and the workspace; text shows one as {{name}}, a formula or script=N{...} reads it by name. Put it on the narrowest owner.",
 		func(ctx context.Context, a setArgs) (any, error) {
 			p, err := ownerPath(a.Owner, "values")
 			if err != nil {
@@ -218,7 +218,7 @@ func valueTools(c *Client) []Tool {
 		Owner string `json:"owner"`
 		Name  string `json:"name"`
 	}
-	del := Typed("delete_value", "Remove one named value from an owner.",
+	del := Typed("delete_value", "Remove one variable from an owner.",
 		func(ctx context.Context, a delArgs) (any, error) {
 			p, err := ownerPath(a.Owner, "values")
 			if err != nil {

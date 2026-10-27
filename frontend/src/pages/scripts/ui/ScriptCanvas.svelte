@@ -197,7 +197,7 @@
   oncontextmenu={onContext}
 >
   {#if hint}<p class="scv__hint">{hint}</p>{/if}
-  {#if !ed.graph.nodes.length}<p class="scv__empty">Пусто. Добавьте ноды из палитры слева.</p>{/if}
+  {#if ed.loading}<p class="scv__empty">Загрузка скрипта…</p>{:else if !ed.graph.nodes.length}<p class="scv__empty">Пусто. Добавьте ноды из палитры слева или правым кликом по полю.</p>{/if}
 
   <div class="scv__world" style:transform="translate({cv.gest.cam.x}px, {cv.gest.cam.y}px) scale({cv.gest.cam.k})">
     <svg class="scv__wires" aria-hidden="true">

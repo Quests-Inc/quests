@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
   import { QuestlineIcon } from '@/entities/questline'
+  import { statusWord } from '@/shared/lib/questStatus.ts'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
 
@@ -194,7 +195,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
             {@render glyph(n, t)}
             <span class="gcard__title">{n.title}</span>
             {#if n.type === 'quest' && n.status && n.status !== 'active'}
-              <span class="gcard__status">{n.status}</span>
+              <span class="gcard__status" title={n.status}>{statusWord(n.status)}</span>
             {:else if n.type === 'step' && n.progress}
               <span class="gcard__prog">{n.progress}</span>
             {/if}

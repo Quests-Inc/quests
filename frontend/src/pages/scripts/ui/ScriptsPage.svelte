@@ -59,6 +59,8 @@
   // 'leave' asks before dropping unsaved edits for another script; 'delete' before removing this one.
   let ask = $state<{ kind: 'leave'; id: number | null } | { kind: 'delete'; id: number } | null>(null)
 
+  /** What a script's sources read, as the list says it. */
+  const SUBJECT_WORDS: Record<string, string> = { step: 'шаг', note: 'заметка', template: 'шаблон', quest: 'квест', workspace: 'пространство' }
   let tryOpen = $state(false)
   /** Code goes to a runner: a node of the code kind, or a saved script the server says needs one. */
   const needsRunner = $derived(
@@ -300,7 +302,7 @@
                     }}
                   >
                     <span>{s.title}</span>
-                    <small>{(s.subjects ?? []).join(', ')} · {s.needs_runner ? 'раннер' : 'сервер'} · v{s.version}</small>
+                    <small>{[(s.subjects ?? []).map((x) => SUBJECT_WORDS[x] ?? x).join(', '), s.needs_runner ? 'на раннере' : 'на сервере', `v${s.version}`].filter(Boolean).join(' · ')}</small>
                   </button>
                 </li>
               {/each}

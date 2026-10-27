@@ -1,3 +1,5 @@
+import { statusWord } from './questStatus.ts'
+
 /** Minimal journal toasts. Import from `.svelte.ts` so the list stays reactive. */
 export type ToastKind = 'info' | 'success' | 'error' | 'progress'
 /** A button in a toast («Отменить»). It runs once; the toast goes away when it is pressed. */
@@ -112,15 +114,6 @@ export function toastDone(id: string, message: string, kind: ToastKind = 'succes
   })
 }
 
-const STATUS_RU: Record<string, string> = {
-  active: 'активен',
-  expired: 'просрочен',
-  frozen: 'заморожен',
-  completed: 'выполнен',
-  failed: 'провален',
-  archived: 'в архиве',
-}
-
 export function statusToastLabel(status: string) {
-  return STATUS_RU[status] || status
+  return statusWord(status)
 }

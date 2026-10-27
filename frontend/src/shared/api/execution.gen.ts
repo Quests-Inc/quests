@@ -25,7 +25,8 @@ export interface Binding {
   NeedsRunner: boolean;
 }
 /**
- * ScriptUse is a place a script is bound to, or (Via "text") a text that embeds it as script=N{…}.
+ * ScriptUse is a place a script is bound to, or (Via "text") a text that embeds it as script=N{…}. For a template step the
+ * id is its template's (what the interface opens) and the title is «template · step».
  */
 export interface ScriptUse {
   subject_type: string;

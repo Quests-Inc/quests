@@ -22,7 +22,7 @@
     legacy = '',
     onClearLegacy,
     entityId,
-  }: { value?: string; kind: 'step' | 'note' | 'template' | 'quest' | 'workspace'; onchange?: () => void; label?: string; legacy?: string; onClearLegacy?: () => void; entityId?: number } = $props()
+  }: { value?: string; kind: 'step' | 'note' | 'template' | 'quest' | 'workspace' | 'hook'; onchange?: () => void; label?: string; legacy?: string; onClearLegacy?: () => void; entityId?: number } = $props()
 
   let menu = $state(false)
   let busy = $state(false)

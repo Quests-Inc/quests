@@ -38,6 +38,7 @@
   {#if onNewCode}
     <button type="button" class="pal__new" onclick={onNewCode}>+ Нода из кода</button>
   {/if}
+  {#if !groups.length}<p class="pal__loading">Загрузка нод…</p>{/if}
   {#each groups as g (g.kind)}
     <section class="pal__group" style:--c={KIND_COLORS[g.kind]}>
     <h3>
@@ -64,6 +65,11 @@
 </aside>
 
 <style>
+  .pal__loading {
+    margin: 0.5rem;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-xs, 0.75rem);
+  }
   .pal {
     flex: 0 0 11.5rem;
     overflow: auto;

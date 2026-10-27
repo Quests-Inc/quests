@@ -6,6 +6,7 @@
   import ScopePicker from '@/shared/ui/ScopePicker.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
+  import { statusWord } from '@/shared/lib/questStatus.ts'
   import { isListSelectAll } from '@/shared/lib/listKeys.ts'
   import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
@@ -244,7 +245,7 @@
         <span class="quest-row__meta">
           <span class="quest-row__meta-left">
             {#if q.status !== 'active'}
-              <span class="status" style:color={statusColor(q.status)}>{q.status}</span>
+              <span class="status" style:color={statusColor(q.status)} title={q.status}>{statusWord(q.status)}</span>
             {/if}
             {#if periodBadge(q)}
               <span class="period-badge" title="Периодический инстанс">{periodBadge(q)}</span>

@@ -36,6 +36,9 @@ export function loadScripts(force: boolean = false) {
  */
 export function scriptsFor(kind: string): Script[] {
   const purpose = purposeOfKind(kind)
+  // A hook may run a script over any entity its event names, or one that reads only the event: the unsorted ones fit too.
+  if (kind === 'hook')
+    return scriptsList.items.filter((s) => (s.purpose ? s.purpose === 'hook' : (s.subjects?.length ?? 0) <= 1))
   return scriptsList.items.filter((s) =>
     s.purpose ? s.purpose === purpose : s.subjects?.length === 1 && s.subjects[0] === kind
   )
