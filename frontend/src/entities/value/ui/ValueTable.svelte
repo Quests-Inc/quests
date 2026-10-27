@@ -329,7 +329,7 @@
     z-index: -1;
     inset: 0.25rem auto 0.25rem 0.25rem;
     width: calc((100% - 0.5rem) / 2);
-    border-radius: var(--radius-md, 4px);
+    border-radius: max(0px, calc(var(--radius-lg, 12px) - 0.25rem));
     background: color-mix(in srgb, var(--color-accent, #c9a227) 25%, transparent);
     transition: transform 180ms ease;
   }
@@ -338,7 +338,7 @@
     min-width: 0;
     height: 2.5rem;
     border: 0;
-    border-radius: var(--radius-md, 4px);
+    border-radius: max(0px, calc(var(--radius-lg, 12px) - 0.25rem));
     background: transparent;
     color: var(--color-fg-muted, #9a9a9a);
     font: inherit;
