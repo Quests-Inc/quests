@@ -101,3 +101,7 @@ the local network (`deploy/README.md`).
 - No per-account storage quota for attachments; two-factor sign-in is optional (a policy that requires it for workspace owners is not built); Grafana has its own login only.
 - `X-Forwarded-For` is trusted for throttling (the gateway rewrites it; a client on the LAN could forge it — the
   per-login stall covers that).
+
+### Note environments
+
+Notes inherit variables and secrets from their parent chain, then the workspace. A move changes both immediately and gets its own history entry. Private notes are hidden from MCP: listing a public child's environment filters private ancestors (both values and secret names/source titles), and listing a private note directly returns 403. Runtime secrets still require the existing owner-authored command or authenticated HTTP graph; members cannot write secrets, commands, scripts or hooks that execute them. Secret values remain sealed and never appear in environment listings, formulas or text interpolation.

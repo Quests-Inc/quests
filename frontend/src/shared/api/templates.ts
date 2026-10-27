@@ -67,20 +67,31 @@ const SECRET_OWNER_PATH = {
 export const SECRET_OWNER_KINDS = Object.keys(SECRET_OWNER_PATH)
 
 function secretsPath(kind: string, id: number) {
+  if (kind === 'workspace') return '/api/workspace/secrets'
   return `/api/${SECRET_OWNER_PATH[kind as keyof typeof SECRET_OWNER_PATH]}/${id}/secrets`
 }
 
-/**
- * Secret *names* for an owner — GET never returns values.
- * `keys` are set on the owner itself, `inherited` ({ key, from, id }) come from
- * a more general owner.
- */
+/** Names and sources only; secret values are never readable. */
+export interface SecretSource {
+  key: string
+  from: string
+  id: number
+  title?: string
+}
 export async function listSecrets(
   kind: string,
   id: number
-): Promise<{ keys: string[]; inherited: { key: string; from: string; id: number }[] }> {
+): Promise<{
+  keys: string[]
+  own: SecretSource[]
+  inherited: SecretSource[]
+  effective: SecretSource[]
+}> {
   const out = await request(secretsPath(kind, id))
-  return { keys: out?.keys || [], inherited: out?.inherited || [] }
+  const keys: string[] = out?.keys ?? []
+  const own = out?.own ?? keys.map((key) => ({ key, from: kind, id }))
+  const inherited = out?.inherited ?? []
+  return { keys, own, inherited, effective: out?.effective ?? [...own, ...inherited] }
 }
 
 /** Write-only: sets/overwrites one secret. Never readable back through the API. */

@@ -152,7 +152,7 @@
 
   {#if mode === 'edit' && line?.id}
     <div class="modal__body">
-      <ValueTable owner={{ kind: 'questline', id: line.id }} />
+      <ValueTable variant="inline" owner={{ kind: 'questline', id: line.id }} />
     </div>
   {/if}
 

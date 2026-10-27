@@ -12,6 +12,8 @@
     rows = 3,
     class: className = '',
     disabled = false,
+    ariaLabel = '',
+    allowedKinds = [],
     placement = 'below',
     el = $bindable(null),
     onkeydown,
@@ -26,6 +28,8 @@
     rows?: number,
     class?: string,
     disabled?: boolean,
+    ariaLabel?: string,
+    allowedKinds?: string[],
     placement?: 'below' | 'inside',
     el?: HTMLTextAreaElement | null,
     onkeydown?: (event: KeyboardEvent) => void,
@@ -51,7 +55,7 @@
       notes,
       attachments,
       templates: templateStore.list,
-    })
+    }).filter((item) => !allowedKinds.length || allowedKinds.includes(item.kind))
     mentionIndex = 0
     mentionOpen = mentionItems.length > 0
   }
@@ -106,6 +110,7 @@
   class={['mention-field', placement === 'inside' && 'mention-field--inside']}
 >
   <textarea
+    aria-label={ariaLabel || undefined}
     bind:this={el}
     bind:value
     {rows}

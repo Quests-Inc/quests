@@ -164,7 +164,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
       <div class="nc__actions">
         <button type="button" class="btn btn--primary" disabled={busy || !dirty || (!command.trim() && !scripted)} onclick={save}>Сохранить</button>
         <button type="button" class="btn" disabled={busy || !active || dirty} onclick={now} title="Запустить на ближайшем такте (до 15 с)">Проверить сейчас</button>
-        <button type="button" class="btn" onclick={() => onOpenSecrets?.()}>Секреты</button>
+        <button type="button" class="btn" onclick={() => onOpenSecrets?.()}>Окружение</button>
         {#if active}<button type="button" class="btn btn--danger" disabled={busy} onclick={remove}>Убрать проверку</button>{/if}
       </div>
       {#if check?.reason}<p class="nc__line">Причина: {check.reason}</p>{/if}

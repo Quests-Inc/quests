@@ -70,24 +70,40 @@ func (h *Handler) listSecrets(segment string) http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if fromMCP(r) && o.Kind == execution.SecretOwnerNote {
+			priv, err := h.Store.NotePrivate(r.Context(), o.ID)
+			if err != nil {
+				valueWriteErr(w, err)
+				return
+			}
+			if priv {
+				writeErr(w, http.StatusForbidden, "приватная заметка")
+				return
+			}
+		}
 		own, err := h.Store.ListSecretKeys(r.Context(), o)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		eff, err := h.Store.ListEffectiveSecretKeys(r.Context(), o)
+		eff, err := h.Store.ListVisibleSecretKeys(r.Context(), o, fromMCP(r))
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		ownRows := []map[string]any{}
 		inherited := []map[string]any{}
+		effective := []map[string]any{}
 		for _, ref := range eff {
+			row := map[string]any{"key": ref.Key, "from": ref.Owner.Kind, "id": ref.Owner.ID, "title": h.Store.OwnerTitle(r.Context(), ref.Owner)}
+			effective = append(effective, row)
 			if ref.Owner == o {
-				continue
+				ownRows = append(ownRows, row)
+			} else {
+				inherited = append(inherited, row)
 			}
-			inherited = append(inherited, map[string]any{"key": ref.Key, "from": ref.Owner.Kind, "id": ref.Owner.ID})
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"keys": own, "inherited": inherited})
+		writeJSON(w, http.StatusOK, map[string]any{"keys": own, "own": ownRows, "inherited": inherited, "effective": effective})
 	}
 }
 

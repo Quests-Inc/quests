@@ -117,7 +117,7 @@
   const MORE_ITEMS = [
     { id: 'settings', label: 'Настройки' },
     { id: 'templates', label: 'Шаблоны' },
-    { id: 'secrets', label: 'Секреты' },
+    { id: 'secrets', label: 'Окружение' },
     { id: 'tags', label: 'Теги' },
     { id: 'trash', label: 'Корзина' },
     { id: 'questline', label: 'Новый квестлайн' },

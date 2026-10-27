@@ -328,7 +328,13 @@ func (h *Handler) patchNote(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	h.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
+	parentChanged := (cur.ParentID == nil) != (updated.ParentID == nil) ||
+		(cur.ParentID != nil && updated.ParentID != nil && *cur.ParentID != *updated.ParentID)
+	if parentChanged {
+		h.logNote(r.Context(), "note_updated", updated, "перемещена: изменено наследуемое окружение", 0)
+	} else {
+		h.logNote(r.Context(), "note_updated", updated, "изменена", 10*time.Minute)
+	}
 	writeJSON(w, 200, h.NotePayloadFiltered(r, updated))
 }
 

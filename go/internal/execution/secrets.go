@@ -19,15 +19,13 @@ import (
 //
 // i.e. a command sees its own secrets, then those of its quest, of the template
 // that emitted the quest, and of the questline the quest sits in. Values are
-// stored as plaintext (the server is the trust boundary — the commands run on
-// the same host) and are never returned by a read endpoint or tool.
+// sealed at rest and never returned by a read endpoint or tool.
 const (
 	SecretOwnerQuestline = "questline"
 	SecretOwnerTemplate  = "template"
 	SecretOwnerQuest     = "quest"
 	SecretOwnerStep      = "step"
-	// A note's secrets are its own: no chain to a quest or a questline (it may refer to things, it does not depend on them);
-	// only the workspace above it.
+	// Notes inherit their parents' secrets, then the workspace's.
 	SecretOwnerNote = "note"
 	// The workspace itself: the root of the chain. Its secrets are inherited down to everything inside it (ADR-0003).
 	SecretOwnerWorkspace = "workspace"
@@ -259,11 +257,21 @@ func (s *Store) secretChain(ctx context.Context, o SecretOwner) ([]SecretOwner, 
 	return append([]SecretOwner{workspaceOwner(ctx)}, below...), nil
 }
 
-// secretChainBelow is the chain under the workspace: questline → template → quest → step, or a note alone.
+// secretChainBelow is the chain under the workspace, least specific first.
 func (s *Store) secretChainBelow(ctx context.Context, o SecretOwner) ([]SecretOwner, error) {
 	var questlineID, templateID, questID sql.NullInt64
 	switch o.Kind {
-	case SecretOwnerQuestline, SecretOwnerNote:
+	case SecretOwnerNote:
+		links, err := s.noteValueLinks(ctx, o.ID)
+		if err != nil {
+			return nil, err
+		}
+		chain := make([]SecretOwner, 0, len(links)-1)
+		for i := len(links) - 2; i >= 0; i-- {
+			chain = append(chain, links[i].Owner)
+		}
+		return chain, nil
+	case SecretOwnerQuestline:
 		return []SecretOwner{o}, nil
 	case SecretOwnerTemplate:
 		err := s.DB.QueryRowContext(ctx, `SELECT questline_id FROM questtemplate WHERE id = ?`, o.ID).Scan(&questlineID)
@@ -359,12 +367,21 @@ func (s *Store) ResolveSecrets(ctx context.Context, o SecretOwner) (map[string]s
 // ListEffectiveSecretKeys returns the names that apply to an owner, each with
 // the owner it effectively comes from (the most specific one) — never values.
 func (s *Store) ListEffectiveSecretKeys(ctx context.Context, o SecretOwner) ([]SecretRef, error) {
-	chain, err := s.secretChain(ctx, o)
+	return s.ListVisibleSecretKeys(ctx, o, false)
+}
+
+// ListVisibleSecretKeys filters private note ancestors for MCP, just like variables.
+func (s *Store) ListVisibleSecretKeys(ctx context.Context, o SecretOwner, skipPrivate bool) ([]SecretRef, error) {
+	links, err := s.valueLinks(ctx, o)
 	if err != nil {
 		return nil, err
 	}
 	src := map[string]SecretOwner{}
-	for _, owner := range chain {
+	for i := len(links) - 1; i >= 0; i-- {
+		if skipPrivate && links[i].Private {
+			continue
+		}
+		owner := links[i].Owner
 		keys, err := s.ListSecretKeys(ctx, owner)
 		if err != nil {
 			return nil, err

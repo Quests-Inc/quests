@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import { deleteValue, listValues, putValue, rollValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
+  import { deleteValue, fetchWorkspaces, listValues, putValue, rollValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
   import { ANY_HOST, hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
   import { readValueInput } from '@/shared/lib/valueInput.ts'
   import { valueDetail, valueTypeColor, valueTypeLabel } from '@/shared/lib/valueTip.ts'
@@ -9,6 +9,7 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
+  import SecretTable from './SecretTable.svelte'
   import ValueEditDialog from '@/shared/ui/ValueEditDialog.svelte'
 
   let {
@@ -19,7 +20,7 @@
   }: {
     owner: { kind: string; id: number }
     readonly?: boolean
-    variant?: 'text' | 'icon' | 'hidden' | 'inline'
+    variant?: 'text' | 'icon' | 'hidden' | 'inline' | 'panel'
     onEffective?: (text: Record<string, string>) => void
   } = $props()
 
@@ -32,8 +33,11 @@
   }
   const TYPES: ValueType[] = ['int', 'float', 'str', 'bool']
 
+  let workspaceReadonly = $state(true)
+  const editReadonly = $derived(readonly || (owner.kind === 'workspace' && workspaceReadonly))
   let own = $state([] as ValueRow[])
   let inherited = $state([] as ValueRow[])
+  let tab = $state<'values' | 'secrets'>('values')
   let open = $state(false)
   let sectionOpen = $state(false)
   let error = $state('')
@@ -52,8 +56,8 @@
         .map((row) => ({ name: row.name, text: formatValue(row.type, row.value) })),
     ),
   )
-  const label = $derived(own.length ? `Переменные · ${own.length}` : 'Переменные')
-  const title = $derived(summary ? `Переменные: ${summary}` : 'Переменные')
+  const label = $derived(own.length ? `Окружение · ${own.length}` : 'Окружение')
+  const title = $derived(summary ? `Окружение: ${summary}` : 'Окружение')
 
   function source(row: ValueRow) {
     if (row.from === 'workspace') return 'пространство'
@@ -79,6 +83,11 @@
     error = ''
     try {
       const list = await listValues(kind, id)
+      if (kind === 'workspace') {
+        const spaces = await fetchWorkspaces()
+        if (hostKey(owner.kind, owner.id) !== key) return
+        workspaceReadonly = spaces.workspaces.find((w) => w.id === spaces.current)?.role !== 'owner'
+      }
       if (hostKey(owner.kind, owner.id) !== key) return
       own = list.own ?? []
       inherited = list.inherited ?? []
@@ -175,6 +184,12 @@
 </script>
 
 {#snippet panel()}
+  <div class="environment-tabs" role="group" aria-label="Вид окружения">
+    <button type="button" class="btn" class:btn--accent={tab === 'values'} aria-pressed={tab === 'values'} onclick={() => (tab = 'values')}>Переменные</button>
+    <button type="button" class="btn" class:btn--accent={tab === 'secrets'} aria-pressed={tab === 'secrets'} onclick={() => (tab = 'secrets')}>Секреты</button>
+  </div>
+  {#if tab === 'secrets'}<SecretTable {owner} {readonly} />{/if}
+  <div class="environment-values" hidden={tab !== 'values'}>
     <p class="values-hint">Имя пишется как здесь (str). В команде оно заглавное (STR).</p>
     {#if truncated}<p class="values-hint">Дальние переменные не влезли в область видимости.</p>{/if}
     {#if own.length || inherited.length}
@@ -201,7 +216,7 @@
                 <Icon name="repeat" size={14} />
               </button>
             {/if}
-            {#if !readonly}
+            {#if !editReadonly}
               <button
                 type="button"
                 class="values-x"
@@ -233,7 +248,7 @@
         {/each}
       </ul>
     {/if}
-    {#if !readonly}
+    {#if !editReadonly}
       <div class="values-add" role="group" aria-label="Новая переменная">
         <select bind:value={type} aria-label="Тип">
           {#each TYPES as item (item)}
@@ -247,10 +262,14 @@
         </button>
       </div>
     {/if}
+  </div>
 {/snippet}
 
-{#if variant === 'inline'}
-  <FormSection title="Переменные" summary={own.length ? `${own.length} · ${summary}` : ''} bind:open={sectionOpen}>
+{#if variant === 'panel'}
+  {#if error}<p class="modal__error">{error}</p>{/if}
+  {@render panel()}
+{:else if variant === 'inline'}
+  <FormSection title="Окружение" summary={own.length ? `${own.length} · ${summary}` : ''} bind:open={sectionOpen}>
     {#if error}<p class="modal__error">{error}</p>{/if}
     <div class="values-inline">{@render panel()}</div>
   </FormSection>
@@ -260,12 +279,12 @@
   type="button"
   class={variant === 'icon' ? 'btn btn--icon values-open values-open--icon' : 'values-open'}
   {title}
-  aria-label="Переменные"
+  aria-label="Окружение"
   aria-haspopup="dialog"
   onclick={() => (open = true)}
 >
   {#if variant === 'icon'}
-    <span aria-hidden="true">{'{}'}</span>
+    <Icon name="key" size={16} />
   {:else}
     {label}
   {/if}
@@ -273,7 +292,7 @@
 {/if}
 
 <ModalShell {open} onClose={() => (open = false)} labelledby="values-modal-title" zIndex={80} maxWidth="36rem">
-  <ModalHead id="values-modal-title" title="Переменные" onClose={() => (open = false)} />
+  <ModalHead id="values-modal-title" title="Окружение" onClose={() => (open = false)} />
   {#if error}<p class="modal__error">{error}</p>{/if}
   <div class="modal__body">
     {@render panel()}
@@ -285,13 +304,15 @@
   <ValueEditDialog
     open
     {owner}
-    {readonly}
+    readonly={editReadonly}
     name={editing}
     onClose={() => (editing = '')}
   />
 {/if}
 
 <style>
+  .environment-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .environment-values:not([hidden]) { display: grid; gap: 0.6rem; }
   .values-open {
     height: 2rem;
     padding: 0 0.7rem;
