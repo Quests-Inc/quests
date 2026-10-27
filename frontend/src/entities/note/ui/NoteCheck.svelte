@@ -2,6 +2,7 @@
   import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import HelpTip from '@/shared/ui/HelpTip.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
+  import { openTarget } from '@/shared/lib/openTarget.ts'
   import { bindScript, getNote, runNoteCheck, setNoteCheck, unbindScript } from '@/shared/api/client.ts'
   import { loadRunners, runnersList } from '@/entities/runner/@x/note'
   import { ScriptPicker } from '@/entities/script/@x/note'
@@ -122,6 +123,11 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     {/if}
     {#if check?.error}<span class="nc__chip nc__chip--warn" title={check.error}>ошибка проверки</span>{/if}
   </button>
+  {#if active}
+    <button type="button" class="nc__runs" title="Запуски проверки этой заметки" onclick={() => openTarget({ kind: 'runs', source: { kind: 'note', id: noteId } })}>
+      запуски
+    </button>
+  {/if}
 
   {#if open}
     <div class="nc__body">
@@ -170,6 +176,18 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
 </div>
 
 <style>
+  .nc__runs {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-xs, 0.75rem);
+    cursor: pointer;
+  }
+  .nc__runs:hover {
+    color: var(--color-accent, #c9a227);
+    text-decoration: underline;
+  }
   .nc {
     display: grid;
     gap: 0.5rem;

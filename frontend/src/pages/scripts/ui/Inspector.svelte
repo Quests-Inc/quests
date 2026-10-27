@@ -1,5 +1,7 @@
 <script lang="ts">
   import Icon from '@/shared/ui/Icon.svelte'
+  import type { ScriptUse } from '@/shared/api/execution.gen.ts'
+  import { openTarget } from '@/shared/lib/openTarget.ts'
   import { EnvName } from '../model/env.ts'
   import type { ScriptEditor } from '../model/editor.svelte.ts'
   import ChoiceParams from './params/ChoiceParams.svelte'
@@ -17,8 +19,24 @@
   import HttpRunnerParams from './params/HttpRunnerParams.svelte'
   import JsonGetParams from './params/JsonGetParams.svelte'
 
-  /** What the selected node or link is made of, and its parameters. */
-  let { ed, onEditCustom }: { ed: ScriptEditor; onEditCustom?: (type: string) => void } = $props()
+  /** What the selected node or link is made of, and its parameters; with nothing selected, where the script is used. */
+  let { ed, onEditCustom, uses = [] }: { ed: ScriptEditor; onEditCustom?: (type: string) => void; uses?: ScriptUse[] } = $props()
+
+  const USE_WORDS: Record<string, string> = {
+    step: 'Шаг',
+    note: 'Заметка',
+    template: 'Шаблон',
+    template_step: 'Шаг шаблона',
+    hook: 'Хук',
+    quest: 'Квест',
+    questline: 'Квестлайн',
+  }
+  const bound = $derived(uses.filter((u) => !u.via))
+  const texts = $derived(uses.filter((u) => u.via === 'text'))
+  function openUse(u: ScriptUse) {
+    if (u.subject_type === 'hook') openTarget({ kind: 'hook', id: u.subject_id })
+    else openTarget({ kind: 'ref', ref: u.subject_type === 'template_step' ? 'template' : u.subject_type, id: u.subject_id })
+  }
 
   let unfoldError = $state('')
   async function unfold(id: number) {
@@ -140,10 +158,69 @@
       <kbd>V</kbd> — выделение рамкой, <kbd>Del</kbd> — удалить, <kbd>Ctrl+Z</kbd> — отменить.
     </p>
     {#if ed.error}<p class="insp__err">{ed.error}</p>{/if}
+    <div class="insp__uses">
+      <h3>Используется</h3>
+      {#if !uses.length}
+        <p class="explain">Нигде: скрипт не подключён к шагу, заметке, шаблону или хуку и не вставлен в тексты.</p>
+      {/if}
+      {#each bound as u (u.subject_type + u.subject_id)}
+        <button type="button" class="insp__use" onclick={() => openUse(u)}>
+          <span class="insp__use-kind">{USE_WORDS[u.subject_type] ?? u.subject_type}</span>
+          <span class="insp__use-title">{u.title || u.subject_id}</span>
+        </button>
+      {/each}
+      {#if texts.length}
+        <h4>Вставлен в тексты</h4>
+        {#each texts as u (u.subject_type + u.subject_id)}
+          <button type="button" class="insp__use" onclick={() => openUse(u)}>
+            <span class="insp__use-kind">{USE_WORDS[u.subject_type] ?? u.subject_type}</span>
+            <span class="insp__use-title">{u.title || u.subject_id}</span>
+          </button>
+        {/each}
+      {/if}
+    </div>
   {/if}
 </aside>
 
 <style>
+  .insp__uses {
+    display: grid;
+    gap: 0.2rem;
+  }
+  .insp__uses h3,
+  .insp__uses h4 {
+    margin: 0.4rem 0 0.1rem;
+    font-size: var(--text-sm, 0.85rem);
+  }
+  .insp__uses h4 {
+    color: var(--color-fg-muted, #9a9a9a);
+    font-weight: normal;
+  }
+  .insp__use {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.2rem 0.3rem;
+    border: 0;
+    border-radius: var(--radius-sm, 3px);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .insp__use:hover {
+    background: var(--color-bg-muted, #1e1e1e);
+  }
+  .insp__use-kind {
+    flex: 0 0 auto;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-xs, 0.75rem);
+  }
+  .insp__use-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .insp {
     flex: 0 0 18rem;
     overflow: auto;

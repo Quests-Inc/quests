@@ -25,7 +25,8 @@ type Binding struct {
 	NeedsRunner bool
 }
 
-// ScriptUse is a place a script is bound to, or (Via "text") a text that embeds it as script=N{…}.
+// ScriptUse is a place a script is bound to, or (Via "text") a text that embeds it as script=N{…}. For a template step the
+// id is its template's (what the interface opens) and the title is «template · step».
 type ScriptUse struct {
 	SubjectType string `json:"subject_type"`
 	SubjectID   int64  `json:"subject_id"`
@@ -138,7 +139,8 @@ func (s *Store) ScriptUses(ctx context.Context, scriptID int64) ([]ScriptUse, er
 		                (SELECT title FROM questtemplate WHERE id = b.subject_id AND b.subject_type = 'template'), '')
 		FROM script_binding b WHERE b.script_id = ?
 		UNION ALL
-		SELECT 'template_step', id, title FROM questtemplatestep WHERE script_id = ?
+		SELECT 'template_step', template_id, COALESCE((SELECT title FROM questtemplate WHERE id = template_id) || ' · ', '') || title
+		FROM questtemplatestep WHERE script_id = ?
 		UNION ALL
 		SELECT 'hook', id, COALESCE(NULLIF(name, ''), 'хук') FROM hook WHERE script_id = ?
 		ORDER BY 1, 2`, scriptID, scriptID, scriptID)
