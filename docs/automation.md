@@ -147,6 +147,7 @@ what limits it is set in the node: `allow` (hosts the request and its redirects 
 line `#!quests-http` and a JSON request; a runner without this node's support would run it as a shell command and fail. Outputs and
 `failed` are as in `http.get`. The palette groups are Sources, Code on a runner, Parse, Control (compare, any/all of), Logic (expression,
 random, regex, JSON, HTTP), Sinks, Custom; a group folds into its head, and so does a node in the editor (kept in the browser, not in the script).
+In a query value `{path}` is the text that arrived on the `path` input and `{path.0}`, `{path.1}` are its parts between commas, so `script=17{55.75,37.62}` can fill `lat={path.0}&lon={path.1}`; a piece used in the query is not added to the path. `json.get` of type `str` takes a number or a flag as text.
 A hook can wait for any of the events in
 `GET /api/hook-events` (quest, step, note, variable, file), has an area (`scope_kind`: workspace, quest, step, note, note_tree)
 and limits (`cooldown_sec`, `max_per_hour`, `include_private`), and a hook script reads the event through `source.event`.

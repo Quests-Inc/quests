@@ -80,8 +80,8 @@
   <input type="text" bind:value={path} onchange={commit} placeholder="/v1/forecast или /users/&#123;path&#125;" aria-label="Путь" />
 </label>
 <label class="field">
-  <span class="label">Параметры запроса (по строке: имя=значение)</span>
-  <textarea rows="3" bind:value={query} onchange={commit} placeholder="current=temperature_2m" aria-label="Параметры запроса"></textarea>
+  <span class="label">Параметры запроса (по строке: имя=значение; &#123;path&#125;, &#123;path.0&#125;, &#123;path.1&#125; — то, что пришло)</span>
+  <textarea rows="3" bind:value={query} onchange={commit} placeholder="lat=&#123;path.0&#125;" aria-label="Параметры запроса"></textarea>
 </label>
 <label class="field">
   <span class="label">Заголовки (по строке: имя=значение)</span>

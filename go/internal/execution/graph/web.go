@@ -160,14 +160,19 @@ func buildFetchURL(scheme string, p httpParams, ins map[string][]Token) (string,
 	if toks := ins["path"]; len(toks) == 1 && !toks[0].Exit {
 		piece, _ = toks[0].Value.(string)
 	}
-	if strings.Contains(path, "{path}") {
+	inQuery := false
+	for _, v := range p.Query {
+		inQuery = inQuery || strings.Contains(v, "{path")
+	}
+	switch {
+	case strings.Contains(path, "{path}"):
 		path = strings.ReplaceAll(path, "{path}", url.PathEscape(piece))
-	} else if piece != "" {
+	case piece != "" && !inQuery:
 		path = strings.TrimSuffix(path, "/") + "/" + url.PathEscape(piece)
 	}
 	q := url.Values{}
 	for k, v := range p.Query {
-		q.Set(k, v)
+		q.Set(k, fillPiece(v, piece))
 	}
 	if toks := ins["query"]; len(toks) == 1 && !toks[0].Exit {
 		if raw, ok := toks[0].Value.(json.RawMessage); ok {
@@ -196,6 +201,22 @@ func buildFetchURL(scheme string, p httpParams, ins map[string][]Token) (string,
 	}
 	return u, nil
 }
+
+// fillPiece puts the arriving piece into a query value: `{path}` is all of it, `{path.0}`, `{path.1}`… are its parts between
+// commas (`55.75,37.62`), trimmed; a part that is not there is empty. The result is escaped when the query is encoded.
+func fillPiece(v, piece string) string {
+	if !strings.Contains(v, "{path") {
+		return v
+	}
+	parts := strings.Split(piece, ",")
+	for i, part := range parts {
+		v = strings.ReplaceAll(v, "{path."+strconv.Itoa(i)+"}", strings.TrimSpace(part))
+	}
+	v = pieceIndexRe.ReplaceAllString(v, "")
+	return strings.ReplaceAll(v, "{path}", strings.TrimSpace(piece))
+}
+
+var pieceIndexRe = regexp.MustCompile(`\{path\.[0-9]+\}`)
 
 // answerTokens puts an answer on the outputs of a request node: the status always, an error answer on `failed`, a text one
 // as `text` and, when it is JSON, as `body`.
@@ -307,8 +328,13 @@ func runJSONGet(rs *resolved, in Token) (map[string]Token, error) {
 	}
 	switch p.Type {
 	case TStr:
-		if s, ok := cur.(string); ok {
+		switch s := cur.(type) {
+		case string:
 			return val(TStr, s)
+		case float64: // a number or a flag is text too: a reading of a sensor goes to a text as it is
+			return val(TStr, strconv.FormatFloat(s, 'f', -1, 64))
+		case bool:
+			return val(TStr, strconv.FormatBool(s))
 		}
 	case TBool:
 		if b, ok := cur.(bool); ok {
