@@ -214,7 +214,7 @@ func (r *CheckRunner) startHook(ctx context.Context, h execution.Hook, event eve
 		env["QUESTS_QUEST_ID"] = strconv.FormatInt(*questID, 10)
 	}
 	origin := strings.Join(append(slices.Clone(chain), "hook:"+strconv.FormatInt(h.ID, 10)), ">")
-	_, err = r.startRun(ctx, ref, &sid, g, runSubject{Type: subjType, ID: subjID, Event: ev, Origin: origin}, runBinding{
+	_, err = r.startRun(ctx, ref, &sid, g, runSubject{Type: subjType, ID: subjID, Event: ev, Origin: origin, SourceKind: execution.RunSourceHook, SourceID: h.ID}, runBinding{
 		Label: h.RunOn, Kind: execution.JobKindHook, Title: title,
 		Dedupe:  "hook:" + strconv.FormatInt(h.ID, 10) + ":" + rev,
 		Timeout: timeout, ValidFor: hookJobValidFor, QuestID: questID, Env: env,

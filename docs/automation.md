@@ -116,6 +116,27 @@ What a plain `check_command` stands for is an *implicit graph* built in `scriptr
 
 Jobs queued before runs existed have no `run_id` and are served by the older kinds until they finish.
 
+### The run log (quest=489)
+
+Every run lands in `script_run` with what started it: `source_kind` = `step`, `note`, `template` (a bound script or an
+implicit check), `hook`, `embed` (a text's `script=N{…}` with a Code node) or `test`, and `source_id` (migration 0031). Server-only
+embeddings computed on show or click (`?auto`, a click without code) are not stored: they are many and change nothing.
+
+| Route | |
+|---|---|
+| `GET /api/runs?script_id=&source_kind=&source_id=&subject_type=&subject_id=&state=&before=&limit=` | a page of the log, newest first, with the titles of the script, the source and the subject |
+| `GET /api/runs/{id}` | one run: every node of its graph with its state, failure and the values on its outputs (`exits` = outputs that carried nothing), and the runner jobs of its Code nodes |
+| `GET /api/run-stats?kind=hook\|step\|note\|template` | the newest run of each source of a kind and how many started in the last hour (the hook list carries it as `runs`) |
+| `POST /api/scripts/{id}/try` | a test run (owner): `subject {type,id}`, `event` (a made-up event of that kind for `source.event`), `args` (a script with `Args`), `graph` (the unsaved graph, stored on the run as `inline`), `on` (the runner for code), `live` |
+
+A test is **dry** unless `live`: its sinks run and write nothing (`dryHost`); the snapshot still shows what came into them.
+Code goes to the runner for real either way. Finished runs are kept three days, and past that the newest 50 of each source stay
+(`RunsKeptPerSource`), so a hook that fires once a week still shows what it did.
+
+UI: Автоматика → «Запуски» (filters by state and source; a jump from another tab narrows it to one script or one source); the
+script editor has «Запустить на…» and «Запуски этого скрипта»; a hook in the list says when it last ran and how; «Раннеры →
+Недавние» folds the jobs of one source into one line. MCP: `script` actions `runs`, `run`, `try`.
+
 ### Computing inside a text: `script=N{…}`
 
 A markdown text (a note, a step, the map's cards) may hold `script=12{5+3к8}`: a live link that, on click, calls script 12 with the

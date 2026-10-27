@@ -49,6 +49,13 @@ func (h *Handler) listHooks(w http.ResponseWriter, r *http.Request) {
 		hookErr(w, err)
 		return
 	}
+	if stats, err := h.Store.RunStatsOf(r.Context(), execution.RunSourceHook); err == nil {
+		for i := range list {
+			if st, ok := stats[list[i].ID]; ok {
+				list[i].Runs = &st
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, list)
 }
 

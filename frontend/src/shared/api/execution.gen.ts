@@ -135,6 +135,30 @@ export interface EmbedStart {
  * commas, tried in turn (the first one online gets the job). Only the owner writes a workspace value.
  */
 export const RunnerValueName = "runner";
+/**
+ * TryStart is a test run from the editor («Запустить на…»): the script as saved (Version) or as drawn and not saved yet
+ * (Inline), over one entity or one made-up event, or with arguments for a script made for texts. Live false keeps the sinks
+ * from writing: they run and report, nothing changes. A Code node still runs on the runner named by Label.
+ */
+export interface TryStart {
+  ScriptID: number /* int64 */;
+  Version: number /* int */;
+  Graph: Graph;
+  /**
+   * Inline is the unsaved graph as JSON (stored on the run, so a Code node's answer resumes it).
+   */
+  Inline: string /* []byte */;
+  SubjectType: string;
+  SubjectID: number /* int64 */;
+  /**
+   * EventKind makes an event of that kind about the subject for a script that reads `source.event`.
+   */
+  EventKind: string;
+  Args: { [key: string]: string};
+  Live: boolean;
+  Label: string;
+  Scope?: any /* graph.ExprScope */;
+}
 
 //////////
 // source: hooks.go
@@ -176,6 +200,10 @@ export interface Hook {
    */
   script_title?: string;
   needs_runner?: boolean;
+  /**
+   * Runs is how the hook's runs went lately (the newest one, how many in the last hour); filled on list for the UI.
+   */
+  runs?: SourceRunStats;
 }
 /**
  * HookIn is what create and update accept.
@@ -212,6 +240,53 @@ export type Kind = any;
  * Kinds is the set of sources a server runs, asked in order: the first that owns a job gets its outcome.
  */
 export type Kinds = Kind[];
+
+//////////
+// source: runlog.go
+
+/**
+ * RunSummary is one line of the run log.
+ */
+export interface RunSummary {
+  id: number /* int64 */;
+  graph_ref: string;
+  script_id?: number /* int64 */;
+  script_title: string;
+  source_kind: string;
+  source_id: number /* int64 */;
+  source_title: string;
+  subject_type: string;
+  subject_id: number /* int64 */;
+  subject_title: string;
+  state: string;
+  error?: string;
+  dry?: boolean;
+  created_at: string;
+  finished_at?: string;
+}
+/**
+ * RunFilter narrows the run log; zero fields do not filter. Before is a run id: the page that goes on from it.
+ */
+export interface RunFilter {
+  ScriptID: number /* int64 */;
+  SourceKind: string;
+  SourceID: number /* int64 */;
+  SubjectType: string;
+  SubjectID: number /* int64 */;
+  State: string;
+  Before: number /* int64 */;
+  Limit: number /* int */;
+}
+/**
+ * SourceRunStats is how a source's runs went lately: the newest one and how many started in the last hour.
+ */
+export interface SourceRunStats {
+  last_id: number /* int64 */;
+  last_state: string;
+  last_at: string;
+  last_error?: string;
+  last_hour: number /* int */;
+}
 
 //////////
 // source: runner.go
@@ -354,6 +429,10 @@ export interface JobFilter {
   Label: string;
   States: string[];
   StepID: number /* int64 */;
+  /**
+   * RunID: the jobs of one script run (its Code nodes).
+   */
+  RunID: number /* int64 */;
   Limit: number /* int */;
 }
 
@@ -407,7 +486,45 @@ export interface ScriptRun {
    */
   key?: string;
   result?: string;
+  /**
+   * SourceKind and SourceID say what started the run (RunSource*): the step, note or template a script is bound to, a hook,
+   * a text's embedding (the script) or a test from the editor (the script).
+   */
+  source_kind: string;
+  source_id: number /* int64 */;
+  /**
+   * Dry is a test run whose sinks only report what they would write.
+   */
+  dry?: boolean;
 }
+/**
+ * What starts a run (script_run.source_kind).
+ */
+export const RunSourceStep = "step";
+/**
+ * What starts a run (script_run.source_kind).
+ */
+export const RunSourceNote = "note";
+/**
+ * What starts a run (script_run.source_kind).
+ */
+export const RunSourceTemplate = "template";
+/**
+ * What starts a run (script_run.source_kind).
+ */
+export const RunSourceHook = "hook";
+/**
+ * What starts a run (script_run.source_kind).
+ */
+export const RunSourceEmbed = "embed";
+/**
+ * What starts a run (script_run.source_kind).
+ */
+export const RunSourceTest = "test";
+/**
+ * GraphRefInline names the graph a run carries itself (a test of an unsaved script).
+ */
+export const GraphRefInline = "inline";
 /**
  * NewScriptRun describes a run to store.
  */
@@ -418,7 +535,19 @@ export interface NewScriptRun {
   SubjectID: number /* int64 */;
   Snapshot: any /* graph.Snapshot */;
   Key: string;
+  /**
+   * SourceKind / SourceID: what started it; empty means the subject itself.
+   */
+  SourceKind: string;
+  SourceID: number /* int64 */;
+  Dry: boolean;
+  GraphInline: any /* json.RawMessage */;
 }
+/**
+ * RunsKeptPerSource is how many of the newest finished runs of one source stay past the cutoff of PurgeRuns, so a hook that
+ * fires once a week still shows what it did.
+ */
+export const RunsKeptPerSource = 50;
 
 //////////
 // source: scripts.go

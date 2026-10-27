@@ -45,6 +45,8 @@ type Hook struct {
 	// ScriptTitle is filled on list/get for the UI.
 	ScriptTitle string `json:"script_title,omitempty"`
 	NeedsRunner bool   `json:"needs_runner,omitempty"`
+	// Runs is how the hook's runs went lately (the newest one, how many in the last hour); filled on list for the UI.
+	Runs *SourceRunStats `json:"runs,omitempty"`
 }
 
 // HookIn is what create and update accept.

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 )
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
@@ -118,5 +120,41 @@ func TestScriptTextUses(t *testing.T) {
 	}
 	if err := st.DeleteScript(ctx, sc.ID); err != nil {
 		t.Fatalf("an embedding does not hold the script: %v", err)
+	}
+}
+
+// Old finished runs go, except the newest RunsKeptPerSource of each source; a waiting run stays whatever its age.
+func TestPurgeRunsKeepsTheNewestOfEachSource(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	mk := func(kind string, src int64, state string) int64 {
+		id, err := st.CreateRun(ctx, NewScriptRun{GraphRef: "implicit:note_check", SubjectType: "note", SubjectID: 1, SourceKind: kind, SourceID: src})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if state != RunWaiting {
+			if err := st.SaveRun(ctx, id, state, graph.Snapshot{}, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return id
+	}
+	for i := 0; i < RunsKeptPerSource+5; i++ {
+		mk("note", 1, RunDone)
+	}
+	mk("hook", 7, RunFailed)
+	waiting := mk("note", 2, RunWaiting)
+	if _, err := st.DB.Exec(`UPDATE script_run SET finished_at = now() - interval '10 days', created_at = now() - interval '10 days'`); err != nil {
+		t.Fatal(err)
+	}
+	n, err := st.PurgeRuns(ctx, time.Now().Add(-72*time.Hour), RunsKeptPerSource)
+	if err != nil || n != 5 {
+		t.Fatalf("purged %d, want the 5 oldest of note 1: %v", n, err)
+	}
+	if list, _ := st.ListRuns(ctx, RunFilter{SourceKind: "hook", SourceID: 7}); len(list) != 1 {
+		t.Fatalf("the only run of a hook stays: %+v", list)
+	}
+	if _, err := st.GetRun(ctx, waiting); err != nil {
+		t.Fatalf("a waiting run stays: %v", err)
 	}
 }

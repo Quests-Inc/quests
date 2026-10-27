@@ -167,6 +167,7 @@ func main() {
 	checks.Egress, srv.Egress = eg, eg
 	srv.RunnerDone = checks.JobFinished
 	srv.StartEmbedded = checks.StartEmbedded
+	srv.TryRun = checks.TryRun
 	hub.OnPublish(func(p events.Payload) { checks.DispatchHooks(p) })
 	go schedule.RunMaintenanceLoop(ctx, st, hub, windows, checks)
 	go srv.RunProbes(ctx)

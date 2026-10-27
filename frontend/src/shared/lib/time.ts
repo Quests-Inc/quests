@@ -99,3 +99,14 @@ export function remainingFromDeadline(deadlineIso: any, now = Date.now()) {
   if (!d) return null
   return Math.round((d.getTime() - now) / 1000)
 }
+
+/** «только что», «5 мин назад», «3 ч назад», а дальше — дата: как давно что-то случилось. */
+export function ago(value: string | Date | null | undefined, now = Date.now()) {
+  const d = parseApiDate(value)
+  if (!d) return ''
+  const s = Math.max(0, Math.round((now - d.getTime()) / 1000))
+  if (s < 45) return 'только что'
+  if (s < 3600) return `${Math.round(s / 60)} мин назад`
+  if (s < 86_400) return `${Math.round(s / 3600)} ч назад`
+  return formatLocal(d, { year: undefined })
+}

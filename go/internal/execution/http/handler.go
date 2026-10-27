@@ -31,6 +31,8 @@ type Handler struct {
 	Egress *egress.Client
 	// StartEmbedded starts the run of a script with a Code node that a text called (the scheduler's side owns runs).
 	StartEmbedded func(ctx context.Context, in execution.EmbedStart) (int64, error)
+	// TryRun starts a test run from the editor (the scheduler's side owns runs).
+	TryRun func(ctx context.Context, in execution.TryStart) (int64, error)
 }
 
 // Register mounts every route of the context.
@@ -42,6 +44,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerScriptEval(mux)
 	h.registerHooks(mux)
 	h.registerTrash(mux)
+	h.registerRuns(mux)
 }
 
 var writeJSON = httpx.WriteJSON

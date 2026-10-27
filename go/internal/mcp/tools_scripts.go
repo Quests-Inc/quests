@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -11,7 +12,7 @@ import (
 // without one tool per action.
 func scriptTools(c *Client) []Tool {
 	type args struct {
-		Action      string            `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind,custom_list,custom_get,custom_create,custom_update,custom_delete,custom_starters,eval"`
+		Action      string            `json:"action" enum:"list,get,create,update,delete,validate,nodes,samples,bind,unbind,custom_list,custom_get,custom_create,custom_update,custom_delete,custom_starters,eval,runs,run,try"`
 		ID          int64             `json:"id,omitempty" desc:"script id (get/update/delete), the step/note/template id (bind/unbind)"`
 		Version     int               `json:"version,omitempty" desc:"get: a past graph version; update: the version you read (always required)"`
 		Title       string            `json:"title,omitempty" desc:"create (required) / update"`
@@ -23,9 +24,17 @@ func scriptTools(c *Client) []Tool {
 		Subject     string            `json:"subject,omitempty" enum:"step,note,template" desc:"bind/unbind: what to attach the script to"`
 		ScriptID    int64             `json:"script_id,omitempty" desc:"bind / hook_create / hook_update: which script"`
 		Limit       int               `json:"limit,omitempty" desc:"list: default 20, max 100"`
-		Args        map[string]string `json:"args,omitempty" desc:"eval: named arguments of the script's Args node, as text"`
+		Args        map[string]string `json:"args,omitempty" desc:"eval / try: named arguments of the script's Args node, as text"`
+		Source      string            `json:"source,omitempty" enum:"step,note,template,hook,embed,test" desc:"runs: only runs started by this kind of source (with source_id)"`
+		SourceID    int64             `json:"source_id,omitempty" desc:"runs: the step, note, template, hook or script that started them"`
+		State       string            `json:"state,omitempty" enum:"waiting,done,failed" desc:"runs: only runs in this state"`
+		Before      int64             `json:"before,omitempty" desc:"runs: the next page goes on below this run id"`
+		Entity      string            `json:"entity,omitempty" desc:"try: the entity the sources read, kind=id (step=5, note=12, quest=3, template=2)"`
+		Event       string            `json:"event,omitempty" desc:"try: a made-up event of this kind about the entity, for a script that reads source.event (kinds: hook events)"`
+		Live        bool              `json:"live,omitempty" desc:"try: let the sinks write (default: dry, they only report)"`
+		On          string            `json:"on,omitempty" desc:"try: runner label for a script with a Code node (default: the workspace's default runner)"`
 	}
-	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete (to the trash; refused while bound; texts that embed it break until a restore — see trash), validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template), eval (id + args: run a script made of server nodes only, Args → … → Result, and get its value: the same as an embedded `script=N`). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
+	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete (to the trash; refused while bound; texts that embed it break until a restore — see trash), validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template), eval (id + args: run a script made of server nodes only, Args → … → Result, and get its value: the same as an embedded `script=N`), runs (the run log, newest first: id to filter by script, or source+source_id, state, before), run (id: one run with each node's state, output values and runner jobs), try (id: a test run over entity / event / args; dry unless live; read it with run). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
 		func(ctx context.Context, a args) (any, error) {
 			switch a.Action {
 			case "list":
@@ -61,6 +70,20 @@ func scriptTools(c *Client) []Tool {
 					return nil, err
 				}
 				return map[string]any{"value": out["value"], "version": out["version"], "workspace": c.Workspace(ctx)}, nil
+			case "runs":
+				return scriptRuns(ctx, c, a.ID, a.Source, a.SourceID, a.State, a.Before, a.Limit)
+			case "run":
+				if a.ID < 1 {
+					return nil, &Err{422, "run needs id (a run id from runs)"}
+				}
+				var out map[string]any
+				if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/runs/%d", a.ID), nil, nil, &out); err != nil {
+					return nil, err
+				}
+				out["workspace"] = c.Workspace(ctx)
+				return out, nil
+			case "try":
+				return scriptTry(ctx, c, a.ID, a.Entity, a.Event, a.Args, a.Live, a.On)
 			case "samples":
 				return scriptSamples(ctx, c)
 			case "bind":
@@ -70,10 +93,71 @@ func scriptTools(c *Client) []Tool {
 			case "custom_list", "custom_get", "custom_create", "custom_update", "custom_delete", "custom_starters":
 				return scriptCustom(ctx, c, a.Action, a.ID, a.Node)
 			default:
-				return nil, &Err{422, "action: list, get, create, update, delete, validate, nodes, samples, bind, unbind or eval, or custom_list / custom_get / custom_create / custom_update / custom_delete"}
+				return nil, &Err{422, "action: list, get, create, update, delete, validate, nodes, samples, bind, unbind, eval, runs, run or try, or custom_list / custom_get / custom_create / custom_update / custom_delete"}
 			}
 		})
 	return []Tool{s}
+}
+
+func scriptRuns(ctx context.Context, c *Client, scriptID int64, source string, sourceID int64, state string, before int64, limit int) (any, error) {
+	q := url.Values{}
+	if scriptID > 0 {
+		q.Set("script_id", fmt.Sprint(scriptID))
+	}
+	if source != "" {
+		q.Set("source_kind", source)
+	}
+	if sourceID > 0 {
+		q.Set("source_id", fmt.Sprint(sourceID))
+	}
+	if state != "" {
+		q.Set("state", state)
+	}
+	if before > 0 {
+		q.Set("before", fmt.Sprint(before))
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	q.Set("limit", fmt.Sprint(limit))
+	var rows []map[string]any
+	if err := c.Do(ctx, http.MethodGet, "/api/runs?"+q.Encode(), nil, nil, &rows); err != nil {
+		return nil, err
+	}
+	out := map[string]any{"items": rows, "total": len(rows), "workspace": c.Workspace(ctx)}
+	if len(rows) == limit {
+		out["next_before"] = rows[len(rows)-1]["id"]
+	}
+	return out, nil
+}
+
+func scriptTry(ctx context.Context, c *Client, id int64, entity, event string, args map[string]string, live bool, on string) (any, error) {
+	if id < 1 {
+		return nil, &Err{422, "try needs id (the script)"}
+	}
+	body := map[string]any{"live": live}
+	if entity != "" {
+		kind, num, ok := strings.Cut(entity, "=")
+		var n int64
+		if _, err := fmt.Sscan(num, &n); !ok || err != nil || n < 1 {
+			return nil, &Err{422, "entity is kind=id, e.g. note=12"}
+		}
+		body["subject"] = map[string]any{"type": kind, "id": n}
+	}
+	if event != "" {
+		body["event"] = event
+	}
+	if len(args) > 0 {
+		body["args"] = args
+	}
+	if on != "" {
+		body["on"] = on
+	}
+	var out map[string]any
+	if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/scripts/%d/try", id), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return map[string]any{"run": out["run"], "dry": !live, "hint": "read it with action=run", "workspace": c.Workspace(ctx)}, nil
 }
 
 func scriptList(ctx context.Context, c *Client, limit int) (any, error) {

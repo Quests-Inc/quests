@@ -471,7 +471,7 @@ func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
 	if _, err := r.Store.Execution.PurgeEgress(ctx, timeutil.NowUTC().Add(-30*24*time.Hour)); err != nil {
 		log.Printf("checks: purge egress log: %v", err)
 	}
-	if _, err := r.Store.Execution.PurgeRuns(ctx, timeutil.NowUTC().Add(-3*24*time.Hour)); err != nil {
+	if _, err := r.Store.Execution.PurgeRuns(ctx, timeutil.NowUTC().Add(-3*24*time.Hour), execution.RunsKeptPerSource); err != nil {
 		log.Printf("checks: purge script runs: %v", err)
 	}
 }
