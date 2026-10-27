@@ -25,7 +25,7 @@ func scriptTools(c *Client) []Tool {
 		Limit       int               `json:"limit,omitempty" desc:"list: default 20, max 100"`
 		Args        map[string]string `json:"args,omitempty" desc:"eval: named arguments of the script's Args node, as text"`
 	}
-	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete, validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template), eval (id + args: run a script made of server nodes only, Args → … → Result, and get its value: the same as an embedded `script=N`). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
+	s := Typed("script", "Workspace scripts (ADR-0003: graphs of typed nodes). Actions: list (summaries), get (with graph; version for a past save), create (graph or sample id from samples), update (pass version you read), delete (to the trash; refused while bound; texts that embed it break until a restore — see trash), validate (check a graph without saving), nodes (catalog), samples (starters), bind / unbind (subject=step|note|template), eval (id + args: run a script made of server nodes only, Args → … → Result, and get its value: the same as an embedded `script=N`). Custom nodes (baked from nodes or one code node, with editable fields) are custom_* actions; custom_starters installs the starting library (the old samples) as custom nodes. Event hooks that run a script are the `hook` tool. Format: docs/adr/0003-script-graphs.md and docs/automation.md. Owner-only for create/update/delete/bind.",
 		func(ctx context.Context, a args) (any, error) {
 			switch a.Action {
 			case "list":
@@ -43,7 +43,7 @@ func scriptTools(c *Client) []Tool {
 				if err := c.Do(ctx, http.MethodDelete, fmt.Sprintf("/api/scripts/%d", a.ID), nil, nil, nil); err != nil {
 					return nil, err
 				}
-				return ok(ctx, c, a.ID, map[string]any{"deleted": true}), nil
+				return ok(ctx, c, a.ID, map[string]any{"deleted": true, "trashed": true}), nil
 			case "validate":
 				return scriptValidate(ctx, c, a.Graph)
 			case "nodes":

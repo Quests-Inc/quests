@@ -10,6 +10,7 @@
   import { displayEvents } from '@/entities/hook'
   import HookModal from './HookModal.svelte'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
+  import { toastTrashed } from '@/shared/lib/trashUndo.ts'
 
   /** Workspace hooks: the list, and a form to add or change one (a quest's or a step's own card has the same form). */
   let {
@@ -82,9 +83,11 @@
     if (!pending) return
     deleteBusy = true
     try {
-      await deleteHook(pending.id)
+      const id = pending.id
+      await deleteHook(id)
       pending = null
       await load()
+      toastTrashed('hook', [id], 'Хук в корзине', load)
     } catch (e) {
       toast(e instanceof Error && e.message ? e.message : 'Не удалось удалить', { kind: 'error' })
     } finally {
@@ -255,7 +258,7 @@
 <ConfirmModal
   open={pending != null}
   title="Удалить хук?"
-  message={pending ? `Удалить «${pending.name || `хук #${pending.id}`}»?` : ''}
+  message={pending ? `«${pending.name || `хук ${pending.id}`}» уйдёт в корзину на 30 дней и перестанет срабатывать.` : ''}
   busy={deleteBusy}
   onCancel={() => {
     if (!deleteBusy) pending = null

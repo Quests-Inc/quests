@@ -82,7 +82,15 @@ func TestScriptLifecycleAndVersions(t *testing.T) {
 	if err := st.DeleteScript(ctx, sc.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleting twice: %v", err)
 	}
+	// The trash keeps the versions; erasing the script for good takes them.
 	var n int
+	_ = st.DB.QueryRow(`SELECT COUNT(*) FROM script_version WHERE script_id = ?`, sc.ID).Scan(&n)
+	if n != 2 {
+		t.Fatalf("%d versions in the trash, want 2", n)
+	}
+	if err := st.PurgeTrashed(ctx, "script", sc.ID); err != nil {
+		t.Fatal(err)
+	}
 	_ = st.DB.QueryRow(`SELECT COUNT(*) FROM script_version WHERE script_id = ?`, sc.ID).Scan(&n)
 	if n != 0 {
 		t.Fatalf("%d versions survived the script", n)

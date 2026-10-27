@@ -127,7 +127,7 @@ func hookAction(ctx context.Context, c *Client, action string, a hookArgs) (any,
 		if err := c.Do(ctx, http.MethodDelete, fmt.Sprintf("/api/hooks/%d", a.ID), nil, nil, nil); err != nil {
 			return nil, err
 		}
-		return ok(ctx, c, a.ID, map[string]any{"deleted": true}), nil
+		return ok(ctx, c, a.ID, map[string]any{"deleted": true, "trashed": true}), nil
 	}
 	return nil, &Err{422, "action: list, get, create, update, delete or events"}
 }

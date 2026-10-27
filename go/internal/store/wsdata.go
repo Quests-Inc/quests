@@ -64,7 +64,7 @@ var kindTable = map[string]string{
 
 var ExportTables = []TableSpec{
 	{Name: "script", HasID: true, Text: []string{"title", "description"}},
-	{Name: "script_version", FK: map[string]string{"script_id": "script"}},
+	{Name: "script_version", Where: `script_id IN (SELECT id FROM script)`, FK: map[string]string{"script_id": "script"}},
 	{Name: "custom_node", HasID: true, Text: []string{"title", "description"}},
 	{Name: "questcategory", HasID: true},
 	{Name: "questline", HasID: true, FK: map[string]string{"category_id": "questcategory"}, Text: []string{"title", "description"}},

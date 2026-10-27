@@ -3,27 +3,26 @@ import { restoreFromTrash, type TrashItem } from '@/shared/api/client.ts'
 
 import { toast, type ToastAction } from './toasts.svelte.ts'
 
-/** The «Отменить» button for items just moved to the trash. */
-export function trashUndo(kind: TrashItem['kind'], ids: number[]): ToastAction {
+const RESTORED: Record<TrashItem['kind'], string> = {
+  quest: 'Квест восстановлен',
+  note: 'Заметка восстановлена',
+  script: 'Скрипт восстановлен',
+  hook: 'Хук восстановлен',
+}
+
+/** The «Отменить» button for items just moved to the trash; `after` reloads what the page shows. */
+export function trashUndo(kind: TrashItem['kind'], ids: number[], after?: () => unknown): ToastAction {
   return {
     label: 'Отменить',
     run: async () => {
       for (const id of ids) await restoreFromTrash(kind, id)
-      toast(
-        ids.length > 1
-          ? `Восстановлено: ${ids.length}`
-          : kind === 'quest'
-            ? 'Квест восстановлен'
-            : 'Заметка восстановлена',
-        {
-          kind: 'success',
-        }
-      )
+      await after?.()
+      toast(ids.length > 1 ? `Восстановлено: ${ids.length}` : RESTORED[kind], { kind: 'success' })
     },
   }
 }
 
 /** The success toast of a delete, with «Отменить». */
-export function toastTrashed(kind: TrashItem['kind'], ids: number[], message: string) {
-  return toast(message, { kind: 'success', action: trashUndo(kind, ids) })
+export function toastTrashed(kind: TrashItem['kind'], ids: number[], message: string, after?: () => unknown) {
+  return toast(message, { kind: 'success', action: trashUndo(kind, ids, after) })
 }

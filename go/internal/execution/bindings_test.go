@@ -109,3 +109,45 @@ func TestOrphanBindingsAreSwept(t *testing.T) {
 		t.Fatalf("and frees the script: %v", err)
 	}
 }
+
+// A note in the trash keeps its binding: the sweep sees it through the trash policy, so a restored note checks as before.
+// Only a note erased for good frees its script.
+func TestTrashedNoteKeepsBinding(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	if _, err := st.DB.Exec(`INSERT INTO note (id, title, description, created_at, updated_at) VALUES (60, 'N', '', now(), now())`); err != nil {
+		t.Fatal(err)
+	}
+	ns := noteScript(t, st)
+	if err := st.BindScript(ctx, SubjectNote, 60, ns.ID); err != nil {
+		t.Fatal(err)
+	}
+	trash := func(q string) {
+		t.Helper()
+		tx, err := st.DB.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if _, err := tx.Exec(`SELECT set_config('app.trash', '1', true)`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	trash(`UPDATE note SET deleted_at = now() WHERE id = 60`)
+	if n, err := st.PurgeOrphanBindings(ctx); err != nil || n != 0 {
+		t.Fatalf("a trashed note keeps its binding: %d %v", n, err)
+	}
+	if b, _ := st.BindingFor(ctx, SubjectNote, 60); b == nil || b.ScriptID != ns.ID {
+		t.Fatalf("binding after the sweep: %+v", b)
+	}
+	trash(`DELETE FROM note WHERE id = 60`)
+	if n, err := st.PurgeOrphanBindings(ctx); err != nil || n != 1 {
+		t.Fatalf("a note erased for good frees it: %d %v", n, err)
+	}
+}

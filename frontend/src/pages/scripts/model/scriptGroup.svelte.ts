@@ -4,6 +4,7 @@ import type { Script } from '@/shared/api/execution.gen.ts'
 import { copyText } from '@/shared/lib/clipboard.ts'
 import { createMultiSelect } from '@/shared/lib/multiSelect.svelte.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
+import { toastTrashed } from '@/shared/lib/trashUndo.ts'
 
 type Item = { id: string; label?: string; sep?: boolean; danger?: boolean; children?: Item[] }
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -106,14 +107,8 @@ export function createScriptGroup(deps: {
     multi.clear()
     await deps.reload()
     if (done.length) deps.onRemoved(done)
-    toast(
-      failed
-        ? `Удалено: ${done.length}; сервер отказал в ${failed} (скрипт подключён)`
-        : `Удалено скриптов: ${done.length}`,
-      {
-        kind: failed ? 'error' : 'success',
-      }
-    )
+    if (failed) toast(`В корзине: ${done.length}; сервер отказал в ${failed} (скрипт подключён)`, { kind: 'error' })
+    else toastTrashed('script', done, `Скриптов в корзине: ${done.length}`, deps.reload)
   }
 
   /** Action of the group menu on the picked scripts `ids`. */

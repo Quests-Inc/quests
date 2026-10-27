@@ -19,16 +19,18 @@ function fakeFetch(routes: Record<string, unknown>) {
   return calls
 }
 
-test('listTrash: квесты и заметки одним списком, свежеудалённое первым', async () => {
+test('listTrash: квесты, заметки, скрипты и хуки одним списком, свежеудалённое первым', async () => {
   fakeFetch({
     'GET /api/trash/quests': [{ kind: 'quest', id: 1, title: 'q', deleted_at: '2026-10-17 10:00:00' }],
     'GET /api/trash/notes': [
       { kind: 'note', id: 7, title: 'n', deleted_at: '2026-10-17 12:00:00' },
       { kind: 'note', id: 8, title: 'old', deleted_at: '2026-10-16 09:00:00' },
     ],
+    'GET /api/trash/scripts': [{ kind: 'script', id: 4, title: 's', deleted_at: '2026-10-17 11:00:00' }],
+    'GET /api/trash/hooks': [],
   })
   const items = await listTrash()
-  expect(items.map((i) => `${i.kind}:${i.id}`)).toEqual(['note:7', 'quest:1', 'note:8'])
+  expect(items.map((i) => `${i.kind}:${i.id}`)).toEqual(['note:7', 'script:4', 'quest:1', 'note:8'])
 })
 
 test('restore, purge и очистка идут в нужные маршруты по виду сущности', async () => {
@@ -37,6 +39,8 @@ test('restore, purge и очистка идут в нужные маршруты
     'DELETE /api/trash/notes/9': null,
     'DELETE /api/trash/quests': null,
     'DELETE /api/trash/notes': null,
+    'DELETE /api/trash/hooks': null,
+    'DELETE /api/trash/scripts': null,
   })
   await restoreFromTrash('quest', 3)
   await purgeFromTrash('note', 9)
@@ -46,5 +50,7 @@ test('restore, purge и очистка идут в нужные маршруты
     'DELETE /api/trash/notes/9',
     'DELETE /api/trash/quests',
     'DELETE /api/trash/notes',
+    'DELETE /api/trash/hooks',
+    'DELETE /api/trash/scripts',
   ])
 })

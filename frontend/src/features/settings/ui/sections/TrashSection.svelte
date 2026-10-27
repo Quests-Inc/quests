@@ -43,7 +43,14 @@
     }
   }
 
-  const restore = (t: TrashItem) => act(() => restoreFromTrash(t.kind, t.id), t.kind === 'quest' ? 'Квест восстановлен' : 'Заметка восстановлена')
+  const KIND: Record<TrashItem['kind'], { name: string; restored: string }> = {
+    quest: { name: 'квест', restored: 'Квест восстановлен' },
+    note: { name: 'заметка', restored: 'Заметка восстановлена' },
+    script: { name: 'скрипт', restored: 'Скрипт восстановлен' },
+    hook: { name: 'хук', restored: 'Хук восстановлен' },
+  }
+
+  const restore = (t: TrashItem) => act(() => restoreFromTrash(t.kind, t.id), KIND[t.kind].restored)
 
   async function doPurge() {
     const c = confirm
@@ -59,9 +66,10 @@
   }
 
   function meta(t: TrashItem) {
-    const parts = [t.kind === 'quest' ? 'квест' : 'заметка']
+    const parts = [KIND[t.kind].name]
     if (t.kind === 'quest' && t.steps_total) parts.push(`шаги ${t.steps_done ?? 0}/${t.steps_total}`)
     if (t.kind === 'note' && t.children) parts.push(`дочерних: ${t.children}`)
+    if (t.kind === 'hook' && t.script_trashed) parts.push('скрипт тоже в корзине')
     parts.push(`удалено ${formatLocal(t.deleted_at, { year: undefined })}`)
     const left = daysLeft(t)
     if (left != null) parts.push(`сотрётся через ${left} дн.`)
@@ -76,8 +84,8 @@
 </script>
 
 <SettingsBlock
-  title="Удалённые квесты и заметки"
-  hint="Удаление не стирает данные: квест или заметка лежит здесь 30 дней вместе со шагами, вложениями и секретами. Заметка возвращается под своего родителя вместе с дочерними."
+  title="Удалённое"
+  hint="Удаление не стирает данные: квест, заметка, скрипт или хук лежит здесь 30 дней вместе со шагами, вложениями, секретами и версиями. Заметка возвращается под своего родителя вместе с дочерними, хук — только после своего скрипта."
 >
   {#if loading}
     <p class="hint">Загрузка…</p>
@@ -90,10 +98,10 @@
       {#each items as t (t.kind + t.id)}
         <li class="row">
           <div class="row__text">
-            <span class="row__title">{t.title || `${t.kind}=${t.id}`}</span>
+            <span class="row__title">{t.title || `${KIND[t.kind].name} ${t.id}`}</span>
             <span class="row__meta">{meta(t)}</span>
           </div>
-          <button type="button" class="btn btn--ghost btn--icon" title="Восстановить" aria-label="Восстановить" disabled={busy} onclick={() => restore(t)}>
+          <button type="button" class="btn btn--ghost btn--icon" title={t.script_trashed ? 'Сначала восстановите скрипт этого хука' : 'Восстановить'} aria-label="Восстановить" disabled={busy || t.script_trashed} onclick={() => restore(t)}>
             <Icon name="undo" size={16} />
           </button>
           <button type="button" class="btn btn--ghost btn--icon" title="Стереть навсегда" aria-label="Стереть навсегда" disabled={busy} onclick={() => (confirm = { item: t })}>

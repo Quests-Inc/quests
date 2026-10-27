@@ -10,6 +10,7 @@
     type HookEventsCatalog,
   } from '@/shared/api/client.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
+  import { toastTrashed } from '@/shared/lib/trashUndo.ts'
   import HookForm from './HookForm.svelte'
   import { displayEvents, newHookDraft, type HookDraft } from '../model/events.ts'
 
@@ -182,7 +183,6 @@
 
   async function remove(row: { id: number }) {
     if (!canEdit) return
-    if (!confirm(`Удалить хук?`)) return
     try {
       if (!live) {
         drafts = drafts.filter((d) => d.localId !== row.id)
@@ -192,6 +192,7 @@
       await deleteHook(row.id)
       if (editingId === row.id) cancelForm()
       await loadLive()
+      toastTrashed('hook', [row.id], 'Хук в корзине', loadLive)
     } catch (e) {
       toast(errMsg(e, 'Не удалось удалить'), { kind: 'error' })
     }
