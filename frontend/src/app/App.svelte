@@ -359,7 +359,11 @@
       setTab: (name: any) => setView(name),
       currentTab: () => nav.view,
     }
-    setOpenTarget((t) => nav.openTarget(t))
+    setOpenTarget((t) => {
+      // A jump to another tab leaves the template window behind (it is where a template's runs are opened from).
+      if (t.kind !== 'ref' || t.ref !== 'template') templatesOpen = false
+      nav.openTarget(t)
+    })
 
     applyTheme(loadSavedTheme())
     // A 401 from any later call means the session lapsed — fall back to login.

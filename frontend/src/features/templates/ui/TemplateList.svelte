@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { TemplateRead } from '@/shared/api/automation.gen'
   import Icon from '@/shared/ui/Icon.svelte'
+  import { getRunStats } from '@/shared/api/client.ts'
+  import type { SourceRunStats } from '@/shared/api/execution.gen.ts'
+  import { openTarget } from '@/shared/lib/openTarget.ts'
 
   /** Список шаблонов в окне: строка с названием и сводкой, быстрые действия и переключатель «включён». */
   let {
@@ -26,6 +29,16 @@
     onCopy(t: TemplateRead, e: Event): void
     onToggleEnabled(t: TemplateRead): void
   } = $props()
+
+  /** The latest emit run of each template that prints its quest by a command or a script (quest=490). */
+  let runs = $state<Record<string, SourceRunStats>>({})
+  const RUN_WORDS: Record<string, string> = { done: 'последний эмит прошёл', failed: 'последний эмит упал', waiting: 'эмит ждёт раннер' }
+  $effect(() => {
+    if (!templates.some((t) => t.emit_pool_command || t.script_id)) return
+    void getRunStats('template')
+      .then((m) => (runs = m ?? {}))
+      .catch(() => {})
+  })
 </script>
 
   <div class="modal__body">
@@ -58,6 +71,18 @@
               <span class="tpl-row__meta">{rowMeta(t)}</span>
             </button>
             <div class="tpl-row__actions">
+              {#if t.emit_pool_command || t.script_id}
+                {@const last = runs[String(t.id)]}
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--icon tpl-row__runs tpl-row__runs--{last?.last_state ?? 'none'}"
+                  onclick={() => openTarget({ kind: 'runs', source: { kind: 'template', id: t.id }, run: last?.last_id })}
+                  title={last ? `${RUN_WORDS[last.last_state] ?? last.last_state}. Запуски эмита` : 'Запуски эмита'}
+                  aria-label="Запуски эмита"
+                >
+                  <Icon name="list" size={14} />
+                </button>
+              {/if}
               <button
                 type="button"
                 class="btn btn--ghost btn--icon"
@@ -152,6 +177,12 @@
     font-weight: 500;
   }
 
+  .tpl-row__runs--done {
+    color: var(--color-success, #7a9e3a);
+  }
+  .tpl-row__runs--failed {
+    color: var(--color-danger, #b54a3a);
+  }
   .tpl-row__meta {
     font-size: var(--text-xs, 0.75rem);
     color: var(--color-fg-muted, #9a9a9a);
