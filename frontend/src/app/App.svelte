@@ -6,6 +6,8 @@
   import { RunnersPage } from '@/pages/runners'
   import { ScriptsPage } from '@/pages/scripts'
   import { HooksPage } from '@/pages/hooks'
+  import { RunsPage } from '@/pages/runs'
+  import { setOpenTarget } from '@/shared/lib/openTarget.ts'
   import { GraphPage } from '@/pages/graph'
   import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
@@ -357,6 +359,7 @@
       setTab: (name: any) => setView(name),
       currentTab: () => nav.view,
     }
+    setOpenTarget((t) => nav.openTarget(t))
 
     applyTheme(loadSavedTheme())
     // A 401 from any later call means the session lapsed — fall back to login.
@@ -643,6 +646,8 @@
     <div class="journal__hooks">
       <HooksPage active={nav.view === 'hooks'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
+  {:else if nav.view === 'runs'}
+    <div class="journal__runs"><RunsPage active={nav.view === 'runs'} /></div>
   {:else if nav.view === 'history'}
     <div class="journal__history">
       <HistoryPage

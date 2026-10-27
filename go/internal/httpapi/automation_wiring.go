@@ -78,6 +78,12 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 				}
 				return s.StartEmbedded(ctx, in)
 			},
+			TryRun: func(ctx context.Context, in execution.TryStart) (int64, error) {
+				if s.TryRun == nil {
+					return 0, errors.New("раннеры здесь не подключены")
+				}
+				return s.TryRun(ctx, in)
+			},
 			RunnerDone: func(ctx context.Context, j execution.RunnerJob) {
 				if s.RunnerDone != nil {
 					s.RunnerDone(ctx, j)

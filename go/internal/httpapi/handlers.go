@@ -79,6 +79,8 @@ type Server struct {
 	Egress *egress.Client
 	// StartEmbedded starts the run of an embedded script that has a Code node; the scheduler's runner owns it.
 	StartEmbedded func(ctx context.Context, in execution.EmbedStart) (int64, error)
+	// TryRun starts a test run from the script editor; the scheduler's runner owns it.
+	TryRun func(ctx context.Context, in execution.TryStart) (int64, error)
 	// WebDAV stores attachment bytes. Nil/unconfigured disables uploads.
 	WebDAV *webdav.Client
 	// ClamAV scans uploads. Unconfigured refuses uploads rather than storing

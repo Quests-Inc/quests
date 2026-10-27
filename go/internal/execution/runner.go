@@ -480,7 +480,9 @@ type JobFilter struct {
 	Label  string
 	States []string
 	StepID int64
-	Limit  int
+	// RunID: the jobs of one script run (its Code nodes).
+	RunID int64
+	Limit int
 }
 
 func (s *Store) ListRunnerJobs(ctx context.Context, f JobFilter) ([]RunnerJob, error) {
@@ -493,6 +495,10 @@ func (s *Store) ListRunnerJobs(ctx context.Context, f JobFilter) ([]RunnerJob, e
 	if f.StepID != 0 {
 		q += ` AND step_id = ?`
 		args = append(args, f.StepID)
+	}
+	if f.RunID != 0 {
+		q += ` AND run_id = ?`
+		args = append(args, f.RunID)
 	}
 	if len(f.States) > 0 {
 		q += ` AND state IN (` + strings.TrimSuffix(strings.Repeat("?,", len(f.States)), ",") + `)`

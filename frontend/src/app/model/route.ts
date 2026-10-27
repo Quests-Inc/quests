@@ -1,7 +1,7 @@
 // Адресная строка приложения: какая вкладка и какой объект открыт, и обратно.
 // Параметры `tab` / `quest=` / `note=` / `attachment=` никогда не живут в строке вместе.
 
-const TABS = ['notes', 'attachments', 'calendar', 'history', 'graph', 'runners', 'scripts', 'hooks'] as const
+const TABS = ['notes', 'attachments', 'calendar', 'history', 'graph', 'runners', 'scripts', 'hooks', 'runs'] as const
 export type UrlTab = (typeof TABS)[number]
 
 function param(name: string): string | null {
@@ -28,21 +28,7 @@ export function tabFromUrl(): UrlTab | null {
   return (TABS as readonly string[]).includes(raw ?? '') ? (raw as UrlTab) : null
 }
 
-/** Rewrite the query from scratch — tab / quest= / note= / attachment= never share the bar. */
-export function replaceSearch(params: Record<string, unknown>) {
-  try {
-    const qs = new URLSearchParams()
-    for (const [key, value] of Object.entries(params)) {
-      if (value != null && value !== '') qs.set(key, String(value))
-    }
-    const next = `${location.pathname}${qs.toString() ? `?${qs}` : ''}`
-    if (next !== `${location.pathname}${location.search}`) {
-      history.replaceState(null, '', next)
-    }
-  } catch {
-    /* ignore */
-  }
-}
+export { replaceSearch } from '@/shared/lib/urlSearch.ts'
 
 /** What the address bar should say for a view, given what is selected in it. */
 export function searchForView(
@@ -74,6 +60,7 @@ export type ViewName =
   | 'runners'
   | 'scripts'
   | 'hooks'
+  | 'runs'
 
 /** Where the app opens from the address: which tab, which object is selected, the map's centre. */
 export function initialRoute(): {

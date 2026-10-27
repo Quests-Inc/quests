@@ -98,3 +98,22 @@ func (s *Store) workspaceRunner(ctx context.Context) string {
 	}
 	return ""
 }
+
+// TryStart is a test run from the editor («Запустить на…»): the script as saved (Version) or as drawn and not saved yet
+// (Inline), over one entity or one made-up event, or with arguments for a script made for texts. Live false keeps the sinks
+// from writing: they run and report, nothing changes. A Code node still runs on the runner named by Label.
+type TryStart struct {
+	ScriptID int64
+	Version  int
+	Graph    graph.Graph
+	// Inline is the unsaved graph as JSON (stored on the run, so a Code node's answer resumes it).
+	Inline      []byte
+	SubjectType string
+	SubjectID   int64
+	// EventKind makes an event of that kind about the subject for a script that reads `source.event`.
+	EventKind string
+	Args      map[string]string
+	Live      bool
+	Label     string
+	Scope     *graph.ExprScope
+}

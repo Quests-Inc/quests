@@ -24,7 +24,23 @@ type scriptHost struct {
 	subj runSubject
 }
 
-func (r *CheckRunner) hostFor(s runSubject) graph.Host { return scriptHost{r: r, subj: s} }
+func (r *CheckRunner) hostFor(s runSubject) graph.Host {
+	if s.Dry {
+		return dryHost{scriptHost{r: r, subj: s}}
+	}
+	return scriptHost{r: r, subj: s}
+}
+
+// dryHost is the host of a test run: sources read as usual, sinks write nothing. What a sink would have written is on the
+// links into it, which the run's snapshot keeps; Result still hands its text back, since that is the answer of the test.
+type dryHost struct{ scriptHost }
+
+func (h dryHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.Token) error {
+	if n.Type == "sink.result" {
+		return h.scriptHost.Sink(ctx, n, in)
+	}
+	return nil
+}
 
 func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, error) {
 	kind := strings.TrimPrefix(n.Type, "source.")

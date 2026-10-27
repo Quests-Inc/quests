@@ -39,6 +39,12 @@ type runSubject struct {
 	Now    time.Time
 	Took   time.Duration
 	Stderr string
+	// SourceKind / SourceID: what started the run when it is not the subject itself (a hook, an embedding, a test).
+	SourceKind string
+	SourceID   int64
+	// Dry: a test whose sinks only report (dryHost); Inline is the unsaved graph a test carries.
+	Dry    bool
+	Inline []byte
 }
 
 // runBinding is how the script is attached to its subject: which runner, how long, and what the job is called.
@@ -66,27 +72,34 @@ const implicitPrefix = "implicit:"
 // startRun evaluates the graph as far as it goes and queues a job for every Code node that is ready. It reports whether it
 // queued anything: false means an open job for the same binding already exists (nothing piles up while a device is away).
 func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64, g graph.Graph, subj runSubject, b runBinding) (bool, error) {
+	_, queued, err := r.startRunID(ctx, ref, scriptID, g, subj, b)
+	return queued, err
+}
+
+// startRunID is startRun that also says which run it stored (0 when none is left: a dropped duplicate).
+func (r *CheckRunner) startRunID(ctx context.Context, ref string, scriptID *int64, g graph.Graph, subj runSubject, b runBinding) (int64, bool, error) {
 	g, reg, err := r.expand(ctx, g)
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	run, err := graph.NewRun(g, reg)
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	run.Fetch = r.fetcher(scriptID)
 	// The run is stored before it advances: its sinks may hand a result back through it.
 	initial, err := run.Snapshot()
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	key := b.Key
 	if key == "" && subj.Origin != "" {
 		key = originKeyPrefix + subj.Origin
 	}
-	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID, Snapshot: initial, Key: key})
+	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{GraphRef: ref, ScriptID: scriptID, SubjectType: subj.Type, SubjectID: subj.ID,
+		Snapshot: initial, Key: key, SourceKind: subj.SourceKind, SourceID: subj.SourceID, Dry: subj.Dry, GraphInline: subj.Inline})
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	subj.RunID = id
 	reqs, advErr := run.Advance(ctx, r.hostFor(subj))
@@ -95,28 +108,28 @@ func (r *CheckRunner) startRun(ctx context.Context, ref string, scriptID *int64,
 	}
 	snap, err := run.Snapshot()
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	state, errText := runState(run, advErr)
 	if err := r.Store.Execution.SaveRun(ctx, id, state, snap, errText); err != nil {
-		return false, err
+		return 0, false, err
 	}
 	if len(reqs) == 0 {
-		return true, nil
+		return id, true, nil
 	}
 	for i, req := range reqs {
 		created, err := r.enqueueCode(ctx, id, req, b, len(reqs) > 1, i)
 		if err != nil {
 			_ = r.Store.Execution.SaveRun(ctx, id, execution.RunFailed, snap, err.Error())
-			return false, err
+			return 0, false, err
 		}
 		if !created {
 			// The same binding already has an open job: this run is not needed.
 			_ = r.Store.Execution.DeleteRun(ctx, id)
-			return false, nil
+			return 0, false, nil
 		}
 	}
-	return true, nil
+	return id, true, nil
 }
 
 // fetcher is what an `http.get` node of a run of this script sends its request with.
@@ -169,6 +182,7 @@ func (r *CheckRunner) StartEmbedded(ctx context.Context, in execution.EmbedStart
 	id, err := r.Store.Execution.CreateRun(ctx, execution.NewScriptRun{
 		GraphRef: fmt.Sprintf("script:%d:%d", in.ScriptID, in.Version), ScriptID: &sid,
 		SubjectType: kind, SubjectID: in.HostID, Snapshot: snap, Key: execution.EmbedKeyPrefix + hex.EncodeToString(salt[:]),
+		SourceKind: execution.RunSourceEmbed, SourceID: in.ScriptID,
 	})
 	if err != nil {
 		return 0, err
@@ -177,7 +191,7 @@ func (r *CheckRunner) StartEmbedded(ctx context.Context, in execution.EmbedStart
 		_ = r.Store.Execution.SetRunResult(ctx, id, out)
 	}
 	b := runBinding{
-		Label: in.Label, Kind: execution.JobKindOnce, Title: fmt.Sprintf("Вставка · script=%d", in.ScriptID),
+		Label: in.Label, Kind: execution.JobKindOnce, Title: "Вставка · " + r.scriptTitle(ctx, in.ScriptID),
 		Dedupe: "embed:" + strconv.FormatInt(id, 10), Timeout: embedTimeout, ValidFor: embedValidFor,
 	}
 	hid := in.HostID
@@ -375,7 +389,7 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 	if embedded {
 		rn.Scope = r.embedScopeOf(ctx, run)
 	}
-	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID, Now: now, Stderr: truncate(j.Stderr, 4000)}
+	subj := runSubject{Type: run.SubjectType, ID: run.SubjectID, RunID: run.ID, Now: now, Stderr: truncate(j.Stderr, 4000), Dry: run.Dry}
 	if chain, ok := strings.CutPrefix(run.Key, originKeyPrefix); ok {
 		subj.Origin = chain
 	}
@@ -386,7 +400,9 @@ func (r *CheckRunner) finishRun(ctx context.Context, j execution.RunnerJob, now 
 		subj.Period = parts[1] // a template's emit: emit:<template>|<period>|<script version or command hash>
 	}
 	reqs, advErr := rn.Resume(ctx, r.hostFor(subj), *j.RunNode, outcome)
-	r.afterResume(ctx, subj, outcome, g, rn)
+	if !subj.Dry {
+		r.afterResume(ctx, subj, outcome, g, rn)
+	}
 	if advErr != nil {
 		log.Printf("script run %d: %v", run.ID, advErr)
 	}
@@ -439,6 +455,9 @@ func (r *CheckRunner) expand(ctx context.Context, g graph.Graph) (graph.Graph, g
 
 // graphOf finds the graph a run executes.
 func (r *CheckRunner) graphOf(ctx context.Context, run execution.ScriptRun) (graph.Graph, error) {
+	if run.GraphRef == execution.GraphRefInline {
+		return graph.Decode(run.GraphInline)
+	}
 	if name, ok := strings.CutPrefix(run.GraphRef, implicitPrefix); ok {
 		g, ok := graph.Implicit(name, "-") // the text of the Code node matters only when the job is queued
 		if !ok {

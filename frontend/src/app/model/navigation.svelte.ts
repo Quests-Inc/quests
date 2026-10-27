@@ -1,6 +1,7 @@
 // Навигация приложения: открытая вкладка, выбранный квест / заметка / вложение, центр карты и адресная строка.
 // Всё, что «открывает» сущность из интерфейса (ссылки, карта, календарь), проходит здесь, чтобы адрес и выбор не расходились.
 import { initialRoute, replaceSearch, searchForView as searchForRoute } from '@/app/model/route.ts'
+import { searchOfTarget, type OpenTarget } from '@/shared/lib/openTarget.ts'
 
 export type View =
   | 'journal'
@@ -12,6 +13,7 @@ export type View =
   | 'runners'
   | 'scripts'
   | 'hooks'
+  | 'runs'
 export type GraphRoot = { type: 'quest' | 'note' | 'questline' | null; id: number | null }
 
 /** Порядок вкладок в шапке: определяет, в какую сторону «уезжает» переключение. */
@@ -25,6 +27,7 @@ export const TAB_ORDER: View[] = [
   'runners',
   'scripts',
   'hooks',
+  'runs',
 ]
 
 const validId = (id: unknown) => {
@@ -106,6 +109,18 @@ export function createNavigation(deps: {
     slideTo('history')
     replaceSearch({ tab: 'history', day: dayKey })
     view = 'history'
+  }
+
+  /** A tab with something picked in it (runs filtered, a script, a hook): the address first, the page reads it when it shows. */
+  function openTarget(t: OpenTarget) {
+    if (t.kind === 'ref') return openRef(t.ref, t.id)
+    const search = searchOfTarget(t)
+    if (!search) return
+    const next = String(search.tab) as View
+    slideTo(next)
+    replaceSearch(search)
+    view = next
+    window.dispatchEvent(new CustomEvent('quests:route', { detail: search }))
   }
 
   function selectQuest(id: number, { pushUrl = true } = {}) {
@@ -219,6 +234,7 @@ export function createNavigation(deps: {
     openGraph,
     onGraphCenter,
     openHistoryDay,
+    openTarget,
     selectQuest,
     selectNote,
     selectAttachment,

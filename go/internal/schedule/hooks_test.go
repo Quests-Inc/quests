@@ -231,4 +231,9 @@ func TestHookWritingAVariableDoesNotLoop(t *testing.T) {
 	if got := read(); got != "hp" {
 		t.Fatalf("the hook woke itself: mirror = %q", got)
 	}
+	// The run log says the hook started it.
+	runs, err := st.Execution.ListRuns(ctx, execution.RunFilter{SourceKind: execution.RunSourceHook})
+	if err != nil || len(runs) != 1 || runs[0].SourceTitle != "зеркало" || runs[0].ScriptTitle != "зеркало" || runs[0].State != execution.RunDone {
+		t.Fatalf("hook runs: %+v %v", runs, err)
+	}
 }

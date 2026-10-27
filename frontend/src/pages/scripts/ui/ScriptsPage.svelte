@@ -14,6 +14,8 @@
   import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
   import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import BakeModal from './BakeModal.svelte'
+  import TryModal from './TryModal.svelte'
+  import { openTarget } from '@/shared/lib/openTarget.ts'
   import CodeNodeModal from './CodeNodeModal.svelte'
   import Inspector from './Inspector.svelte'
   import NodeMetaModal from './NodeMetaModal.svelte'
@@ -58,13 +60,30 @@
   // 'leave' asks before dropping unsaved edits for another script; 'delete' before removing this one.
   let ask = $state<{ kind: 'leave'; id: number | null } | { kind: 'delete'; id: number } | null>(null)
 
+  let tryOpen = $state(false)
+  /** Code goes to a runner: a node of the code kind, or a saved script the server says needs one. */
+  const needsRunner = $derived(
+    ed.graph.nodes.some((n) => ed.meta(n.type).kind === 'code') ||
+      (!ed.dirty && Boolean(scriptsList.items.find((x) => x.id === selectedId)?.needs_runner))
+  )
+
+  /** `?tab=scripts&script=N` (a jump from a hook, a run…) opens that script. */
+  function openFromUrl() {
+    const id = Number(new URL(location.href).searchParams.get('script'))
+    if (Number.isFinite(id) && id > 0 && id !== selectedId) pick(id)
+  }
+
   $effect(() => {
     if (!active) return
     untrack(() => {
       void loadScripts(true)
       void loadCustomNodes(true)
       if (!samples.length) void getScriptSamples().then((x) => (samples = x)).catch(() => {})
+      openFromUrl()
     })
+    const onRoute = () => untrack(openFromUrl)
+    window.addEventListener('quests:route', onRoute)
+    return () => window.removeEventListener('quests:route', onRoute)
   })
 
   async function openScript(id: number) {
@@ -314,6 +333,25 @@
           <button
             type="button"
             class="btn btn--icon"
+            title="Запустить на… — проверить скрипт на шаге, заметке, событии или аргументах"
+            aria-label="Запустить на…"
+            disabled={!ed.graph.nodes.length || busy}
+            onclick={() => (tryOpen = true)}
+          >
+            <Icon name="target" />
+          </button>
+          <button
+            type="button"
+            class="btn btn--icon"
+            title="Запуски этого скрипта"
+            aria-label="Запуски этого скрипта"
+            onclick={() => selectedId != null && openTarget({ kind: 'runs', script: selectedId })}
+          >
+            <Icon name="list" />
+          </button>
+          <button
+            type="button"
+            class="btn btn--icon"
             disabled={!ed.dirty || ed.saving || busy}
             title={ed.saving ? 'Сохранение…' : 'Сохранить (Ctrl+S)'}
             aria-label="Сохранить"
@@ -363,6 +401,15 @@
   </section>
 </SidebarLayout>
 
+<TryModal
+  open={tryOpen}
+  scriptId={selectedId}
+  graph={ed.graph}
+  dirty={ed.dirty}
+  subjects={ed.subjects}
+  {needsRunner}
+  onClose={() => (tryOpen = false)}
+/>
 <CodeNodeModal
   open={codeModal.open}
   editing={codeModal.editing}

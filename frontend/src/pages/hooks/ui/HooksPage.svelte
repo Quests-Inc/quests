@@ -11,6 +11,10 @@
   import HookModal from './HookModal.svelte'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { toastTrashed } from '@/shared/lib/trashUndo.ts'
+  import { openTarget } from '@/shared/lib/openTarget.ts'
+  import { ago } from '@/shared/lib/time.ts'
+
+  const RUN_WORDS: Record<string, string> = { done: '✓ сработал', failed: '✗ ошибка', waiting: '… ждёт раннер' }
 
   /** Workspace hooks: the list, and a form to add or change one (a quest's or a step's own card has the same form). */
   let {
@@ -41,9 +45,22 @@
     }
   }
 
+  /** `?tab=hooks&hook=N` (a jump from the run log) opens that hook's form once the list is there. */
+  async function openFromUrl() {
+    const id = Number(new URL(location.href).searchParams.get('hook'))
+    if (!Number.isFinite(id) || id < 1) return
+    await load()
+    const h = hooks.find((x) => x.id === id)
+    if (h) openForm(h)
+  }
+
   $effect(() => {
     if (!active) return
     void load()
+    void openFromUrl()
+    const onRoute = (): void => void openFromUrl()
+    window.addEventListener('quests:route', onRoute)
+    return () => window.removeEventListener('quests:route', onRoute)
   })
 
   let filtered = $derived.by(() => {
@@ -205,6 +222,21 @@
               <span>{h.script_title || `скрипт ${h.script_id}`}</span>
               {#if h.run_on}<span>{h.run_on}</span>{/if}
             </div>
+            <button
+              type="button"
+              class="hookpage__runs hookpage__runs--{h.runs?.last_state ?? 'none'}"
+              title={h.runs?.last_error || 'Запуски этого хука'}
+              onclick={(e) => {
+                e.stopPropagation()
+                openTarget({ kind: 'runs', source: { kind: 'hook', id: h.id }, run: h.runs?.last_id })
+              }}
+            >
+              {#if h.runs}
+                {RUN_WORDS[h.runs.last_state] ?? h.runs.last_state} {ago(h.runs.last_at)}{h.runs.last_hour ? ` · за час: ${h.runs.last_hour}` : ''}
+              {:else}
+                ещё не срабатывал
+              {/if}
+            </button>
           </div>
           <div class="hookpage__acts">
             <button
@@ -334,6 +366,28 @@
   .hookpage__n {
     font-variant-numeric: tabular-nums;
     opacity: 0.7;
+  }
+
+  .hookpage__runs {
+    display: block;
+    justify-self: start;
+    margin-top: 0.15rem;
+    text-align: left;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-xs, 0.75rem);
+    cursor: pointer;
+  }
+  .hookpage__runs:hover {
+    text-decoration: underline;
+  }
+  .hookpage__runs--done {
+    color: var(--color-success, #7a9e3a);
+  }
+  .hookpage__runs--failed {
+    color: var(--color-danger, #b54a3a);
   }
 
   .hookpage__list {

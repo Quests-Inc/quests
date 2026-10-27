@@ -3,8 +3,9 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import { cancelRunnerJob, createRunner, deleteRunner, getRunnerJobs, getRunners } from '@/shared/api/client.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
-  import { parseApiDate } from '@/shared/lib/time.ts'
+  import { formatLocal, parseApiDate } from '@/shared/lib/time.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
+  import { openTarget } from '@/shared/lib/openTarget.ts'
 
   /**
    * Devices that run checks for us, and what they are doing: who is online,
@@ -28,6 +29,20 @@
   let running = $derived(jobs.filter((j) => j.state === 'assigned' || j.state === 'running'))
   let queued = $derived(jobs.filter((j) => j.state === 'queued'))
   let finished = $derived(jobs.filter((j) => !OPEN_STATES.includes(j.state)))
+  /** Finished jobs by what queued them (a step, a note, a template, else the title): a check every 5 minutes is one line. */
+  const groupKey = (j: any) =>
+    j.step_id ? `step:${j.step_id}` : j.note_id ? `note:${j.note_id}` : j.template_id ? `template:${j.template_id}` : `title:${j.title}`
+  let groups = $derived.by(() => {
+    const m = new Map<string, any[]>()
+    for (const j of finished) {
+      const k = groupKey(j)
+      const list = m.get(k)
+      if (list) list.push(j)
+      else m.set(k, [j])
+    }
+    return [...m.entries()].map(([key, list]) => ({ key, last: list[0], list, failed: list.filter((j) => j.state !== 'success' && j.state !== 'canceled').length }))
+  })
+  let openGroup = $state<string | null>(null)
 
   async function load() {
     try {
@@ -291,24 +306,42 @@
       <p class="hint">Заданий ещё не было.</p>
     {:else}
       <ul class="jobs">
-        {#each finished as j (j.id)}
-          {@const st = STATE[j.state] ?? { text: j.state, cls: 'off' }}
+        {#each groups as g (g.key)}
+          {@const last = g.last}
+          {@const st = STATE[last.state] ?? { text: last.state, cls: 'off' }}
           <li class="job">
-            <button type="button" class="job__row job__row--btn" onclick={() => (openJob = openJob === j.id ? null : j.id)} aria-expanded={openJob === j.id}>
+            <button type="button" class="job__row job__row--btn" onclick={() => (openGroup = openGroup === g.key ? null : g.key)} aria-expanded={openGroup === g.key}>
               <span class="pill pill--{st.cls}">{st.text}</span>
-              <span class="job__title">{j.title || `задание ${j.id}`}</span>
+              <span class="job__title">{last.title || `задание ${last.id}`}</span>
               <span class="job__meta mono">
-                {j.runner_label} · {KIND[j.kind] ?? j.kind}{j.attempt_no > 1 ? ` · попытка ${j.attempt_no}` : ''}{took(j) ? ` · ${took(j)}` : ''}
+                {last.runner_label} · {KIND[last.kind] ?? last.kind}{g.list.length > 1 ? ` · ×${g.list.length}` : ''}{g.failed ? ` · ошибок ${g.failed}` : ''}
               </span>
             </button>
-            {#if j.reason}<p class="hint">{j.reason}</p>{/if}
-            {#if openJob === j.id}
-              <div class="job__out">
-                <p class="hint mono">{j.command}</p>
-                {#if j.stdout}<pre class="log mono">{j.stdout}</pre>{/if}
-                {#if j.stderr}<pre class="log log--err mono">{j.stderr}</pre>{/if}
-                {#if !j.stdout && !j.stderr}<p class="hint">Вывода нет.</p>{/if}
-              </div>
+            {#if openGroup === g.key}
+              <ul class="jobs jobs--inner">
+                {#each g.list as j (j.id)}
+                  {@const jst = STATE[j.state] ?? { text: j.state, cls: 'off' }}
+                  <li class="job">
+                    <button type="button" class="job__row job__row--btn" onclick={() => (openJob = openJob === j.id ? null : j.id)} aria-expanded={openJob === j.id}>
+                      <span class="pill pill--{jst.cls}">{jst.text}</span>
+                      <span class="job__title">{j.finished_at ? formatLocal(j.finished_at) : `задание ${j.id}`}</span>
+                      <span class="job__meta mono">{j.attempt_no > 1 ? `попытка ${j.attempt_no}` : ''}{took(j) ? ` · ${took(j)}` : ''}</span>
+                    </button>
+                    {#if j.reason}<p class="hint">{j.reason}</p>{/if}
+                    {#if openJob === j.id}
+                      <div class="job__out">
+                        <p class="hint mono">{j.command}</p>
+                        {#if j.stdout}<pre class="log mono">{j.stdout}</pre>{/if}
+                        {#if j.stderr}<pre class="log log--err mono">{j.stderr}</pre>{/if}
+                        {#if !j.stdout && !j.stderr}<p class="hint">Вывода нет.</p>{/if}
+                        {#if j.run_id}
+                          <button type="button" class="btn btn--ghost" onclick={() => openTarget({ kind: 'runs', run: j.run_id })}>Весь запуск скрипта</button>
+                        {/if}
+                      </div>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
             {/if}
           </li>
         {/each}
@@ -417,6 +450,9 @@
   }
 
   .runners__list,
+  .jobs--inner {
+    margin: 0.3rem 0 0 1rem;
+  }
   .jobs {
     list-style: none;
     margin: 0;

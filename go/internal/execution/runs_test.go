@@ -56,7 +56,7 @@ func TestRunStoreAndItsJobs(t *testing.T) {
 
 	// Purging: a waiting run stays however old, a finished one goes, and takes its job along.
 	waiting, _ := st.CreateRun(ctx, NewScriptRun{GraphRef: "implicit:x", SubjectType: "step", SubjectID: 1000, Snapshot: snap})
-	if n, err := st.PurgeRuns(ctx, timeutil.NowUTC().Add(time.Hour)); err != nil || n != 1 {
+	if n, err := st.PurgeRuns(ctx, timeutil.NowUTC().Add(time.Hour), 0); err != nil || n != 1 {
 		t.Fatalf("purge: %d %v", n, err)
 	}
 	if _, err := st.GetRun(ctx, waiting); err != nil {

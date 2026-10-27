@@ -1,3 +1,4 @@
+import type { SourceRunStats } from './execution.gen'
 import { request } from './http.ts'
 
 export type Hook = {
@@ -22,6 +23,8 @@ export type Hook = {
   needs_runner?: boolean
   created_at?: string
   updated_at?: string
+  /** how its runs went lately (the newest, how many in the last hour); on the list only */
+  runs?: SourceRunStats
 }
 
 export type HookEventInfo = { kind: string; family: string; title: string; fields: string[] }

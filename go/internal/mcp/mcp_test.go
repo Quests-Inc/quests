@@ -659,3 +659,39 @@ func TestDryRunOnRunnerCallsTheTestEndpoint(t *testing.T) {
 		t.Fatalf("command on runner: %s", text)
 	}
 }
+
+func TestScriptRunsAndTry(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{
+		"GET /api/runs":           `[{"id":9,"state":"done"},{"id":8,"state":"failed"}]`,
+		"GET /api/runs/9":         `{"id":9,"nodes":[]}`,
+		"POST /api/scripts/4/try": `{"run":10}`,
+	}}
+	s, _ := newTestServer(t, f)
+	resps := rpc(t, s,
+		call(1, "script", `{"action":"runs","id":4,"source":"hook","source_id":3,"state":"done","before":20,"limit":2}`),
+		call(2, "script", `{"action":"run","id":9}`),
+		call(3, "script", `{"action":"try","id":4,"entity":"note=12","event":"note_updated","args":{"_":"1"},"on":"stand"}`),
+		call(4, "script", `{"action":"try","id":4,"entity":"note"}`),
+		call(5, "script", `{"action":"run"}`),
+	)
+	if text, isErr := result(t, resps[0]); isErr || !strings.Contains(text, `"next_before":8`) {
+		t.Fatalf("runs: %s", text)
+	}
+	if text, isErr := result(t, resps[1]); isErr || !strings.Contains(text, `"nodes"`) {
+		t.Fatalf("run: %s", text)
+	}
+	if text, isErr := result(t, resps[2]); isErr || !strings.Contains(text, `"run":10`) || !strings.Contains(text, `"dry":true`) {
+		t.Fatalf("try: %s", text)
+	}
+	for _, i := range []int{3, 4} {
+		if _, isErr := result(t, resps[i]); !isErr {
+			t.Fatalf("call %d must be refused", i+1)
+		}
+	}
+	joined := strings.Join(f.seen, " ")
+	for _, want := range []string{"script_id=4", "source_kind=hook", "source_id=3", "state=done", "before=20", "limit=2"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("the runs query lacks %s: %s", want, joined)
+		}
+	}
+}
