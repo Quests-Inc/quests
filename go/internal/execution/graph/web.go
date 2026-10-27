@@ -130,45 +130,9 @@ func (r *Run) runHTTP(ctx context.Context, rs *resolved, ins map[string][]Token)
 	if r.Fetch == nil {
 		return nil, errors.New("исходящие запросы здесь недоступны")
 	}
-	p.Host = strings.ToLower(strings.TrimSpace(p.Host))
-	path := p.Path
-	piece := ""
-	if toks := ins["path"]; len(toks) == 1 && !toks[0].Exit {
-		piece, _ = toks[0].Value.(string)
-	}
-	if strings.Contains(path, "{path}") {
-		path = strings.ReplaceAll(path, "{path}", url.PathEscape(piece))
-	} else if piece != "" {
-		path = strings.TrimSuffix(path, "/") + "/" + url.PathEscape(piece)
-	}
-	q := url.Values{}
-	for k, v := range p.Query {
-		q.Set(k, v)
-	}
-	if toks := ins["query"]; len(toks) == 1 && !toks[0].Exit {
-		if raw, ok := toks[0].Value.(json.RawMessage); ok {
-			var m map[string]any
-			if err := json.Unmarshal(raw, &m); err != nil {
-				return nil, errors.New("query: нужен JSON-объект со скалярами")
-			}
-			for k, v := range m {
-				switch s := v.(type) {
-				case string:
-					q.Set(k, s)
-				case float64, bool:
-					q.Set(k, fmt.Sprint(s))
-				default:
-					return nil, fmt.Errorf("query.%s: нужен скаляр", k)
-				}
-			}
-		}
-	}
-	if len(q) > maxFetchQuery {
-		return nil, fmt.Errorf("в запросе не больше %d параметров", maxFetchQuery)
-	}
-	u := "https://" + p.Host + path
-	if len(q) > 0 {
-		u += "?" + q.Encode()
+	u, err := buildFetchURL("https", p, ins)
+	if err != nil {
+		return nil, err
 	}
 	fr := FetchRequest{URL: u, Auth: p.Auth}
 	if toks := ins["secrets"]; len(toks) == 1 && !toks[0].Exit {
@@ -184,19 +148,92 @@ func (r *Run) runHTTP(ctx context.Context, rs *resolved, ins map[string][]Token)
 		}
 		return map[string]Token{"failed": failedDoc(ff.Kind, ff.Message, ff.Status)}, nil
 	}
-	out := map[string]Token{"status": {Type: TInt, Value: int64(res.Status)}}
-	if res.Status >= 400 {
-		out["failed"] = failedDoc(FetchStatus, "ответ "+strconv.Itoa(res.Status), res.Status)
-		return out, nil
+	return answerTokens(res.Status, res.Body), nil
+}
+
+// buildFetchURL is the address a request goes to: what the owner fixed (host, path, query) and what arrived over links (one path
+// piece, escaped, and query values), so what came from outside cannot move the request to another host.
+func buildFetchURL(scheme string, p httpParams, ins map[string][]Token) (string, error) {
+	p.Host = strings.ToLower(strings.TrimSpace(p.Host))
+	path := p.Path
+	piece := ""
+	if toks := ins["path"]; len(toks) == 1 && !toks[0].Exit {
+		piece, _ = toks[0].Value.(string)
 	}
-	if !utf8.Valid(res.Body) {
-		return map[string]Token{"failed": failedDoc(FetchBadContent, "ответ не текст", res.Status)}, nil
+	inQuery := false
+	for _, v := range p.Query {
+		inQuery = inQuery || strings.Contains(v, "{path")
 	}
-	out["text"] = Token{Type: TStr, Value: string(res.Body)}
-	if trimmed := strings.TrimSpace(string(res.Body)); trimmed != "" && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid([]byte(trimmed)) {
+	switch {
+	case strings.Contains(path, "{path}"):
+		path = strings.ReplaceAll(path, "{path}", url.PathEscape(piece))
+	case piece != "" && !inQuery:
+		path = strings.TrimSuffix(path, "/") + "/" + url.PathEscape(piece)
+	}
+	q := url.Values{}
+	for k, v := range p.Query {
+		q.Set(k, fillPiece(v, piece))
+	}
+	if toks := ins["query"]; len(toks) == 1 && !toks[0].Exit {
+		if raw, ok := toks[0].Value.(json.RawMessage); ok {
+			var m map[string]any
+			if err := json.Unmarshal(raw, &m); err != nil {
+				return "", errors.New("query: нужен JSON-объект со скалярами")
+			}
+			for k, v := range m {
+				switch s := v.(type) {
+				case string:
+					q.Set(k, s)
+				case float64, bool:
+					q.Set(k, fmt.Sprint(s))
+				default:
+					return "", fmt.Errorf("query.%s: нужен скаляр", k)
+				}
+			}
+		}
+	}
+	if len(q) > maxFetchQuery {
+		return "", fmt.Errorf("в запросе не больше %d параметров", maxFetchQuery)
+	}
+	u := scheme + "://" + p.Host + path
+	if len(q) > 0 {
+		u += "?" + q.Encode()
+	}
+	return u, nil
+}
+
+// fillPiece puts the arriving piece into a query value: `{path}` is all of it, `{path.0}`, `{path.1}`… are its parts between
+// commas (`55.75,37.62`), trimmed; a part that is not there is empty. The result is escaped when the query is encoded.
+func fillPiece(v, piece string) string {
+	if !strings.Contains(v, "{path") {
+		return v
+	}
+	parts := strings.Split(piece, ",")
+	for i, part := range parts {
+		v = strings.ReplaceAll(v, "{path."+strconv.Itoa(i)+"}", strings.TrimSpace(part))
+	}
+	v = pieceIndexRe.ReplaceAllString(v, "")
+	return strings.ReplaceAll(v, "{path}", strings.TrimSpace(piece))
+}
+
+var pieceIndexRe = regexp.MustCompile(`\{path\.[0-9]+\}`)
+
+// answerTokens puts an answer on the outputs of a request node: the status always, an error answer on `failed`, a text one
+// as `text` and, when it is JSON, as `body`.
+func answerTokens(status int, data []byte) map[string]Token {
+	out := map[string]Token{"status": {Type: TInt, Value: int64(status)}}
+	if status >= 400 {
+		out["failed"] = failedDoc(FetchStatus, "ответ "+strconv.Itoa(status), status)
+		return out
+	}
+	if !utf8.Valid(data) {
+		return map[string]Token{"failed": failedDoc(FetchBadContent, "ответ не текст", status)}
+	}
+	out["text"] = Token{Type: TStr, Value: string(data)}
+	if trimmed := strings.TrimSpace(string(data)); trimmed != "" && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid([]byte(trimmed)) {
 		out["body"] = Token{Type: TDoc, Value: json.RawMessage(trimmed)}
 	}
-	return out, nil
+	return out
 }
 
 func failedDoc(kind, message string, status int) Token {
@@ -291,8 +328,13 @@ func runJSONGet(rs *resolved, in Token) (map[string]Token, error) {
 	}
 	switch p.Type {
 	case TStr:
-		if s, ok := cur.(string); ok {
+		switch s := cur.(type) {
+		case string:
 			return val(TStr, s)
+		case float64: // a number or a flag is text too: a reading of a sensor goes to a text as it is
+			return val(TStr, strconv.FormatFloat(s, 'f', -1, 64))
+		case bool:
+			return val(TStr, strconv.FormatBool(s))
 		}
 	case TBool:
 		if b, ok := cur.(bool); ok {

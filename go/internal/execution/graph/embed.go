@@ -29,9 +29,9 @@ func registerEmbed(add func(NodeType)) {
 	add(NodeType{Name: "args", Title: "Аргументы", Kind: KindSource, Trusted: true, Ports: argsPorts})
 	add(NodeType{Name: "sink.result", Title: "Результат", Kind: KindSink, Trusted: true,
 		Ports: func(json.RawMessage) ([]Port, []Port, error) { return []Port{req("value", TStr)}, nil, nil }})
-	add(NodeType{Name: "expr", Title: "Выражение", Kind: KindControl, Trusted: true, Ports: exprPorts})
-	add(NodeType{Name: "random", Title: "Случайное", Kind: KindControl, Trusted: true, Ports: randomPorts})
-	add(NodeType{Name: "regex", Title: "Регулярка", Kind: KindControl, Trusted: true, Ports: regexPorts})
+	add(NodeType{Name: "expr", Title: "Выражение", Kind: KindLogic, Trusted: true, Ports: exprPorts})
+	add(NodeType{Name: "random", Title: "Случайное", Kind: KindLogic, Trusted: true, Ports: randomPorts})
+	add(NodeType{Name: "regex", Title: "Регулярка", Kind: KindLogic, Trusted: true, Ports: regexPorts})
 }
 
 // ArgParam is one named argument of an Args node.

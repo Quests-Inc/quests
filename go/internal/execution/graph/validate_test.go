@@ -233,7 +233,7 @@ func TestAssignable(t *testing.T) {
 
 func TestTrustedFlag(t *testing.T) {
 	for name, nt := range Builtin() {
-		if want := name != "code"; nt.Trusted != want {
+		if want := name != "code" && name != runnerHTTPType; nt.Trusted != want {
 			t.Errorf("%s: trusted = %v", name, nt.Trusted)
 		}
 	}

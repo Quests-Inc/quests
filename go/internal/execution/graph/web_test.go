@@ -153,3 +153,20 @@ func TestJSONGet(t *testing.T) {
 		}
 	}
 }
+
+func TestQueryValuesTakeTheArrivingPiece(t *testing.T) {
+	g := weatherGraph(`{"host":"api.example.org","path":"/v1/forecast","query":{"lat":"{path.0}","lon":"{path.1}","q":"{path}","z":"{path.5}"}}`, `{"path":"main.t","type":"str"}`)
+	var got FetchRequest
+	fetch := func(_ context.Context, r FetchRequest) (FetchResult, error) {
+		got = r
+		return FetchResult{Status: 200, Body: []byte(`{"main":{"t":3.6}}`)}, nil
+	}
+	out, err := EvaluateFetch(t.Context(), g, Builtin(), map[string]string{"_": "55.75, 37.62"}, nil, fetch)
+	if err != nil || out != "3.6" {
+		t.Fatalf("a number reads as text: out=%q err=%v", out, err)
+	}
+	// The piece goes only where the query says; it is not added to the path as well, and it is escaped by the encoder.
+	if want := "https://api.example.org/v1/forecast?lat=55.75&lon=37.62&q=55.75%2C+37.62&z="; got.URL != want {
+		t.Fatalf("url = %q, want %q", got.URL, want)
+	}
+}

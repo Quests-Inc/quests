@@ -12,6 +12,7 @@
     pendingFrom,
     onDown,
     onPort,
+    onFold,
   }: {
     n: ScriptNodeView
     ports: NodePorts | undefined
@@ -21,6 +22,7 @@
     pendingFrom: End | null
     onDown: (e: PointerEvent) => void
     onPort: (side: 'in' | 'out', n: ScriptNodeView, port: string, e: PointerEvent | MouseEvent) => void
+    onFold: (id: number) => void
   } = $props()
 
   const rows = $derived(Math.max(ports?.inputs.length ?? 0, ports?.outputs.length ?? 0, 1))
@@ -32,6 +34,7 @@
   class:snode--sel={selected}
   class:snode--picked={picked}
   class:snode--bad={problems.length > 0 || Boolean(ports?.error)}
+  class:snode--folded={n.collapsed}
   data-gkey={n.key}
   style:--c={n.color}
   style:left="{n.x - n.w / 2}px"
@@ -41,9 +44,19 @@
   onpointerdown={onDown}
 >
   <div class="snode__head" style:height="{HEAD_H}px" title={problems.join('\n')}>
+    <button
+      type="button"
+      class="snode__fold"
+      aria-expanded={!n.collapsed}
+      aria-label={n.collapsed ? 'Развернуть ноду' : 'Свернуть ноду'}
+      title={n.collapsed ? 'Развернуть' : 'Свернуть в шапку'}
+      onpointerdown={(e) => e.stopPropagation()}
+      onclick={() => onFold(n.id)}
+    >{n.collapsed ? '▸' : '▾'}</button>
     <span class="snode__title">{n.title}</span>
     {#if !n.trusted}<span class="snode__tag" title="Пользовательский код: выполняется только на раннере">раннер</span>{/if}
   </div>
+  {#if !n.collapsed}
   <div class="snode__body" style:height="{rows * ROW_H}px">
     <ul class="snode__col">
       {#each ports?.inputs ?? [] as p (p.name)}
@@ -83,7 +96,8 @@
       {/each}
     </ul>
   </div>
-  {#if ports?.error}<p class="snode__err" title={ports.error}>параметры неверны</p>{/if}
+  {/if}
+  {#if ports?.error && !n.collapsed}<p class="snode__err" title={ports.error}>параметры неверны</p>{/if}
 </div>
 
 <style>
@@ -126,6 +140,27 @@
     color: #fff;
     font-weight: 600;
     overflow: hidden;
+  }
+
+  .snode--folded .snode__head {
+    border-radius: 9px;
+  }
+
+  .snode__fold {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.8;
+  }
+
+  .snode__fold:hover {
+    opacity: 1;
   }
 
   .snode__title {

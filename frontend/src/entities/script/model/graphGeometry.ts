@@ -10,7 +10,8 @@ export const PAD_B = 8
 const GAP_X = 90
 const GAP_Y = 36
 
-export function nodeHeight(p: NodePorts | undefined): number {
+export function nodeHeight(p: NodePorts | undefined, collapsed = false): number {
+  if (collapsed) return HEAD_H
   const rows = Math.max(p?.inputs.length ?? 0, p?.outputs.length ?? 0, 1)
   return HEAD_H + rows * ROW_H + PAD_B
 }
@@ -27,6 +28,8 @@ export interface ScriptNodeView {
   kind: string
   color: string
   trusted: boolean
+  /** drawn as its head only: the ports are hidden and every wire of a side meets the head */
+  collapsed: boolean
   x: number
   y: number
   w: number
@@ -42,10 +45,12 @@ export const nodeKey = (id: number) => `n${id}`
 export function viewNodes(
   g: Graph,
   portsOf: PortsOf,
-  meta: (type: string) => { title: string; kind: string; color: string; trusted: boolean }
+  meta: (type: string) => { title: string; kind: string; color: string; trusted: boolean },
+  collapsed: ReadonlySet<number> = new Set()
 ): ScriptNodeView[] {
   return g.nodes.map((n) => {
-    const h = nodeHeight(portsOf(n.id))
+    const folded = collapsed.has(n.id)
+    const h = nodeHeight(portsOf(n.id), folded)
     const m = meta(n.type)
     return {
       key: nodeKey(n.id),
@@ -55,6 +60,7 @@ export function viewNodes(
       kind: m.kind,
       color: m.color,
       trusted: m.trusted,
+      collapsed: folded,
       x: (n.x ?? 0) + NODE_W / 2,
       y: (n.y ?? 0) + h / 2,
       w: NODE_W,
@@ -83,11 +89,12 @@ export function commitPositions(g: Graph, views: Pick<ScriptNodeView, 'id' | 'x'
 
 /** Where a port's anchor is, in the world, for a node drawn at `v`. */
 export function anchorOf(
-  v: Pick<ScriptNodeView, 'x' | 'y' | 'w' | 'h'>,
+  v: Pick<ScriptNodeView, 'x' | 'y' | 'w' | 'h'> & { collapsed?: boolean },
   p: NodePorts | undefined,
   side: 'in' | 'out',
   port: string
 ): { x: number; y: number } {
+  if (v.collapsed) return { x: v.x + (side === 'out' ? v.w / 2 : -v.w / 2), y: v.y }
   const list = (side === 'in' ? p?.inputs : p?.outputs) ?? []
   const i = Math.max(
     0,

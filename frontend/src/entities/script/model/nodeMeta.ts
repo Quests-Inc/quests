@@ -1,13 +1,14 @@
 import type { Kind } from '@/shared/api/scriptgraph.gen.ts'
 
 /** The order node kinds are listed in the palette. */
-export const KIND_ORDER: Kind[] = ['source', 'code', 'parse', 'control', 'sink', 'custom']
+export const KIND_ORDER: Kind[] = ['source', 'code', 'parse', 'control', 'logic', 'sink', 'custom']
 
 export const KIND_TITLES: Record<string, string> = {
   source: 'Источники',
   code: 'Код на раннере',
   parse: 'Разбор',
   control: 'Управление',
+  logic: 'Логика',
   sink: 'Приёмники',
   custom: 'Свои ноды',
 }
@@ -18,6 +19,7 @@ export const KIND_COLORS: Record<string, string> = {
   code: '#c47a20',
   parse: '#4aa3df',
   control: '#b06ad8',
+  logic: '#8a6ad8',
   sink: '#d85a5a',
   custom: '#3aa89a',
 }
@@ -48,6 +50,8 @@ export function defaultParams(type: string): unknown {
     case 'sink.value':
       return { name: 'value', type: 'str' }
     case 'http.get':
+      return { host: 'api.example.org' }
+    case 'http.runner':
       return { host: 'api.example.org' }
     case 'json.get':
       return { path: 'value', type: 'str' }

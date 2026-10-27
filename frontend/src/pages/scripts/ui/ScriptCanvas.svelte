@@ -231,6 +231,7 @@
         pendingFrom={cv.pending?.from ?? null}
         onDown={(e) => cv.gest.onCardDown(e, n)}
         {onPort}
+        onFold={ed.toggleFold}
       />
     {/each}
   </div>

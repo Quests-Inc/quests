@@ -51,6 +51,8 @@ export function createScriptEditor() {
   let subjects = $state<string[]>([])
   let graph = $state.raw<Graph>(EMPTY)
   let savedKey = $state('')
+  // Nodes folded into their head. A convenience of this browser, kept per script, not part of the script.
+  let collapsed = $state<ReadonlySet<number>>(new Set())
 
   let infos = $state<NodeInfo[]>([])
   // The ports each distinct (type, parameters) resolves to; `portsTick` tells readers the cache grew.
@@ -148,10 +150,46 @@ export function createScriptEditor() {
     }
   }
 
+  const foldKey = (id: number) => `quests.script.folded.${id}`
+
+  function loadFolded(id: number): ReadonlySet<number> {
+    try {
+      const raw = JSON.parse(localStorage.getItem(foldKey(id)) ?? '[]')
+      return new Set(Array.isArray(raw) ? raw.filter((n): n is number => typeof n === 'number') : [])
+    } catch {
+      return new Set()
+    }
+  }
+
+  function saveFolded() {
+    if (scriptId == null) return
+    try {
+      if (collapsed.size) localStorage.setItem(foldKey(scriptId), JSON.stringify([...collapsed]))
+      else localStorage.removeItem(foldKey(scriptId))
+    } catch {
+      /* no storage: the nodes stay folded until the page is closed */
+    }
+  }
+
+  /** Fold a node into its head, or unfold it. */
+  function toggleFold(id: number) {
+    const next = new Set(collapsed)
+    if (!next.delete(id)) next.add(id)
+    collapsed = next
+    saveFolded()
+  }
+
+  /** Fold or unfold every node at once (unfold when all are folded). */
+  function foldAll() {
+    collapsed = collapsed.size >= graph.nodes.length ? new Set() : new Set(graph.nodes.map((n) => n.id))
+    saveFolded()
+  }
+
   /** Load a script into the editor. */
   async function open(s: ScriptFull) {
     const mine = ++openSeq
     scriptId = s.id
+    collapsed = loadFolded(s.id)
     title = s.title
     description = s.description
     purpose = s.purpose
@@ -176,6 +214,7 @@ export function createScriptEditor() {
   function reset() {
     openSeq++
     scriptId = null
+    collapsed = new Set()
     title = description = purpose = ''
     graph = EMPTY
     problems = []
@@ -430,6 +469,11 @@ export function createScriptEditor() {
       for (const p of problems) if (p.node) m.set(p.node, [...(m.get(p.node) ?? []), p.message])
       return m
     },
+    get collapsed() {
+      return collapsed
+    },
+    toggleFold,
+    foldAll,
     portsOf,
     meta,
     open,

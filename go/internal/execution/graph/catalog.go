@@ -56,14 +56,15 @@ func Builtin() Registry {
 	// What woke a hook: the event, with the fields of its family as ports.
 	add(NodeType{Name: "source.event", Title: "Источник: событие", Kind: KindSource, Trusted: true, Ports: eventSourcePorts})
 	add(NodeType{Name: codeType, Title: "Код (раннер)", Kind: KindCode, Trusted: false, Ports: codePorts})
+	add(NodeType{Name: runnerHTTPType, Title: "HTTP: запрос (раннер)", Kind: KindCode, Trusted: false, Ports: runnerHTTPPorts})
 	add(NodeType{Name: "parse", Title: "Разбор", Kind: KindParse, Trusted: true, Ports: parsePorts})
 	add(NodeType{Name: "compare", Title: "Сравнить", Kind: KindControl, Trusted: true, Ports: comparePorts})
 	add(NodeType{Name: "any_of", Title: "Любой из", Kind: KindControl, Trusted: true, Ports: anyOfPorts})
 	add(NodeType{Name: "all_of", Title: "Каждый из", Kind: KindControl, Trusted: true, Ports: allOfPorts})
 
 	registerEmbed(add)
-	add(NodeType{Name: "http.get", Title: "HTTP: запрос", Kind: KindControl, Trusted: true, Network: true, Ports: httpPorts})
-	add(NodeType{Name: "json.get", Title: "JSON: достать", Kind: KindControl, Trusted: true, Ports: jsonGetPorts})
+	add(NodeType{Name: "http.get", Title: "HTTP: запрос", Kind: KindLogic, Trusted: true, Network: true, Ports: httpPorts})
+	add(NodeType{Name: "json.get", Title: "JSON: достать", Kind: KindLogic, Trusted: true, Ports: jsonGetPorts})
 
 	sink := func(name, title string, params func(json.RawMessage) error, in ...Port) {
 		ports := func(p json.RawMessage) ([]Port, []Port, error) {
@@ -241,7 +242,7 @@ func (r Registry) Infos() []NodeInfo {
 	return out
 }
 
-var kindOrder = map[Kind]int{KindSource: 0, KindCode: 1, KindParse: 2, KindControl: 3, KindSink: 4, KindCustom: 5}
+var kindOrder = map[Kind]int{KindSource: 0, KindCode: 1, KindParse: 2, KindControl: 3, KindLogic: 4, KindSink: 5, KindCustom: 6}
 
 // Ports returns the inputs and outputs a node of the type would have with the parameters, or why the parameters are wrong.
 func (r Registry) Ports(typ string, params json.RawMessage) (in, out []Port, err error) {
