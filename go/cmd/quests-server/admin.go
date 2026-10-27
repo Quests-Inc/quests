@@ -37,6 +37,8 @@ const adminUsage = `quests-server admin commands (run on the host with access to
   quests-server token add <name> [user] [--workspace <id>]
                                          mint an API token for a headless client (PostgreSQL: bound to a workspace)
   quests-server workspace ls             list workspaces and their members
+  quests-server workspace seed <id>      add/update untouched starter examples
+  quests-server workspace seed-remove <id>  remove starter examples
   quests-server workspace add <name> <user>   create a workspace owned by <user>
   quests-server workspace member <id> <user> [owner|member]
                                          add <user> to workspace <id> (default role: member; an existing member gets the new role)
@@ -462,6 +464,8 @@ func runWorkspaceCmd(st *identity.Store, wst *store.Store, args []string) {
 		fatal("usage: quests-server workspace ls|add|member")
 	}
 	switch args[0] {
+	case "seed", "seed-remove":
+		runStarterCmd(ctx, wst, args)
 	case "ls":
 		users, err := st.ListUsers()
 		if err != nil {

@@ -39,3 +39,10 @@ pages read the variables again. Hooks can wait for it (the «переменна�
 
 The `{}` button in a quest's and a note's toolbar, the «Переменные» section of the quest and step forms, the questline's block,
 and Settings → workspace for the workspace's own.
+
+## Write several variables from a script
+
+The «Переменные: записать несколько» node (`sink.values`) accepts `ref` and a JSON object on `values`. Each object key
+becomes a variable name; numbers, strings and booleans determine the scalar type. Nested objects, arrays, nulls, bad names,
+limits and an existing formula reject the entire write. The transaction either writes every field or writes nothing;
+change events are emitted only after commit. The single-variable node keeps its existing contract.

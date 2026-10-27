@@ -28,6 +28,8 @@ test('listTrash: квесты, заметки, скрипты и хуки одн
     ],
     'GET /api/trash/scripts': [{ kind: 'script', id: 4, title: 's', deleted_at: '2026-10-17 11:00:00' }],
     'GET /api/trash/hooks': [],
+    'GET /api/trash/templates': [],
+    'GET /api/trash/questlines': [],
   })
   const items = await listTrash()
   expect(items.map((i) => `${i.kind}:${i.id}`)).toEqual(['note:7', 'script:4', 'quest:1', 'note:8'])
@@ -39,6 +41,8 @@ test('restore, purge и очистка идут в нужные маршруты
     'DELETE /api/trash/notes/9': null,
     'DELETE /api/trash/quests': null,
     'DELETE /api/trash/notes': null,
+    'DELETE /api/trash/templates': null,
+    'DELETE /api/trash/questlines': null,
     'DELETE /api/trash/hooks': null,
     'DELETE /api/trash/scripts': null,
   })
@@ -50,6 +54,8 @@ test('restore, purge и очистка идут в нужные маршруты
     'DELETE /api/trash/notes/9',
     'DELETE /api/trash/quests',
     'DELETE /api/trash/notes',
+    'DELETE /api/trash/templates',
+    'DELETE /api/trash/questlines',
     'DELETE /api/trash/hooks',
     'DELETE /api/trash/scripts',
   ])

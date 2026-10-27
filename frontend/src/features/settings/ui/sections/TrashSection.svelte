@@ -34,6 +34,7 @@
     busy = true
     try {
       await run()
+      window.dispatchEvent(new Event('quests:content-changed'))
       toast(done, { kind: 'success' })
     } catch (e) {
       toast((e as Error).message || String(e), { kind: 'error' })
@@ -48,6 +49,8 @@
     note: { name: 'заметка', restored: 'Заметка восстановлена' },
     script: { name: 'скрипт', restored: 'Скрипт восстановлен' },
     hook: { name: 'хук', restored: 'Хук восстановлен' },
+    template: { name: 'шаблон', restored: 'Шаблон восстановлен выключенным' },
+    questline: { name: 'квестлайн', restored: 'Квестлайн восстановлен' },
   }
 
   const restore = (t: TrashItem) => act(() => restoreFromTrash(t.kind, t.id), KIND[t.kind].restored)
@@ -85,7 +88,7 @@
 
 <SettingsBlock
   title="Удалённое"
-  hint="Удаление не стирает данные: квест, заметка, скрипт или хук лежит здесь 30 дней вместе со шагами, вложениями, секретами и версиями. Заметка возвращается под своего родителя вместе с дочерними, хук — только после своего скрипта."
+  hint="Удаление не стирает данные: квест, заметка, скрипт, хук, шаблон или квестлайн лежит здесь 30 дней вместе со шагами, вложениями, секретами и версиями. Заметка возвращается под своего родителя вместе с дочерними, хук — только после своего скрипта."
 >
   {#if loading}
     <p class="hint">Загрузка…</p>

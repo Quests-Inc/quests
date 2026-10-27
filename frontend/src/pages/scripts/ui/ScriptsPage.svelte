@@ -14,6 +14,7 @@
   import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
   import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import BakeModal from './BakeModal.svelte'
+  import VersionsModal from './VersionsModal.svelte'
   import TryModal from './TryModal.svelte'
   import { openTarget } from '@/shared/lib/openTarget.ts'
   import CodeNodeModal from './CodeNodeModal.svelte'
@@ -62,6 +63,7 @@
   /** What a script's sources read, as the list says it. */
   const SUBJECT_WORDS: Record<string, string> = { step: 'шаг', note: 'заметка', template: 'шаблон', quest: 'квест', workspace: 'пространство' }
   let tryOpen = $state(false)
+  let versionsOpen = $state(false)
   /** Code goes to a runner: a node of the code kind, or a saved script the server says needs one. */
   const needsRunner = $derived(
     ed.graph.nodes.some((n) => ed.meta(n.type).kind === 'code') ||
@@ -329,7 +331,7 @@
     {:else}
       <div class="scripts__bar">
         <input type="text" class="scripts__title" bind:value={ed.title} aria-label="Название скрипта" />
-        <span class="scripts__ver">v{ed.version}{ed.dirty ? ' · не сохранён' : ''}</span>
+        <button type="button" class="btn scripts__ver" title="Посмотреть версии, сравнить или откатить" onclick={() => (versionsOpen = true)}>Версия {ed.version}{ed.dirty ? ' · не сохранён' : ''}</button>
         <div class="detail__actions">
           <button
             type="button"
@@ -398,6 +400,12 @@
   </section>
 </SidebarLayout>
 
+<VersionsModal open={versionsOpen} id={selectedId} version={ed.version} graph={ed.graph} dirty={ed.dirty} onClose={() => (versionsOpen = false)} onRestore={async (graph) => {
+  if (selectedId == null) return
+  await updateScript(selectedId, { version: ed.version, graph })
+  await openScript(selectedId)
+  await loadScripts(true)
+}} />
 <TryModal
   open={tryOpen}
   scriptId={selectedId}

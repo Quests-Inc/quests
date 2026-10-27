@@ -210,7 +210,7 @@
 <ConfirmModal
   open={deleteConfirmOpen}
   title="Удалить квестлайн?"
-  message="Квесты останутся, но отвяжутся от линии."
+  message="Квестлайн переместится в корзину на 30 дней. Квесты и их связи сохранятся до окончательного удаления."
   confirmLabel="Удалить"
   busy={deleting}
   onCancel={() => (deleteConfirmOpen = false)}

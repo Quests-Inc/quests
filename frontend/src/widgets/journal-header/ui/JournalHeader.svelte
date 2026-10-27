@@ -3,7 +3,7 @@
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import HealthMeter from './HealthMeter.svelte'
 
-  type View = 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks' | 'runs'
+  type View = 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks' | 'runs' | 'templates' | 'trash'
 
   let {
     view,
@@ -46,13 +46,15 @@
     runners: { view: 'runners', label: 'Раннеры', icon: 'layers' },
     scripts: { view: 'scripts', label: 'Скрипты', icon: 'edit' },
     hooks: { view: 'hooks', label: 'Хуки', icon: 'flag' },
+    templates: { view: 'templates', label: 'Шаблоны', icon: 'repeat' },
+    trash: { view: 'trash', label: 'Корзина', icon: 'delete' },
     runs: { view: 'runs', label: 'Запуски', icon: 'list' },
   }
 
   const MAIN: Tab[] = [T.journal, T.notes, T.graph, T.calendar]
   const GROUPS: Group[] = [
-    { id: 'more', label: 'Архив', icon: 'folder', tabs: [T.attachments, T.history] },
-    { id: 'auto', label: 'Автоматика', icon: 'repeat', tabs: [T.scripts, T.hooks, T.runs, T.runners] },
+    { id: 'more', label: 'Данные', icon: 'folder', tabs: [T.attachments, T.history, T.trash] },
+    { id: 'auto', label: 'Автоматика', icon: 'repeat', tabs: [T.templates, T.scripts, T.hooks, T.runs, T.runners] },
   ]
 
   /** A group button wears the name of its open section, so you can tell where you are. */
@@ -116,10 +118,8 @@
 
   const MORE_ITEMS = [
     { id: 'settings', label: 'Настройки' },
-    { id: 'templates', label: 'Шаблоны' },
     { id: 'secrets', label: 'Окружение' },
     { id: 'tags', label: 'Теги' },
-    { id: 'trash', label: 'Корзина' },
     { id: 'questline', label: 'Новый квестлайн' },
   ]
 

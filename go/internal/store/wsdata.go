@@ -29,61 +29,6 @@ const (
 	ExportVersion = 1
 )
 
-type polyFK struct {
-	TypeCol, IDCol string
-}
-
-// TableSpec describes how one table travels. Tables are listed in insertion order.
-type TableSpec struct {
-	Name   string
-	HasID  bool
-	FK     map[string]string // column → referenced table
-	Poly   []polyFK          // (type column, id column) pairs naming their target table by type
-	SelfFK string            // column referencing the same table, fixed up in a second pass
-	Text   []string          // columns scanned for kind=ID references
-	// Secret tables are exported only on request.
-	Secret bool
-	// Where drops the rows that belong to something in the trash. The trash policy hides a trashed quest or note
-	// itself, but not the rows hanging off it, and those must not travel with the archive.
-	Where string
-}
-
-const (
-	liveQuest  = `(SELECT id FROM quest)`
-	liveNote   = `(SELECT id FROM note)`
-	liveStep   = `(SELECT id FROM queststep WHERE quest_id IN ` + liveQuest + `)`
-	liveOwner  = `(owner_type NOT IN ('quest', 'note') OR owner_id IN (SELECT id FROM quest WHERE owner_type = 'quest' UNION ALL SELECT id FROM note WHERE owner_type = 'note'))`
-	liveAttach = `(SELECT id FROM attachment WHERE ` + liveOwner + `)`
-)
-
-// Kind names in kind=ID tokens and entity_type / owner_type columns → table.
-var kindTable = map[string]string{
-	"quest": "quest", "questline": "questline", "note": "note", "step": "queststep",
-	"attachment": "attachment", "template": "questtemplate", "tag": "tag", "category": "questcategory",
-}
-
-var ExportTables = []TableSpec{
-	{Name: "script", HasID: true, Text: []string{"title", "description"}},
-	{Name: "script_version", Where: `script_id IN (SELECT id FROM script)`, FK: map[string]string{"script_id": "script"}},
-	{Name: "custom_node", HasID: true, Text: []string{"title", "description"}},
-	{Name: "questcategory", HasID: true},
-	{Name: "questline", HasID: true, FK: map[string]string{"category_id": "questcategory"}, Text: []string{"title", "description"}},
-	{Name: "questtemplate", HasID: true, FK: map[string]string{"category_id": "questcategory", "questline_id": "questline"}, Text: []string{"title", "description"}},
-	{Name: "questtemplatestep", HasID: true, FK: map[string]string{"template_id": "questtemplate", "script_id": "script"}, Text: []string{"title", "description", "check_command"}},
-	{Name: "quest", HasID: true, FK: map[string]string{"category_id": "questcategory", "questline_id": "questline", "template_id": "questtemplate"}, Text: []string{"title", "description", "source"}},
-	{Name: "queststep", HasID: true, Where: `quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest"}, Text: []string{"title", "description", "check_command"}},
-	{Name: "tag", HasID: true},
-	{Name: "quest_tag", Where: `quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest", "tag_id": "tag"}},
-	{Name: "template_tag", FK: map[string]string{"template_id": "questtemplate", "tag_id": "tag"}},
-	{Name: "note", HasID: true, SelfFK: "parent_id", Text: []string{"title", "description"}},
-	{Name: "attachment", HasID: true, Where: liveOwner, Poly: []polyFK{{"owner_type", "owner_id"}}, Text: []string{"comment"}},
-	{Name: "attachment_revision", HasID: true, Where: `attachment_id IN ` + liveAttach, FK: map[string]string{"attachment_id": "attachment"}, Text: []string{"comment"}},
-	{Name: "templateemitroll", HasID: true, FK: map[string]string{"template_id": "questtemplate"}, Text: []string{"picked_refs"}},
-	{Name: "questchangelog", HasID: true, Where: `quest_id IS NULL OR quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest"}, Poly: []polyFK{{"entity_type", "entity_id"}, {"parent_type", "parent_id"}}, Text: []string{"title", "detail", "comment"}},
-	{Name: "secret", HasID: true, Where: `(quest_id IS NULL OR quest_id IN ` + liveQuest + `) AND (note_id IS NULL OR note_id IN ` + liveNote + `) AND (step_id IS NULL OR step_id IN ` + liveStep + `)`, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note"}, Secret: true},
-	{Name: "named_value", HasID: true, Where: `(quest_id IS NULL OR quest_id IN ` + liveQuest + `) AND (note_id IS NULL OR note_id IN ` + liveNote + `) AND (step_id IS NULL OR step_id IN ` + liveStep + `)`, FK: map[string]string{"questline_id": "questline", "template_id": "questtemplate", "quest_id": "quest", "step_id": "queststep", "note_id": "note", "roll_script": "script"}},
-}
-
 var identRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
 // ReadTable streams the rows of a workspace table (under the context's workspace)
@@ -165,6 +110,7 @@ type ImportOptions struct {
 	Attachment func(ctx context.Context, oldPath, ownerType string, ownerID int64, filename string) (newPath string, err error)
 	// MaxRowsPerTable caps untrusted input (0 = 200000).
 	MaxRowsPerTable int
+	seed            *seedPlan
 }
 
 // ImportReport is what an import did.
@@ -195,7 +141,12 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 	rep.Counts = map[string]int{}
 	rep.Skipped = map[string]int{}
 
-	tx, err := s.DB.BeginTx(ctx, nil)
+	var tx *sql.Tx
+	if opt.seed != nil {
+		tx = opt.seed.tx
+	} else {
+		tx, err = s.DB.BeginTx(ctx, nil)
+	}
 	if err != nil {
 		return rep, err
 	}
@@ -208,6 +159,15 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 	ids := map[string]map[int64]int64{}
 	for _, t := range ExportTables {
 		ids[t.Name] = map[int64]int64{}
+		if opt.seed != nil {
+			for old, id := range opt.seed.ids[t.Name] {
+				ids[t.Name][old] = id
+			}
+		}
+	}
+	written := map[string]map[int64]bool{}
+	for _, t := range ExportTables {
+		written[t.Name] = map[int64]bool{}
 	}
 	allowed := map[string]map[string]bool{}
 	columnsOf := func(table string) (map[string]bool, error) {
@@ -262,6 +222,9 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 				return fmt.Errorf("%s: more than %d rows", spec.Name, opt.MaxRowsPerTable)
 			}
 			oldID, _ := toInt64(row["id"])
+			if opt.seed != nil && !opt.seed.prepare(spec.Name, oldID, row) {
+				return nil
+			}
 			vals := map[string]any{}
 			for c, v := range row {
 				if c == "id" || c == "workspace_id" || c == "search_tsv" {
@@ -302,7 +265,7 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 					nid, ok = mapID(target, v)
 				}
 				if !ok {
-					if spec.Name == "attachment" { // owner is required
+					if spec.Name == "attachment" || spec.Name == "script_binding" { // owner is required
 						rep.Skipped[spec.Name]++
 						return nil
 					}
@@ -390,12 +353,28 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 				args = append(args, v)
 			}
 			q := "INSERT INTO " + spec.Name + " (" + strings.Join(names, ", ") + ") VALUES (" + strings.TrimSuffix(strings.Repeat("?, ", len(names)), ", ") + ")"
+			existing := int64(0)
+			if opt.seed != nil && spec.HasID {
+				existing = ids[spec.Name][oldID]
+			}
+			if existing > 0 {
+				sets := make([]string, len(names))
+				for i, c := range names {
+					sets[i] = c + "=?"
+				}
+				q = "UPDATE " + spec.Name + " SET " + strings.Join(sets, ",") + " WHERE id=?"
+				args = append(args, existing)
+			}
 			res, err := tx.ExecContext(ctx, q, args...)
 			if err != nil {
 				return fmt.Errorf("%s: %w", spec.Name, err)
 			}
 			if spec.HasID {
-				newID, _ := res.LastInsertId()
+				newID := existing
+				if newID == 0 {
+					newID, _ = res.LastInsertId()
+				}
+				written[spec.Name][newID] = true
 				ids[spec.Name][oldID] = newID
 				switch spec.Name {
 				case "attachment":
@@ -407,6 +386,15 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 						noteParents[newID] = p
 					}
 				}
+			}
+			if spec.Name == "script_version" {
+				sid, _ := toInt64(vals["script_id"])
+				ver, _ := toInt64(vals["version"])
+				key := fmt.Sprintf("script_version:%d", sid)
+				if written[key] == nil {
+					written[key] = map[int64]bool{}
+				}
+				written[key][ver] = true
 			}
 			rep.Counts[spec.Name]++
 			return nil
@@ -464,6 +452,9 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 				rows.Close()
 				return rep, err
 			}
+			if !written[spec.Name][id] {
+				continue
+			}
 			changed := false
 			out := make([]any, len(cur))
 			for i, c := range cur {
@@ -508,7 +499,7 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 		}
 	}
 	// Scripts and custom nodes hold numbers in their graphs (`custom.N`, the entity a source reads): they follow to the new ids.
-	if err = s.remapScriptGraphs(ctx, tx, ids, &rep); err != nil {
+	if err = s.remapScriptGraphs(ctx, tx, ids, written, &rep); err != nil {
 		return rep, err
 	}
 	// quest.source is "template:N" for emitted quests.
@@ -528,6 +519,9 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 			srows.Close()
 			return rep, err
 		}
+		if !written["quest"][id] {
+			continue
+		}
 		if old, perr := strconv.ParseInt(strings.TrimPrefix(v, "template:"), 10, 64); perr == nil {
 			if nid, ok := ids["questtemplate"][old]; ok {
 				srcs = append(srcs, src{id, "template:" + strconv.FormatInt(nid, 10)})
@@ -541,6 +535,11 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 		}
 	}
 	rep.IDs = ids
+	if opt.seed != nil {
+		if err = opt.seed.finish(ctx, ids); err != nil {
+			return rep, err
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return rep, err
 	}

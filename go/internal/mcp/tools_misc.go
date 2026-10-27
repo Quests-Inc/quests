@@ -157,7 +157,7 @@ func questlineTools(c *Client) []Tool {
 	type delArgs struct {
 		ID int64 `json:"id"`
 	}
-	del := Typed("delete_questline", "Delete a questline; its quests stay (detach first with update_quest clear_questline if the API refuses).",
+	del := Typed("delete_questline", "Move a questline to the trash for 30 days; its quests and links stay until permanent purge. Restore with trash.",
 		func(ctx context.Context, a delArgs) (any, error) {
 			if err := c.Do(ctx, http.MethodDelete, fmt.Sprintf("/api/questlines/%d", a.ID), nil, nil, nil); err != nil {
 				return nil, err

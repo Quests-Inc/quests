@@ -190,6 +190,7 @@
       {#if viewMode !== 'formatted'}
         <MentionTextarea
           class="notes__edit"
+          host={selectedId ? { kind: 'note', id: selectedId } : undefined}
           placement="inside"
           bind:value={ed.description}
           bind:el={editEl}

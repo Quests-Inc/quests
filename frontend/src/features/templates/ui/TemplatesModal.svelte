@@ -51,20 +51,16 @@
    * `focusId` opens that template for editing (a template=N link);
    * `onOpenSecrets(id)` opens the secrets manager on a template.
    */
-  let { open = false, focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
-
+  let { open = false, embedded = false, focusId = null, onClose, onChanged, onOpenSecrets }: { open: boolean, embedded?: boolean, focusId?: number | null, onClose: () => void, onChanged: () => void, onOpenSecrets?: (id: number) => void } = $props()
   let quests = $derived(questCatalog.list)
   let notes = $derived(noteCatalog.list)
   let attachments = $derived(flattenAttachmentIndex(attachmentCatalog.index).filter((a: { hidden?: boolean }) => !a.hidden))
-
   const LOCAL_TZ = localTimeZone() || 'Europe/Moscow'
-
   let templates = $state(([] as any[]))
   let loading = $state(false)
   let error = $state('')
   let view = $state(('list' as 'list' | 'create' | 'edit'))
   let editing = $state((null as any | null))
-
   let title = $state('')
   let description = $state('')
   let tagCatalog: { id: number, slug: string, label: string, color?: string }[] = $state([])
@@ -113,19 +109,16 @@
   let deleting = $state(false)
   let deleteConfirmOpen = $state(false)
   let formError = $state('')
-
   let secSchedule = $state(true)
   let secProps = $state(false)
   let secPool = $state(false)
   let secSteps = $state(true)
-
   let suggestOn = $derived(view === 'create')
   // Questline/section suggestion (quest=205): only while creating, and only
   // until the user (or the context the dialog was opened from) has chosen.
   let lineTouched = $state(false)
   let catTouched = $state(false)
   let suggestIndex = $derived(open && suggestOn ? buildSuggestIndex(quests) : null)
-
   const FREQ_OPTIONS = [
     { id: 'daily', label: 'каждый день' },
     { id: 'weekly', label: 'по дням недели' },
@@ -136,7 +129,6 @@
   ]
   const DAY_OPTIONS = WEEKDAY_LABELS.map((d) => ({ id: String(d.id), label: d.label }))
   const SIG_OPTIONS = QUEST_SIGNIFICANCES.map((s) => ({ ...s, kind: ('sig' as const) }))
-
   let isSurprise = $derived(emitMode === 'surprise')
   let hasDeadline = $derived(!isSurprise && Boolean(deadlineHour))
   let hasPool = $derived(Boolean(emitPoolCommand.trim()) || Boolean(emitScript))
@@ -145,9 +137,7 @@
       void loadRunners()
     }
   })
-
   let weekdayIds = $derived(new Set([...weekdays].map(String)))
-
   let lineOptions = $derived(
     questlines.map((l) => ({ id: String(l.id), label: l.title, color: l.color || '' })),
   )
@@ -157,7 +147,6 @@
   let lineCategory = $derived(
     categoryId === '' ? null : categories.find((c) => String(c.id) === categoryId) ?? null,
   )
-
   let scheduleSummary = $derived.by(() => {
     const days = freq === 'weekly' ? daysLabel(weekdays) : 'каждый день'
     const dur = durationLabel(durationHours, durationMinutes)
@@ -176,7 +165,6 @@
     if (timezone.trim() && timezone.trim() !== LOCAL_TZ) parts.push(timezone.trim())
     return parts.join(' · ')
   })
-
   let propsSummary = $derived(
     [
       QUEST_SIGNIFICANCES.find((s) => s.id === significance)?.label,
@@ -506,12 +494,12 @@
   const metaOf = (t: TemplateRead) => rowMeta(t, streaks[t.id])
 </script>
 
-<ModalShell {open} onClose={handleClose} labelledby="templates-modal-title" zIndex={40} maxWidth="36rem">
+{#snippet content()}
   <ModalHead
     id="templates-modal-title"
     title={view === 'list' ? 'Шаблоны' : view === 'create' ? 'Новый шаблон' : 'Редактировать шаблон'}
     icon="repeat"
-    {onClose}
+    onClose={handleClose}
   />
   {#if view === 'list'}
     <TemplateList {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
@@ -528,6 +516,7 @@
       <div class="field">
         <span class="label">Описание</span>
         <MentionTextarea
+          host={editing?.id ? { kind: 'template', id: editing.id } : undefined}
           bind:value={description}
           {quests}
           {questlines}
@@ -765,7 +754,12 @@
       </ModalFoot>
     </form>
   {/if}
-</ModalShell>
+{/snippet}
+{#if embedded}
+  <section class="templates-page modal formscope">{@render content()}</section>
+{:else}
+  <ModalShell {open} onClose={handleClose} labelledby="templates-modal-title" zIndex={40} maxWidth="36rem">{@render content()}</ModalShell>
+{/if}
 
 <ContextMenu
   open={ctxOpen}
@@ -779,7 +773,7 @@
 <ConfirmModal
   open={deleteConfirmOpen}
   title="Удалить шаблон?"
-  message={editing ? `Удалить шаблон «${editing.title}»? Созданные квесты останутся.` : ''}
+  message={editing ? `Удалить шаблон «${editing.title}»? Шаблон переместится в корзину на 30 дней и перестанет выпускать квесты. Созданные квесты останутся.` : ''}
   busy={deleting}
   onCancel={() => {
     if (!deleting) deleteConfirmOpen = false
@@ -788,6 +782,7 @@
 />
 
 <style>
+  .templates-page { max-width: 52rem; max-height: none; overflow: visible; margin: 0 auto; }
 
   .tz-line {
     gap: 0.35rem;

@@ -3,6 +3,7 @@ package journalhttp
 import (
 	"encoding/json"
 	"errors"
+	"github.com/quests-inc/quests/go/internal/platform/trashrow"
 	"io"
 	"net/http"
 	"os"
@@ -96,8 +97,7 @@ func (h *Handler) deleteQuestline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title := questlineTitle(row)
-	h.PurgeAttachments(r.Context(), ownerQuestline, id)
-	if err := h.Store.DeleteQuestline(r.Context(), id, h.DataDir); err != nil {
+	if err := trashrow.Move(r.Context(), h.Store.DB, "questline", id); err != nil {
 		if errors.Is(err, journal.ErrNotFound) {
 			writeErr(w, 404, "Questline not found")
 			return

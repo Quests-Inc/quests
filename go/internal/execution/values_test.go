@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -305,5 +306,32 @@ func TestEmbedRunnerChoice(t *testing.T) {
 	}
 	if _, err := st.ResolveEmbedRunner(ctx, "vps"); err == nil {
 		t.Fatal("a revoked runner is not available")
+	}
+}
+
+func TestScriptValuesBatchIsAtomic(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	o := oQuest
+	values, err := st.WriteScriptValues(ctx, o, json.RawMessage(`{"hp":12,"ratio":1.5,"name":"wolf","alive":true}`))
+	if err != nil || len(values) != 4 {
+		t.Fatalf("write: %v %v", values, err)
+	}
+	if _, err := st.SetNamedFormula(ctx, o, "protected", "int", "hp+1"); err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{`{"hp":99,"protected":3}`, `{"hp":99,"bad-key":1}`, `{"hp":99,"nested":{}}`, `{"hp":99,"nothing":null}`} {
+		if _, err := st.WriteScriptValues(ctx, o, json.RawMessage(raw)); err == nil {
+			t.Fatalf("accepted %s", raw)
+		}
+		set, err := st.ResolveNamedValues(ctx, o, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range set.Own {
+			if v.Name == "hp" && v.Value != "12" {
+				t.Fatalf("partial write: %+v", set)
+			}
+		}
 	}
 }

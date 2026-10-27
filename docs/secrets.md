@@ -43,3 +43,6 @@ Whoever can create or change a step with a command in a questline can print its 
 ## Environment contract
 
 Variables and secrets share the hierarchy and panel, not the rules for their values. Variable names, types, literals, formulas and script sources remain readable. Secrets remain sealed, write-only, restricted by name and writable only by owners. They never participate in `{{…}}`, formulas or ordinary graph output. Runtime commands and authenticated HTTP headers resolve the full chain under the existing owner-only execution permissions; hiding a note from MCP does not change an owner's runtime environment. Membership does not grant permission to author commands or hooks. Do not place a credential on a parent unless all descendants may use it.
+
+Trashing a template or questline preserves its links and environment. Permanent purge detaches its independent quests;
+a template copies secrets needed by live auto-checks before it is purged, as the earlier direct delete did.

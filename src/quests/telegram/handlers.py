@@ -19,7 +19,7 @@ from quests.telegram.actions_preview import (
     history_to_prompt_text,
 )
 from quests.telegram.api_client import ApiError, QuestsApi
-from quests.telegram.formatters import format_active_by_category, format_quest_card
+from quests.telegram.formatters import format_active_by_category, format_quest_card, status_label
 from quests.telegram.keyboards import (
     BTN_CANCEL,
     BTN_HELP,
@@ -308,7 +308,7 @@ def build_router(
     async def cb_open(query: CallbackQuery) -> None:
         raw = (query.data or "").split(":", 1)[-1]
         if not raw.isdigit():
-            await query.answer("bad id")
+            await query.answer("Неверный номер")
             return
         qid = int(raw)
         try:
@@ -326,7 +326,7 @@ def build_router(
     async def cb_edit_expand(query: CallbackQuery) -> None:
         raw = (query.data or "").split(":", 1)[-1]
         if not raw.isdigit():
-            await query.answer("bad id")
+            await query.answer("Неверный номер")
             return
         qid = int(raw)
         try:
@@ -341,7 +341,7 @@ def build_router(
     async def cb_refresh(query: CallbackQuery) -> None:
         parts = (query.data or "").split(":")
         if len(parts) < 2 or not parts[1].isdigit():
-            await query.answer("bad id")
+            await query.answer("Неверный номер")
             return
         qid = int(parts[1])
         page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
@@ -358,7 +358,7 @@ def build_router(
     async def cb_page(query: CallbackQuery) -> None:
         parts = (query.data or "").split(":")
         if len(parts) != 3 or not parts[1].isdigit() or not parts[2].isdigit():
-            await query.answer("bad page")
+            await query.answer("Неверная страница")
             return
         qid = int(parts[1])
         page = int(parts[2])
@@ -374,12 +374,12 @@ def build_router(
     async def cb_status(query: CallbackQuery) -> None:
         parts = (query.data or "").split(":")
         if len(parts) != 3 or not parts[1].isdigit():
-            await query.answer("bad callback")
+            await query.answer("Не удалось распознать действие")
             return
         qid = int(parts[1])
         new_status = parts[2]
         if new_status not in {"active", "completed", "failed", "expired", "frozen"}:
-            await query.answer("unknown status")
+            await query.answer("Неизвестный статус")
             return
         try:
             current = await api.get_quest(qid)
@@ -398,7 +398,7 @@ def build_router(
         await _edit_quest_card(
             query, q, page=0, expanded=not _is_closed(q)
         )
-        await query.answer(f"→ {new_status}")
+        await query.answer(f"→ {status_label(new_status)}")
 
     @router.callback_query(F.data.startswith("qt:"))
     async def cb_toggle_step(query: CallbackQuery) -> None:
@@ -410,7 +410,7 @@ def build_router(
             or not parts[2].isdigit()
             or not parts[3].isdigit()
         ):
-            await query.answer("bad step")
+            await query.answer("Неверный шаг")
             return
         qid = int(parts[1])
         sid = int(parts[2])
@@ -496,7 +496,7 @@ def build_router(
         elif token.isdigit():
             await state.update_data(category_id=int(token))
         else:
-            await query.answer("bad category")
+            await query.answer("Неверная категория")
             return
         # Category picker message is part of the dialog — keep tracked.
         if query.message is not None:

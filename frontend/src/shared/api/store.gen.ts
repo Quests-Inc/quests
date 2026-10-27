@@ -32,6 +32,18 @@ export interface BackupInsert {
 }
 
 //////////
+// source: container_trash.go
+
+export interface TrashedContainer {
+  id: number /* int64 */;
+  kind: string;
+  title: string;
+  deleted_at: string;
+  deleted_by?: number /* int64 */;
+  purge_at: string;
+}
+
+//////////
 // source: graph.go
 
 /**
@@ -136,6 +148,21 @@ export interface DraftOp {
 }
 
 //////////
+// source: starter.go
+
+export interface SeedReport {
+  version: number /* int */;
+  added: number /* int */;
+  updated: number /* int */;
+  preserved: number /* int */;
+  deleted: number /* int */;
+}
+
+//////////
+// source: starter_remove.go
+
+
+//////////
 // source: stats.go
 
 /**
@@ -176,3 +203,27 @@ export interface UserLLM {
 //////////
 // source: workspaces.go
 
+
+//////////
+// source: wsdata_tables.go
+
+/**
+ * TableSpec describes how one table travels. Tables are listed in insertion order.
+ */
+export interface TableSpec {
+  Name: string;
+  HasID: boolean;
+  FK: { [key: string]: string}; // column → referenced table
+  Poly: polyFK[]; // (type column, id column) pairs naming their target table by type
+  SelfFK: string; // column referencing the same table, fixed up in a second pass
+  Text: string[]; // columns scanned for kind=ID references
+  /**
+   * Secret tables are exported only on request.
+   */
+  Secret: boolean;
+  /**
+   * Where drops the rows that belong to something in the trash. The trash policy hides a trashed quest or note
+   * itself, but not the rows hanging off it, and those must not travel with the archive.
+   */
+  Where: string;
+}

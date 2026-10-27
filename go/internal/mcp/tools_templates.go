@@ -181,7 +181,7 @@ func templateTools(c *Client) []Tool {
 	type idArg struct {
 		ID int64 `json:"id"`
 	}
-	del := Typed("delete_template", "Delete a template (quests it already made stay).", func(ctx context.Context, a idArg) (any, error) {
+	del := Typed("delete_template", "Move a template to the trash for 30 days; it stops emitting, and its existing quests and links stay. Restore with trash (returns disabled).", func(ctx context.Context, a idArg) (any, error) {
 		if err := c.Do(ctx, http.MethodDelete, fmt.Sprintf("/api/templates/%d", a.ID), nil, nil, nil); err != nil {
 			return nil, err
 		}

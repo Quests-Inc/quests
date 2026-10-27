@@ -47,6 +47,21 @@ func (s *Server) PurgeExpiredTrash(ctx context.Context) {
 				_ = os.Remove(filepath.Join(s.DataDir, "note-icons", icon))
 			}
 		}
+		for _, kind := range []string{"template", "questline"} {
+			items, err := s.Store.ListTrashedContainers(wctx, kind)
+			if err != nil {
+				log.Printf("trash: workspace %d %s: %v", ws, kind, err)
+				continue
+			}
+			for _, item := range items {
+				at, err := timeutil.ParseFlexible(item.DeletedAt)
+				if err == nil && at.Before(cutoff) {
+					if err := s.purgeContainer(wctx, kind, item.ID); err != nil {
+						log.Printf("trash: purge %s %d: %v", kind, item.ID, err)
+					}
+				}
+			}
+		}
 		// Hooks before scripts: a script's purge takes its trashed hooks along anyway.
 		for _, kind := range []string{"hook", "script"} {
 			ids, err := s.Store.Execution.TrashedIDsBefore(wctx, kind, cutoff)

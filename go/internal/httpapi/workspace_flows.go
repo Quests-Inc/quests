@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/quests-inc/quests/go/internal/identity"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/store"
 )
 
@@ -27,12 +28,29 @@ func ProvisionWorkspace(ctx context.Context, st *store.Store, userID int64, name
 
 // EnsureUserWorkspace gives a user without any workspace one; a brand-new personal workspace gets the default categories.
 func EnsureUserWorkspace(ctx context.Context, st *store.Store, userID int64, username string) (identity.Workspace, error) {
+	previous, err := st.Identity.UserWorkspaces(ctx, userID)
+	if err != nil {
+		return identity.Workspace{}, err
+	}
 	ws, fresh, err := st.Identity.EnsureUserWorkspace(ctx, userID, username)
-	if err != nil || !fresh {
+	if err != nil || len(previous) > 0 {
 		return ws, err
 	}
-	if err := st.CopyCategories(ctx, identity.DefaultWorkspaceID, ws.ID); err != nil {
+	if fresh {
+		if err := st.CopyCategories(ctx, identity.DefaultWorkspaceID, ws.ID); err != nil {
+			return identity.Workspace{}, err
+		}
+	}
+	wctx := wsctx.With(ctx, ws.ID)
+	// A legacy default workspace may already contain user data: claiming it must not add examples.
+	var count int
+	if err := st.DB.QueryRowContext(wctx, `SELECT (SELECT count(*) FROM note)+(SELECT count(*) FROM quest)+(SELECT count(*) FROM script)`).Scan(&count); err != nil {
 		return identity.Workspace{}, err
+	}
+	if count == 0 {
+		if _, err := st.SeedStarter(wctx); err != nil {
+			return identity.Workspace{}, err
+		}
 	}
 	return ws, nil
 }

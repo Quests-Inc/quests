@@ -147,7 +147,7 @@ export function createNoteGroup(deps: {
 
   function askUnprivate() {
     confirm = {
-      title: 'Снять PRIVATE?',
+      title: 'Снять приватность?',
       message: `Текст ${ids.length} заметок станет виден агентам через MCP.`,
       label: 'Снять',
       run: () => flag('is_private'),

@@ -108,6 +108,8 @@
         <HttpRunnerParams params={node.params as never} onChange={set} />
       {:else if node.type === 'json.get'}
         <JsonGetParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'sink.values'}
+        <p class="explain">Объект из входа «values» записывается в переменные сущности из «ref»: один ключ — одна переменная. При ошибке не записывается ничего. Формулы не заменяются.</p>
       {:else if node.type === 'sink.value'}
         <ValueSinkParams params={node.params as never} onChange={set} />
       {:else if node.type === 'args'}

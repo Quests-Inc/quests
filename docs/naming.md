@@ -34,3 +34,19 @@ A new screen is read once for codes on screen (rule 2). Places fixed by the revi
 list, the card and on the map; the source nodes' titles («Источник: заметка»); the script list's captions (no raw subjects);
 the hook form and list (event titles); the hook filter «Все»; the step chip («каждые N с» instead of «auto Ns»); runner job
 states in the run log; job names of embeddings (the script's title instead of `script=N`).
+
+### Remaining screens audited on 28.10 (quest=491)
+
+- Template list/form: recurrence, scope, tags, script binding, runner, emit result and errors. Human labels are Russian;
+  JSON field names, cron syntax, runner labels and time zones are author-entered syntax and remain unchanged.
+- Settings: services, appearance, keys, workspace, archive, connections, account and assistant. Replaced heartbeat jargon
+  in visible activity hints. Product/protocol names (API, HUD, MCP, WebDAV, ClamAV, Markdown) stay proper names.
+- Calendar and map: filters, quest states, event captions, empty states, menus and dialogs use Russian helpers. Entity
+  references copied to the clipboard and user-authored titles stay as typed.
+- Notes: README/PRIVATE/CATEGORY captions in menus and confirmations are now «к прочтению», «приватная», «категория».
+  Search flag syntax and API field names remain compatible. Secondary note actions live in the «Действия» menu.
+- Telegram: cards and keyboards already translate states; fixed the status-change acknowledgement and malformed
+  callback errors that still exposed English. Logs and callback protocol identifiers are internal.
+- Desktop HUD: quest lanes, settings groups, option labels and empty states were checked in the Go sources. Key names,
+  font families and named style packs are proper names; GTK window identities remain internal. Native GTK execution
+  was not part of this source audit.

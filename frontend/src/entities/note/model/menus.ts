@@ -153,9 +153,9 @@ export function noteMenuItems({
       label: 'Флаги',
       children: [
         { id: 'pin', label: note?.pinned ? 'Снять закреп' : 'Закрепить' },
-        { id: 'readme', label: note?.is_readme ? 'Снять README' : 'Пометить README' },
-        { id: 'private', label: note?.is_private ? 'Снять PRIVATE' : 'Пометить PRIVATE' },
-        { id: 'category', label: note?.is_category ? 'Снять CATEGORY' : 'Пометить CATEGORY' },
+        { id: 'readme', label: note?.is_readme ? 'Снять «к прочтению»' : 'Пометить «к прочтению»' },
+        { id: 'private', label: note?.is_private ? 'Снять приватность' : 'Сделать приватной' },
+        { id: 'category', label: note?.is_category ? 'Снять категорию' : 'Сделать категорией' },
         { id: 'outdated', label: note?.outdated ? 'Снять «устарела»' : 'Пометить «устарела»' },
       ],
     },
@@ -215,8 +215,8 @@ export function noteGroupMenuItems({ rows, moveSearch }: { rows: Row[]; moveSear
       label: 'Флаги',
       children: [
         flag('pin', 'pinned', 'Закрепить', 'Снять закреп'),
-        flag('readme', 'is_readme', 'Пометить README', 'Снять README'),
-        flag('private', 'is_private', 'Пометить PRIVATE', 'Снять PRIVATE'),
+        flag('readme', 'is_readme', 'Пометить «к прочтению»', 'Снять «к прочтению»'),
+        flag('private', 'is_private', 'Сделать приватной', 'Снять приватность'),
         flag('outdated', 'outdated', 'Пометить «устарела»', 'Снять «устарела»'),
       ],
     },

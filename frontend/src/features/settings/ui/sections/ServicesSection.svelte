@@ -24,7 +24,7 @@
     }
     const age = row?.age_seconds
     if (age == null) {
-      return comp === 'webdav' || comp === 'clamav' || comp === 'backup' ? 'нет опроса' : 'нет heartbeat'
+      return comp === 'webdav' || comp === 'clamav' || comp === 'backup' ? 'нет опроса' : 'нет сигнала активности'
     }
     if (age < 2) return 'только что'
     return `${age} с назад`
@@ -52,7 +52,7 @@
 
 <SettingsBlock
   title="Сервисы"
-  hint="API отвечает сам; HUD и бот шлют heartbeat. WebDAV и ClamAV сервер опрашивает сам раз в 15 с. БД — сверка версии схемы при старте."
+  hint="API отвечает сам; HUD и бот шлют сигналы активности. WebDAV и ClamAV сервер опрашивает сам раз в 15 с. БД — сверка версии схемы при старте."
 >
   <ul class="svc-list">
     {#each rows as r (r.name)}

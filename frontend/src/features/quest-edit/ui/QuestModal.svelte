@@ -386,6 +386,7 @@
     <div class="field">
       <span class="label">Описание</span>
       <MentionTextarea
+        host={mode === 'edit' && quest?.id ? { kind: 'quest', id: quest.id } : undefined}
         bind:value={description}
         {quests}
         {questlines}

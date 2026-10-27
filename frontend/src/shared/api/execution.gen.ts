@@ -610,8 +610,7 @@ export interface ScriptUpdate {
  * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
- * stored as plaintext (the server is the trust boundary — the commands run on
- * the same host) and are never returned by a read endpoint or tool.
+ * sealed at rest and never returned by a read endpoint or tool.
  */
 export const SecretOwnerQuestline = "questline";
 /**
@@ -620,8 +619,7 @@ export const SecretOwnerQuestline = "questline";
  * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
- * stored as plaintext (the server is the trust boundary — the commands run on
- * the same host) and are never returned by a read endpoint or tool.
+ * sealed at rest and never returned by a read endpoint or tool.
  */
 export const SecretOwnerTemplate = "template";
 /**
@@ -630,8 +628,7 @@ export const SecretOwnerTemplate = "template";
  * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
- * stored as plaintext (the server is the trust boundary — the commands run on
- * the same host) and are never returned by a read endpoint or tool.
+ * sealed at rest and never returned by a read endpoint or tool.
  */
 export const SecretOwnerQuest = "quest";
 /**
@@ -640,13 +637,11 @@ export const SecretOwnerQuest = "quest";
  * 	step > quest > template > questline > workspace
  * i.e. a command sees its own secrets, then those of its quest, of the template
  * that emitted the quest, and of the questline the quest sits in. Values are
- * stored as plaintext (the server is the trust boundary — the commands run on
- * the same host) and are never returned by a read endpoint or tool.
+ * sealed at rest and never returned by a read endpoint or tool.
  */
 export const SecretOwnerStep = "step";
 /**
- * A note's secrets are its own: no chain to a quest or a questline (it may refer to things, it does not depend on them);
- * only the workspace above it.
+ * Notes inherit their parents' secrets, then the workspace's.
  */
 export const SecretOwnerNote = "note";
 /**

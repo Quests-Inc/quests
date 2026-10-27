@@ -44,7 +44,7 @@
   import { SecretsModal } from '@/features/secrets'
   import { refreshTemplates, templateStore } from '@/entities/template'
   import { TagsModal } from '@/features/tags'
-  import { SettingsModal } from '@/features/settings'
+  import { SettingsModal, TrashSection } from '@/features/settings'
   import ToastHost from '@/shared/ui/ToastHost.svelte'
   import { JournalHeader } from '@/widgets/journal-header'
   import { sidebars, SIDEBAR_ONE_PANE } from '@/shared/lib/sidebar.svelte.ts'
@@ -82,7 +82,7 @@
     revealList: (tab) => revealListOnNarrow(tab),
     openTemplate: (id) => {
       templatesFocusId = id
-      templatesOpen = true
+      nav.setView('templates')
     },
   })
   const { setView, swipeTab, openGraph, onGraphCenter, openHistoryDay, clearQuest: clearSelectedQuest, openRef: onJournalRef } = nav
@@ -114,7 +114,6 @@
   let categories = $state([])
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
 
-  let templatesOpen = $state(false)
   let secretsOpen = $state(false)
   /** entity the secrets modal opens on (context menu → «Секреты»), or null */
   let secretsOwner = $state((null as { kind: string, id: number } | null))
@@ -189,7 +188,7 @@
   }
 
   function openTemplates() {
-    templatesOpen = true
+    nav.setView('templates')
   }
   function openSecrets(owner: { kind: string; id: number } | null = null) {
     secretsOwner = owner
@@ -258,7 +257,8 @@
   function slideTab(node: any, { dir, out = false }: any) {
     const sign = out ? -dir : dir
     return {
-      duration: 220,
+      duration: 110,
+      delay: 0,
       easing: cubicOut,
       css: (t: number) => `transform: translateX(${(1 - t) * sign * 100}%)`,
     }
@@ -360,8 +360,6 @@
       currentTab: () => nav.view,
     }
     setOpenTarget((t) => {
-      // A jump to another tab leaves the template window behind (it is where a template's runs are opened from).
-      if (t.kind !== 'ref' || t.ref !== 'template') templatesOpen = false
       nav.openTarget(t)
     })
 
@@ -374,6 +372,8 @@
       authed = false
     })
 
+    const refreshContent = () => { void load({ silent: true }); void refreshTemplates() }
+    window.addEventListener('quests:content-changed', refreshContent)
     let cancelled = false
     ;(async () => {
       if (inviteToken) return // the invitation screen owns the page
@@ -404,6 +404,7 @@
 
     return () => {
       cancelled = true
+      window.removeEventListener('quests:content-changed', refreshContent)
       if (stopApp) stopApp()
       stopApp = null
     }
@@ -615,7 +616,7 @@
   <div
     class="journal__viewport"
     in:slideTab={{ dir: nav.navDir }}
-    out:slideTab={{ dir: nav.navDir, out: true }}
+
   >
   {#if nav.view === 'calendar'}
     <CalendarPage
@@ -650,6 +651,24 @@
     <div class="journal__hooks">
       <HooksPage active={nav.view === 'hooks'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
+  {:else if nav.view === 'templates'}
+    <div class="journal__review-page">
+<TemplatesModal
+  open embedded
+  focusId={templatesFocusId}
+  onClose={() => {
+    nav.setView('journal')
+    templatesFocusId = null
+  }}
+  onChanged={() => {
+    void load({ silent: true })
+    void refreshTemplates()
+  }}
+  onOpenSecrets={(id) => openSecrets({ kind: 'template', id })}
+/>
+    </div>
+  {:else if nav.view === 'trash'}
+    <div class="journal__review-page"><h1>Корзина</h1><TrashSection /></div>
   {:else if nav.view === 'runs'}
     <div class="journal__runs"><RunsPage active={nav.view === 'runs'} /></div>
   {:else if nav.view === 'history'}
@@ -736,19 +755,7 @@
 
 <JournalOverlays {desk} {questlines} {selected} />
 
-<TemplatesModal
-  open={templatesOpen}
-  focusId={templatesFocusId}
-  onClose={() => {
-    templatesOpen = false
-    templatesFocusId = null
-  }}
-  onChanged={() => {
-    void load({ silent: true })
-    void refreshTemplates()
-  }}
-  onOpenSecrets={(id) => openSecrets({ kind: 'template', id })}
-/>
+
 
 <SecretsModal
   open={secretsOpen}
@@ -779,6 +786,7 @@
 {/if}
 
 <style>
+  .journal__review-page { height: 100%; overflow: auto; padding: 1rem; }
   /* Blank canvas while the auth probe is in flight — avoids flashing either
      the login card or the journal before we know which one is right. */
   .boot-gate {

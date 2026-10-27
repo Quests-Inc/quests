@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { getScripts, listValues } from '@/shared/api/client.ts'
+  import { completeText, textCompletionToken, type TextToken } from '@/shared/lib/textCompletion.ts'
+  import InsertScriptModal from './InsertScriptModal.svelte'
   import { activeMentionToken, applyMention, matchMentions } from '@/shared/lib/mentionSuggest.ts'
   import { templateStore } from '../model/templatesStore.svelte.ts'
 
@@ -14,6 +17,7 @@
     disabled = false,
     ariaLabel = '',
     allowedKinds = [],
+    host,
     placement = 'below',
     el = $bindable(null),
     onkeydown,
@@ -30,6 +34,7 @@
     disabled?: boolean,
     ariaLabel?: string,
     allowedKinds?: string[],
+    host?: { kind: string; id: number },
     placement?: 'below' | 'inside',
     el?: HTMLTextAreaElement | null,
     onkeydown?: (event: KeyboardEvent) => void,
@@ -41,7 +46,26 @@
   let mentionIndex = $state(0)
   let mentionToken = $state((null as { query: string, start: number } | null))
 
+  let completion = $state<TextToken | null>(null)
+  let insertOpen = $state(false)
+  let insertAt = 0
+  let completionSeq = 0
+  async function refreshCompletion(token: TextToken) {
+    const seq = ++completionSeq
+    try {
+      const items = token.kind === 'script'
+        ? (await getScripts()).filter((s) => s.purpose === 'embed' && `${s.id} ${s.title}`.toLowerCase().includes(token.query.toLowerCase())).map((s) => ({ kind: 'script', id: s.id, title: s.title, label: 'скрипт', insertion: `script=${s.id}` }))
+        : (await listValues(host?.kind ?? 'workspace', host?.id ?? 0)).effective.filter((v) => v.name.startsWith(token.query)).map((v, i) => ({ kind: 'value', id: i, title: v.name, label: 'переменная', insertion: `{{${v.name}}}` }))
+      if (seq !== completionSeq) return
+      mentionItems = items.slice(0, 8)
+      mentionIndex = 0
+      mentionOpen = mentionItems.length > 0
+    } catch { if (seq === completionSeq) mentionOpen = false }
+  }
   function refreshMentions(caret: number) {
+    completionSeq++
+    completion = allowedKinds.length ? null : textCompletionToken(value, caret)
+    if (completion) { mentionOpen = false; void refreshCompletion(completion); return }
     const token = activeMentionToken(value, caret)
     if (!token) {
       mentionOpen = false
@@ -66,12 +90,14 @@
     oninput?.(event)
   }
 
-  function pickMention(item: { kind: any; id: any }) {
-    if (!item || !mentionToken) return
-    const { text: nextText, caret } = applyMention(value, mentionToken, item)
+  function pickMention(item: { kind: any; id: any; insertion?: string }) {
+    if (!item || (!mentionToken && !completion)) return
+    const { text: nextText, caret } = completion && item.insertion ? completeText(value, completion, item.insertion) : applyMention(value, mentionToken!, item)
     value = nextText
     mentionOpen = false
     mentionToken = null
+    completion = null
+    completionSeq++
     queueMicrotask(() => {
       el?.focus()
       el?.setSelectionRange(caret, caret)
@@ -141,9 +167,18 @@
       {/each}
     </ul>
   {/if}
+  {#if !allowedKinds.length && !disabled}
+    <button type="button" class="insert-script" onclick={() => { insertAt = el?.selectionStart ?? value.length; insertOpen = true }}>Вставить скрипт…</button>
+  {/if}
 </div>
+<InsertScriptModal open={insertOpen} onClose={() => (insertOpen = false)} onInsert={(text) => {
+  value = value.slice(0, insertAt) + text + value.slice(insertAt)
+  queueMicrotask(() => { el?.focus(); el?.setSelectionRange(insertAt + text.length, insertAt + text.length) })
+}} />
 
 <style>
+  .insert-script { border: 0; background: none; color: var(--color-fg-muted, #9a9a9a); font: inherit; font-size: 0.75rem; cursor: pointer; padding: 0.25rem 0; }
+  .mention-field--inside .insert-script { position: absolute; right: 1rem; top: 0.25rem; }
   .mention-field {
     position: relative;
     display: block;

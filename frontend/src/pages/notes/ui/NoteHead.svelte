@@ -120,50 +120,6 @@
           </button>
           <button
             type="button"
-            class="btn btn--icon notes__status-btn notes__status-btn--readme"
-            class:notes__status-btn--on={isReadme}
-            onclick={onToggleReadme}
-            title={isReadme ? 'Снять README (прочитано)' : 'Пометить README (прочитать)'}
-            aria-label={isReadme ? 'Снять README' : 'Пометить README'}
-            aria-pressed={isReadme}
-          >
-            <Icon name="alert" />
-          </button>
-          <button
-            type="button"
-            class="btn btn--icon notes__status-btn notes__status-btn--private"
-            class:notes__status-btn--on={isPrivate}
-            onclick={onTogglePrivate}
-            title={isPrivate ? 'Снять PRIVATE' : 'Пометить PRIVATE (скрыть от MCP)'}
-            aria-label={isPrivate ? 'Снять PRIVATE' : 'Пометить PRIVATE'}
-            aria-pressed={isPrivate}
-          >
-            <Icon name="lock" />
-          </button>
-          <button
-            type="button"
-            class="btn btn--icon notes__status-btn notes__status-btn--category"
-            class:notes__status-btn--on={isCategory}
-            onclick={onToggleCategory}
-            title={isCategory ? 'Снять CATEGORY' : 'Пометить CATEGORY (папка-агрегатор)'}
-            aria-label={isCategory ? 'Снять CATEGORY' : 'Пометить CATEGORY'}
-            aria-pressed={isCategory}
-          >
-            <Icon name="folder" />
-          </button>
-          <button
-            type="button"
-            class="btn btn--icon notes__status-btn notes__status-btn--outdated"
-            class:notes__status-btn--on={outdated}
-            onclick={onToggleOutdated}
-            title={outdated ? `Снять «устарела»${outdatedReason ? ': ' + outdatedReason : ''}` : 'Пометить «устарела» (содержимое расходится с действительностью)'}
-            aria-label={outdated ? 'Снять «устарела»' : 'Пометить «устарела»'}
-            aria-pressed={outdated}
-          >
-            <Icon name="clock-alert" />
-          </button>
-          <button
-            type="button"
             class="btn btn--icon"
             class:notes__status-btn--on={findOpen}
             onclick={() => (findOpen = !findOpen)}
@@ -195,30 +151,12 @@
           >
             {#if saving}…{:else}<Icon name="save" />{/if}
           </button>
-          <button
-            type="button"
-            class="btn btn--icon"
-            disabled={exportBusy}
-            onclick={onExport}
-            title={exportBusy ? 'Выгрузка…' : 'Скачать'}
-            aria-label={exportBusy ? 'Выгрузка…' : 'Скачать заметку'}
-            aria-haspopup="menu"
-          >
-            {#if exportBusy}…{:else}<Icon name="file-download" />{/if}
-          </button>
-          <button
-            type="button"
-            class="btn btn--icon btn--danger"
-            onclick={onDelete}
-            title="Удалить"
-            aria-label="Удалить"
-          >
-            <Icon name="delete" />
-          </button>
+          <button type="button" class="btn btn--icon" onclick={onContextMenu} title="Действия с заметкой: флаги, скачать, удалить" aria-label="Действия с заметкой" aria-haspopup="menu"><Icon name="more" /></button>
         </div>
         {/if}
       </div>
       <div class="notes__colophon">
+        {#if isReadme || isPrivate || isCategory || outdated}<span class="hint">{[isReadme && 'к прочтению', isPrivate && 'приватная', isCategory && 'категория', outdated && 'устарела'].filter(Boolean).join(' · ')}</span>{/if}
         <nav class="notes__crumbs" aria-label="Родитель">
           {#each crumbs as c, i (c.id ?? 'root')}
             {#if i > 0}<span class="notes__crumb-sep" aria-hidden="true">/</span>{/if}

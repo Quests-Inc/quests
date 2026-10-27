@@ -119,6 +119,8 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		return h.r.sinkTemplate(ctx, h.subj, n, in)
 	case "sink.done":
 		return nil
+	case "sink.values":
+		return h.r.sinkValues(ctx, in, h.subj.Origin)
 	case "sink.value":
 		return h.r.sinkValue(ctx, n, in, h.subj.Origin)
 	case "sink.result":
@@ -404,4 +406,36 @@ func (h scriptHost) eventSource(n graph.Node) (map[string]any, error) {
 		out["attachment_id"], out["owner_type"], out["owner_id"] = num("attachment_id"), str("owner_type"), num("owner_id")
 	}
 	return out, nil
+}
+
+func (r *CheckRunner) sinkValues(ctx context.Context, in map[string]graph.Token, origin string) error {
+	ref, err := refOf(in)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(in["values"].Value)
+	if err != nil {
+		return err
+	}
+	owner := execution.SecretOwner{Kind: ref.Kind, ID: ref.ID}
+	if ref.Kind == "workspace" {
+		owner = execution.WorkspaceSecretOwner(ctx)
+	}
+	values, err := r.Store.Execution.WriteScriptValues(ctx, owner, raw)
+	if err != nil {
+		return err
+	}
+	if r.Hub != nil {
+		for _, v := range values {
+			var value any
+			encoded := json.RawMessage(v.Value)
+			if v.Type == "str" {
+				value = v.Value
+			} else {
+				_ = json.Unmarshal(encoded, &value)
+			}
+			r.Hub.ValuesChanged(wsctx.From(ctx), events.ValueChange{OwnerKind: owner.Kind, OwnerID: owner.ID, Name: v.Name, Type: v.Type, Value: value, Origin: origin})
+		}
+	}
+	return nil
 }
