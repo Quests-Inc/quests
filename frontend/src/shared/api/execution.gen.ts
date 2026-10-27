@@ -25,13 +25,21 @@ export interface Binding {
   NeedsRunner: boolean;
 }
 /**
- * ScriptUse is a place a script is bound to.
+ * ScriptUse is a place a script is bound to, or (Via "text") a text that embeds it as script=N{…}.
  */
 export interface ScriptUse {
   subject_type: string;
   subject_id: number /* int64 */;
   title: string;
+  /**
+   * Via is "text" for an embedding in a description: it does not hold the script, a deleted script only breaks the link.
+   */
+  via?: string;
 }
+/**
+ * UseViaText marks a ScriptUse that is an embedding in a text.
+ */
+export const UseViaText = "text";
 /**
  * ScriptInUse is returned when a script that is still bound is deleted.
  */
@@ -538,6 +546,23 @@ export interface SealedCounts {
   readable: number /* int */;
   unreadable: number /* int */;
   plain: number /* int */; // not sealed yet (secret values written before sealing existed)
+}
+
+//////////
+// source: trash.go
+
+/**
+ * TrashedItem is a script or a hook in the trash.
+ */
+export interface TrashedItem {
+  ID: number /* int64 */;
+  Title: string;
+  DeletedAt: string;
+  DeletedBy?: number /* int64 */;
+  /**
+   * ScriptID is a hook's script (to tell that it is in the trash too).
+   */
+  ScriptID: number /* int64 */;
 }
 
 //////////

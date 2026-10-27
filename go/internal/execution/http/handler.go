@@ -41,6 +41,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerScripts(mux)
 	h.registerScriptEval(mux)
 	h.registerHooks(mux)
+	h.registerTrash(mux)
 }
 
 var writeJSON = httpx.WriteJSON

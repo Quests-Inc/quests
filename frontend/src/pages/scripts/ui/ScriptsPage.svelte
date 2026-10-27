@@ -4,6 +4,7 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import { candidates, codeSpecOf, customIdOf, customNodes, loadCustomNodes, loadScripts, PURPOSE_NONE, PURPOSES, scriptsList } from '@/entities/script'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
+  import { toastTrashed } from '@/shared/lib/trashUndo.ts'
   import { createScript, deleteScript, getCustomNodes, getScript, getScriptSamples, getScriptUses, updateScript } from '@/shared/api/client.ts'
   import type { CustomNode, ScriptUse } from '@/shared/api/execution.gen.ts'
   import type { Graph, Sample } from '@/shared/api/scriptgraph.gen.ts'
@@ -163,6 +164,24 @@
     }
   }
 
+  /** Texts that embed the script about to be deleted: their links break while it is in the trash. */
+  let askTexts = $state<ScriptUse[]>([])
+  function askDelete(id: number) {
+    ask = { kind: 'delete', id }
+    askTexts = []
+    void getScriptUses(id)
+      .then((u) => {
+        if (ask?.kind === 'delete' && ask.id === id) askTexts = u.filter((x) => x.via === 'text')
+      })
+      .catch(() => {})
+  }
+  const deleteMessage = $derived(
+    'Скрипт со всеми версиями уйдёт в корзину на 30 дней. Если он подключён к шагу, заметке, шаблону или хуку, сервер откажет и покажет, где.' +
+      (askTexts.length
+        ? ` Он вставлен в тексты (${askTexts.length}): ${askTexts.map((u) => `«${u.title}»`).join(', ')} — эти вставки перестанут работать, пока скрипт в корзине.`
+        : '')
+  )
+
   async function remove(id: number) {
     ask = null
     try {
@@ -172,6 +191,7 @@
         ed.reset()
       }
       await loadScripts(true)
+      toastTrashed('script', [id], 'Скрипт в корзине', () => loadScripts(true))
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), { kind: 'error' })
     }
@@ -301,7 +321,7 @@
           >
             {#if ed.saving}…{:else}<Icon name="save" />{/if}
           </button>
-          <button type="button" class="btn btn--icon btn--danger" title="Удалить" aria-label="Удалить" onclick={() => selectedId != null && (ask = { kind: 'delete', id: selectedId })}>
+          <button type="button" class="btn btn--icon btn--danger" title="Удалить" aria-label="Удалить" onclick={() => selectedId != null && askDelete(selectedId)}>
             <Icon name="delete" />
           </button>
         </div>
@@ -357,7 +377,7 @@
   onRename={(id, title) => patchScript(id, { title })}
   onPurpose={(id, purpose) => void patchScript(id, { purpose })}
   onBake={(id) => void bakeScript(id)}
-  onDelete={(id) => (ask = { kind: 'delete', id })}
+  onDelete={(id) => askDelete(id)}
   onCopy={(id) => void grp.copyRef(id)}
   onDuplicate={(id) => void grp.duplicate(id).then((n) => n != null && openScript(n))}
   group={scriptMenu.id != null ? grp.multi.targets(scriptMenu.id) : []}
@@ -367,7 +387,7 @@
 <ConfirmModal
   open={grp.ask.length > 0}
   title="Удалить скрипты?"
-  message={`Удалить выбранные скрипты (${grp.ask.length}) со всеми версиями? Если скрипт где-то подключён, сервер откажет.`}
+  message={`Выбранные скрипты (${grp.ask.length}) со всеми версиями уйдут в корзину на 30 дней. Подключённые сервер не отдаст; вставки в тексты перестанут работать, пока скрипт в корзине.`}
   busy={grp.busy}
   onCancel={grp.cancelDelete}
   onConfirm={grp.confirmDelete}
@@ -388,7 +408,7 @@
 <ConfirmModal
   open={ask?.kind === 'delete'}
   title="Удалить скрипт?"
-  message="Скрипт и все его версии будут удалены. Если он где-то подключён, сервер откажет и покажет, где."
+  message={deleteMessage}
   onCancel={() => (ask = null)}
   onConfirm={() => ask?.kind === 'delete' && void remove(ask.id)}
 />

@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/quests-inc/quests/go/internal/execution"
 	journalhttp "github.com/quests-inc/quests/go/internal/journal/http"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
@@ -14,7 +16,7 @@ import (
 // trashRetention is how long a quest or a note stays in the trash before the scheduler erases it for good.
 const trashRetention = journalhttp.TrashRetention
 
-// PurgeExpiredTrash erases, in every workspace, the quests and notes that have been in the trash for longer than the
+// PurgeExpiredTrash erases, in every workspace, the quests, notes, scripts and hooks that have been in the trash for longer than the
 // retention: the rows, their attachments (database and WebDAV bytes) and a note's icon file.
 func (s *Server) PurgeExpiredTrash(ctx context.Context) {
 	cutoff := timeutil.NowUTC().Add(-trashRetention)
@@ -43,6 +45,18 @@ func (s *Server) PurgeExpiredTrash(ctx context.Context) {
 			s.knowledgeHTTP().PurgeOwnerAttachments(wctx, "note", id)
 			if icon != "" {
 				_ = os.Remove(filepath.Join(s.DataDir, "note-icons", icon))
+			}
+		}
+		// Hooks before scripts: a script's purge takes its trashed hooks along anyway.
+		for _, kind := range []string{"hook", "script"} {
+			ids, err := s.Store.Execution.TrashedIDsBefore(wctx, kind, cutoff)
+			if err != nil {
+				log.Printf("trash: workspace %d %ss: %v", ws, kind, err)
+			}
+			for _, id := range ids {
+				if err := s.Store.Execution.PurgeTrashed(wctx, kind, id); err != nil && !errors.Is(err, execution.ErrNotFound) {
+					log.Printf("trash: purge %s %d: %v", kind, id, err)
+				}
 			}
 		}
 	})

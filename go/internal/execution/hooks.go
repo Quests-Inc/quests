@@ -439,16 +439,9 @@ func (s *Store) DisableHook(ctx context.Context, id int64, reason string) error 
 	return err
 }
 
-// DeleteHook removes a hook.
+// DeleteHook moves a hook to the trash (trash.go): it stops firing until it is restored.
 func (s *Store) DeleteHook(ctx context.Context, id int64) error {
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM hook WHERE id = ?`, id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return s.trashRow(ctx, "hook", id)
 }
 
 // HookEventsCatalog is the aliases and kinds the UI/API expose (same as CLI).

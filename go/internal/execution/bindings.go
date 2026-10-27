@@ -25,18 +25,34 @@ type Binding struct {
 	NeedsRunner bool
 }
 
-// ScriptUse is a place a script is bound to.
+// ScriptUse is a place a script is bound to, or (Via "text") a text that embeds it as script=N{…}.
 type ScriptUse struct {
 	SubjectType string `json:"subject_type"`
 	SubjectID   int64  `json:"subject_id"`
 	Title       string `json:"title"`
+	// Via is "text" for an embedding in a description: it does not hold the script, a deleted script only breaks the link.
+	Via string `json:"via,omitempty"`
 }
+
+// UseViaText marks a ScriptUse that is an embedding in a text.
+const UseViaText = "text"
 
 // ScriptInUse is returned when a script that is still bound is deleted.
 type ScriptInUse struct{ Uses []ScriptUse }
 
 func (e *ScriptInUse) Error() string {
 	return fmt.Sprintf("скрипт используется (%d): сначала отвяжите его", len(e.Uses))
+}
+
+// boundUses is the uses that hold a script (bindings, template steps, hooks), without the texts that only embed it.
+func boundUses(uses []ScriptUse) []ScriptUse {
+	out := []ScriptUse{}
+	for _, u := range uses {
+		if u.Via == "" {
+			out = append(out, u)
+		}
+	}
+	return out
 }
 
 func validSubject(kind string) bool {
@@ -112,7 +128,8 @@ func (s *Store) Bindings(ctx context.Context, subjectType string) (map[int64]Bin
 	return out, rows.Err()
 }
 
-// ScriptUses lists where a script is bound, with the title of the step or note.
+// ScriptUses lists where a script is bound, with the title of the step or note, and then the texts that embed it
+// (script=N{…} in the description of a note, quest, step, questline or template; Via "text").
 func (s *Store) ScriptUses(ctx context.Context, scriptID int64) ([]ScriptUse, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT b.subject_type, b.subject_id,
@@ -137,17 +154,64 @@ func (s *Store) ScriptUses(ctx context.Context, scriptID int64) ([]ScriptUse, er
 		}
 		out = append(out, u)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	texts, err := s.scriptTextUses(ctx, scriptID)
+	if err != nil {
+		return nil, err
+	}
+	return append(out, texts...), nil
+}
+
+// scriptTextUses is the texts with script=N{ in them (the same token the markdown renders as an embedding).
+func (s *Store) scriptTextUses(ctx context.Context, scriptID int64) ([]ScriptUse, error) {
+	pattern := fmt.Sprintf(`(^|[^a-z0-9_])script=%d\{`, scriptID)
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT 'note', id, title FROM note WHERE description ~ ?
+		UNION ALL
+		SELECT 'quest', id, title FROM quest WHERE description ~ ?
+		UNION ALL
+		SELECT 'step', id, title FROM queststep WHERE description ~ ? AND quest_id IN (SELECT id FROM quest)
+		UNION ALL
+		SELECT 'questline', id, title FROM questline WHERE description ~ ?
+		UNION ALL
+		SELECT 'template', id, title FROM questtemplate WHERE description ~ ?
+		ORDER BY 1, 2`, pattern, pattern, pattern, pattern, pattern)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ScriptUse{}
+	for rows.Next() {
+		u := ScriptUse{Via: UseViaText}
+		if err := rows.Scan(&u.SubjectType, &u.SubjectID, &u.Title); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
 	return out, rows.Err()
 }
 
-// PurgeOrphanBindings drops the bindings whose step or note no longer exists.
+// PurgeOrphanBindings drops the bindings whose step, note or template no longer exists. A note or a quest in the trash still
+// exists: its binding must come back with it, so the trash policy (migration 0015) is opened for this statement and only a
+// row erased for good frees its binding.
 func (s *Store) PurgeOrphanBindings(ctx context.Context) (int64, error) {
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM script_binding
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `SELECT set_config('app.trash', '1', true)`); err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM script_binding
 		WHERE (subject_type = 'step' AND NOT EXISTS (SELECT 1 FROM queststep WHERE id = script_binding.subject_id))
 		   OR (subject_type = 'note' AND NOT EXISTS (SELECT 1 FROM note WHERE id = script_binding.subject_id))
 		   OR (subject_type = 'template' AND NOT EXISTS (SELECT 1 FROM questtemplate WHERE id = script_binding.subject_id))`)
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
 }

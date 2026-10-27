@@ -239,28 +239,28 @@ func noteTools(c *Client) []Tool {
 
 	type trashArgs struct {
 		Action string `json:"action" enum:"list,restore"`
-		Kind   string `json:"kind,omitempty" enum:"quest,note" desc:"restore: what to bring back"`
+		Kind   string `json:"kind,omitempty" enum:"quest,note,script,hook" desc:"restore: what to bring back"`
 		ID     int64  `json:"id,omitempty" desc:"restore: its id"`
 	}
-	trash := Typed("trash", "The trash of deleted quests and notes (kept 30 days). list: what can be restored, newest first, with the date it is erased; restore: bring a quest or note back (a note returns under its parent with its children).",
+	trash := Typed("trash", "The trash of deleted quests, notes, scripts and hooks (kept 30 days). list: what can be restored, newest first, with the date it is erased; restore: bring one back (a note returns under its parent with its children; a hook only after its script).",
 		func(ctx context.Context, a trashArgs) (any, error) {
 			if a.Action == "restore" {
-				if a.ID == 0 || (a.Kind != "quest" && a.Kind != "note") {
-					return nil, &Err{422, "restore needs kind (quest or note) and id"}
+				if a.ID == 0 || (a.Kind != "quest" && a.Kind != "note" && a.Kind != "script" && a.Kind != "hook") {
+					return nil, &Err{422, "restore needs kind (quest, note, script or hook) and id"}
 				}
 				if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/trash/%ss/%d/restore", a.Kind, a.ID), nil, nil, nil); err != nil {
 					return nil, err
 				}
 				return ok(ctx, c, a.ID, map[string]any{"kind": a.Kind, "restored": true}), nil
 			}
-			var quests, notes []map[string]any
-			if err := c.Do(ctx, http.MethodGet, "/api/trash/quests", nil, nil, &quests); err != nil {
-				return nil, err
+			items := []map[string]any{}
+			for _, seg := range []string{"quests", "notes", "scripts", "hooks"} {
+				var part []map[string]any
+				if err := c.Do(ctx, http.MethodGet, "/api/trash/"+seg, nil, nil, &part); err != nil {
+					return nil, err
+				}
+				items = append(items, part...)
 			}
-			if err := c.Do(ctx, http.MethodGet, "/api/trash/notes", nil, nil, &notes); err != nil {
-				return nil, err
-			}
-			items := append(quests, notes...)
 			sort.SliceStable(items, func(i, j int) bool { return fmt.Sprint(items[i]["deleted_at"]) > fmt.Sprint(items[j]["deleted_at"]) })
 			return map[string]any{"items": items, "total": len(items), "workspace": c.Workspace(ctx)}, nil
 		})

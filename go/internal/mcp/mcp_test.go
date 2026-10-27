@@ -593,6 +593,8 @@ func TestTrashToolListsAndRestores(t *testing.T) {
 	f := &fakeAPI{routes: map[string]string{
 		"GET /api/trash/quests":           `[{"kind":"quest","id":5,"title":"q","deleted_at":"2026-10-17T10:00:00Z"}]`,
 		"GET /api/trash/notes":            `[{"kind":"note","id":9,"title":"n","deleted_at":"2026-10-17T11:00:00Z"}]`,
+		"GET /api/trash/scripts":          `[{"kind":"script","id":3,"title":"s","deleted_at":"2026-10-17T09:00:00Z"}]`,
+		"GET /api/trash/hooks":            `[]`,
 		"POST /api/trash/notes/9/restore": `{"id":9}`,
 	}}
 	s, _ := newTestServer(t, f)
@@ -602,8 +604,9 @@ func TestTrashToolListsAndRestores(t *testing.T) {
 		call(3, "trash", `{"action":"restore","kind":"note"}`),
 	)
 	text, isErr := result(t, resps[0])
-	if isErr || !strings.Contains(text, `"total":2`) || strings.Index(text, `"id":9`) > strings.Index(text, `"id":5`) {
-		t.Fatalf("list must hold both kinds, newest first: %s", text)
+	if isErr || !strings.Contains(text, `"total":3`) || strings.Index(text, `"id":9`) > strings.Index(text, `"id":5`) ||
+		strings.Index(text, `"id":5`) > strings.Index(text, `"id":3`) {
+		t.Fatalf("list must hold every kind, newest first: %s", text)
 	}
 	if text, isErr := result(t, resps[1]); isErr || !strings.Contains(text, `"restored":true`) {
 		t.Fatalf("restore: %s", text)

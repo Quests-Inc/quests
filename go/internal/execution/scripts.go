@@ -378,19 +378,13 @@ func (s *Store) UpdateScript(ctx context.Context, id int64, in ScriptUpdate) (Sc
 	return s.GetScript(ctx, id)
 }
 
-// DeleteScript removes a script and all its versions.
+// DeleteScript moves a script to the trash (trash.go) with its versions. A script that is still bound (a step, a note, a
+// template, a template step, a hook) stays; texts that embed it do not hold it: their links break until it is restored.
 func (s *Store) DeleteScript(ctx context.Context, id int64) error {
 	if uses, err := s.ScriptUses(ctx, id); err != nil {
 		return err
-	} else if len(uses) > 0 {
-		return &ScriptInUse{Uses: uses}
+	} else if bound := boundUses(uses); len(bound) > 0 {
+		return &ScriptInUse{Uses: bound}
 	}
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM script WHERE id = ?`, id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return s.trashRow(ctx, "script", id)
 }
