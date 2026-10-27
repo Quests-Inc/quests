@@ -89,7 +89,7 @@
   </ul>
   {#if canWrite && !readonly}
     <div class="add-row" role="group" aria-label="Записать секрет">
-      <input aria-label="Имя секрета" placeholder="API_TOKEN" bind:value={key} autocomplete="off" spellcheck="false" onkeydown={enter} />
+      <input type="text" aria-label="Имя секрета" placeholder="API_TOKEN" bind:value={key} autocomplete="off" spellcheck="false" onkeydown={enter} />
       <input type="password" aria-label="Новое значение секрета" placeholder="Новое значение" bind:value autocomplete="new-password" onkeydown={enter} />
       <button type="button" class="btn" disabled={busy} onclick={() => void write()}>Записать</button>
     </div>
@@ -103,6 +103,11 @@
   .secret-row code { overflow-wrap: anywhere; }
   .secret-row .hint { flex: 1; }
   .inherited { border-style: dashed; }
-  .add-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .add-row input { min-width: 5rem; flex: 1; width: 0; }
+  .add-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: stretch; gap: 0.5rem; }
+  .add-row input, .add-row button { box-sizing: border-box; height: 2.5rem; min-height: 2.5rem; margin: 0; }
+  .add-row input { width: 100%; min-width: 0; background: var(--color-bg, #121212); }
+  @media (max-width: 480px) {
+    .add-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .add-row button { grid-column: 1 / -1; }
+  }
 </style>

@@ -184,9 +184,9 @@
 </script>
 
 {#snippet panel()}
-  <div class="environment-tabs" role="group" aria-label="Вид окружения">
-    <button type="button" class="btn" class:btn--accent={tab === 'values'} aria-pressed={tab === 'values'} onclick={() => (tab = 'values')}>Переменные</button>
-    <button type="button" class="btn" class:btn--accent={tab === 'secrets'} aria-pressed={tab === 'secrets'} onclick={() => (tab = 'secrets')}>Секреты</button>
+  <div class="environment-tabs" class:environment-tabs--secrets={tab === 'secrets'} role="group" aria-label="Вид окружения">
+    <button type="button" class="environment-tabs__option" aria-pressed={tab === 'values'} onclick={() => (tab = 'values')}>Переменные</button>
+    <button type="button" class="environment-tabs__option" aria-pressed={tab === 'secrets'} onclick={() => (tab = 'secrets')}>Секреты</button>
   </div>
   {#if tab === 'secrets'}<SecretTable {owner} {readonly} />{/if}
   <div class="environment-values" hidden={tab !== 'values'}>
@@ -311,7 +311,42 @@
 {/if}
 
 <style>
-  .environment-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .environment-tabs {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    padding: 0.25rem;
+    box-sizing: border-box;
+    margin-bottom: 0.75rem;
+    border-radius: var(--radius-lg, 12px);
+    background: var(--color-bg, #121212);
+  }
+  .environment-tabs::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0.25rem auto 0.25rem 0.25rem;
+    width: calc((100% - 0.5rem) / 2);
+    border-radius: var(--radius-md, 4px);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 25%, transparent);
+    transition: transform 180ms ease;
+  }
+  .environment-tabs--secrets::before { transform: translateX(100%); }
+  .environment-tabs__option {
+    min-width: 0;
+    height: 2.5rem;
+    border: 0;
+    border-radius: var(--radius-md, 4px);
+    background: transparent;
+    color: var(--color-fg-muted, #9a9a9a);
+    font: inherit;
+    cursor: pointer;
+  }
+  .environment-tabs__option[aria-pressed='true'] { color: var(--color-accent, #c9a227); }
+  .environment-tabs__option:focus-visible { outline: 1px solid var(--color-accent, #c9a227); outline-offset: -2px; }
+  @media (prefers-reduced-motion: reduce) { .environment-tabs::before { transition: none; } }
   .environment-values:not([hidden]) { display: grid; gap: 0.6rem; }
   .values-open {
     height: 2rem;
