@@ -237,6 +237,9 @@ func (h *Handler) listWorkspaces(w http.ResponseWriter, r *http.Request) {
 		list, err = h.Auth.UserWorkspaces(r.Context(), p.User.ID)
 	} else {
 		list, err = h.Auth.AllWorkspaces(r.Context())
+		for i := range list {
+			list[i].Role = identity.RoleOwner
+		}
 	}
 	if err != nil {
 		httpx.WriteErr(w, http.StatusInternalServerError, err.Error())

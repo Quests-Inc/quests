@@ -1,7 +1,19 @@
 // Адресная строка приложения: какая вкладка и какой объект открыт, и обратно.
 // Параметры `tab` / `quest=` / `note=` / `attachment=` никогда не живут в строке вместе.
 
-const TABS = ['notes', 'attachments', 'calendar', 'history', 'graph', 'runners', 'scripts', 'hooks', 'runs'] as const
+const TABS = [
+  'notes',
+  'attachments',
+  'calendar',
+  'history',
+  'graph',
+  'runners',
+  'scripts',
+  'hooks',
+  'runs',
+  'templates',
+  'trash',
+] as const
 export type UrlTab = (typeof TABS)[number]
 
 function param(name: string): string | null {
@@ -61,6 +73,8 @@ export type ViewName =
   | 'scripts'
   | 'hooks'
   | 'runs'
+  | 'templates'
+  | 'trash'
 
 /** Where the app opens from the address: which tab, which object is selected, the map's centre. */
 export function initialRoute(): {

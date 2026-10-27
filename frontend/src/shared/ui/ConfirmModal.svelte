@@ -10,12 +10,13 @@
     confirmLabel = 'Удалить',
     cancelLabel = 'Отмена',
     busy = false,
+    zIndex = 60,
     onConfirm = () => {},
     onCancel = () => {},
-  }: { open?: boolean, title?: string, message?: string, confirmLabel?: string, cancelLabel?: string, busy?: boolean, onConfirm?: () => void, onCancel?: () => void } = $props()
+  }: { open?: boolean, title?: string, message?: string, confirmLabel?: string, cancelLabel?: string, busy?: boolean, zIndex?: number, onConfirm?: () => void, onCancel?: () => void } = $props()
 </script>
 
-<ModalShell {open} onClose={onCancel} labelledby="confirm-modal-title" zIndex={60} maxWidth="24rem" closeDisabled={busy}>
+<ModalShell {open} onClose={onCancel} labelledby="confirm-modal-title" {zIndex} maxWidth="24rem" closeDisabled={busy}>
   <ModalHead id="confirm-modal-title" {title} onClose={onCancel} closeDisabled={busy} />
   <div class="modal__body">
     <p class="modal__text">{message}</p>

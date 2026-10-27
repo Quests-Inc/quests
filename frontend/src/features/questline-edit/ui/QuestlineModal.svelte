@@ -152,7 +152,7 @@
 
   {#if mode === 'edit' && line?.id}
     <div class="modal__body">
-      <ValueTable owner={{ kind: 'questline', id: line.id }} />
+      <ValueTable variant="inline" owner={{ kind: 'questline', id: line.id }} />
     </div>
   {/if}
 
@@ -210,7 +210,7 @@
 <ConfirmModal
   open={deleteConfirmOpen}
   title="Удалить квестлайн?"
-  message="Квесты останутся, но отвяжутся от линии."
+  message="Квестлайн переместится в корзину на 30 дней. Квесты и их связи сохранятся до окончательного удаления."
   confirmLabel="Удалить"
   busy={deleting}
   onCancel={() => (deleteConfirmOpen = false)}

@@ -75,7 +75,7 @@ export function contextMenuItems({
       { id: 'add', label: 'Добавить квест' },
       { id: 'edit', label: 'Редактировать' },
       { id: 'icon', label: 'Иконка' },
-      { id: 'secrets', label: 'Секреты' },
+      { id: 'secrets', label: 'Окружение' },
       { id: 'sep-danger', sep: true },
       { id: 'delete', label: 'Удалить', danger: true },
     ]
@@ -121,7 +121,7 @@ export function contextMenuItems({
           checked: s.id === significance,
         })),
       },
-      { id: 'secrets', label: 'Секреты' },
+      { id: 'secrets', label: 'Окружение' },
       {
         id: 'export',
         label: 'Экспорт',
@@ -173,7 +173,7 @@ export function contextMenuItems({
       { id: 'sep-edit', sep: true },
       { id: 'edit', label: 'Редактировать' },
       { id: 'add-step', label: 'Добавить шаг' },
-      { id: 'secrets', label: 'Секреты' },
+      { id: 'secrets', label: 'Окружение' },
       { id: 'sep-danger', sep: true },
       { id: 'delete', label: 'Удалить шаг', danger: true }
     )

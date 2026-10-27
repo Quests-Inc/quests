@@ -53,7 +53,7 @@ test('шапка: четыре вкладки и две группы, актив
     'Заметки',
     'Карта',
     'Календарь',
-    'Архив',
+    'Данные',
     'Автоматика',
   ])
   expect(tabs.filter((t) => t.getAttribute('aria-selected') === 'true').map((t) => t.getAttribute('title'))).toEqual([
@@ -134,7 +134,7 @@ test('группа раскрывается по наведению, пункт 
   group.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }))
   flushSync()
   const items = [...h.target.querySelectorAll<HTMLElement>('.view-drop [role=menuitem]')]
-  expect(items.map((i) => i.textContent?.trim())).toEqual(['Вложения', 'История'])
+  expect(items.map((i) => i.textContent?.trim())).toEqual(['Вложения', 'История', 'Корзина'])
   items[1].click()
   flushSync()
   expect(h.calls).toEqual(['view:history'])
@@ -153,6 +153,6 @@ test('касание и клавиатура: тап по группе откр�
   trigger.click()
   flushSync()
   expect(trigger.getAttribute('aria-expanded')).toBe('true')
-  expect(h.target.querySelectorAll('.view-drop [role=menuitem]')).toHaveLength(2)
+  expect(h.target.querySelectorAll('.view-drop [role=menuitem]')).toHaveLength(3)
   h.stop()
 })

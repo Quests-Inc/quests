@@ -48,6 +48,6 @@ export function templateMenuItems(
     { id: 'duplicate', label: 'Дублировать (копия выключена)' },
     { id: 'toggle', label: t.enabled ? 'Выключить' : 'Включить' },
     { id: 'sep-secrets', sep: true },
-    { id: 'secrets', label: 'Секреты' },
+    { id: 'secrets', label: 'Окружение' },
   ]
 }

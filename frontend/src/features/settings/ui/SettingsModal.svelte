@@ -1,6 +1,7 @@
 <script lang="ts">
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
+  import StarterBlock from './sections/StarterBlock.svelte'
   import ServicesSection from './sections/ServicesSection.svelte'
   import AppearanceSection from './sections/AppearanceSection.svelte'
   import HotkeysSection from './sections/HotkeysSection.svelte'
@@ -27,7 +28,7 @@
     { id: 'services', label: 'Сервисы' },
     { id: 'appearance', label: 'Внешний вид' },
     { id: 'hotkeys', label: 'Клавиши' },
-    { id: 'trash', label: 'Корзина' },
+    { id: 'examples', label: 'Примеры и гайды' },
     ...(onLogout && wsx.loaded
       ? [
           { id: 'workspace', label: 'Пространство' },
@@ -43,7 +44,7 @@
 
   $effect(() => {
     if (!open) return
-    active = section && ['services', 'appearance', 'hotkeys', 'trash'].includes(section) ? section : 'services'
+    active = section && ['services', 'appearance', 'hotkeys', 'trash', 'examples'].includes(section) ? section : 'services'
     pane = section ? 'content' : 'nav'
     if (onLogout) void loadWorkspaceState()
   })
@@ -84,6 +85,8 @@
           <AppearanceSection />
         {:else if active === 'hotkeys'}
           <HotkeysSection />
+        {:else if active === 'examples'}
+          <StarterBlock readonly={!!onLogout && wsx.myRole !== 'owner'} />
         {:else if active === 'trash'}
           <TrashSection />
         {:else if active === 'workspace'}

@@ -123,7 +123,7 @@ func secretTools(c *Client) []Tool {
 	type listArgs struct {
 		Owner string `json:"owner" desc:"questline=N | template=N | quest=N | step=N | note=N | workspace (the active one: inherited by everything in it)"`
 	}
-	list := Typed("list_secrets", "Names of the secrets set on an owner (values are never readable).",
+	list := Typed("list_secrets", "Secrets of an owner: own, inherited, effective name/source rows (same groups as list_values), plus legacy keys. Notes inherit parents and workspace; private notes are hidden from MCP. Secret values are never readable.",
 		func(ctx context.Context, a listArgs) (any, error) {
 			p, err := secretPath(a.Owner)
 			if err != nil {

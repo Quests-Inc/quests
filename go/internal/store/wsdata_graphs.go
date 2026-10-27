@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/quests-inc/quests/go/internal/execution/graph"
 )
 
 // remapScriptGraphs rewrites the ids inside the imported scripts' graphs and custom nodes' definitions (quest=458).
-func (s *Store) remapScriptGraphs(ctx context.Context, tx *sql.Tx, ids map[string]map[int64]int64, rep *ImportReport) error {
+func (s *Store) remapScriptGraphs(ctx context.Context, tx *sql.Tx, ids map[string]map[int64]int64, written map[string]map[int64]bool, rep *ImportReport) error {
 	custom := func(id int64) (int64, bool) { n, ok := ids["custom_node"][id]; return n, ok }
 	entity := func(kind string, id int64) (int64, bool) {
 		t, ok := kindTable[kind]
@@ -42,6 +43,9 @@ func (s *Store) remapScriptGraphs(ctx context.Context, tx *sql.Tx, ids map[strin
 		return err
 	}
 	for _, r := range nodes {
+		if !written["custom_node"][r.id] {
+			continue
+		}
 		var body struct {
 			Inputs  json.RawMessage     `json:"inputs"`
 			Outputs json.RawMessage     `json:"outputs"`
@@ -86,6 +90,9 @@ func (s *Store) remapScriptGraphs(ctx context.Context, tx *sql.Tx, ids map[strin
 		return err
 	}
 	for _, r := range vers {
+		if !written[fmt.Sprintf("script_version:%d", r.script)][int64(r.version)] {
+			continue
+		}
 		g, err := graph.Decode([]byte(r.graph))
 		if err != nil {
 			continue

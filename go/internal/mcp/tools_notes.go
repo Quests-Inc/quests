@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -239,14 +240,14 @@ func noteTools(c *Client) []Tool {
 
 	type trashArgs struct {
 		Action string `json:"action" enum:"list,restore"`
-		Kind   string `json:"kind,omitempty" enum:"quest,note,script,hook" desc:"restore: what to bring back"`
+		Kind   string `json:"kind,omitempty" enum:"quest,note,script,hook,template,questline" desc:"restore: what to bring back"`
 		ID     int64  `json:"id,omitempty" desc:"restore: its id"`
 	}
-	trash := Typed("trash", "The trash of deleted quests, notes, scripts and hooks (kept 30 days). list: what can be restored, newest first, with the date it is erased; restore: bring one back (a note returns under its parent with its children; a hook only after its script).",
+	trash := Typed("trash", "The trash of deleted quests, notes, scripts, hooks, templates and questlines (kept 30 days). list: what can be restored, newest first, with the date it is erased; restore: bring one back (a note returns under its parent with its children; a hook only after its script; a template returns disabled).",
 		func(ctx context.Context, a trashArgs) (any, error) {
 			if a.Action == "restore" {
-				if a.ID == 0 || (a.Kind != "quest" && a.Kind != "note" && a.Kind != "script" && a.Kind != "hook") {
-					return nil, &Err{422, "restore needs kind (quest, note, script or hook) and id"}
+				if a.ID == 0 || (a.Kind != "quest" && a.Kind != "note" && a.Kind != "script" && a.Kind != "hook" && a.Kind != "template" && a.Kind != "questline") {
+					return nil, &Err{422, "restore needs kind (quest, note, script, hook, template or questline) and id"}
 				}
 				if err := c.Do(ctx, http.MethodPost, fmt.Sprintf("/api/trash/%ss/%d/restore", a.Kind, a.ID), nil, nil, nil); err != nil {
 					return nil, err
@@ -254,9 +255,13 @@ func noteTools(c *Client) []Tool {
 				return ok(ctx, c, a.ID, map[string]any{"kind": a.Kind, "restored": true}), nil
 			}
 			items := []map[string]any{}
-			for _, seg := range []string{"quests", "notes", "scripts", "hooks"} {
+			for _, seg := range []string{"quests", "notes", "scripts", "hooks", "templates", "questlines"} {
 				var part []map[string]any
 				if err := c.Do(ctx, http.MethodGet, "/api/trash/"+seg, nil, nil, &part); err != nil {
+					var apiErr *Err
+					if (seg == "templates" || seg == "questlines") && errors.As(err, &apiErr) && apiErr.Code == 404 {
+						continue
+					}
 					return nil, err
 				}
 				items = append(items, part...)

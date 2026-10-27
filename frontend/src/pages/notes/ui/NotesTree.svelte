@@ -215,7 +215,7 @@
               </span>
               {#if n.is_readme || n.is_private || n.is_category || n.outdated || readmeBubbleIds.has(n.id)}
                 <span class="notes__row-status" aria-hidden="true">
-                  {#if n.is_readme}<span class="notes__status-dot notes__status-dot--readme"><Icon name="alert" size={12} /></span>{:else if readmeBubbleIds.has(n.id)}<span class="notes__status-dot notes__status-dot--readme-bubble" title="Ниже есть README"><Icon name="alert" size={12} /></span>{/if}
+                  {#if n.is_readme}<span class="notes__status-dot notes__status-dot--readme"><Icon name="alert" size={12} /></span>{:else if readmeBubbleIds.has(n.id)}<span class="notes__status-dot notes__status-dot--readme-bubble" title="Ниже есть заметки к прочтению"><Icon name="alert" size={12} /></span>{/if}
                   {#if n.is_private}<span class="notes__status-dot notes__status-dot--private"><Icon name="lock" size={12} /></span>{/if}
                   {#if n.is_category}<span class="notes__status-dot notes__status-dot--category"><Icon name="folder" size={12} /></span>{/if}
                   {#if n.outdated}<span class="notes__status-dot notes__status-dot--outdated" title={n.outdated_reason || 'Устарела'}><Icon name="clock-alert" size={12} /></span>{/if}

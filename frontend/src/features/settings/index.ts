@@ -10,3 +10,5 @@ export { default as ServicesSection } from './ui/sections/ServicesSection.svelte
 export { default as SettingsBlock } from './ui/sections/SettingsBlock.svelte'
 export { default as WorkspaceSection } from './ui/sections/WorkspaceSection.svelte'
 export * from './model/workspaceState.svelte.ts'
+
+export { default as TrashSection } from './ui/sections/TrashSection.svelte'

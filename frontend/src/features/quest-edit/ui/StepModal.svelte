@@ -106,6 +106,7 @@
     <div class="field">
       <span class="label">Описание</span>
       <MentionTextarea
+        host={step?.id ? { kind: 'step', id: step.id } : undefined}
         bind:value={draft.description}
         {quests}
         {questlines}

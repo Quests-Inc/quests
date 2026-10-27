@@ -15,6 +15,9 @@ import (
 
 func (s *Server) registerDomainRoutes(mux *http.ServeMux) {
 
+	mux.HandleFunc("POST /api/workspace/starter", s.seedStarter)
+	mux.HandleFunc("DELETE /api/workspace/starter", s.removeStarter)
+	s.registerContainerTrash(mux)
 	s.automationHTTP().Register(mux)
 	s.executionHTTP().Register(mux)
 	mux.HandleFunc("GET /api/graph", s.getGraph)

@@ -341,3 +341,50 @@ func TestWorkspaceSecretUpsertListDelete(t *testing.T) {
 		t.Fatal("a secret with two owners must be refused")
 	}
 }
+
+func TestNoteSecretsFollowParentsAndMoves(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	if _, err := st.DB.Exec(`INSERT INTO note (id, title, parent_id, is_private, created_at, updated_at) VALUES (1, 'private root', NULL, 1, now(), now()), (2, 'child', 1, 0, now(), now()), (3, 'other', NULL, 0, now(), now())`); err != nil {
+		t.Fatal(err)
+	}
+	root, child, other := SecretOwner{SecretOwnerNote, 1}, SecretOwner{SecretOwnerNote, 2}, SecretOwner{SecretOwnerNote, 3}
+	mustSet(t, st, workspaceOwner(ctx), "SHARED", "workspace-value")
+	mustSet(t, st, root, "SHARED", "root-value")
+	mustSet(t, st, root, "PRIVATE_KEY", "private-value")
+	mustSet(t, st, child, "OWN", "child-value")
+	mustSet(t, st, other, "SHARED", "other-value")
+	got, err := st.ResolveSecrets(ctx, child)
+	if err != nil || got["SHARED"] != "root-value" || got["OWN"] != "child-value" {
+		t.Fatalf("inherit: %v %v", got, err)
+	}
+	refs, err := st.ListVisibleSecretKeys(ctx, child, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range refs {
+		if r.Owner == root {
+			t.Fatalf("private source leaked: %+v", refs)
+		}
+	}
+	if _, err := st.DB.Exec(`UPDATE note SET parent_id=3 WHERE id=2`); err != nil {
+		t.Fatal(err)
+	}
+	got, err = st.ResolveSecrets(ctx, child)
+	if err != nil || got["SHARED"] != "other-value" || got["PRIVATE_KEY"] != "" {
+		t.Fatalf("move: %v %v", got, err)
+	}
+	mustSet(t, st, child, "SHARED", "child-override")
+	got, err = st.ResolveSecrets(ctx, child)
+	if err != nil || got["SHARED"] != "child-override" {
+		t.Fatalf("override: %v %v", got, err)
+	}
+	// A damaged cyclic hierarchy must terminate and keep the child's precedence.
+	if _, err := st.DB.Exec(`UPDATE note SET parent_id=2 WHERE id=3`); err != nil {
+		t.Fatal(err)
+	}
+	got, err = st.ResolveSecrets(ctx, child)
+	if err != nil || got["SHARED"] != "child-override" {
+		t.Fatalf("cycle: %v %v", got, err)
+	}
+}

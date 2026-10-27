@@ -110,7 +110,7 @@ test('PRIVATE: поставить можно сразу, снять — толь
   both.pick(5, 4)
   both.grp.openMenu(both.ev, 5)
   await both.grp.select('private')
-  expect(both.grp.confirm?.title).toBe('Снять PRIVATE?')
+  expect(both.grp.confirm?.title).toBe('Снять приватность?')
   expect(both.log.filter((e) => e[0] === 'flag')).toEqual([])
   await both.grp.doConfirm()
   expect(both.log.filter((e) => e[0] === 'flag')).toEqual([

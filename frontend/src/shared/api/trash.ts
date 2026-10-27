@@ -2,7 +2,7 @@ import { request } from './http.ts'
 
 /** A deleted quest, note, script or hook: it lives in the trash for 30 days (`purge_at`), then the scheduler erases it. */
 export type TrashItem = {
-  kind: 'quest' | 'note' | 'script' | 'hook'
+  kind: 'quest' | 'note' | 'script' | 'hook' | 'template' | 'questline'
   id: number
   title: string
   deleted_at: string
@@ -20,7 +20,7 @@ export type TrashItem = {
   script_trashed?: boolean
 }
 
-const KINDS = ['quests', 'notes', 'scripts', 'hooks'] as const
+const KINDS = ['quests', 'notes', 'scripts', 'hooks', 'templates', 'questlines'] as const
 
 /** Everything in the trash, newest deleted first. */
 export async function listTrash(): Promise<TrashItem[]> {
@@ -43,6 +43,8 @@ export async function emptyTrash() {
     request('/api/trash/quests', { method: 'DELETE' }),
     request('/api/trash/notes', { method: 'DELETE' }),
   ])
+  await request('/api/trash/templates', { method: 'DELETE' })
+  await request('/api/trash/questlines', { method: 'DELETE' })
   await request('/api/trash/hooks', { method: 'DELETE' })
   await request('/api/trash/scripts', { method: 'DELETE' })
 }

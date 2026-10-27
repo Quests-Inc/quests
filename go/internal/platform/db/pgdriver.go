@@ -39,6 +39,7 @@ var noIDTables = map[string]bool{
 	"user_totp":           true,
 	"note_stat":           true,
 	"script_version":      true,
+	"seed_item":           true,
 	"quest_failure_inbox": true,
 }
 

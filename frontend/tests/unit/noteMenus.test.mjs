@@ -66,7 +66,7 @@ test('noteMenuItems: пустой без заметки; при поиске н�
   })
   expect(items.map((i) => i.id)).not.toContain('rename')
   expect(items[0].label).toBe('Копировать note=3')
-  expect(items.find((i) => i.id === 'flags').children.find((c) => c.id === 'readme').label).toBe('Снять README')
+  expect(items.find((i) => i.id === 'flags').children.find((c) => c.id === 'readme').label).toBe('Снять «к прочтению»')
   expect(items.find((i) => i.id === 'export').children[1].label).toBe('PDF…')
   expect(items.find((i) => i.id === 'move').children).toEqual([{ id: 'move:root' }])
 })

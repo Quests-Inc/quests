@@ -549,3 +549,6 @@ func ExprScopeOf(set ValueSet) *graph.ExprScope {
 	}
 	return sc
 }
+
+// OwnerTitle is a display label for the source of an environment entry.
+func (s *Store) OwnerTitle(ctx context.Context, o SecretOwner) string { return s.ownerTitle(ctx, o) }

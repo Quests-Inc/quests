@@ -14,6 +14,8 @@ export type View =
   | 'scripts'
   | 'hooks'
   | 'runs'
+  | 'templates'
+  | 'trash'
 export type GraphRoot = { type: 'quest' | 'note' | 'questline' | null; id: number | null }
 
 /** Порядок вкладок в шапке: определяет, в какую сторону «уезжает» переключение. */
@@ -28,6 +30,8 @@ export const TAB_ORDER: View[] = [
   'scripts',
   'hooks',
   'runs',
+  'templates',
+  'trash',
 ]
 
 const validId = (id: unknown) => {

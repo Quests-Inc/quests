@@ -147,3 +147,13 @@ export function disableMyMfa(code: string) {
 export function regenerateRecoveryCodes(code: string) {
   return request('/api/me/2fa/recovery', { method: 'POST', body: JSON.stringify({ code }) })
 }
+
+export function seedStarter() {
+  return request<{ version: number; added: number; updated: number; preserved: number; deleted: number }>(
+    '/api/workspace/starter',
+    { method: 'POST' }
+  )
+}
+export function removeStarter() {
+  return request<{ trashed: number }>('/api/workspace/starter', { method: 'DELETE' })
+}

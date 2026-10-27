@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/quests-inc/quests/go/internal/execution"
@@ -106,5 +107,24 @@ func TestTestEventCarriesTheSubject(t *testing.T) {
 		if ev := testEvent(kind, "note", 7); ev[key] != int64(7) || ev["kind"] != kind {
 			t.Errorf("%s: %v", kind, ev)
 		}
+	}
+}
+
+func TestBatchValueSinkWritesAnObject(t *testing.T) {
+	st := openChecksDB(t)
+	ctx := wsctx.With(context.Background(), 1)
+	r := NewCheckRunner(st, events.New())
+	note, err := st.Knowledge.CreateNote(ctx, knowledge.Note{Title: "batch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := scriptHost{r: r}
+	inputs := map[string]graph.Token{"ref": {Type: graph.TRefNote, Value: graph.Ref{Kind: "note", ID: note.ID}}, "values": {Type: graph.TDoc, Value: json.RawMessage(`{"hp":12,"alive":true}`)}}
+	if err := host.Sink(ctx, graph.Node{Type: "sink.values"}, inputs); err != nil {
+		t.Fatal(err)
+	}
+	set, err := st.Execution.ResolveNamedValues(ctx, execution.SecretOwner{Kind: "note", ID: note.ID}, false)
+	if err != nil || len(set.Own) != 2 {
+		t.Fatalf("sink: %+v %v", set, err)
 	}
 }

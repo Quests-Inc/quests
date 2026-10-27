@@ -3,6 +3,7 @@ package automationhttp
 import (
 	"encoding/json"
 	"errors"
+	"github.com/quests-inc/quests/go/internal/platform/trashrow"
 	"net/http"
 	"strconv"
 	"strings"
@@ -82,7 +83,7 @@ func (h *Handler) patchTemplate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err := h.Store.DeleteTemplate(r.Context(), id); err != nil {
+	if err := trashrow.Move(r.Context(), h.Store.DB, "questtemplate", id); err != nil {
 		if errors.Is(err, automation.ErrNotFound) {
 			writeErr(w, 404, "Template not found")
 			return

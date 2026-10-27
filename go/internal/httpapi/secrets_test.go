@@ -152,3 +152,36 @@ func TestWorkspaceSecretsOverHTTP(t *testing.T) {
 		t.Fatalf("not deleted: %v", out)
 	}
 }
+
+func TestNoteSecretsEnvironmentShapeAndMCPPrivacy(t *testing.T) {
+	h, s := secretsServer(t)
+	pgtest.Seed(t, s.Store.DB, `INSERT INTO note (id,title,parent_id,is_private,created_at,updated_at) VALUES (101,'private parent',NULL,1,now(),now()),(102,'public child',101,0,now(),now())`)
+	for path, value := range map[string]string{"/api/notes/101/secrets/PARENT": "parent-secret-value", "/api/notes/102/secrets/OWN": "child-secret-value"} {
+		if code, _ := secretReq(h, http.MethodPut, path, map[string]string{"value": value}); code != 204 {
+			t.Fatalf("put: %d", code)
+		}
+	}
+	code, out := secretReq(h, http.MethodGet, "/api/notes/102/secrets", nil)
+	if code != 200 || len(out["own"].([]any)) != 1 || len(out["inherited"].([]any)) != 1 || len(out["effective"].([]any)) != 2 {
+		t.Fatalf("shape: %d %v", code, out)
+	}
+	raw, _ := json.Marshal(out)
+	if bytes.Contains(raw, []byte("secret-value")) {
+		t.Fatal("secret value leaked")
+	}
+	for _, id := range []string{"101", "102"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/notes/"+id+"/secrets", nil)
+		req.Header.Set("X-Quests-Source", "mcp")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if id == "101" {
+			if w.Code != 403 {
+				t.Fatalf("private note: %d %s", w.Code, w.Body.String())
+			}
+			continue
+		}
+		if w.Code != 200 || bytes.Contains(w.Body.Bytes(), []byte("PARENT")) || bytes.Contains(w.Body.Bytes(), []byte("private parent")) {
+			t.Fatalf("private inheritance leak: %d %s", w.Code, w.Body.String())
+		}
+	}
+}
