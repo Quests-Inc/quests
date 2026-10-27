@@ -9,6 +9,7 @@
   import { TemplateStreak } from '@/entities/template'
   import { ValueTable } from '@/entities/value'
   import StepValues from './StepValues.svelte'
+  import StepAutoChip from './StepAutoChip.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { formatLocal, localTimeZone } from '@/shared/lib/time.ts'
   import { parseRefs } from '@/shared/lib/refs.ts'
@@ -16,6 +17,8 @@
   import { createQuestPdf } from '../model/pdfExport.svelte.ts'
   import { toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
   import { animateText } from '@/shared/lib/typewriter.ts'
+  import { getRunStats } from '@/shared/api/client.ts'
+  import type { SourceRunStats } from '@/shared/api/execution.gen.ts'
 
   let {
     selected,
@@ -80,6 +83,19 @@
     onRef?: (kind: string, id: number) => void,
     onOpenGraph?: (type: string, id: number) => void,
   } = $props()
+
+  /** The latest run of each step with a check or a script (quest=490): the dot on the step's chip. */
+  let stepRuns = $state<Record<string, SourceRunStats>>({})
+  $effect(() => {
+    const auto = ((selected?.steps ?? []) as { check_command?: string; script_id?: number }[]).some((s) => s.check_command || s.script_id)
+    void selected?.updated_at
+    if (!auto) return
+    untrack(() => {
+      void getRunStats('step')
+        .then((m) => (stepRuns = m ?? {}))
+        .catch(() => {})
+    })
+  })
 
   const tzLabel = localTimeZone()
   const pdf = createQuestPdf({
@@ -459,30 +475,8 @@
           <span class="step__mark">{step.done ? '✓' : step.run_status === 'running' ? '▶' : '○'}</span>
           <span class="step__main">
             <span class="step__title"><span class="strike" class:strike--done={step.done}><RefText source={step.title} {labels} {onRef} /></span></span>
-            {#if step.check_command}
-              <span
-                class="step__auto"
-                class:step__auto--run={step.run_status === 'running'}
-                class:step__auto--wait={waiting}
-                title={step.check_command}
-              >
-                {#if waiting}
-                  ждёт
-                {:else if step.run_status === 'running'}
-                  идёт
-                {:else if step.run_status === 'fail'}
-                  сбой
-                {:else if step.run_mode === 'once'}
-                  разово
-                {:else if step.run_mode === 'watch'}
-                  наблюдение {step.check_interval_seconds || '?'}s
-                {:else}
-                  auto {step.check_interval_seconds || '?'}s
-                {/if}
-                {#if step.run_on}
-                  · {step.run_on}
-                {/if}
-              </span>
+            {#if step.check_command || step.script_id}
+              <StepAutoChip {step} {waiting} last={stepRuns[String(step.id)]} />
             {/if}
           </span>
           <div class="step__controls">

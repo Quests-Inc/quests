@@ -33,7 +33,6 @@
    */
   let { active = true }: { active?: boolean } = $props()
 
-  const USE_KINDS: Record<string, string> = { step: 'шаг', note: 'заметка', template: 'шаблон', template_step: 'шаг шаблона' }
 
   const ed = createScriptEditor()
   const cv = createCanvas(ed)
@@ -390,13 +389,9 @@
             onInsert={(k, id, at) => void insertGraph(k, id, at)}
           />
         </div>
-        <Inspector {ed} onEditCustom={(t) => void editCustom(t)} />
+        <Inspector {ed} {uses} onEditCustom={(t) => void editCustom(t)} />
       </div>
-      {#if uses.length}
-        <p class="scripts__uses">
-          Используется: {uses.map((u) => `${USE_KINDS[u.subject_type] ?? u.subject_type} «${u.title}»`).join(', ')}
-        </p>
-      {/if}
+
     {/if}
   </section>
 </SidebarLayout>
@@ -622,11 +617,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
-  .scripts__uses {
-    margin: 0;
-    font-size: var(--text-xs, 0.78rem);
-    color: var(--color-fg-muted, #9a9a9a);
   }
   @media (max-width: 960px) {
     .scripts__main {
