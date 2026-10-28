@@ -96,7 +96,7 @@
         <li role="presentation">
           <button type="button" class="find__row" class:find__row--on={i === active} role="option" aria-selected={i === active} onmouseenter={() => (active = i)} onclick={() => pick(m)}>
             <span class="find__type" style:--c={TYPES[m.type]?.color}>
-              <span class="find__glyph" aria-hidden="true">{TYPES[m.type]?.glyph}</span>{LABEL[m.type]}
+              {LABEL[m.type]}
             </span>
             <span class="find__title">{m.title}</span>
           </button>
@@ -129,7 +129,6 @@
     width: 100%;
     padding: 0.35rem 0.5rem;
     border: 0;
-    border-left: 2px solid transparent;
     border-radius: 6px;
     background: transparent;
     color: inherit;
@@ -143,27 +142,12 @@
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 8%, transparent);
   }
 
-  .find__row--on {
-    border-left-color: var(--color-accent, #c9a227);
-  }
-
-  /* The kind: a pill in the entity's own colour (the same as its card on the map), centred on the title's line. */
+  /* The kind: just the word, in the entity's own colour (the same as its card on the map), centred on the title's line. */
   .find__type {
     flex: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    min-width: 6.5rem;
-    padding: 0.1rem 0.55rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--c, #888) 16%, transparent);
+    width: 6rem;
     color: var(--c, var(--color-fg-muted, #9a9a9a));
     font-size: var(--text-xs, 0.75rem);
-    line-height: 1.5;
-  }
-
-  .find__glyph {
-    font-size: 0.7rem;
   }
 
   .find__title {
