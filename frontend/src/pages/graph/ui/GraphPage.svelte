@@ -16,6 +16,9 @@
   import { createGraphPrefs } from '../model/prefs.svelte.ts'
   import { createGraphQuery } from '../model/query.svelte.ts'
   import GraphToolbar from './GraphToolbar.svelte'
+  import GraphLayouts from './GraphLayouts.svelte'
+  import { createGraphLayouts } from '../model/layouts.svelte.ts'
+  import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
 
   /**
    * Relations map tab: what a quest/note is connected to, drawn from existing
@@ -214,6 +217,31 @@
     saved,
   })
 
+  const layouts = createGraphLayouts({
+    center: () => query.center,
+    setCenter: (c) => query.setCenter(c),
+    clearCenter: () => query.clearMap(),
+    roots: () => gd.draft.roots,
+    writeRoots: putGraphDraftRoots,
+    loadDraft: () => gd.load(),
+    depth: { get: () => query.depth, set: (d) => (query.depth = d) },
+    layout: {
+      get: () => stage.layoutMode,
+      set: (l) => {
+        stage.layoutMode = l
+        prefs.layoutMode = l
+      },
+    },
+    prefs,
+    folds,
+    nodes: () => stage.nodes,
+    saved,
+    cam: { get: () => gest.cam, set: (c) => (gest.cam = c) },
+    stageSize: () => stage.stageSize,
+    settled: () => !query.loading && stage.ready,
+    applyLayout: () => stage.applyLayout(),
+  })
+
   function toggleSelectMode() {
     stage.toggleSelectMode()
     menu.close()
@@ -347,6 +375,10 @@
 />
 <svelte:document onfullscreenchange={onFullscreenChange} />
 
+<SidebarLayout key="graph" class="graph-shell">
+  {#snippet sidebar()}
+    <GraphLayouts {layouts} />
+  {/snippet}
 <div class="graph">
   <GraphToolbar
     bind:rootQuery={query.rootQuery}
@@ -413,6 +445,7 @@
     {/if}
   </GraphCanvas>
 </div>
+</SidebarLayout>
 
 <input bind:this={menu.fileInput} type="file" multiple hidden onchange={onFilesPicked} />
 

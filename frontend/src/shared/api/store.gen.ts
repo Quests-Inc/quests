@@ -148,6 +148,21 @@ export interface DraftOp {
 }
 
 //////////
+// source: graphlayout.go
+
+/**
+ * GraphLayout is a saved view of the relations map: its State is the map's own JSON (centre, depth, filters, open links,
+ * card positions, camera), which the server keeps without reading. A layout is its author's, inside one workspace.
+ */
+export interface GraphLayout {
+  id: number /* int64 */;
+  title: string;
+  state?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+//////////
 // source: starter.go
 
 export interface SeedReport {

@@ -77,5 +77,11 @@ export function createClusterFolds(deps: {
     disband,
     reset,
     forgetPositions,
+    /** Встать на сохранённый расклад: какие группы раскрыты и какие разложены. */
+    restore(s: { expanded?: string[]; loose?: string[] }) {
+      expanded = new Set(s.expanded ?? [])
+      loose = new Set(s.loose ?? [])
+      origins.clear()
+    },
   }
 }

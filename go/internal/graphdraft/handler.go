@@ -122,6 +122,7 @@ type attachPayload struct {
 
 // Register mounts the map draft routes.
 func (h *Handler) Register(mux *http.ServeMux) {
+	h.registerLayouts(mux)
 	mux.HandleFunc("GET /api/graph-draft", h.getGraphDraft)
 	mux.HandleFunc("POST /api/graph-draft/ops", h.postGraphDraftOp)
 	mux.HandleFunc("PUT /api/graph-draft/ops/{id}", h.putGraphDraftOp)

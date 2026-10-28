@@ -125,5 +125,22 @@ export function createGraphPrefs(store: Store | null) {
       write(store, KEYS.expand, next)
     },
     ownExpand: (key: string) => expandKeys.filter((k) => k === key || k.startsWith(`${key}>`)),
+    /** Встать на сохранённый расклад: фильтры, скрытое и раскрытое (непустые фильтры, неизвестное отбрасывается). */
+    restore(s: { statuses?: string[]; types?: string[]; hidden?: string[]; expand?: string[] }) {
+      const st = strings(s.statuses).filter((x) => QUEST_STATUSES.includes(x))
+      if (st.length) {
+        questStatuses = new Set(st)
+        write(store, KEYS.statuses, st)
+      }
+      const ty = strings(s.types).filter((x) => ENTITY_TYPES.includes(x))
+      if (ty.length) {
+        shownTypes = new Set(ty)
+        write(store, KEYS.types, ty)
+      }
+      hidden = new Set(strings(s.hidden))
+      write(store, KEYS.hidden, [...hidden])
+      expandKeys = strings(s.expand)
+      write(store, KEYS.expand, expandKeys)
+    },
   }
 }

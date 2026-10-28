@@ -93,3 +93,26 @@ export function putGraphDraftOp(id: number, payload: any) {
 }
 
 // --- Runners: devices that execute checks (quests-runner), and their job queue.
+
+/** A saved layout of the map (personal): the list has no `state`, one layout read by id has it. */
+export type GraphLayout = { id: number; title: string; state?: unknown; created_at: string; updated_at: string }
+
+export function listGraphLayouts() {
+  return request<GraphLayout[]>('/api/graph-layouts')
+}
+
+export function getGraphLayout(id: number) {
+  return request<GraphLayout>(`/api/graph-layouts/${id}`)
+}
+
+export function createGraphLayout(title: string, state: unknown) {
+  return request<GraphLayout>('/api/graph-layouts', { method: 'POST', body: JSON.stringify({ title, state }) })
+}
+
+export function updateGraphLayout(id: number, patch: { title?: string; state?: unknown }) {
+  return request<GraphLayout>(`/api/graph-layouts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+}
+
+export function deleteGraphLayout(id: number) {
+  return request(`/api/graph-layouts/${id}`, { method: 'DELETE' })
+}

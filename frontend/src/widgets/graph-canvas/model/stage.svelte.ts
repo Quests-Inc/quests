@@ -470,6 +470,8 @@ export function createGraphStage(deps: {
       return Boolean(n && n.key !== deps.getData()?.root && CENTERABLE.has(n.type) && !n.draft)
     },
     touch,
+    /** Разложить заново с тем, что сейчас в `saved` (расклад поставил позиции карточек). */
+    applyLayout,
     compose,
     poke,
     fit,
