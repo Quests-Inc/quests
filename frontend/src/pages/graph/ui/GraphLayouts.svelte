@@ -125,14 +125,16 @@
 />
 
 <style>
+  /* The look of the other lists (scripts, runs): a raised panel, rows with a straight left rail that turns accent on the open one. */
   .glay {
     display: flex;
     flex-direction: column;
     min-height: 0;
     height: 100%;
+    background: var(--color-bg-raised, #1a1a1a);
   }
   .glay__empty {
-    margin: 0.75rem;
+    margin: 0.75rem 0.6rem;
     font-size: var(--text-sm, 0.875rem);
     color: var(--color-fg-muted, #9a9a9a);
   }
@@ -140,30 +142,35 @@
     flex: 1 1 auto;
     overflow: auto;
     margin: 0;
-    padding: 0.25rem;
+    padding: 0 0 0.5rem;
     list-style: none;
   }
   .glay__item {
     display: flex;
     align-items: center;
     gap: 0.2rem;
-    border-radius: var(--radius-md, 4px);
+    padding-right: 0.3rem;
+    border-left: 2px solid transparent;
   }
   .glay__item:hover {
-    background: var(--color-bg-muted, #1e1e1e);
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
   }
-  .glay__item--on {
-    box-shadow: inset 2px 0 0 var(--color-accent, #c9a227);
+  .glay__item--on,
+  .glay__item--on:hover {
+    border-left-color: var(--color-accent, #c9a227);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 14%, var(--color-bg-raised, #1a1a1a));
   }
   .glay__open {
     flex: 1 1 auto;
     min-width: 0;
     display: grid;
     gap: 0.1rem;
-    padding: 0.4rem 0.5rem;
+    padding: 0.4rem 0.6rem 0.4rem 0.55rem;
     border: 0;
     background: transparent;
     color: inherit;
+    font-family: var(--font-body, Georgia, serif);
+    font-size: var(--text-sm, 0.875rem);
     text-align: left;
     cursor: pointer;
   }
@@ -172,9 +179,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .glay__item--on .glay__title {
-    color: var(--color-accent, #c9a227);
-  }
   .glay__open small {
     color: var(--color-fg-muted, #9a9a9a);
     font-size: var(--text-xs, 0.75rem);
@@ -182,6 +186,21 @@
   .glay__acts {
     display: flex;
     opacity: 0;
+  }
+  /* Flat icons: the row is the thing, its actions are a quiet extra (a boxed button per action weighs more than the title). */
+  .glay__acts :global(.btn) {
+    width: 1.9rem;
+    min-width: 0;
+    height: 1.9rem;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+  .glay__acts :global(.btn:hover),
+  .glay__acts :global(.btn:focus-visible) {
+    color: var(--color-fg, #e8e8e8);
+    background: color-mix(in srgb, var(--color-fg, #e8e8e8) 8%, transparent);
   }
   .glay__item:hover .glay__acts,
   .glay__item:focus-within .glay__acts,

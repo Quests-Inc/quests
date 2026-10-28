@@ -229,7 +229,8 @@
   let graphOn = $state(nav.view === 'graph')
   let graphEl = $state((null as HTMLDivElement | null))
   let prevView = nav.view
-  const SLIDE_MS = 220
+  // One duration for every tab: the map (kept mounted, animated by hand) and the others (`slideTab`) must feel the same.
+  const SLIDE_MS = 110
   const SLIDE_EASE = 'cubic-bezier(0.215, 0.61, 0.355, 1)'
   $effect(() => {
     const v = nav.view
@@ -258,7 +259,7 @@
   function slideTab(node: any, { dir, out = false }: any) {
     const sign = out ? -dir : dir
     return {
-      duration: 110,
+      duration: SLIDE_MS,
       delay: 0,
       easing: cubicOut,
       css: (t: number) => `transform: translateX(${(1 - t) * sign * 100}%)`,
