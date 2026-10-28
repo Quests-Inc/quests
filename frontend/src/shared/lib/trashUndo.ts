@@ -8,6 +8,8 @@ const RESTORED: Record<TrashItem['kind'], string> = {
   note: 'Заметка восстановлена',
   script: 'Скрипт восстановлен',
   hook: 'Хук восстановлен',
+  template: 'Шаблон восстановлен',
+  questline: 'Квестлайн восстановлен',
 }
 
 /** The «Отменить» button for items just moved to the trash; `after` reloads what the page shows. */

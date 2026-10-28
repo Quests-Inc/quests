@@ -22,6 +22,7 @@
   import flag from '@/assets/icons/flag.svg?raw'
   import folder from '@/assets/icons/folder.svg?raw'
   import key from '@/assets/icons/key.svg?raw'
+  import tag from '@/assets/icons/tag.svg?raw'
   import lock from '@/assets/icons/lock.svg?raw'
   import layers from '@/assets/icons/layers.svg?raw'
   import list from '@/assets/icons/list.svg?raw'
@@ -79,6 +80,7 @@
     flag,
     folder,
     key,
+    tag,
     lock,
     layers,
     list,

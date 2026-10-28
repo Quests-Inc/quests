@@ -212,6 +212,11 @@
   font-family: var(--font-mono, monospace);
 }
 
+/* A modal sits on the raised surface, so its pills (explanations, descriptions) are cut from that, not from the page background. */
+:is(.modal, .formscope) {
+  --pill-bg: color-mix(in srgb, var(--color-bg-raised, #1a1a1a) 88%, #000);
+}
+
 /* A paragraph that explains a form: the look of a description. */
 :is(.modal, .formscope) .explain {
   margin: 0;

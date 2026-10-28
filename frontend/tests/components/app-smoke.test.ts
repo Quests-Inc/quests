@@ -159,9 +159,7 @@ test('ссылка на вложение выбирает его на вклад
 
 test('создание квеста: кнопка «Новый квест» → форма → POST и новый квест в списке', async () => {
   await openAt('')
-  const open = [...document.querySelectorAll('button')].find(
-    (b) => b.textContent?.trim() === 'Новый квест'
-  ) as HTMLElement
+  const open = liveButton('Новый квест')!
   open.click()
   await settle(80)
   const input = document.querySelector('.modal__form input[type=text]') as HTMLInputElement

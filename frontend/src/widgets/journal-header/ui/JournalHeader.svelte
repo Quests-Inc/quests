@@ -116,27 +116,41 @@
   let moreX = $state(0)
   let moreY = $state(0)
 
-  const MORE_ITEMS = [
-    { id: 'settings', label: 'Настройки' },
-    { id: 'secrets', label: 'Окружение' },
-    { id: 'tags', label: 'Теги' },
-    { id: 'questline', label: 'Новый квестлайн' },
+  /** The right-hand actions in priority order. All are drawn as icons while the row has room; what does not fit goes, from the end, under «⋯». */
+  type Action = { id: string, label: string, aria?: string, icon: string, accent?: boolean, run: () => void }
+  const ACTIONS: Action[] = [
+    { id: 'quest', label: 'Новый квест', icon: 'add', accent: true, run: () => onOpenCreateQuest() },
+    { id: 'assistant', label: 'Команда', aria: 'Командная строка журнала', icon: 'terminal', run: () => onOpenAssistant() },
+    { id: 'secrets', label: 'Окружение', icon: 'key', run: () => onOpenSecrets() },
+    { id: 'tags', label: 'Теги', icon: 'tag', run: () => onOpenTags() },
+    { id: 'questline', label: 'Новый квестлайн', icon: 'layers', run: () => onOpenCreateQuestline() },
+    { id: 'settings', label: 'Настройки', icon: 'settings', run: () => onOpenSettings() },
   ]
+
+  /** One icon button is this wide (rem) plus the gap; measured against the room the right column really has. */
+  const BTN_REM = 2
+  const GAP_REM = 0.1
+  let room = $state(Infinity)
+  const shown = $derived.by(() => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    const fits = Math.floor((room / rem + GAP_REM) / (BTN_REM + GAP_REM))
+    if (fits >= ACTIONS.length) return ACTIONS.length
+    return Math.max(0, fits - 1)
+  })
+  const inline = $derived(ACTIONS.slice(0, shown))
+  const folded = $derived(ACTIONS.slice(shown))
+
+  function watchRoom(node: HTMLElement) {
+    const ro = new ResizeObserver(() => (room = node.clientWidth))
+    ro.observe(node)
+    return { destroy: () => ro.disconnect() }
+  }
 
   function openMore(event: { currentTarget: HTMLElement }) {
     const rect = event.currentTarget.getBoundingClientRect()
     moreX = rect.right
     moreY = rect.bottom + 4
     moreOpen = true
-  }
-
-  const MORE_ACTIONS: Record<string, () => void> = {
-    settings: () => onOpenSettings(),
-    templates: () => onOpenTemplates(),
-    secrets: () => onOpenSecrets(),
-    tags: () => onOpenTags(),
-    trash: () => onOpenTrash(),
-    questline: () => onOpenCreateQuestline(),
   }
 </script>
 
@@ -201,26 +215,19 @@
     {/each}
   </div>
 
-  <div class="header-actions">
-    <button type="button" class="btn" title="Команда" onclick={onOpenAssistant} aria-label="Командная строка журнала">
-      <Icon name="terminal" />
-      <span class="btn__text">Команда</span>
-    </button>
-    <button type="button" class="btn btn--accent" title="Новый квест" onclick={onOpenCreateQuest} aria-label="Новый квест">
-      <Icon name="add" />
-      <span class="btn__text">Новый квест</span>
-    </button>
-    <button
-      type="button"
-      class="btn btn--overflow"
-      title="Ещё"
-      onclick={openMore}
-      aria-haspopup="menu"
-      aria-expanded={moreOpen}
-      aria-label="Ещё действия"
-    >
-      <Icon name="more" />
-    </button>
+  <div class="header-right" use:watchRoom>
+    <div class="header-actions">
+      {#each inline as a (a.id)}
+        <button type="button" class="btn btn--icon-only" class:btn--accent={a.accent} title={a.label} aria-label={a.aria ?? a.label} onclick={a.run}>
+          <Icon name={a.icon} />
+        </button>
+      {/each}
+      {#if folded.length}
+        <button type="button" class="btn btn--icon-only btn--overflow" title="Ещё" onclick={openMore} aria-haspopup="menu" aria-expanded={moreOpen} aria-label="Ещё действия">
+          <Icon name="more" />
+        </button>
+      {/if}
+    </div>
   </div>
 </header>
 
@@ -228,8 +235,8 @@
   open={moreOpen}
   x={moreX}
   y={moreY}
-  items={MORE_ITEMS}
-  onSelect={(id) => MORE_ACTIONS[id]?.()}
+  items={folded.map((a) => ({ id: a.id, label: a.label }))}
+  onSelect={(id) => folded.find((a) => a.id === id)?.run()}
   onClose={() => (moreOpen = false)}
 />
 

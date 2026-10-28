@@ -207,6 +207,10 @@ export interface UserLLM {
 //////////
 // source: wsdata_tables.go
 
+export interface PolyFK {
+  TypeCol: string;
+  IDCol: string;
+}
 /**
  * TableSpec describes how one table travels. Tables are listed in insertion order.
  */
@@ -214,7 +218,7 @@ export interface TableSpec {
   Name: string;
   HasID: boolean;
   FK: { [key: string]: string}; // column → referenced table
-  Poly: polyFK[]; // (type column, id column) pairs naming their target table by type
+  Poly: PolyFK[]; // (type column, id column) pairs naming their target table by type
   SelfFK: string; // column referencing the same table, fixed up in a second pass
   Text: string[]; // columns scanned for kind=ID references
   /**

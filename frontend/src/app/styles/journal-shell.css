@@ -49,8 +49,14 @@
   min-width: 0;
 }
 
+/* The grid cell the actions measure: icons are drawn while they fit, the rest folds under «⋯». */
+.header-right {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .header-actions {
-  justify-self: end;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -197,20 +203,6 @@
   opacity: 0.6;
   /* The chevron sits on the text's centre line, not above it. */
   transform: translateY(1px);
-}
-
-/* Labels give way to icons as the row runs out of width. */
-@media (max-width: 1100px) {
-  .header-actions .btn__text {
-    display: none;
-  }
-
-  .header-actions .btn {
-    width: var(--nav-control-h, 2rem);
-    min-width: var(--nav-control-h, 2rem);
-    padding: 0;
-    gap: 0;
-  }
 }
 
 @media (max-width: 760px) {

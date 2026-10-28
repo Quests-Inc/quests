@@ -80,7 +80,14 @@ test('шапка: одинаковые действия справа на люб
     h.stop()
     return { actions, meter: Boolean(meter) }
   })
-  expect(sets[0].actions).toEqual(['Командная строка журнала', 'Новый квест', 'Ещё действия'])
+  expect(sets[0].actions).toEqual([
+    'Новый квест',
+    'Командная строка журнала',
+    'Окружение',
+    'Теги',
+    'Новый квестлайн',
+    'Настройки',
+  ])
   expect(sets[1]).toEqual(sets[0])
   expect(sets[2]).toEqual(sets[0])
   expect(sets[0].meter).toBe(true)
