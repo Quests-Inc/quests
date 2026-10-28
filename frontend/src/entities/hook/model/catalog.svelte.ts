@@ -32,6 +32,7 @@ export const FAMILY_WORDS: Record<string, string> = {
   note: 'Заметка',
   value: 'Переменная',
   attachment: 'Вложение',
+  template: 'Шаблон',
 }
 
 /** Event kinds with the short aliases (`complete`, `note`…) unfolded into the kinds they mean. */

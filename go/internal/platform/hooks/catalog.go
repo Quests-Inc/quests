@@ -16,6 +16,7 @@ const (
 	FamilyNote       = "note"
 	FamilyValue      = "value"
 	FamilyAttachment = "attachment"
+	FamilyTemplate   = "template"
 )
 
 // Catalog is every kind of event hooks know. It is the one list the interface, the MCP tool and the ports of `source.event` are built from.
@@ -36,6 +37,9 @@ var Catalog = []EventInfo{
 	{"values_changed", FamilyValue, "переменная записана или удалена", []string{"owner_kind", "owner_id", "name", "type", "value"}},
 	{"attachment_added", FamilyAttachment, "вложение добавлено", []string{"attachment_id", "owner_type", "owner_id", "title"}},
 	{"attachment_revision", FamilyAttachment, "новая версия вложения", []string{"attachment_id", "owner_type", "owner_id", "title"}},
+	{"template_emitted", FamilyTemplate, "шаблон выдал квест", []string{"template_id", "quest_id", "title", "period"}},
+	{"template_emit_failed", FamilyTemplate, "выдача шаблона провалилась", []string{"template_id", "title", "period", "detail"}},
+	{"template_period_skipped", FamilyTemplate, "период шаблона пропущен", []string{"template_id", "title", "period"}},
 }
 
 // EventFamily is the family of a kind, or "" for a kind the catalog does not know.

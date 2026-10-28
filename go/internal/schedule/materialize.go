@@ -84,6 +84,8 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		}
 
 		emitMode := strings.ToLower(strings.TrimSpace(tmpl.EmitMode))
+		prevRoll, hadRoll, _ := st.Automation.EmitRollFor(ctx, tmpl.ID, key)
+		wasMiss := hadRoll && prevRoll.Outcome == "miss"
 		var surpriseRollID sql.NullInt64
 		var deadline *time.Time
 		var duration *int
@@ -92,6 +94,9 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			rollID, outcome, scheduledAt, err := ensureSurpriseRoll(ctx, st, tmpl, key, localNow, rng)
 			if err != nil {
 				return created, err
+			}
+			if outcome == "miss" && !wasMiss {
+				publishTemplateEvent(ctx, hub, "template_period_skipped", tmpl, key, "не выпало", nil)
 			}
 			if outcome == "miss" || outcome == "materialized" {
 				continue
@@ -145,8 +150,12 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 				// attempt's trace instead of silently doing nothing.
 				poolFailed = true
 				poolFailMsg = res.FailMsg
+				publishTemplateEvent(ctx, hub, "template_emit_failed", tmpl, key, res.FailMsg, nil)
 			case res.Spec == nil:
 				// retry pending, still running, or "no quest this period"
+				if roll, ok, _ := st.Automation.EmitRollFor(ctx, tmpl.ID, key); ok && roll.Outcome == "miss" && !wasMiss {
+					publishTemplateEvent(ctx, hub, "template_period_skipped", tmpl, key, "команда не выдала квест", nil)
+				}
 				continue
 			default:
 				spec = res.Spec
@@ -258,6 +267,9 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 				Automated:    createdQ.Automated,
 				Sound:        strPtr("quest_created"),
 			})
+		}
+		if !poolFailed {
+			publishTemplateEvent(ctx, hub, "template_emitted", tmpl, key, "", &qid)
 		}
 		created = append(created, qid)
 	}
@@ -499,6 +511,7 @@ func materializeManual(ctx context.Context, st *store.Store, hub *events.Hub, te
 			Automated:    createdQ.Automated,
 			Sound:        strPtr("quest_created"),
 		})
+		publishTemplateEvent(ctx, hub, "template_emitted", tmpl, key, "ручной эмит", &qid)
 	}
 	return qid, nil
 }

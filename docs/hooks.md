@@ -7,7 +7,9 @@ hooks; members may list them. ADR-0004 has the reasoning.
 
 - **Events** come from one catalog (`GET /api/hook-events`, `platform/hooks/catalog.go`), in families: quest, step, note,
   variable (`values_changed`: owner, name, type, and the value for a number or a yes/no, never for a text), file
-  (`attachment_added`, `attachment_revision`). The interface shows their titles and picks a whole family from its head; the
+  (`attachment_added`, `attachment_revision`), template (`template_emitted`, `template_emit_failed`, `template_period_skipped`:
+  a quest was made, the emit ran out of attempts, the period passed with nothing to make; `template_id` and `period` in the
+  payload, `source.event` family `template` has a `ref` to the template). The interface shows their titles and picks a whole family from its head; the
   codes are in the hints. Short aliases (`complete`, `note`…) are still accepted by the API and unfold into kinds.
 - **Area** (`scope_kind`): `workspace`, `quest`, `step`, `note` or `note_tree` (a note and everything under it), with `scope_id`.
 - **Limits**: `cooldown_sec` (a pause per event kind and entity; the first event runs at once, later ones wait and the newest

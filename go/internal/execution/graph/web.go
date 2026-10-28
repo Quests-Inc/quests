@@ -372,7 +372,7 @@ func (g Graph) UsesNetwork(reg Registry) []string {
 }
 
 // EventFamilies are the kinds of event `source.event` can be set to read; `any` gives the common ports only.
-var EventFamilies = map[string]bool{"any": true, "quest": true, "step": true, "note": true, "value": true, "attachment": true}
+var EventFamilies = map[string]bool{"any": true, "quest": true, "step": true, "note": true, "value": true, "attachment": true, "template": true}
 
 // EventSourceParams are the parameters of `source.event`: which family of events the ports are shaped for (a hook script knows
 // what its hook waits for), and, for a variable, the kind of owner the `ref` output points at.
@@ -392,7 +392,7 @@ func eventSourcePorts(raw json.RawMessage) ([]Port, []Port, error) {
 		p.Family = "any"
 	}
 	if !EventFamilies[p.Family] {
-		return nil, nil, fmt.Errorf("параметр %q: any, quest, step, note, value или attachment", "family")
+		return nil, nil, fmt.Errorf("параметр %q: any, quest, step, note, value, attachment или template", "family")
 	}
 	out := []Port{req("kind", TStr), req("title", TStr), req("detail", TStr), req("event", TDoc)}
 	switch p.Family {
@@ -413,6 +413,8 @@ func eventSourcePorts(raw json.RawMessage) ([]Port, []Port, error) {
 		out = append(out, req("ref", t), req("secrets", TSecret), req("owner_kind", TStr), req("owner_id", TInt), req("name", TStr), req("type", TStr), req("value", TDoc))
 	case "attachment":
 		out = append(out, req("attachment_id", TInt), req("owner_type", TStr), req("owner_id", TInt))
+	case "template":
+		out = append(out, req("ref", TRefTemplate), req("secrets", TSecret), req("template_id", TInt), req("period", TStr))
 	}
 	return nil, out, nil
 }

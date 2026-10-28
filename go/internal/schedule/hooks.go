@@ -26,9 +26,9 @@ const maxHookDepth = 3
 
 // eventRefs are the entities an event is about, whatever its kind.
 type eventRefs struct {
-	Quest, Step, Note int64
-	OwnerKind         string
-	OwnerID           int64
+	Quest, Step, Note, Template int64
+	OwnerKind                   string
+	OwnerID                     int64
 }
 
 func eventInt(event events.Payload, key string) int64 {
@@ -44,11 +44,14 @@ func eventInt(event events.Payload, key string) int64 {
 }
 
 func refsOf(event events.Payload) eventRefs {
-	r := eventRefs{Quest: eventInt(event, "quest_id"), Step: eventInt(event, "step_id"), Note: eventInt(event, "note_id")}
+	r := eventRefs{Quest: eventInt(event, "quest_id"), Step: eventInt(event, "step_id"), Note: eventInt(event, "note_id"), Template: eventInt(event, "template_id")}
 	r.OwnerKind, _ = event["owner_kind"].(string)
 	r.OwnerID = eventInt(event, "owner_id")
 	if r.Note == 0 && r.OwnerKind == "note" {
 		r.Note = r.OwnerID // a variable of a note: the note is what it is about
+	}
+	if r.Template == 0 && r.OwnerKind == "template" {
+		r.Template = r.OwnerID
 	}
 	if r.Step == 0 && r.OwnerKind == "step" {
 		r.Step = r.OwnerID
@@ -68,6 +71,8 @@ func (e eventRefs) entityKey() string {
 		return "step=" + strconv.FormatInt(e.Step, 10)
 	case e.Quest > 0:
 		return "quest=" + strconv.FormatInt(e.Quest, 10)
+	case e.Template > 0:
+		return "template=" + strconv.FormatInt(e.Template, 10)
 	case e.OwnerID > 0:
 		return e.OwnerKind + "=" + strconv.FormatInt(e.OwnerID, 10)
 	}
@@ -237,6 +242,8 @@ func hookSubject(g graph.Graph, h execution.Hook, event events.Payload, workspac
 			id = refs.Step
 		case "note":
 			id = refs.Note
+		case "template":
+			id = refs.Template
 		default:
 			return "", 0, fmt.Errorf("хук не умеет источник %s", kind)
 		}

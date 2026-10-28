@@ -30,6 +30,7 @@ var eventAliases = map[string][]string{
 	"variable":         {"values_changed"},
 	"variables":        {"values_changed"},
 	"attachment":       {"attachment_added", "attachment_revision"},
+	"template":         {"template_emitted", "template_emit_failed", "template_period_skipped"},
 }
 
 // DefaultWorkspace is where a hook lives when its file entry names none (everything that

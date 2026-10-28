@@ -73,4 +73,35 @@ func TestMaterializeDuePoolFailNotifiesAndInboxes(t *testing.T) {
 	if !sawFail {
 		t.Fatalf("want quest_failed toast=true in hub events, got %#v", evs)
 	}
+	var sawEmitFailed bool
+	for _, ev := range evs {
+		if ev["kind"] == "template_emit_failed" && ev["template_id"] == int64(9) {
+			sawEmitFailed = true
+		}
+		if ev["kind"] == "template_emitted" {
+			t.Fatalf("a failed emit must not announce a quest: %#v", ev)
+		}
+	}
+	if !sawEmitFailed {
+		t.Fatalf("want template_emit_failed for hooks, got %#v", evs)
+	}
+}
+
+// A template that gives its quest tells the hooks (template_emitted), with the template and the period.
+func TestMaterializeDueAnnouncesTheTemplateEmit(t *testing.T) {
+	st := openEmitSpecDB(t)
+	insertTemplate(t, st, 10, `title`, `'Обычный'`)
+	hub := events.New()
+	today := time.Now().UTC()
+	now := time.Date(today.Year(), today.Month(), today.Day(), 9, 0, 0, 0, time.UTC)
+	ids, err := MaterializeDue(bg(), st, hub, now, rand.New(rand.NewSource(1)))
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+	for _, ev := range hub.EventsSince(0, 1) {
+		if ev["kind"] == "template_emitted" && ev["template_id"] == int64(10) && ev["period"] != "" {
+			return
+		}
+	}
+	t.Fatalf("want template_emitted, got %#v", hub.EventsSince(0, 1))
 }
