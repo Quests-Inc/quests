@@ -34,7 +34,7 @@
   position: relative;
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--space-3, 0.75rem);
   min-height: var(--header-height, 3.25rem);
@@ -189,6 +189,7 @@
 
 /* Health on the left, section tabs in the middle, the same actions on the right in every section. */
 .view-tabs {
+  justify-self: center;
   display: flex;
   align-items: stretch;
   gap: 0.15rem;

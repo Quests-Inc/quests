@@ -140,9 +140,21 @@
   const inline = $derived(ACTIONS.slice(0, shown))
   const folded = $derived(ACTIONS.slice(shown))
 
+  /** The room for the icons is what the header has left after the health and, when they share its row, the tabs: measured from the header, not from the icons' own column, so the column cannot lock itself small. */
   function watchRoom(node: HTMLElement) {
-    const ro = new ResizeObserver(() => (room = node.clientWidth))
+    const measure = () => {
+      const cs = getComputedStyle(node)
+      const gap = parseFloat(cs.columnGap) || 0
+      const inner = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const left = node.querySelector('.header-left')!.getBoundingClientRect()
+      const tabs = node.querySelector('.view-tabs')!.getBoundingClientRect()
+      const sameRow = tabs.top < left.bottom
+      room = inner - left.width - gap - (sameRow ? tabs.width + gap : 0)
+    }
+    const ro = new ResizeObserver(measure)
     ro.observe(node)
+    node.querySelectorAll('.header-left, .view-tabs').forEach((el) => ro.observe(el))
+    measure()
     return { destroy: () => ro.disconnect() }
   }
 
@@ -156,7 +168,7 @@
 
 <svelte:window onpointerdown={onWindowDown} />
 
-<header class="journal__header" bind:this={headerEl}>
+<header class="journal__header" bind:this={headerEl} use:watchRoom>
   <div class="header-left">
     <HealthMeter {health} {liveStatus} />
   </div>
@@ -215,7 +227,7 @@
     {/each}
   </div>
 
-  <div class="header-right" use:watchRoom>
+  <div class="header-right">
     <div class="header-actions">
       {#each inline as a (a.id)}
         <button type="button" class="btn btn--icon-only" class:btn--accent={a.accent} title={a.label} aria-label={a.aria ?? a.label} onclick={a.run}>

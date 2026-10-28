@@ -389,7 +389,7 @@
 
 @media (orientation: portrait) {
   .journal__header {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: max-content minmax(0, 1fr);
     padding-bottom: 0;
   }
 
