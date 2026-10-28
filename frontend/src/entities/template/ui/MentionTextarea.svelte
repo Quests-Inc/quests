@@ -1,10 +1,12 @@
 <script lang="ts">
   import { getScripts, listValues } from '@/shared/api/client.ts'
+  import { proseValue } from '@/shared/lib/valueText.ts'
   import { completeText, textCompletionToken, type TextToken } from '@/shared/lib/textCompletion.ts'
   import InsertScriptModal from './InsertScriptModal.svelte'
   import { activeMentionToken, applyMention, matchMentions } from '@/shared/lib/mentionSuggest.ts'
   import { pairBackspace, pairKey, type PairEdit } from '@/shared/lib/autoPair.ts'
   import { highlightMarkdown } from '@/shared/lib/mdHighlight.ts'
+  import { caretXY, placePopup } from '@/shared/lib/caretXY.ts'
   import { templateStore } from '../model/templatesStore.svelte.ts'
 
   let {
@@ -62,8 +64,8 @@
     const seq = ++completionSeq
     try {
       const items = token.kind === 'script'
-        ? (await getScripts()).filter((s) => s.purpose === 'embed' && `${s.id} ${s.title}`.toLowerCase().includes(token.query.toLowerCase())).map((s) => ({ kind: 'script', id: s.id, title: s.title, label: 'скрипт', insertion: `script=${s.id}` }))
-        : (await listValues(host?.kind ?? 'workspace', host?.id ?? 0)).effective.filter((v) => v.name.startsWith(token.query)).map((v, i) => ({ kind: 'value', id: i, title: v.name, label: 'переменная', insertion: `{{${v.name}}}` }))
+        ? (await getScripts()).filter((s) => s.purpose === 'embed' && `${s.id} ${s.title}`.toLowerCase().includes(token.query.toLowerCase())).map((s) => ({ kind: 'script', id: s.id, title: s.title, label: '', hint: `№${s.id}`, insertion: `script=${s.id}` }))
+        : (await listValues(host?.kind ?? 'workspace', host?.id ?? 0)).effective.filter((v) => v.name.startsWith(token.query)).map((v, i) => ({ kind: 'value', id: i, title: v.name, label: '', hint: v.error ? 'ошибка' : v.value == null ? '' : proseValue(v.type, v.value), insertion: `{{${v.name}}}` }))
       if (seq !== completionSeq) return
       mentionItems = items.slice(0, 8)
       mentionIndex = 0
@@ -111,6 +113,35 @@
       el?.setSelectionRange(caret, caret)
     })
   }
+
+  // The suggestion list stands at the caret: under its line, or above it when the screen leaves too little room below.
+  let popupStyle = $state('')
+  const POPUP = { w: 384, rowH: 34, maxH: 192 }
+  $effect(() => {
+    void value
+    const n = mentionItems.length
+    const ta = el
+    const wrap = ta?.parentElement
+    if (!mentionOpen || !ta || !wrap) {
+      popupStyle = ''
+      return
+    }
+    const c = caretXY(ta)
+    if (!c) {
+      popupStyle = ''
+      return
+    }
+    const y = ta.offsetTop + c.top - ta.scrollTop
+    const r = ta.getBoundingClientRect()
+    const screenY = r.top + c.top - ta.scrollTop
+    const p = placePopup(
+      { left: ta.offsetLeft + c.left - ta.scrollLeft, top: y, height: c.height },
+      { w: wrap.offsetWidth, h: wrap.offsetHeight },
+      { w: POPUP.w, h: Math.min(POPUP.maxH, n * POPUP.rowH + 10) },
+      { below: window.innerHeight - (screenY + c.height), above: screenY }
+    )
+    popupStyle = `left:${p.left}px;width:${p.width}px;right:auto;margin:0;${p.top != null ? `top:${p.top}px;bottom:auto` : `bottom:${p.bottom}px;top:auto`}`
+  })
 
   // Highlighting: a layer under a transparent field, with the field's own font and padding copied to it.
   const markdownField = $derived(highlight && !allowedKinds.length)
@@ -236,7 +267,7 @@
     onscroll={syncLayer}
   ></textarea>
   {#if mentionOpen}
-    <ul class="mentions" role="listbox">
+    <ul class="mentions" role="listbox" style={popupStyle || undefined}>
       {#each mentionItems as item, i (`${item.kind}:${item.id}`)}
         <li>
           <button
@@ -248,7 +279,7 @@
             onmousedown={(e) => e.preventDefault()}
             onclick={() => pickMention(item)}
           >
-            <span class="mentions__kind">{item.label}</span>
+            {#if item.label}<span class="mentions__kind">{item.label}</span>{/if}
             <span class="mentions__title">{item.title}</span>
             {#if item.hint}<span class="mentions__hint">{item.hint}</span>{/if}
           </button>
