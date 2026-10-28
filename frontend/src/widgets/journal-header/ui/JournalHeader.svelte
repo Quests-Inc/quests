@@ -160,7 +160,20 @@
     return { destroy: () => ro.disconnect() }
   }
 
+  /** «⋯» opens as soon as the mouse is over it and closes a moment after the pointer leaves both the button and the list. */
+  let moreTimer: ReturnType<typeof setTimeout> | undefined
+  function onWindowOver(e: PointerEvent) {
+    if (!moreOpen || e.pointerType !== 'mouse') return
+    const t = e.target as Element
+    if (t.closest('.ctx-menu, .btn--overflow')) return clearTimeout(moreTimer)
+    clearTimeout(moreTimer)
+    moreTimer = setTimeout((): void => {
+      moreOpen = false
+    }, 220)
+  }
+
   function openMore(event: { currentTarget: HTMLElement }) {
+    clearTimeout(moreTimer)
     const rect = event.currentTarget.getBoundingClientRect()
     moreX = rect.right
     moreY = rect.bottom + 4
@@ -168,7 +181,7 @@
   }
 </script>
 
-<svelte:window onpointerdown={onWindowDown} />
+<svelte:window onpointerdown={onWindowDown} onpointerover={onWindowOver} />
 
 <header class="journal__header" bind:this={headerEl} use:watchRoom>
   <div class="header-left">
@@ -237,7 +250,7 @@
         </button>
       {/each}
       {#if folded.length}
-        <button type="button" class="btn btn--icon-only btn--overflow" title="Ещё" onclick={openMore} aria-haspopup="menu" aria-expanded={moreOpen} aria-label="Ещё действия">
+        <button type="button" class="btn btn--icon-only btn--overflow" title="Ещё" onclick={openMore} onpointerenter={(e) => e.pointerType === 'mouse' && openMore(e)} aria-haspopup="menu" aria-expanded={moreOpen} aria-label="Ещё действия">
           <Icon name="more" />
         </button>
       {/if}
