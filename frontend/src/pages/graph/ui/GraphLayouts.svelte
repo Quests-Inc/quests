@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '@/shared/ui/Icon.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
+  import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import { ago } from '@/shared/lib/time.ts'
   import { sidebars, SIDEBAR_ONE_PANE } from '@/shared/lib/sidebar.svelte.ts'
   import type { createGraphLayouts } from '../model/layouts.svelte.ts'
@@ -20,8 +21,8 @@
     if (!layouts.loaded) void layouts.load()
   })
 
-  async function saveNew(e: SubmitEvent) {
-    e.preventDefault()
+  async function saveNew(e?: SubmitEvent) {
+    e?.preventDefault()
     const t = title.trim()
     if (!t) return
     await layouts.saveNew(t)
@@ -52,18 +53,16 @@
 </script>
 
 <aside class="glay" aria-label="Расклады карты">
-  <form class="glay__new" onsubmit={saveNew}>
-    <input
-      type="text"
-      maxlength="120"
-      placeholder="Название расклада"
-      aria-label="Название нового расклада"
-      title="Сохранить текущую карту — центр, фильтры, раскрытое и позиции карточек — под этим именем"
+  <form onsubmit={saveNew}>
+    <SidebarTools
       bind:value={title}
+      placeholder="Название расклада"
+      label="Название нового расклада"
+      hint="Сохранить текущую карту — центр, фильтры, раскрытое и позиции карточек — под этим именем"
+      createLabel="Сохранить текущую карту"
+      createBusy={!title.trim() || layouts.busy}
+      onCreate={() => void saveNew()}
     />
-    <button type="submit" class="btn btn--icon-only" disabled={!title.trim() || layouts.busy} title="Сохранить текущую карту" aria-label="Сохранить текущую карту">
-      <Icon name="save" size={16} />
-    </button>
   </form>
 
   {#if !layouts.loaded}
@@ -131,16 +130,6 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-  }
-  .glay__new {
-    display: flex;
-    gap: 0.3rem;
-    padding: 0.5rem;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-  .glay__new input {
-    flex: 1 1 auto;
-    min-width: 0;
   }
   .glay__empty {
     margin: 0.75rem;
