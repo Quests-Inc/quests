@@ -3,6 +3,8 @@
   import { completeText, textCompletionToken, type TextToken } from '@/shared/lib/textCompletion.ts'
   import InsertScriptModal from './InsertScriptModal.svelte'
   import { activeMentionToken, applyMention, matchMentions } from '@/shared/lib/mentionSuggest.ts'
+  import { pairBackspace, pairKey, type PairEdit } from '@/shared/lib/autoPair.ts'
+  import { highlightMarkdown } from '@/shared/lib/mdHighlight.ts'
   import { templateStore } from '../model/templatesStore.svelte.ts'
 
   let {
@@ -19,6 +21,8 @@
     allowedKinds = [],
     host,
     placement = 'below',
+    highlight = true,
+    pairs = true,
     el = $bindable(null),
     onkeydown,
     oninput,
@@ -36,6 +40,10 @@
     allowedKinds?: string[],
     host?: { kind: string; id: number },
     placement?: 'below' | 'inside',
+    /** Colour the markdown and our inserts as they are typed (a layer under the field). Off for fields of references only. */
+    highlight?: boolean,
+    /** Close `*` `**` `{{` `(` `[` … by itself while typing. */
+    pairs?: boolean,
     el?: HTMLTextAreaElement | null,
     onkeydown?: (event: KeyboardEvent) => void,
     oninput?: (event: Event) => void,
@@ -104,7 +112,84 @@
     })
   }
 
+  // Highlighting: a layer under a transparent field, with the field's own font and padding copied to it.
+  const markdownField = $derived(highlight && !allowedKinds.length)
+  const MAX_HIGHLIGHT = 80_000
+  let layer = $state(null as HTMLDivElement | null)
+  const layerHtml = $derived(markdownField && value.length <= MAX_HIGHLIGHT ? highlightMarkdown(value) : '')
+  const useLayer = $derived(markdownField && value.length <= MAX_HIGHLIGHT)
+
+  function syncLayer() {
+    const ta = el
+    const lay = layer
+    if (!ta || !lay) return
+    const cs = getComputedStyle(ta)
+    const set = lay.style
+    // The layer sits exactly over the field's box, whatever else the wrapper holds (the «insert script» button, a hint).
+    set.top = `${ta.offsetTop}px`
+    set.left = `${ta.offsetLeft}px`
+    set.width = `${ta.offsetWidth}px`
+    set.height = `${ta.offsetHeight}px`
+    set.font = cs.font
+    set.letterSpacing = cs.letterSpacing
+    set.lineHeight = cs.lineHeight
+    set.tabSize = cs.tabSize
+    set.textTransform = cs.textTransform
+    set.paddingTop = cs.paddingTop
+    set.paddingLeft = cs.paddingLeft
+    set.paddingBottom = cs.paddingBottom
+    // The field's scrollbar narrows its text; the layer has none, so it gives the same width away.
+    const bars = ta.offsetWidth - ta.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth)
+    set.paddingRight = `${parseFloat(cs.paddingRight) + Math.max(0, bars)}px`
+    set.borderWidth = cs.borderWidth
+    set.borderRadius = cs.borderRadius
+    set.backgroundColor = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? '' : cs.backgroundColor
+    lay.scrollTop = ta.scrollTop
+    lay.scrollLeft = ta.scrollLeft
+  }
+  $effect(() => {
+    void layerHtml
+    void useLayer
+    if (!useLayer) return
+    syncLayer()
+  })
+  $effect(() => {
+    const ta = el
+    if (!ta || !useLayer) return
+    const ro = new ResizeObserver(() => syncLayer())
+    ro.observe(ta)
+    return () => ro.disconnect()
+  })
+
+  /** Apply a pair edit through the browser's own typing, so Ctrl+Z still undoes it. */
+  function applyPair(edit: PairEdit) {
+    const ta = el
+    if (!ta) return
+    if (edit.kind === 'edit') {
+      ta.setSelectionRange(edit.start, edit.end)
+      const done = edit.text ? document.execCommand('insertText', false, edit.text) : document.execCommand('delete')
+      if (!done) {
+        ta.setRangeText(edit.text, edit.start, edit.end, 'end')
+        value = ta.value
+      }
+      ta.setSelectionRange(edit.caret, edit.selEnd ?? edit.caret)
+    } else {
+      ta.setSelectionRange(edit.caret, edit.caret)
+    }
+    refreshMentions(ta.selectionStart ?? edit.caret)
+  }
+
   function onFieldKeydown(event: KeyboardEvent) {
+    if (pairs && markdownField && !disabled && !mentionOpen && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey && el) {
+      const a = el.selectionStart ?? 0
+      const b = el.selectionEnd ?? a
+      const edit = event.key === 'Backspace' ? pairBackspace(el.value, a, b) : pairKey(el.value, a, b, event.key)
+      if (edit) {
+        event.preventDefault()
+        applyPair(edit)
+        return
+      }
+    }
     if (mentionOpen) {
       if (event.key === 'ArrowDown') {
         event.preventDefault()
@@ -133,8 +218,11 @@
 </script>
 
 <div
-  class={['mention-field', placement === 'inside' && 'mention-field--inside']}
+  class={['mention-field', placement === 'inside' && 'mention-field--inside', useLayer && 'mention-field--hl']}
 >
+  {#if useLayer}
+    <div class="mdh-layer" bind:this={layer} aria-hidden="true">{@html layerHtml}</div>
+  {/if}
   <textarea
     aria-label={ariaLabel || undefined}
     bind:this={el}
@@ -145,6 +233,7 @@
     class={className}
     oninput={onFieldInput}
     onkeydown={onFieldKeydown}
+    onscroll={syncLayer}
   ></textarea>
   {#if mentionOpen}
     <ul class="mentions" role="listbox">
@@ -188,6 +277,30 @@
   .mention-field--inside {
     height: 100%;
     min-height: 18rem;
+  }
+
+  .mdh-layer {
+    position: absolute;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid transparent;
+    color: var(--color-fg, #e8e8e8);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    pointer-events: none;
+  }
+
+  /* The field itself stays, but its glyphs are drawn by the layer under it (the caret and the selection are the field's). */
+  .mention-field--hl textarea {
+    position: relative;
+    background: transparent !important;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--color-fg, #e8e8e8);
+  }
+
+  .mention-field--hl textarea::selection {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 35%, transparent);
   }
 
   textarea {

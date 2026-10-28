@@ -401,3 +401,59 @@ a:has(> .md-ref__ico) {
 .md-script--err {
   color: var(--color-danger, #d85a5a);
 }
+
+/* Подсветка исходного текста при вводе (слой под полем, shared/lib/mdHighlight.ts). Цвета — токены, поэтому темы работают. */
+.mdh-layer .mdh-mark {
+  color: var(--color-fg-subtle, #6e6e6e);
+}
+.mdh-layer .mdh-heading {
+  color: var(--color-accent, #c9a227);
+  font-weight: 600;
+}
+.mdh-layer .mdh-heading .mdh-mark {
+  color: color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
+}
+.mdh-layer .mdh-quote {
+  color: var(--color-fg-muted, #9a9a9a);
+  font-style: italic;
+}
+.mdh-layer .mdh-bold,
+.mdh-layer .mdh-bolditalic {
+  color: color-mix(in srgb, var(--color-fg, #e8e8e8) 80%, var(--color-accent, #c9a227));
+  font-weight: 600;
+}
+.mdh-layer .mdh-italic,
+.mdh-layer .mdh-bolditalic {
+  font-style: italic;
+}
+.mdh-layer .mdh-italic {
+  color: color-mix(in srgb, var(--color-fg, #e8e8e8) 80%, var(--color-info, #5a8a7a));
+}
+.mdh-layer .mdh-strike {
+  color: var(--color-fg-muted, #9a9a9a);
+  text-decoration: line-through;
+}
+.mdh-layer .mdh-code {
+  color: var(--color-warning, #c47a20);
+}
+.mdh-layer .mdh-link,
+.mdh-layer .mdh-image,
+.mdh-layer .mdh-url {
+  color: #4f9fc7;
+}
+/* Наши вставки: скрипт, переменная, ссылка на сущность. */
+.mdh-layer .mdh-script {
+  color: #d9894a;
+  background: color-mix(in srgb, #d9894a 14%, transparent);
+  border-radius: 3px;
+}
+.mdh-layer .mdh-value {
+  color: var(--color-success, #7a9e3a);
+  background: color-mix(in srgb, var(--color-success, #7a9e3a) 14%, transparent);
+  border-radius: 3px;
+}
+.mdh-layer .mdh-ref {
+  color: #b48ad6;
+  background: color-mix(in srgb, #b48ad6 14%, transparent);
+  border-radius: 3px;
+}
