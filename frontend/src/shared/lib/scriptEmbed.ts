@@ -78,10 +78,11 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       const host = valueHost(node)
       let value: string
       if (parsed.set && host && !parsed.auto) {
-        value = String(
-          (await rollValue(host.kind, host.id, parsed.set, { script: parsed.id, arg: parsed.arg })).value ?? ''
-        )
+        await rollValue(host.kind, host.id, parsed.set, { script: parsed.id, arg: parsed.arg })
+        // The result lives in the variable (its chip reads again); the formula stays as it was. Writing « = 8» into it too
+        // would widen the link until the text is redrawn, and stay there when the new value equals the old one.
         touchValues(hostKey(host.kind, host.id))
+        return
       } else {
         value = await evalScriptText(parsed.id, { _: parsed.arg }, host, parsed.on)
       }

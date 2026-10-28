@@ -245,6 +245,32 @@ test('script=N{…} is a live link: a click computes, a second click throws agai
   expect(a.title).toContain('деление на ноль')
 })
 
+test('script=N{…}?set=имя: клик пишет результат в переменную, а формула остаётся как была — без « = N»', async () => {
+  const calls: string[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    calls.push(`${init?.method ?? 'GET'} ${url} ${init?.body ?? ''}`)
+    return new Response(JSON.stringify({ value: 8, version: 1 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }) as any
+  cleanup.push(() => {
+    globalThis.fetch = realFetch
+  })
+  const el = body('Хиты script=2{2к8+2}?set=hp.', { host: { kind: 'note', id: 3 } })
+  const a = el.querySelector('a.md-script') as HTMLAnchorElement
+  expect(a.title).toBe('Посчитать и записать в hp')
+  a.click()
+  await sleep(80)
+  expect(calls.some((c) => c.includes('/api/') && c.includes('hp'))).toBe(true)
+  expect(a.textContent).toBe('2к8+2')
+  expect(a.classList.contains('md-script--busy')).toBe(false)
+  a.click()
+  await sleep(80)
+  expect(a.textContent).toBe('2к8+2')
+})
+
 test('script=N{…}?auto считает при показе и по клику бросает ещё раз', async () => {
   const calls: string[] = []
   const realFetch = globalThis.fetch
