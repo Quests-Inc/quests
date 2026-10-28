@@ -3,6 +3,7 @@
   import type { Script } from '@/shared/api/execution.gen.ts'
   import { scriptInsertion } from '@/shared/lib/textCompletion.ts'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
+  import ModalFoot from '@/shared/ui/ModalFoot.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
   let { open, onClose, onInsert }: { open: boolean; onClose: () => void; onInsert: (text: string) => void } = $props()
   let scripts = $state<Script[]>([])
@@ -19,16 +20,48 @@
   }
 </script>
 <ModalShell {open} {onClose} labelledby="insert-script-title" zIndex={95} maxWidth="34rem">
-  <ModalHead id="insert-script-title" title="Вставить скрипт" {onClose} />
-  <div class="modal__body">
+  <ModalHead id="insert-script-title" title="Вставить скрипт" icon="edit" {onClose} />
+  <form
+    class="modal__form"
+    onsubmit={(e) => {
+      e.preventDefault()
+      insert()
+    }}
+  >
     {#if error}<p class="modal__error" role="alert">{error}</p>{/if}
-    <label class="field"><span>Скрипт для вставки</span><select bind:value={id}>{#each scripts as s (s.id)}<option value={s.id}>{s.title}</option>{/each}</select></label>
-    {#if !scripts.length}<p class="hint">Нет скриптов с назначением «Вставки в текст». Создайте такой в «Автоматике».</p>{/if}
-    <label class="field"><span>Выражение</span><input bind:value={arg} placeholder="2к6 + сила" maxlength="200" /></label>
-    <label><input type="checkbox" bind:checked={auto} disabled={!!set || !!on} /> Вычислять при показе</label>
-    <label><input type="checkbox" bind:checked={hide} /> Скрывать выражение</label>
-    <label class="field"><span>Записать результат в переменную (необязательно)</span><input bind:value={set} placeholder="hp" /></label>
-    <label class="field"><span>Раннер (необязательно)</span><input bind:value={on} placeholder="laptop" /></label>
-    <button type="button" class="btn btn--accent" disabled={!id || !arg.trim()} onclick={insert}>Вставить</button>
-  </div>
+    <label class="field">
+      <span class="label">Скрипт</span>
+      <select bind:value={id} disabled={!scripts.length}>
+        {#each scripts as s (s.id)}<option value={s.id}>{s.title}</option>{/each}
+      </select>
+    </label>
+    {#if !scripts.length}
+      <p class="explain">Нет скриптов с назначением «Вставки в текст». Создайте такой в «Автоматике» → «Скрипты».</p>
+    {/if}
+    <label class="field">
+      <span class="label">Выражение</span>
+      <input type="text" bind:value={arg} placeholder="2к6 + сила" maxlength="200" />
+    </label>
+    <label class="check">
+      <input type="checkbox" bind:checked={auto} disabled={!!set || !!on} />
+      Вычислять при показе
+    </label>
+    <label class="check">
+      <input type="checkbox" bind:checked={hide} />
+      Скрывать выражение
+    </label>
+    <label class="field">
+      <span class="label">Записать результат в переменную</span>
+      <input type="text" bind:value={set} placeholder="hp" />
+    </label>
+    <label class="field">
+      <span class="label">Раннер</span>
+      <input type="text" bind:value={on} placeholder="laptop" />
+    </label>
+    <p class="explain">
+      Клик по вставке считает выражение заново. «Вычислять при показе» считает сразу, как только текст открыт, но недоступно с записью в
+      переменную и с раннером. Имя переменной и раннер необязательны.
+    </p>
+    <ModalFoot onCancel={onClose} submitLabel="Вставить" submitIcon="add" disabled={!id || !arg.trim()} />
+  </form>
 </ModalShell>
