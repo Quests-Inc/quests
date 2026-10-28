@@ -104,3 +104,30 @@ func TestStepMirrorRefusesSelfAndCircles(t *testing.T) {
 		t.Fatalf("two links in all (A→C, B→C), got %d hooks", len(hooks))
 	}
 }
+
+// The hub gives hooks the event as it built it (the quest is a pointer, not a JSON number): a hook with an area of one quest
+// must still be woken by it.
+func TestQuestAreaHookIsWokenByARealHubEvent(t *testing.T) {
+	st := openChecksDB(t)
+	ctx := wsctx.With(context.Background(), 1)
+	child := seedQuest(t, st, []journal.Step{{Title: "a", ProgressTotal: 1}, {Title: "b", ProgressTotal: 1}})
+	parent := seedQuest(t, st, []journal.Step{{Title: "ждём", ProgressTotal: 1}})
+	if _, err := st.Execution.SetStepMirror(ctx, parent.Steps[0].ID, child.ID); err != nil {
+		t.Fatal(err)
+	}
+	hub := events.New()
+	r := NewCheckRunner(st, hub)
+	done := make(chan struct{}, 1)
+	hub.OnPublish(func(p events.Payload) { r.DispatchHooks(p); done <- struct{}{} })
+	qid := child.ID
+	hub.Publish("quest_updated", events.PublishOpts{Workspace: 1, QuestID: &qid, Toast: false, Source: "system"})
+	<-done
+	settle(t, st, r)
+	q, err := st.Journal.GetQuest(ctx, parent.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Steps[0].ProgressTotal != 2 {
+		t.Fatalf("the step must take the followed quest's 2 steps from a real event, got total %d", q.Steps[0].ProgressTotal)
+	}
+}

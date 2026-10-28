@@ -39,6 +39,11 @@ func eventInt(event events.Payload, key string) int64 {
 		return v
 	case int:
 		return int64(v)
+	case *int64:
+		// The hub hands its observers the payload as it was built: the quest is a pointer there, not yet a JSON number.
+		if v != nil {
+			return *v
+		}
 	}
 	return 0
 }
@@ -303,6 +308,11 @@ func eventQuestID(event events.Payload) *int64 {
 	case int:
 		i := int64(v)
 		if i > 0 {
+			return &i
+		}
+	case *int64:
+		if v != nil && *v > 0 {
+			i := *v
 			return &i
 		}
 	}
