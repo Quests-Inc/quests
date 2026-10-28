@@ -9,7 +9,8 @@
   import { RunsPage } from '@/pages/runs'
   import { setOpenTarget } from '@/shared/lib/openTarget.ts'
   import { GraphPage } from '@/pages/graph'
-  import { createNavigation, TAB_ORDER } from '@/app/model/navigation.svelte.ts'
+  import { createNavigation } from '@/app/model/navigation.svelte.ts'
+  import { TAB_ORDER, VIEW_TABS } from '@/shared/lib/viewTabs.ts'
   import { buildRefLabels } from '@/app/model/refLabels.ts'
   import { bindRefRegistries } from '@/app/model/refRegistry.svelte.ts'
   import {
@@ -422,9 +423,9 @@
       {
         id: 'tabs',
         group: 'Вкладки',
-        label: 'Журнал, заметки, вложения, календарь, история, карта',
-        keys: '1–6',
-        codes: TAB_ORDER.flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
+        label: TAB_ORDER.slice(0, 9).map((v) => VIEW_TABS[v].label.toLowerCase()).join(', '),
+        keys: `1–${Math.min(9, TAB_ORDER.length)}`,
+        codes: TAB_ORDER.slice(0, 9).flatMap((_, i) => [`Digit${i + 1}`, `Numpad${i + 1}`]),
         run: (event: { code: string|any[] }) => {
           const i = Number(event.code.slice(-1)) - 1
           if (TAB_ORDER[i] === nav.view) return false

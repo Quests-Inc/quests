@@ -2,8 +2,7 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import HealthMeter from './HealthMeter.svelte'
-
-  type View = 'journal' | 'notes' | 'attachments' | 'calendar' | 'history' | 'graph' | 'runners' | 'scripts' | 'hooks' | 'runs' | 'templates' | 'trash'
+  import { MAIN_TABS as MAIN, VIEW_GROUPS as GROUPS, type View, type ViewGroup as Group } from '@/shared/lib/viewTabs.ts'
 
   let {
     view,
@@ -32,30 +31,6 @@
     onOpenCreateQuest: () => void,
     onOpenAssistant: () => void,
   } = $props()
-
-  type Tab = { view: View, label: string, icon: string }
-  type Group = { id: string, label: string, icon: string, tabs: Tab[] }
-
-  const T: Record<View, Tab> = {
-    journal: { view: 'journal', label: 'Журнал', icon: 'scroll' },
-    notes: { view: 'notes', label: 'Заметки', icon: 'document' },
-    graph: { view: 'graph', label: 'Карта', icon: 'map' },
-    calendar: { view: 'calendar', label: 'Календарь', icon: 'calendar' },
-    attachments: { view: 'attachments', label: 'Вложения', icon: 'attachment' },
-    history: { view: 'history', label: 'История', icon: 'scroll' },
-    runners: { view: 'runners', label: 'Раннеры', icon: 'layers' },
-    scripts: { view: 'scripts', label: 'Скрипты', icon: 'edit' },
-    hooks: { view: 'hooks', label: 'Хуки', icon: 'flag' },
-    templates: { view: 'templates', label: 'Шаблоны', icon: 'repeat' },
-    trash: { view: 'trash', label: 'Корзина', icon: 'delete' },
-    runs: { view: 'runs', label: 'Запуски', icon: 'list' },
-  }
-
-  const MAIN: Tab[] = [T.journal, T.notes, T.graph, T.calendar]
-  const GROUPS: Group[] = [
-    { id: 'more', label: 'Данные', icon: 'folder', tabs: [T.attachments, T.history, T.trash] },
-    { id: 'auto', label: 'Автоматика', icon: 'repeat', tabs: [T.templates, T.scripts, T.hooks, T.runs, T.runners] },
-  ]
 
   /** A group button wears the name of its open section, so you can tell where you are. */
   const groupTab = (g: Group) => g.tabs.find((t) => t.view === view) ?? null

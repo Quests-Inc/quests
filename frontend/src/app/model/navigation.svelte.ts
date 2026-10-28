@@ -2,37 +2,10 @@
 // Всё, что «открывает» сущность из интерфейса (ссылки, карта, календарь), проходит здесь, чтобы адрес и выбор не расходились.
 import { initialRoute, replaceSearch, searchForView as searchForRoute } from '@/app/model/route.ts'
 import { searchOfTarget, type OpenTarget } from '@/shared/lib/openTarget.ts'
+import { TAB_ORDER, type View } from '@/shared/lib/viewTabs.ts'
 
-export type View =
-  | 'journal'
-  | 'notes'
-  | 'attachments'
-  | 'calendar'
-  | 'history'
-  | 'graph'
-  | 'runners'
-  | 'scripts'
-  | 'hooks'
-  | 'runs'
-  | 'templates'
-  | 'trash'
+export { TAB_ORDER, type View }
 export type GraphRoot = { type: 'quest' | 'note' | 'questline' | null; id: number | null }
-
-/** Порядок вкладок в шапке: определяет, в какую сторону «уезжает» переключение. */
-export const TAB_ORDER: View[] = [
-  'journal',
-  'notes',
-  'attachments',
-  'calendar',
-  'history',
-  'graph',
-  'runners',
-  'scripts',
-  'hooks',
-  'runs',
-  'templates',
-  'trash',
-]
 
 const validId = (id: unknown) => {
   const n = Number(id)
