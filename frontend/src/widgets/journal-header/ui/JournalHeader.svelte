@@ -142,13 +142,15 @@
 
   /** The room for the icons is what the header has left after the health and, when they share its row, the tabs: measured from the header, not from the icons' own column, so the column cannot lock itself small. */
   function watchRoom(node: HTMLElement) {
-    const measure = () => {
+    const measure = (): void => {
       const cs = getComputedStyle(node)
       const gap = parseFloat(cs.columnGap) || 0
       const inner = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
       const left = node.querySelector('.header-left')!.getBoundingClientRect()
       const tabs = node.querySelector('.view-tabs')!.getBoundingClientRect()
       const sameRow = tabs.top < left.bottom
+      // No layout (a bare DOM): nothing to measure against, so draw everything.
+      if (!(inner > 0)) return void (room = Infinity)
       room = inner - left.width - gap - (sameRow ? tabs.width + gap : 0)
     }
     const ro = new ResizeObserver(measure)
