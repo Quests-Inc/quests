@@ -23,6 +23,7 @@ function fakeMap(
       shownTypes: new Set(['quest', 'note']),
       hidden: new Set<string>(),
       expandKeys: [] as string[],
+      sizes: {} as Record<string, { w: number; h: number }>,
     },
     folds: { expanded: new Set<string>(), loose: new Set<string>() },
     nodes: [] as { key: string; x: number; y: number; draft?: unknown }[],
@@ -63,6 +64,12 @@ function fakeMap(
       },
       get expandKeys() {
         return st.prefs.expandKeys
+      },
+      get sizes() {
+        return st.prefs.sizes
+      },
+      restoreSizes: (s) => {
+        st.prefs.sizes = (s ?? {}) as typeof st.prefs.sizes
       },
       restore: (s) => {
         if (s.statuses?.length) st.prefs.questStatuses = new Set(s.statuses)
@@ -111,6 +118,7 @@ test('расклад: снятая карта встаёт на чистую ц�
   ]
   a.st.saved.set('cluster:quest:7', { x: 300, y: 40 })
   a.st.cam = { x: 400, y: 200, k: 2 }
+  a.st.prefs.sizes = { 'note:3': { w: 500, h: 400 } }
   const state = JSON.parse(JSON.stringify(captureLayout(a.deps))) as LayoutState
 
   expect(state.positions['quest:7']).toEqual({ x: 10, y: 20 })
@@ -129,6 +137,7 @@ test('расклад: снятая карта встаёт на чистую ц�
   expect(b.st.prefs.expandKeys).toEqual(['quest:7>note'])
   expect([...b.st.folds.loose]).toEqual(['quest:7'])
   expect(b.st.saved.get('note:3')).toEqual({ x: -50, y: 80 })
+  expect(b.st.prefs.sizes).toEqual({ 'note:3': { w: 500, h: 400 } })
   expect(b.st.laidOut).toBe(1)
   // Центр поля a: ((500-400)/2, (300-200)/2) = (50, 50) в мире; в окне b он тоже в центре.
   expect(b.st.cam.k).toBe(2)

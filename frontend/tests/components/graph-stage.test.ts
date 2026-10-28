@@ -51,6 +51,7 @@ function make() {
     questStatuses: new Set(['active']),
     shownTypes: kinds,
     expandKeys: [] as string[],
+    sizes: {} as Record<string, { w: number; h: number }>,
     saveHidden(next: Set<string>) {
       prefs.hidden = next
     },

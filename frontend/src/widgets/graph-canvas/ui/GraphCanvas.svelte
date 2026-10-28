@@ -40,9 +40,11 @@
     onToggleSelect,
     onClear,
     onRecenter,
+    resize,
     children,
   }: {
     stage: Stage
+    resize?: ReturnType<typeof import('../model/resize.svelte.ts').createCardResize>
     gest: Gest
     folds: Folds
     lk: Link
@@ -147,6 +149,9 @@
         {labels}
         onOpenMore={stage.openMore}
         {onShowChanges}
+        resizing={resize?.active === n.key}
+        onResizeStart={resize?.start}
+        onResizeReset={resize?.reset}
       />
     {/each}
   </div>

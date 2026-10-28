@@ -10,7 +10,7 @@
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { GraphDraftLog, createGraphDraft, createGraphEdits } from '@/features/graph-draft'
-  import { GraphCanvas, createClusterFolds, createGraphGestures, createGraphStage, createLinkMode } from '@/widgets/graph-canvas'
+  import { GraphCanvas, createCardResize, createClusterFolds, createGraphGestures, createGraphStage, createLinkMode } from '@/widgets/graph-canvas'
   import { handleGraphKey } from '../model/keys.ts'
   import { createGraphMenu } from '../model/menu.svelte.ts'
   import { createGraphPrefs } from '../model/prefs.svelte.ts'
@@ -168,6 +168,14 @@
   function showChanges(key: string) {
     if (stage.showChanges(key)) gd.open = true
   }
+
+  const resize = createCardResize({
+    getK: () => gest.cam.k,
+    touchView: () => stage.touch(),
+    getSaved: () => saved,
+    setSize: (key, size) => prefs.setSize(key, size),
+    remeasure: () => stage.compose(),
+  })
 
   const menu = createGraphMenu({
     worldAt: (e) => gest.worldAt(e),
@@ -408,6 +416,7 @@
     {gest}
     {folds}
     {lk}
+    {resize}
     bind:editing={edits.editing}
     {data}
     {center}

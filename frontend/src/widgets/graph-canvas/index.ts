@@ -1,6 +1,7 @@
 export { default as GraphCanvas } from './ui/GraphCanvas.svelte'
 export { createClusterFolds } from './model/folds.svelte.ts'
 export { createGraphGestures } from './model/gestures.svelte.ts'
+export { createCardResize } from './model/resize.svelte.ts'
 export { createLinkMode } from './model/linking.svelte.ts'
 export { createGraphStage } from './model/stage.svelte.ts'
 export { handleCanvasKey, typing, dialogOpen } from './model/keys.ts'

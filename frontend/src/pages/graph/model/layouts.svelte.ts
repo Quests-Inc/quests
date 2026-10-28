@@ -29,6 +29,8 @@ export type LayoutState = {
   expand: string[]
   folds: { expanded: string[]; loose: string[] }
   positions: Record<string, Spot>
+  /** Sizes of the cards the person stretched. */
+  sizes?: Record<string, { w: number; h: number }>
   view: { cx: number; cy: number; k: number } | null
 }
 
@@ -46,6 +48,8 @@ export type LayoutDeps = {
     shownTypes: Set<string>
     hidden: Set<string>
     expandKeys: string[]
+    sizes: Record<string, { w: number; h: number }>
+    restoreSizes: (s: unknown) => void
     restore: (s: { statuses?: string[]; types?: string[]; hidden?: string[]; expand?: string[] }) => void
   }
   folds: { expanded: Set<string>; loose: Set<string>; restore: (s: { expanded?: string[]; loose?: string[] }) => void }
@@ -82,6 +86,7 @@ export function captureLayout(d: LayoutDeps): LayoutState {
     expand: [...d.prefs.expandKeys],
     folds: { expanded: [...d.folds.expanded], loose: [...d.folds.loose] },
     positions,
+    sizes: { ...d.prefs.sizes },
     view,
   }
 }
@@ -111,6 +116,7 @@ export async function applyLayoutState(d: LayoutDeps, s: LayoutState) {
   if (s.depth) d.depth.set(s.depth)
   if (s.layout) d.layout.set(s.layout)
   d.prefs.restore({ statuses: s.statuses, types: s.types, hidden: s.hidden, expand: s.expand })
+  d.prefs.restoreSizes(s.sizes ?? {})
   d.folds.restore(s.folds ?? {})
   d.saved.clear()
   for (const [k, p] of Object.entries(s.positions ?? {})) d.saved.set(k, p)

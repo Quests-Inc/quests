@@ -10,6 +10,7 @@ const KEYS = {
   statuses: 'quests.graph.statuses',
   types: 'quests.graph.types',
   expand: 'quests.graph.expand',
+  sizes: 'quests.graph.sizes',
 }
 
 function readJSON(store: Store | null, key: string): unknown {
@@ -57,6 +58,19 @@ export function createGraphPrefs(store: Store | null) {
   )
 
   let expandKeys = $state<string[]>(strings(readJSON(store, KEYS.expand)))
+
+  /** Размеры, которые человек задал растягиванием: ключ карточки → ширина и высота. */
+  const readSizes = (raw: unknown) => {
+    const out: Record<string, { w: number; h: number }> = {}
+    if (raw && typeof raw === 'object') {
+      for (const [k, v] of Object.entries(raw as Record<string, { w?: unknown; h?: unknown }>)) {
+        if (typeof v?.w === 'number' && typeof v.h === 'number' && v.w > 0 && v.h > 0) out[k] = { w: v.w, h: v.h }
+      }
+    }
+    return out
+  }
+  let sizes = $state<Record<string, { w: number; h: number }>>(readSizes(readJSON(store, KEYS.sizes)))
+  const MAX_SIZES = 400
 
   const toggled = (set: Set<string>, v: string) => {
     const next = new Set(set)
@@ -123,6 +137,24 @@ export function createGraphPrefs(store: Store | null) {
     setExpand(next: string[]) {
       expandKeys = next
       write(store, KEYS.expand, next)
+    },
+    get sizes() {
+      return sizes
+    },
+    /** Запомнить размер карточки (null — вернуть автоматический). Хранится не больше 400 последних. */
+    setSize(key: string, size: { w: number; h: number } | null) {
+      const next = { ...sizes }
+      delete next[key]
+      if (size) next[key] = size
+      const keys = Object.keys(next)
+      for (const k of keys.slice(0, Math.max(0, keys.length - MAX_SIZES))) delete next[k]
+      sizes = next
+      write(store, KEYS.sizes, next)
+    },
+    /** Поставить размеры целиком (расклад): прежние заменяются. */
+    restoreSizes(next: unknown) {
+      sizes = readSizes(next)
+      write(store, KEYS.sizes, sizes)
     },
     ownExpand: (key: string) => expandKeys.filter((k) => k === key || k.startsWith(`${key}>`)),
     /** Встать на сохранённый расклад: фильтры, скрытое и раскрытое (непустые фильтры, неизвестное отбрасывается). */

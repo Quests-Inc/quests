@@ -39,6 +39,9 @@
     labels = {},
     onOpenMore,
     onShowChanges,
+    onResizeStart,
+    onResizeReset,
+    resizing = false,
   }: {
     n: GraphNodeView
     selected?: boolean
@@ -73,6 +76,11 @@
     labels?: Record<string, string>
     onOpenMore(n: GraphNodeView, type: string): void
     onShowChanges: (key: string) => void
+    /** Pointer down on the corner grip: the page stretches the card. */
+    onResizeStart?: (e: PointerEvent, n: GraphNodeView) => void
+    /** Double click on the grip: back to the size of the content. */
+    onResizeReset?: (n: GraphNodeView) => void
+    resizing?: boolean
   } = $props()
 
 const autofocusIf = (node: { focus: () => void }, on: unknown) => {
@@ -96,6 +104,11 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   const square = $derived(n.type === 'attachment' || n.type === 'cluster')
   const big = $derived(n.type === 'quest' || n.type === 'note')
   const withText = $derived(n.type === 'step' && !!n.desc)
+  /** Whose values and scripts the text speaks for: the entity of the card, when it is a real one (not a draft). */
+  const hostOf = $derived.by(() => {
+    const id = Number(n.id)
+    return !n.draft && Number.isInteger(id) && id > 0 && ['note', 'quest', 'step', 'questline'].includes(n.type) ? { kind: n.type, id } : undefined
+  })
 </script>
 
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -120,8 +133,10 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         style:z-index={editingHere ? 1_000_000 : z}
         style:left="{n.x - n.w / 2}px"
         style:top="{n.y - n.h / 2}px"
-        style:width={big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
-        style:height={ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
+        class:gcard--sized={n.sw != null}
+        class:gcard--resizing={resizing}
+        style:width={n.sw != null ? `${n.sw}px` : big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
+        style:height={n.sh != null ? `${editingHere ? Math.max(n.sh, 340) : n.sh}px` : ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
         data-gkey={n.key}
         title="{t.label}: {n.title}{orphan ? ' — на неё нет ссылок' : ''}"
         onpointerdown={(e) => {
@@ -201,8 +216,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
             {/if}
           </div>
           {#if n.desc && tier !== 'title'}
-            <div class="gcard__body" style:max-height="{big ? CARD[n.type].max : CARD.stepBody.max}px">
-              <MarkdownBody source={n.desc} {labels} onRef={(k, id) => onOpen?.(k, id)} />
+            <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
+              <MarkdownBody source={n.desc} {labels} host={hostOf} ownValues={!!hostOf} onRef={(k, id) => onOpen?.(k, id)} />
             </div>
           {/if}
         {:else}
@@ -229,6 +244,21 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
               {/each}
             </div>
           {/if}
+        {/if}
+        {#if !square && tier !== 'lite' && !editingHere && onResizeStart}
+          <button
+            type="button"
+            class="gcard__grip"
+            tabindex="-1"
+            title="Потяните, чтобы растянуть; двойной клик — вернуть размер по содержимому"
+            aria-label="Растянуть карточку"
+            onpointerdown={(e) => onResizeStart(e, n)}
+            oncontextmenu={(e) => e.stopPropagation()}
+            ondblclick={(e) => {
+              e.stopPropagation()
+              onResizeReset?.(n)
+            }}
+          ></button>
         {/if}
         {#if changed}
           <button
@@ -272,6 +302,45 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     font-size: var(--text-sm, 0.875rem);
     cursor: default;
     user-select: text;
+  }
+
+  /* A stretched card: the text fills it and scrolls, nothing is cut by the usual height cap. */
+  .gcard--sized {
+    max-width: none;
+  }
+
+  .gcard--sized.gcard--pill {
+    white-space: normal;
+  }
+
+  .gcard__grip {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, var(--c, #888) 70%, transparent) 50%, transparent 56%, transparent 66%, color-mix(in srgb, var(--c, #888) 70%, transparent) 66%, transparent 72%);
+    border-radius: 0 0 12px 0;
+    cursor: nwse-resize;
+    opacity: 0;
+    touch-action: none;
+  }
+
+  .gcard:hover .gcard__grip,
+  .gcard--sel .gcard__grip,
+  .gcard--resizing .gcard__grip,
+  .gcard__grip:focus-visible {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    .gcard__grip {
+      opacity: 0.7;
+      width: 22px;
+      height: 22px;
+    }
   }
 
   .gcard--pill {

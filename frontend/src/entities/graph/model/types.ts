@@ -22,6 +22,9 @@ export interface GraphNodeView {
   y: number
   w: number
   h: number
+  /** Size the person gave by stretching the card; without it the card is as big as its content. */
+  sw?: number
+  sh?: number
 }
 
 export interface GraphGroupView {

@@ -21,6 +21,7 @@
     labels = {},
     values = {},
     host,
+    ownValues = false,
     onRef,
     typing = false,
   }: {
@@ -29,6 +30,8 @@
     labels?: Record<string, string>,
     values?: Record<string, string>,
     host?: { kind: string; id: number },
+    /** The text reads the named values of `host` itself: load them here (a page that has its own value table passes `values`). */
+    ownValues?: boolean,
     onRef?: (kind: string, id: number) => void,
     typing?: boolean,
   } = $props()
@@ -87,7 +90,41 @@
     }
   })
 
-  let merged = $derived({ ...foreign, ...values })
+  let own = $state({} as Record<string, string>)
+  $effect(() => {
+    void valueRev.n
+    const h = host
+    if (!ownValues || !h) {
+      own = {}
+      return
+    }
+    let dead = false
+    listValues(h.kind, h.id)
+      .then((list) => {
+        if (dead) return
+        const rows = list.effective ?? []
+        publishValues(
+          hostKey(h.kind, h.id),
+          rows.map((row) => ({
+            name: row.name,
+            type: row.type,
+            text: row.value == null ? '' : proseValue(row.type, row.value),
+            formula: row.formula ?? '',
+            error: row.error ?? '',
+            roll: row.roll?.arg ?? '',
+          }))
+        )
+        own = Object.fromEntries(rows.map((row) => [row.name, row.value == null ? '' : proseValue(row.type, row.value)]))
+      })
+      .catch(() => {
+        if (!dead) own = {}
+      })
+    return () => {
+      dead = true
+    }
+  })
+
+  let merged = $derived({ ...foreign, ...own, ...values })
   let html = $derived(renderMarkdown(source, { labels, values: merged }))
   let valueSig = $derived(
     Object.keys(merged)
