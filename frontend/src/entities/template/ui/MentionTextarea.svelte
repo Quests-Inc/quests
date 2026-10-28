@@ -114,6 +114,20 @@
     })
   }
 
+  // Arrow keys move the active row; the list scrolls by itself so that row stays in view (only the list, never the page behind it).
+  let listEl = $state(null as HTMLUListElement | null)
+  $effect(() => {
+    void mentionIndex
+    const ul = listEl
+    if (!mentionOpen || !ul) return
+    queueMicrotask(() => {
+      const row = ul.querySelector<HTMLElement>('.mentions__opt--on')?.closest('li')
+      if (!row) return
+      if (row.offsetTop < ul.scrollTop) ul.scrollTop = row.offsetTop
+      else if (row.offsetTop + row.offsetHeight > ul.scrollTop + ul.clientHeight) ul.scrollTop = row.offsetTop + row.offsetHeight - ul.clientHeight
+    })
+  })
+
   // The suggestion list stands at the caret: under its line, or above it when the screen leaves too little room below.
   let popupStyle = $state('')
   const POPUP = { w: 384, rowH: 34, maxH: 192 }
@@ -267,7 +281,7 @@
     onscroll={syncLayer}
   ></textarea>
   {#if mentionOpen}
-    <ul class="mentions" role="listbox" style={popupStyle || undefined}>
+    <ul class="mentions" role="listbox" style={popupStyle || undefined} bind:this={listEl}>
       {#each mentionItems as item, i (`${item.kind}:${item.id}`)}
         <li>
           <button
