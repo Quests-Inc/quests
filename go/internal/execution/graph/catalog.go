@@ -51,7 +51,7 @@ func Builtin() Registry {
 	source("step", TRefStep, req("title", TStr), req("description", TStr), req("progress", TInt), req("total", TInt), req("done", TBool))
 	source("note", TRefNote, req("title", TStr))
 	source("template", TRefTemplate, req("title", TStr), req("period", TStr))
-	source("quest", TRefQuest, req("title", TStr), req("status", TStr), req("description", TStr))
+	source("quest", TRefQuest, req("title", TStr), req("status", TStr), req("description", TStr), req("progress", TInt), req("total", TInt))
 	source("workspace", TRefWorkspace, req("name", TStr))
 
 	// What woke a hook: the event, with the fields of its family as ports.

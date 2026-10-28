@@ -28,6 +28,7 @@ var Catalog = []EventInfo{
 	{"status_changed", FamilyQuest, "статус квеста изменён", []string{"quest_id", "title", "detail"}},
 	{"quest_failed", FamilyQuest, "квест провален", []string{"quest_id", "title"}},
 	{"quest_expired", FamilyQuest, "квест просрочен", []string{"quest_id", "title"}},
+	{"quest_updated", FamilyQuest, "квест изменён (шаги, поля)", []string{"quest_id", "title"}},
 	{"quest_deleted", FamilyQuest, "квест удалён", []string{"quest_id", "title"}},
 	{"step_completed", FamilyStep, "шаг выполнен", []string{"quest_id", "step_id", "title", "step_title"}},
 	{"step_progress", FamilyStep, "прогресс шага", []string{"quest_id", "step_id", "title", "step_title"}},

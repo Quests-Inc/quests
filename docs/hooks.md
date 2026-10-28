@@ -27,6 +27,17 @@ on the API host, through the administrator's egress policy.
 **Loops.** A run descends from a chain of hooks (`origin`, `hook:3>hook:7`); what it writes to variables carries the chain in
 the event, and a hook is not woken by an event its own chain made, nor by a chain of three.
 
+## A step that follows a quest
+
+A hook made by the step field «Следит за квестом» (`hook.mirror_step_id` names the step; it goes with the step) has the followed quest
+as its area, waits for `step_progress`, `step_completed`, `quest_updated`, `status_changed`, `quest_completed`, `quest_failed`, `quest_expired`,
+and runs a script of three nodes: `source.quest` (the followed quest, from the area) → `source.step` with `id` of the step →
+`sink.step_progress`, wired `progress`→`progress`, `total`→`total`, `ref`→`ref`. `source.quest` has the ports `progress` (steps done)
+and `total` (steps; 1 for a quest without steps). Any script can do the same with `id` on a source: a source with an `id` reads that
+entity of the workspace, not the one the run was started for. Limits of the link: it is made once per step (`PUT /api/steps/{id}/mirror`
+replaces), refuses its own quest and circles, and a followed quest in the trash simply stops changing. The script's `id` is literal, so
+a workspace restored into another one needs its links made again.
+
 ## Seeing what a hook did
 
 The hook list says when each hook last ran and how, and how many times in the last hour; a click opens its runs in Автоматика →

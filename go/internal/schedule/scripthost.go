@@ -93,8 +93,11 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 		if err != nil {
 			return nil, err
 		}
+		// Progress is the steps done of the steps there are (what the quest's own label counts); a quest without steps is 0 of 1,
+		// so the numbers can be written onto a step as they are.
+		done, total, _ := journal.ProgressLabel(q.Steps)
 		return map[string]any{"ref": ref, "secrets": secrets, "title": q.Title, "status": string(q.Status),
-			"description": q.Description, "event": event}, nil
+			"description": q.Description, "progress": int64(done), "total": int64(max(total, 1)), "event": event}, nil
 	case "workspace":
 		name, err := h.r.Store.Execution.Identity.WorkspaceName(ctx, id)
 		if err != nil {

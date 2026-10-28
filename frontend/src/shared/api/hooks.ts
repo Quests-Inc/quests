@@ -89,3 +89,27 @@ export function updateHook(
 export function deleteHook(id: number) {
   return request(`/api/hooks/${id}`, { method: 'DELETE' })
 }
+
+/** A step that follows a quest (quest=298): a hook and a script made for the link, read back here. */
+export type StepMirror = {
+  step_id: number
+  quest_id: number
+  parent_quest_id: number
+  hook_id: number
+  script_id: number
+}
+
+export function getStepMirror(stepId: number) {
+  return request<StepMirror | null>(`/api/steps/${stepId}/mirror`)
+}
+
+export function setStepMirror(stepId: number, questId: number) {
+  return request<StepMirror>(`/api/steps/${stepId}/mirror`, {
+    method: 'PUT',
+    body: JSON.stringify({ quest_id: questId }),
+  })
+}
+
+export function clearStepMirror(stepId: number) {
+  return request(`/api/steps/${stepId}/mirror`, { method: 'DELETE' })
+}

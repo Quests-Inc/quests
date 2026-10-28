@@ -84,6 +84,13 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 				}
 				return s.TryRun(ctx, in)
 			},
+			MirrorChanged: func(ctx context.Context, questID int64) {
+				if s.Hub == nil {
+					return
+				}
+				silent := ""
+				s.Hub.Publish("quest_updated", events.PublishOpts{Workspace: wsctx.From(ctx), QuestID: &questID, Toast: false, Source: "system", Sound: &silent})
+			},
 			RunnerDone: func(ctx context.Context, j execution.RunnerJob) {
 				if s.RunnerDone != nil {
 					s.RunnerDone(ctx, j)

@@ -95,6 +95,26 @@ func stepTools(c *Client) []Tool {
 			return q.result(ctx, c, false), nil
 		})
 
+	type followArgs struct {
+		StepID  int64  `json:"step_id"`
+		QuestID *int64 `json:"quest_id,omitempty" desc:"the quest the step follows; leave out to stop following"`
+	}
+	follow := Typed("follow_quest", "Make a step follow another quest: its progress becomes the followed quest's steps done of steps there are, updated at every change (a hook and a script made for it). Without quest_id the step stops following. Refuses its own quest and circles.",
+		func(ctx context.Context, a followArgs) (any, error) {
+			path := fmt.Sprintf("/api/steps/%d/mirror", a.StepID)
+			if a.QuestID == nil {
+				if err := c.Do(ctx, http.MethodDelete, path, nil, nil, nil); err != nil {
+					return nil, err
+				}
+				return map[string]any{"ok": true, "step_id": a.StepID, "follows": nil}, nil
+			}
+			var m map[string]any
+			if err := c.Do(ctx, http.MethodPut, path, nil, map[string]any{"quest_id": *a.QuestID}, &m); err != nil {
+				return nil, err
+			}
+			return map[string]any{"ok": true, "step_id": a.StepID, "follows": m}, nil
+		})
+
 	type op struct {
 		Op     string `json:"op" enum:"add,update,delete"`
 		StepID int64  `json:"step_id,omitempty" desc:"required for update and delete"`
@@ -161,5 +181,5 @@ func stepTools(c *Client) []Tool {
 			return ok(ctx, c, a.QuestID, map[string]any{"results": results, "progress_label": label}), nil
 		})
 
-	return []Tool{add, upd, del, batch}
+	return []Tool{add, upd, del, batch, follow}
 }

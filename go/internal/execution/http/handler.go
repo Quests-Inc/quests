@@ -33,11 +33,14 @@ type Handler struct {
 	StartEmbedded func(ctx context.Context, in execution.EmbedStart) (int64, error)
 	// TryRun starts a test run from the editor (the scheduler's side owns runs).
 	TryRun func(ctx context.Context, in execution.TryStart) (int64, error)
+	// MirrorChanged nudges the followed quest of a new link, so the step takes its progress at once (the root publishes an event).
+	MirrorChanged func(ctx context.Context, questID int64)
 }
 
 // Register mounts every route of the context.
 func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerSecretRoutes(mux)
+	h.registerMirror(mux)
 	h.registerValueRoutes(mux)
 	h.registerRunner(mux)
 	h.registerScripts(mux)

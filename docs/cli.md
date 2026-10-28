@@ -150,10 +150,17 @@ The active workspace is `QUESTS_WORKSPACE` / the token's workspace (same as ever
 
 ## Child quests as steps
 
-A parent quest's step can watch another quest:
+A parent quest's step can follow another quest. Two ways:
 
-1. `quest=N` in the step's description (in the frontend it is a link to the quest).
-2. The step's `check_command`: `quests progress N`, mode “watch” (`run_mode=watch`), with `run_on` naming a runner. In the modal the hint appears by itself as soon as `quest=N` shows up in the step's title or description.
-3. The runner executes the check with `QUESTS_API` and a token in the environment, so the CLI works from inside the command.
+1. **Native (a hook, no runner).** On a saved step the field «Следит за квестом» (or `follow_quest` in MCP, `PUT /api/steps/{id}/mirror`
+   with `{"quest_id": N}`) makes the server create a hook with the followed quest as its area and a small script. At every change of
+   that quest (a step moved, steps added or removed, its status changed) the step's progress becomes *steps done* of *steps there
+   are*, and its maximum follows; a completed parent reopens when the followed quest gains steps. A step cannot follow its own
+   quest or close a circle (A follows B, B follows A, through any number of quests). The step's own check is cleared when it starts
+   following; taking the link away removes the hook and the script. See [`hooks.md`](hooks.md).
+2. **Polling (the old way, for a step not yet saved, or for a server without hooks).** `quest=N` in the step's description, and the
+   step's `check_command` `quests progress N` in mode «watch» (`run_mode=watch`) on a runner. In the modal the hint appears by itself
+   as soon as `quest=N` shows up in the step's title or description. The runner executes the check with `QUESTS_API` and a token in the
+   environment, so the CLI works from inside the command.
 
-A poll check prints a number or JSON `{"progress": N, "total": M, "description": "…"}`; every field is optional. `total` changes the step's maximum, so when the child quest gains steps the parent step's maximum follows by itself. Modes: `poll` (a step that reached its maximum is closed and no longer polled), `watch` (polling continues after closing, at most once a minute: if the child quest gained steps, the parent step reopens) and `once` (a single run). `watch` works only while the quest is `active`: a finished quest's steps are not polled, to avoid useless requests. A native link without polling is postponed: quest=298.
+A poll check prints a number or JSON `{"progress": N, "total": M, "description": "…"}`; every field is optional. `total` changes the step's maximum, so when the child quest gains steps the parent step's maximum follows by itself. Modes: `poll` (a step that reached its maximum is closed and no longer polled), `watch` (polling continues after closing, at most once a minute: if the child quest gained steps, the parent step reopens) and `once` (a single run). `watch` works only while the quest is `active`: a finished quest's steps are not polled, to avoid useless requests.

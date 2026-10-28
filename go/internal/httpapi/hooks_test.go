@@ -125,3 +125,47 @@ func TestHookAreaAndLimitsOverHTTP(t *testing.T) {
 		t.Fatalf("back to the workspace: %d %v", code, out)
 	}
 }
+
+// A step follows a quest over HTTP: set, read back, refused for its own quest and for a circle, then taken away.
+func TestStepMirrorOverHTTP(t *testing.T) {
+	h, s := secretsServer(t)
+	call := func(method, path, body string) (int, map[string]any) {
+		var in any
+		if body != "" {
+			in = json.RawMessage(body)
+		}
+		return secretReq(h, method, path, in)
+	}
+	a := pgtest.SeedQuest(t, s.Store.DB, "родитель")
+	b := pgtest.SeedQuest(t, s.Store.DB, "дочерний")
+	step := func(quest int64) string {
+		var id int64
+		if err := s.Store.DB.QueryRow(`INSERT INTO queststep (quest_id, title, description, progress_current, progress_total, sort_order)
+			VALUES (?, 'шаг', '', 0, 1, 0) RETURNING id`, quest).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return strconv.FormatInt(id, 10)
+	}
+	sa, sb := step(a), step(b)
+	qa, qb := strconv.FormatInt(a, 10), strconv.FormatInt(b, 10)
+
+	if code, out := call(http.MethodPut, "/api/steps/"+sa+"/mirror", `{"quest_id":`+qa+`}`); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a step following its own quest: %d %v", code, out)
+	}
+	code, out := call(http.MethodPut, "/api/steps/"+sa+"/mirror", `{"quest_id":`+qb+`}`)
+	if code != http.StatusOK || jsonNum(out["quest_id"]) != qb {
+		t.Fatalf("set: %d %v", code, out)
+	}
+	if code, out = call(http.MethodGet, "/api/steps/"+sa+"/mirror", ""); code != http.StatusOK || jsonNum(out["quest_id"]) != qb {
+		t.Fatalf("read back: %d %v", code, out)
+	}
+	if code, out = call(http.MethodPut, "/api/steps/"+sb+"/mirror", `{"quest_id":`+qa+`}`); code != http.StatusUnprocessableEntity {
+		t.Fatalf("a circle: %d %v", code, out)
+	}
+	if code, _ = call(http.MethodDelete, "/api/steps/"+sa+"/mirror", ""); code != http.StatusNoContent {
+		t.Fatalf("delete: %d", code)
+	}
+	if code, out = call(http.MethodGet, "/api/steps/"+sa+"/mirror", ""); code != http.StatusOK || out != nil {
+		t.Fatalf("after delete: %d %v", code, out)
+	}
+}
