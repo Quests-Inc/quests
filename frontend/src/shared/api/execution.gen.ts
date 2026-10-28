@@ -243,6 +243,20 @@ export type Kind = any;
 export type Kinds = Kind[];
 
 //////////
+// source: mirror.go
+
+/**
+ * Mirror is the link of one step to the quest it follows.
+ */
+export interface Mirror {
+  step_id: number /* int64 */;
+  quest_id: number /* int64 */;
+  parent_quest_id: number /* int64 */;
+  hook_id: number /* int64 */;
+  script_id: number /* int64 */;
+}
+
+//////////
 // source: runlog.go
 
 /**
