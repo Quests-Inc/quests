@@ -18,6 +18,7 @@ type Root = { type: string; id: number }
 
 /** Что лежит в раскладе. Камера — точка мира в центре поля и масштаб, чтобы не зависеть от размера окна. */
 export type LayoutState = {
+  trees?: Record<string, { depth: number; layout: string }>
   v: 1
   center: { type: string | null; id: number | null }
   roots: Root[]
@@ -44,6 +45,8 @@ export type LayoutDeps = {
   depth: { get: () => number; set: (d: number) => void }
   layout: { get: () => string; set: (l: string) => void }
   prefs: {
+    trees?: Record<string, { depth: number; layout: string }>
+    restoreTrees?: (s: unknown) => void
     questStatuses: Set<string>
     shownTypes: Set<string>
     hidden: Set<string>
@@ -75,6 +78,7 @@ export function captureLayout(d: LayoutDeps): LayoutState {
       ? { cx: round((size.w / 2 - cam.x) / cam.k), cy: round((size.h / 2 - cam.y) / cam.k), k: cam.k }
       : null
   return {
+    trees: d.prefs.trees ? { ...d.prefs.trees } : undefined,
     v: 1,
     center: { ...d.center() },
     roots: d.roots().map((r) => ({ type: r.type, id: r.id })),
@@ -115,6 +119,14 @@ export async function applyLayoutState(d: LayoutDeps, s: LayoutState) {
   await tick()
   if (s.depth) d.depth.set(s.depth)
   if (s.layout) d.layout.set(s.layout)
+  d.prefs.restoreTrees?.(
+    s.trees ??
+      Object.fromEntries(
+        [s.center, ...(s.roots ?? [])]
+          .filter((r) => r?.type && r.id)
+          .map((r) => [`${r.type}:${r.id}`, { depth: s.depth || 2, layout: s.layout || 'tree' }])
+      )
+  )
   d.prefs.restore({ statuses: s.statuses, types: s.types, hidden: s.hidden, expand: s.expand })
   d.prefs.restoreSizes(s.sizes ?? {})
   d.folds.restore(s.folds ?? {})

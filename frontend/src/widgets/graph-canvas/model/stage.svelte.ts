@@ -33,6 +33,7 @@ type LaidOut = { nodes: GraphNodeView[]; edges: ViewEdge[]; groups?: GraphGroupV
 type Cam = { x: number; y: number; k: number }
 
 export function createGraphStage(deps: {
+  getTrees?: () => { key: string; keys: string[]; layout: string }[]
   getActive: () => boolean
   getData: () => Graph | null
   getDraft: () => { ops: DraftOp[]; roots: Root[] }
@@ -121,7 +122,49 @@ export function createGraphStage(deps: {
 
   function applyLayout() {
     if (!view) return
-    view = { ...view, groups: arrangeView(view, layoutMode, { loose: deps.folds.loose, saved: deps.saved }) }
+    const trees = deps.getTrees?.() ?? []
+    if (!trees.length) {
+      view = { ...view, groups: arrangeView(view, layoutMode, { loose: deps.folds.loose, saved: deps.saved }) }
+      return
+    }
+    const rootKeys = new Set(trees.map((t) => t.key))
+    const assigned = new Set<string>()
+    const groups: GraphGroupView[] = []
+    let right = 0
+    for (const tree of trees) {
+      const keys = new Set(tree.keys)
+      const nodes = view.nodes.filter(
+        (n) =>
+          !assigned.has(n.key) &&
+          (!rootKeys.has(n.key) || n.key === tree.key) &&
+          (keys.has(n.key) || (n.type === 'cluster' && keys.has(n.key.slice(8))))
+      )
+      if (!nodes.length) continue
+      const localKeys = new Set(nodes.map((n) => n.key))
+      const local = { nodes, edges: view.edges.filter((e) => localKeys.has(e.from) && localKeys.has(e.to)) }
+      const treeGroups = arrangeView(local, tree.layout, { loose: deps.folds.loose, saved: new Map() })
+      const left = Math.min(...nodes.map((n) => n.x - n.w / 2))
+      for (const n of nodes) {
+        n.x += right - left
+        assigned.add(n.key)
+      }
+      right = Math.max(...nodes.map((n) => n.x + n.w / 2)) + 160
+      // Reapply hand positions only after the tree has its place on the canvas.
+      for (const n of nodes) {
+        const p = deps.saved.get(n.key)
+        if (p) {
+          n.x = p.x
+          n.y = p.y
+        }
+      }
+      groups.push(...treeGroups)
+    }
+    const rest = view.nodes.filter((n) => !assigned.has(n.key))
+    if (rest.length)
+      groups.push(
+        ...arrangeView({ nodes: rest, edges: [] }, layoutMode, { loose: deps.folds.loose, saved: deps.saved })
+      )
+    view = { ...view, groups }
   }
 
   function fit() {
@@ -135,6 +178,7 @@ export function createGraphStage(deps: {
   /** Спрятать карточки, измерить, разложить, показать. Камера вписывается только при новом центре или глубине. */
   async function rebuild(g: { root?: string; nodes: GraphNodeView[]; edges: ViewEdge[] }, open: Set<string>) {
     const mine = ++buildSeq
+    const wasReady = untrack(() => ready)
     ready = false
     // The sizes are put on the plain nodes before they become state: reading `view` back here would make this effect depend on its own write.
     const fresh = prepareGraph(g, open, deps.folds.loose)
@@ -145,6 +189,10 @@ export function createGraphStage(deps: {
         n.sh = s.h
       }
     }
+    untrack(() => {
+      for (const n of wasReady ? (view?.nodes ?? []) : [])
+        if (!deps.saved.has(n.key)) deps.saved.set(n.key, { x: n.x, y: n.y })
+    })
     view = fresh
     await tick()
     await tick()
@@ -159,7 +207,7 @@ export function createGraphStage(deps: {
     applyLayout()
     ready = true
     await tick()
-    const fitKey = `${g.root}|${deps.getDepth()}`
+    const fitKey = `${g.root}|${deps.getTrees ? '' : deps.getDepth()}`
     if (fitKey !== lastFitKey) {
       lastFitKey = fitKey
       fit()
@@ -172,6 +220,7 @@ export function createGraphStage(deps: {
    */
   function compose() {
     const g = deps.getData()
+    void deps.getTrees?.()
     const open = deps.folds.expanded
     void deps.folds.loose
     const draft = deps.getDraft()

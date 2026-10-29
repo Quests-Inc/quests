@@ -11,6 +11,7 @@ const KEYS = {
   types: 'quests.graph.types',
   expand: 'quests.graph.expand',
   sizes: 'quests.graph.sizes',
+  trees: 'quests.graph.trees',
 }
 
 function readJSON(store: Store | null, key: string): unknown {
@@ -40,6 +41,19 @@ export function createGraphPrefs(store: Store | null) {
     }
   })()
   let layoutMode = layoutRaw && layoutRaw in LAYOUTS ? layoutRaw : 'tree'
+
+  type TreeSettings = { depth: number; layout: string }
+  const readTrees = (raw: unknown): Record<string, TreeSettings> => {
+    const out: Record<string, TreeSettings> = {}
+    if (raw && typeof raw === 'object')
+      for (const [key, value] of Object.entries(raw)) {
+        const v = value as TreeSettings
+        if (v && [1, 2, 3].includes(v.depth) && Object.hasOwn(LAYOUTS, v.layout))
+          out[key] = { depth: v.depth, layout: v.layout }
+      }
+    return out
+  }
+  let trees = $state(readTrees(readJSON(store, KEYS.trees)))
 
   let hidden = $state(new Set<string>(strings(readJSON(store, KEYS.hidden))))
 
@@ -80,6 +94,17 @@ export function createGraphPrefs(store: Store | null) {
   }
 
   return {
+    get trees() {
+      return trees
+    },
+    setTree(key: string, settings: TreeSettings) {
+      trees = { ...trees, [key]: { ...settings } }
+      write(store, KEYS.trees, trees)
+    },
+    restoreTrees(raw: unknown) {
+      trees = readTrees(raw)
+      write(store, KEYS.trees, trees)
+    },
     /** Раскладка: 'tree' | 'down' | 'radial' | 'layers' | 'free'. */
     get layoutMode() {
       return layoutMode

@@ -15,3 +15,7 @@ export function cell<T>(initial: T) {
     },
   }
 }
+
+export function watch(fn: () => void) {
+  $effect(fn)
+}

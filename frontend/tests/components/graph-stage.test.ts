@@ -1,8 +1,12 @@
 import { expect, test } from 'bun:test'
 
+import { flushSync } from 'svelte'
+
 import type { Graph } from '@/shared/api/store.gen'
 import { createClusterFolds } from '@/widgets/graph-canvas/model/folds.svelte.ts'
 import { createGraphStage } from '@/widgets/graph-canvas/model/stage.svelte.ts'
+
+import { inRoot, watch } from './root.svelte.ts'
 
 const kinds = new Set(['questline', 'quest', 'step', 'note', 'attachment'])
 
@@ -40,7 +44,7 @@ function graph(): Graph {
   }
 }
 
-function make() {
+function make(getTrees?: () => { key: string; keys: string[]; layout: string }[]) {
   const saved = new Map<string, { x: number; y: number }>()
   const folds = createClusterFolds({ saved, getNodes: () => [], getGroups: () => [] })
   let cam = { x: 0, y: 0, k: 1 }
@@ -64,6 +68,7 @@ function make() {
   el.getBoundingClientRect = () =>
     ({ width: 800, height: 600, left: 0, top: 0, right: 800, bottom: 600, x: 0, y: 0, toJSON() {} }) as DOMRect
   const stage = createGraphStage({
+    getTrees,
     getActive: () => active,
     getData: () => data,
     getDraft: () => ({ ops: [], roots: [] }),
@@ -81,7 +86,7 @@ function make() {
     loadDraft: async () => {},
   })
   stage.el = el
-  return { stage, prefs, cam: () => cam, setActive: (v: boolean) => (active = v), data }
+  return { stage, prefs, saved, cam: () => cam, setActive: (v: boolean) => (active = v), data }
 }
 
 async function flush() {
@@ -151,4 +156,46 @@ test('raise: последняя тронутая карточка выше ос�
   const top = stage.front['quest:2']
   stage.raise('quest:1')
   expect(stage.front['quest:1']).toBeGreaterThan(top)
+})
+
+test('смена раскладки дерева сохраняет позиции другого дерева; обновление сохраняет ручную позицию', async () => {
+  const trees = [
+    { key: 'quest:1', keys: ['quest:1'], layout: 'tree' },
+    { key: 'note:4', keys: ['note:4'], layout: 'radial' },
+  ]
+  const { stage, saved } = make(() => trees)
+  stage.compose()
+  await flush()
+  const note = stage.nodes.find((n) => n.key === 'note:4')!
+  note.x = 1200
+  note.y = 400
+  saved.set(note.key, { x: note.x, y: note.y })
+  trees[0].layout = 'down'
+  stage.applyLayout()
+  expect(stage.nodes.find((n) => n.key === 'note:4')).toMatchObject({ x: 1200, y: 400 })
+  stage.compose()
+  await flush()
+  expect(stage.nodes.find((n) => n.key === 'note:4')).toMatchObject({ x: 1200, y: 400 })
+})
+
+test('готовность поля не запускает повторную сборку из эффекта страницы', async () => {
+  const { stage } = make()
+  let builds = 0
+  const dispose = inRoot(() =>
+    watch(() => {
+      builds += 1
+      if (builds > 3) throw new Error('Зацикленная сборка карты')
+      stage.compose()
+    })
+  )
+  try {
+    flushSync()
+    await flush()
+    flushSync()
+    await flush()
+    expect(stage.ready).toBe(true)
+    expect(builds).toBe(1)
+  } finally {
+    dispose()
+  }
 })

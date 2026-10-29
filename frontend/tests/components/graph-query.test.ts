@@ -164,3 +164,22 @@ test('первый добавленный становится центром, �
     { type: 'note', id: 8 },
   ])
 })
+
+test('у каждого дерева своя глубина; общие карточки и рёбра объединяются', async () => {
+  const { q, roots, calls, pending } = make({
+    getTreeSettings: (key: string) => ({ depth: key === 'quest:5' ? 1 : 3, layout: 'tree' }),
+  })
+  roots.push({ type: 'note', id: 8 })
+  q.depth = 2
+  q.load()
+  expect(calls.filter((c) => c.startsWith('fetch'))).toEqual(['fetch:quest:5:1::note', 'fetch:note:8:3::note'])
+  const shared = { key: 'note:9', type: 'note', id: 9, depth: 1, title: 'Общая' }
+  pending[0].resolve({ ...graph, nodes: [shared] })
+  pending[1].resolve({ ...graph, root: 'note:8', nodes: [shared], depth: 3 })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(q.data?.nodes).toHaveLength(1)
+  expect(q.memberships).toEqual({ 'quest:5': ['note:9'], 'note:8': ['note:9'] })
+  const count = calls.length
+  q.depth = 1
+  expect(calls).toHaveLength(count)
+})

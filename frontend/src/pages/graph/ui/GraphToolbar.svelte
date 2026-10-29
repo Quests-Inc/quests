@@ -51,7 +51,7 @@
     <input
       class="search graph__search"
       type="search"
-      placeholder="Центр: найти квест или заметку…"
+      placeholder="Добавить дерево: найти квест или заметку…"
       bind:value={rootQuery}
       onfocus={() => (pickOpen = true)}
       onblur={() => setTimeout(() => (pickOpen = false), 150)}
@@ -73,7 +73,7 @@
     {/if}
   </div>
   <label class="graph__ctl">
-    Раскладка
+    При добавлении: раскладка
     <select
       bind:value={layoutMode}
       onchange={onLayoutChange}
@@ -109,7 +109,7 @@
     </div>
   </details>
   <label class="graph__ctl">
-    Глубина
+    Глубина при добавлении
     <select bind:value={depth} aria-label="Глубина">
       <option value={1}>1</option>
       <option value={2}>2</option>

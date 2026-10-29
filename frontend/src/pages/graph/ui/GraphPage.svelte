@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { computeTiers } from '@/entities/graph'
+  import { computeTiers, LAYOUTS } from '@/entities/graph'
   import { noteCatalog } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
@@ -95,6 +95,8 @@
     askDrop: (op) => gd.askDrop(op),
   })
   query = createGraphQuery({
+    getTreeSettings: (key) => prefs.trees[key],
+    initTree: (key, depth) => { if (!prefs.trees[key]) prefs.setTree(key, { depth, layout: stage.layoutMode }) },
     getActive: () => active,
     getRootType: () => rootType ?? null,
     getRootId: () => rootId ?? null,
@@ -133,6 +135,7 @@
     loadDraft: () => gd.load(),
   })
   stage = createGraphStage({
+    getTrees: () => Object.entries(query.memberships).map(([key, keys]) => ({ key, keys, layout: prefs.trees[key]?.layout ?? stage.layoutMode })),
     getActive: () => active,
     getData: () => query.data,
     getDraft: () => gd.draft,
@@ -292,7 +295,36 @@
   let matches = $derived(found.items)
   let rootParsed = $derived(found.parsed)
   let ctx = $derived(menu.ctx)
-  let ctxItems = $derived(menu.items())
+  function targetTrees() {
+    const keys = menu.ctx.group ? stage.picked : new Set(menu.ctx.node ? [menu.ctx.node.key] : [])
+    const trees = Object.entries(query.memberships)
+    return [...new Set([...keys].map((key) => trees.find(([root]) => root === key)?.[0] ?? trees.find(([, members]) => members.includes(key))?.[0]).filter((key): key is string => !!key))]
+  }
+  let ctxItems = $derived.by(() => {
+    const items = menu.items()
+    const roots = targetTrees()
+    if (roots.length) items.push({ id: 'tree-settings', label: `Настройки деревьев (${roots.length})`, children: [
+      { id: 'tree-layout', label: 'Раскладка', children: Object.entries(LAYOUTS).map(([value, label]) => ({ id: `tree-layout:${value}`, label, checked: roots.every((key) => prefs.trees[key]?.layout === value) })) },
+      { id: 'tree-depth', label: 'Глубина', children: [1, 2, 3].map((value) => ({ id: `tree-depth:${value}`, label: String(value), checked: roots.every((key) => (prefs.trees[key]?.depth ?? 2) === value) })) },
+    ] })
+    return items
+  })
+  function selectContextAction(id: string) {
+    if (!id.startsWith('tree-layout:') && !id.startsWith('tree-depth:')) { void onCtxSelect(id); return }
+    const roots = targetTrees()
+    const affected = new Set(roots.flatMap((key) => query.memberships[key] ?? []))
+    // Pin every unaffected card; only an explicit layout action releases the chosen trees.
+    for (const n of stage.nodes) {
+      if (id.startsWith('tree-layout:') && affected.has(n.key)) saved.delete(n.key)
+      else saved.set(n.key, { x: n.x, y: n.y })
+    }
+    for (const key of roots) {
+      const old = prefs.trees[key] ?? { depth: 2, layout: stage.layoutMode }
+      prefs.setTree(key, id.startsWith('tree-layout:') ? { ...old, layout: id.slice(12) } : { ...old, depth: Number(id.slice(11)) })
+    }
+    if (id.startsWith('tree-layout:')) stage.applyLayout()
+    menu.close()
+  }
   let questModal = $derived(menu.questModal)
   let findModal = $derived(menu.findOpen)
 
@@ -320,7 +352,6 @@
 
   function onLayoutChange() {
     prefs.layoutMode = stage.layoutMode
-    relayout()
   }
 
   function onKey(e: KeyboardEvent) {
@@ -401,7 +432,7 @@
     {questStatuses}
     {typesLabel}
     {shownTypes}
-    onChooseRoot={chooseRoot}
+    onChooseRoot={(m) => { query.rootQuery = ''; query.pickOpen = false; void addToMap(m.type, m.id) }}
     onToggleStatus={toggleStatus}
     onToggleType={toggleType}
     onLayoutChange={onLayoutChange}
@@ -540,7 +571,7 @@
   x={ctx.x}
   y={ctx.y}
   items={ctxItems}
-  onSelect={onCtxSelect}
+  onSelect={selectContextAction}
   onClose={menu.close}
 />
 
