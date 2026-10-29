@@ -2,6 +2,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
   align-content: start;
+  grid-auto-rows: max-content;
   gap: 1rem;
   padding: 1rem;
 }
@@ -16,30 +17,34 @@
   align-items: stretch;
   gap: 0.75rem;
   min-width: 0;
+  overflow: hidden;
   padding: 0.75rem;
   border: 1px solid color-mix(in srgb, var(--file-color) 35%, var(--color-border, #333));
   border-radius: var(--radius-lg, 12px);
-  background: color-mix(in srgb, var(--file-color) 12%, var(--color-bg-raised, #1a1a1a));
+  --attachment-card-bg: color-mix(in srgb, var(--file-color) 12%, var(--color-bg-raised, #1a1a1a));
+  background: var(--attachment-card-bg);
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__item:hover {
   border-color: var(--file-color);
-  background: color-mix(in srgb, var(--file-color) 17%, var(--color-bg-raised, #1a1a1a));
+  --attachment-card-bg: color-mix(in srgb, var(--file-color) 17%, var(--color-bg-raised, #1a1a1a));
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__item--on,
 .attpage .attpage__list.attpage__list--cards .attpage__item--picked {
   border-color: var(--color-accent, #c9a227);
-  background: color-mix(in srgb, var(--color-accent, #c9a227) 7%, var(--color-bg-raised, #1a1a1a));
+  --attachment-card-bg: color-mix(in srgb, var(--color-accent, #c9a227) 7%, var(--color-bg-raised, #1a1a1a));
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__thumb {
+  position: relative;
   flex: none;
   width: 100%;
   height: 9rem;
   border-radius: var(--radius-lg, 12px);
-  background: var(--pill-bg, #151515);
-  border-color: var(--color-border, #333);
+  --attachment-preview-bg: color-mix(in srgb, var(--attachment-card-bg) 70%, var(--color-bg, #121212));
+  background: var(--attachment-preview-bg);
+  border-color: color-mix(in srgb, var(--file-color) 18%, var(--attachment-card-bg));
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__thumb img {
@@ -47,23 +52,33 @@
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__main {
-  align-content: start;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: auto;
   gap: 0.5rem;
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__name {
+  flex: none;
   flex-wrap: wrap;
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__file,
 .attpage .attpage__list.attpage__list--cards .attpage__cmt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   white-space: normal;
   overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__file {
   flex: 1 1 100%;
+  max-height: 1.45em;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__owner {
@@ -73,8 +88,59 @@
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__acts {
+  align-items: center;
   justify-content: flex-end;
   padding-top: 0.5rem;
   border-top: 1px solid var(--color-border, #333);
   opacity: 1;
+}
+
+.attpage .attpage__list.attpage__list--cards .attpage__cmt {
+  max-height: 1.45em;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.attpage .attpage__list.attpage__list--cards .attpage__type-badge {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  z-index: 1;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--file-color) 30%, transparent);
+  border-radius: var(--radius-md, 4px);
+  background: color-mix(in srgb, var(--attachment-card-bg) 94%, transparent);
+  color: var(--file-color);
+  font: 0.65rem/1.2 var(--font-mono, monospace);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.attpage .attpage__list.attpage__list--cards .attpage__item:hover .attpage__type-badge,
+.attpage .attpage__list.attpage__list--cards .attpage__item:focus-within .attpage__type-badge {
+  opacity: 0;
+}
+
+.attpage .attpage__list.attpage__list--cards .attpage__meta {
+  flex: none;
+  min-width: 0;
+  margin-top: auto;
+}
+
+.attpage .attpage__list.attpage__list--cards .attpage__cmt {
+  flex: none;
+}
+
+.attpage .attpage__list.attpage__list--cards .attpage__revision {
+  margin-right: auto;
+}
+
+.attpage .attpage__owner {
+  color: inherit;
+  text-decoration: none;
+}
+
+.attpage .attpage__owner:hover {
+  color: var(--color-accent, #c9a227);
+  text-decoration: underline;
 }

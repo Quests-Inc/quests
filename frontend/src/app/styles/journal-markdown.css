@@ -152,70 +152,70 @@
 }
 
 /* Syntax tokens — follow journal theme tokens, not a stock hljs theme. */
-.md .hljs-comment,
-.md .hljs-quote {
+:is(.md, .file-code) .hljs-comment,
+:is(.md, .file-code) .hljs-quote {
   color: var(--color-fg-subtle, #6e6e6e);
   font-style: italic;
 }
 
-.md .hljs-keyword,
-.md .hljs-selector-tag,
-.md .hljs-meta .hljs-keyword,
-.md .hljs-doctag,
-.md .hljs-section,
-.md .hljs-name {
+:is(.md, .file-code) .hljs-keyword,
+:is(.md, .file-code) .hljs-selector-tag,
+:is(.md, .file-code) .hljs-meta .hljs-keyword,
+:is(.md, .file-code) .hljs-doctag,
+:is(.md, .file-code) .hljs-section,
+:is(.md, .file-code) .hljs-name {
   color: var(--color-sig-epic, #d3869b);
 }
 
-.md .hljs-string,
-.md .hljs-regexp,
-.md .hljs-addition,
-.md .hljs-attribute,
-.md .hljs-meta .hljs-string {
+:is(.md, .file-code) .hljs-string,
+:is(.md, .file-code) .hljs-regexp,
+:is(.md, .file-code) .hljs-addition,
+:is(.md, .file-code) .hljs-attribute,
+:is(.md, .file-code) .hljs-meta .hljs-string {
   color: var(--color-sig-uncommon, #8ec07c);
 }
 
-.md .hljs-number,
-.md .hljs-literal,
-.md .hljs-bullet,
-.md .hljs-link {
+:is(.md, .file-code) .hljs-number,
+:is(.md, .file-code) .hljs-literal,
+:is(.md, .file-code) .hljs-bullet,
+:is(.md, .file-code) .hljs-link {
   color: var(--color-sig-legendary, #fe8019);
 }
 
-.md .hljs-title,
-.md .hljs-title.function_,
-.md .hljs-title.class_,
-.md .hljs-type,
-.md .hljs-built_in,
-.md .hljs-selector-id,
-.md .hljs-selector-class {
+:is(.md, .file-code) .hljs-title,
+:is(.md, .file-code) .hljs-title.function_,
+:is(.md, .file-code) .hljs-title.class_,
+:is(.md, .file-code) .hljs-type,
+:is(.md, .file-code) .hljs-built_in,
+:is(.md, .file-code) .hljs-selector-id,
+:is(.md, .file-code) .hljs-selector-class {
   color: var(--color-accent, #c9a227);
 }
 
-.md .hljs-variable,
-.md .hljs-template-variable,
-.md .hljs-params,
-.md .hljs-attr,
-.md .hljs-property {
+:is(.md, .file-code) .hljs-variable,
+:is(.md, .file-code) .hljs-template-variable,
+:is(.md, .file-code) .hljs-params,
+:is(.md, .file-code) .hljs-attr,
+:is(.md, .file-code) .hljs-property {
   color: var(--color-info, #5a8a7a);
 }
 
-.md .hljs-deletion,
-.md .hljs-tag {
+:is(.md, .file-code) .hljs-deletion,
+:is(.md, .file-code) .hljs-tag {
   color: var(--color-danger, #b54a3a);
 }
 
-.md .hljs-meta,
-.md .hljs-punctuation,
-.md .hljs-operator {
+:is(.md, .file-code) .hljs-meta,
+:is(.md, .file-code) .hljs-punctuation,
+:is(.md, .file-code) .hljs-operator {
   color: var(--color-fg-muted, #9a9a9a);
 }
 
-.md .hljs-emphasis {
+:is(.md, .file-code) .hljs-emphasis {
   font-style: italic;
 }
 
-.md .hljs-strong {
+:is(.md, .file-code) .hljs-strong {
   font-weight: 600;
 }
 

@@ -48,11 +48,11 @@ afterEach(() => {
   fail = false
   globalThis.IntersectionObserver = originalObserver
 })
-async function open() {
+async function open(filename = 'file.txt') {
   globalThis.IntersectionObserver = Observer as unknown as typeof IntersectionObserver
   target = document.createElement('div')
   document.body.append(target)
-  app = mount(AttachmentPreview, { target, props: { a } })
+  app = mount(AttachmentPreview, { target, props: { a: { ...a, filename } } })
   await tick()
 }
 test('preview loads only near the viewport and keeps markup as plain text', async () => {
@@ -73,4 +73,14 @@ test('unavailable preview falls back to its file icon', async () => {
   await tick()
   expect(target.querySelector('pre')).toBeNull()
   expect(target.querySelector('.file-preview__icon')?.textContent).toContain('TXT')
+})
+
+test('HTML preview is highlighted without becoming executable markup', async () => {
+  await open('file.html')
+  reveal()
+  await tick()
+  await tick()
+  expect(target.querySelector('pre .hljs-tag')).not.toBeNull()
+  expect(target.querySelector('pre')?.textContent).toContain('<script>alert(1)</script>')
+  expect(target.querySelector('script')).toBeNull()
 })

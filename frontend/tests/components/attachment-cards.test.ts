@@ -30,31 +30,54 @@ afterEach(() => {
   setAttachmentIndex(null)
 })
 test('cards retain previews, file actions and multi-selection; all three layouts remain available', async () => {
-  setAttachmentIndex({ note: { '1': [file(1, 'Карта.png', 'image/png'), file(2, 'Отчёт.pdf', 'application/pdf')] } })
+  setAttachmentIndex({
+    note: {
+      '1': [
+        { ...file(1, 'Карта.png', 'image/png'), revision: 2, revision_count: 2 },
+        file(2, 'Отчёт.pdf', 'application/pdf'),
+      ],
+    },
+  })
   const picked: number[] = []
   target = document.createElement('div')
   document.body.append(target)
   app = mount(AttachmentsPage, { target, props: { onSelect: (id) => id != null && picked.push(id) } })
   await tick()
-  const button = (name: string) => [...target.querySelectorAll('button')].find((b) => b.textContent?.trim() === name)!
+  const viewButton = () => target.querySelector<HTMLButtonElement>('.attpage__view')!
   expect(target.querySelector('.attpage__group')).not.toBeNull()
-  button('Карточки').click()
+  viewButton().click()
   await tick()
-  expect(button('Карточки').getAttribute('aria-pressed')).toBe('true')
+  expect(viewButton().dataset.view).toBe('cards')
+  expect(viewButton().textContent?.trim()).toBe('')
   expect(target.querySelector('.attpage__list--cards')).not.toBeNull()
   expect(target.querySelectorAll('[data-att-id]')).toHaveLength(2)
   expect(target.querySelector('[data-att-id="1"] img')?.getAttribute('loading')).toBe('lazy')
   expect(target.querySelectorAll('a[download]')).toHaveLength(2)
+  expect(target.querySelector('[data-att-id="1"] .attpage__acts .attpage__revision')?.textContent).toBe('v2/2')
+  expect(target.querySelector('[data-att-id="1"] .attpage__name .attpage__revision')).toBeNull()
   target.querySelector<HTMLElement>('[data-att-id="1"]')!.click()
   expect(picked).toEqual([1])
   target.querySelector('[data-att-id="2"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }))
   await tick()
   expect(target.querySelector('[data-att-id="2"]')!.classList.contains('attpage__item--picked')).toBe(true)
-  button('Список').click()
+  viewButton().click()
   await tick()
   expect(target.querySelector('.attpage__list--cards')).toBeNull()
   expect(target.querySelector('.attpage__group')).toBeNull()
-  button('По владельцу').click()
+  viewButton().click()
   await tick()
   expect(target.querySelector('.attpage__group')).not.toBeNull()
+  const sortButton = target.querySelector<HTMLButtonElement>('[aria-label="Сортировка"]')!
+  expect(target.querySelector('select')).toBeNull()
+  sortButton.click()
+  await tick()
+  const byName = [...target.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find(
+    (b) => b.textContent?.trim() === 'По имени'
+  )!
+  byName.click()
+  await tick()
+  expect(target.querySelector('[data-att-id]')?.getAttribute('data-att-id')).toBe('1')
+  expect(sortButton.textContent).toContain('По имени')
+  expect(sortButton.getAttribute('aria-expanded')).toBe('false')
+  expect(document.activeElement).toBe(sortButton)
 })

@@ -21,6 +21,7 @@
   import filter from '@/assets/icons/filter.svg?raw'
   import flag from '@/assets/icons/flag.svg?raw'
   import folder from '@/assets/icons/folder.svg?raw'
+  import grid from '@/assets/icons/grid.svg?raw'
   import key from '@/assets/icons/key.svg?raw'
   import tag from '@/assets/icons/tag.svg?raw'
   import lock from '@/assets/icons/lock.svg?raw'
@@ -79,6 +80,7 @@
     search,
     flag,
     folder,
+    grid,
     key,
     tag,
     lock,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import './attachmentCards.css'
+  import './attachmentToolbar.css'
   import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -71,13 +72,27 @@
 
   let search = $state('')
   let sort = $state('new')
+  let sortOpen = $state(false)
+  let sortX = $state(0)
+  let sortY = $state(0)
+  let sortButton = $state<HTMLButtonElement | null>(null)
+  let sortChoices = $derived(SORTS.map((s) => ({ id: s.id, label: s.label, checked: s.id === sort })))
+  function openSort() {
+    if (!sortButton) return
+    const rect = sortButton.getBoundingClientRect()
+    sortX = rect.left
+    sortY = rect.bottom + 4
+    sortOpen = true
+  }
   const VIEWS = [
-    { id: 'list', label: 'Список' },
-    { id: 'grouped', label: 'По владельцу' },
-    { id: 'cards', label: 'Карточки' },
+    { id: 'list', label: 'Список', icon: 'list' },
+    { id: 'grouped', label: 'По владельцу', icon: 'folder' },
+    { id: 'cards', label: 'Карточки', icon: 'grid' },
   ] as const
   let view = $state<'list' | 'grouped' | 'cards'>('grouped')
   let grouped = $derived(view === 'grouped')
+  let viewIndex = $derived(VIEWS.findIndex((v) => v.id === view))
+  let nextView = $derived(VIEWS[(viewIndex + 1) % VIEWS.length])
   let versionInput = $state((null as HTMLInputElement | null))
   const foldedGroups = createFoldedGroups()
 
@@ -265,22 +280,34 @@
         aria-label="Поиск вложений"
         title={`Фильтры: ${helpLine(ATT_SPEC)}; -key:value — исключить`}
       />
-      <select class="attpage__select" bind:value={sort} aria-label="Сортировка">
-        {#each SORTS as s (s.id)}
-          <option value={s.id}>{s.label}</option>
-        {/each}
-      </select>
-      <div class="attpage__seg" role="group" aria-label="Вид вложений">
-        {#each VIEWS as v (v.id)}
-          <button
-            type="button"
-            class="attpage__pill"
-            class:attpage__pill--on={view === v.id}
-            aria-pressed={view === v.id}
-            onclick={() => (view = v.id)}
-          >{v.label}</button>
-        {/each}
-      </div>
+      <button
+        bind:this={sortButton}
+        type="button"
+        class="attpage__select"
+        aria-label="Сортировка"
+        aria-haspopup="menu"
+        aria-expanded={sortOpen}
+        onclick={() => sortOpen ? (sortOpen = false) : openSort()}
+        onkeydown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            openSort()
+          }
+        }}
+      >
+        <span>{SORTS.find((s) => s.id === sort)?.label}</span>
+        <Icon name="chevron-down" size={12} />
+      </button>
+      <button
+        type="button"
+        class="attpage__view"
+        data-view={view}
+        aria-label={`Вид вложений: ${VIEWS[viewIndex].label}. Переключить: ${nextView.label}`}
+        title={`Вид: ${VIEWS[viewIndex].label}. Следующий: ${nextView.label}`}
+        onclick={() => (view = nextView.id)}
+      >
+        <Icon name={VIEWS[viewIndex].icon} size={18} />
+      </button>
     </div>
     <FlagHints value={search} spec={ATT_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} />
     <div class="attpage__row2">
@@ -394,14 +421,17 @@
           <span class="attpage__ext">{extOf(a) || '···'}</span>
         </span>
       {/if}
+      {#if view === 'cards' && extOf(a)}
+        <span class="attpage__type-badge" aria-hidden="true">{extOf(a)}</span>
+      {/if}
     </div>
     <div class="attpage__main">
       <div class="attpage__name">
-        <span class="attpage__file">{a.filename || `attachment=${a.id}`}</span>
+        <span class="attpage__file" title={a.filename}>{a.filename || `attachment=${a.id}`}</span>
         {#if a.hidden}
           <span class="attpage__chip attpage__chip--hidden" title="Скрыто"><Icon name="eye-off" size={11} /></span>
         {/if}
-        {#if (a.revision_count || 1) > 1}
+        {#if view !== 'cards' && (a.revision_count || 1) > 1}
           <span class="attpage__chip" title="Версия {a.revision} из {a.revision_count}">v{a.revision}/{a.revision_count}</span>
         {/if}
         {#if a.available === false}<span class="attpage__chip attpage__chip--warn">DAV offline</span>{/if}
@@ -410,16 +440,29 @@
           <span class="attpage__chip attpage__chip--warn">{a.scan_status}</span>
         {/if}
       </div>
-      {#if a.comment}<p class="attpage__cmt">{a.comment}</p>{/if}
+      {#if a.comment}<p class="attpage__cmt" title={a.comment}>{a.comment}</p>{/if}
       <div class="attpage__meta">
         {#if showOwner}
-          <span class="attpage__owner">{KIND_ONE[ownerKind(a)]} · {ownerLabel(a)}</span>
+          <a
+            class="attpage__owner"
+            href={`?${ownerKind(a)}=${a.owner_id}`}
+            title={`${KIND_ONE[ownerKind(a)]} ${ownerLabel(a)}`}
+            onclick={(event) => {
+              event.stopPropagation()
+              if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+              event.preventDefault()
+              onOpenOwner?.(ownerKind(a), Number(a.owner_id))
+            }}
+          >{KIND_ONE[ownerKind(a)]} {ownerLabel(a)}</a>
         {/if}
         <span>{formatSize(a.size_bytes)}</span>
         <span>{formatWhen(a.uploaded_at)}</span>
       </div>
     </div>
     <div class="attpage__acts">
+      {#if view === 'cards' && (a.revision_count || 1) > 1}
+        <span class="attpage__chip attpage__revision" title="Версия {a.revision} из {a.revision_count}">v{a.revision}/{a.revision_count}</span>
+      {/if}
       <a
         class="attpage__ico"
         href={attachmentDownloadUrl(ownerKind(a), a.owner_id, a.id)}
@@ -494,6 +537,19 @@
   onClose={() => (ctxOpen = false)}
 />
 
+<ContextMenu
+  open={sortOpen}
+  anchor={sortButton}
+  x={sortX}
+  y={sortY}
+  items={sortChoices}
+  onSelect={(id) => (sort = id)}
+  onClose={() => {
+    sortOpen = false
+    sortButton?.focus()
+  }}
+/>
+
 <style>
   .attpage {
     position: relative;
@@ -501,79 +557,6 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-  }
-
-  .attpage__tools {
-    display: grid;
-    gap: 0.55rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-
-  .attpage__row1,
-  .attpage__row2 {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
-
-  .attpage__search {
-    flex: 1 1 14rem;
-    min-width: 0;
-  }
-
-  .attpage__select {
-    flex: 0 0 auto;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-size: var(--text-sm, 0.875rem);
-  }
-
-  .attpage__select option {
-    background: var(--color-bg-raised, #1a1a1a);
-  }
-
-  .attpage__seg {
-    display: inline-flex;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    overflow: hidden;
-  }
-
-  .attpage__pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.28rem 0.65rem;
-    border: 0;
-    border-right: 1px solid var(--color-border, #333);
-    background: transparent;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .attpage__pill:last-child {
-    border-right: 0;
-  }
-
-  .attpage__pill:hover {
-    color: var(--color-fg, #e8e8e8);
-  }
-
-  .attpage__pill--on {
-    color: var(--color-fg, #e8e8e8);
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, transparent);
-  }
-
-  .attpage__n {
-    font-variant-numeric: tabular-nums;
-    opacity: 0.7;
-    font-size: var(--text-xs, 0.75rem);
   }
 
   .attpage__split {
