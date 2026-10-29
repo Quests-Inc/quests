@@ -2,7 +2,7 @@
   import type { RevisionRead } from '@/shared/api/knowledge.gen'
   import type { AttachmentView } from '@/shared/api/knowledge_http.gen'
   import { EntityHistory } from '@/entities/history'
-  import { extOf, formatSize, formatWhen, isRaster, thumbSrc } from '@/entities/attachment'
+  import { AttachmentPreview, formatSize, formatWhen } from '@/entities/attachment'
   import Icon from '@/shared/ui/Icon.svelte'
 
   /** Панель выбранного вложения: превью, действия, сведения, комментарий, версии и история. */
@@ -54,11 +54,7 @@
       </div>
 
       <div class="attpage__preview" class:attpage__preview--hidden={a.hidden}>
-        {#if isRaster(a)}
-          <img src={thumbSrc(a)} alt={a.filename} loading="lazy" />
-        {:else}
-          <span class="attpage__bigext">{extOf(a) || 'FILE'}</span>
-        {/if}
+        <AttachmentPreview {a} />
         {#if a.hidden}
           <span class="attpage__hiddenbadge"><Icon name="eye-off" size={14} /> скрыто</span>
         {/if}
@@ -218,28 +214,15 @@
     position: relative;
     display: grid;
     place-items: center;
-    min-height: 7rem;
-    max-height: 16rem;
+    height: 16rem;
     overflow: hidden;
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 5%, transparent);
   }
 
-  .attpage__preview img {
-    max-width: 100%;
-    max-height: 16rem;
-    object-fit: contain;
-  }
-
-  .attpage__preview--hidden img {
+  .attpage__preview--hidden :global(.file-preview) {
     opacity: 0.55;
-  }
-
-  .attpage__bigext {
-    font-family: var(--font-mono, monospace);
-    font-size: 1.6rem;
-    color: var(--color-fg-muted, #9a9a9a);
   }
 
   .attpage__hiddenbadge {

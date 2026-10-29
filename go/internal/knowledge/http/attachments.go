@@ -55,6 +55,7 @@ func (h *Handler) RegisterAttachments(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/attachments", h.listAllAttachments)
 	// Owner-less inline view for markdown images: `![](attachment=N)`.
 	mux.HandleFunc("GET /api/attachments/{aid}/image", h.getAttachmentImage)
+	mux.HandleFunc("GET /api/attachments/{aid}/preview", h.getAttachmentPreview)
 }
 
 // attachmentFor resolves {id}/{aid} and refuses an attachment that belongs to a

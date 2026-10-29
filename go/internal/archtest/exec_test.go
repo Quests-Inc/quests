@@ -13,12 +13,13 @@ import (
 // user-written command (docs/automation.md): user code goes to a runner. A new entry here is a decision to review —
 // say in the comment which of the rules still holds.
 var execAllowed = map[string]string{
-	"cmd/quests-runner/exec.go":          "the runner: the one place user commands run, on the owner's device",
-	"cmd/quests-runner/exec_other.go":    "the runner (non-unix process-group handling)",
-	"cmd/quests-runner/exec_unix.go":     "the runner (unix process-group handling)",
-	"internal/schedule/backup_pg.go":     "pg_dump of the server's own database: a fixed command, no user input",
-	"internal/overlay/shell/monitors.go": "the HUD on a workstation (window-manager calls), not part of the server",
-	"internal/mcp/tools_templates.go":    "dry_run_emit_pool: runs on the MCP server's machine (the user's own, over stdio), never on the API host",
+	"internal/platform/filepreview/preview.go": "fixed pdftotext executable and flags, bounded attachment bytes on stdin; no user command, shell, or filename; request deadline limits execution",
+	"cmd/quests-runner/exec.go":                "the runner: the one place user commands run, on the owner's device",
+	"cmd/quests-runner/exec_other.go":          "the runner (non-unix process-group handling)",
+	"cmd/quests-runner/exec_unix.go":           "the runner (unix process-group handling)",
+	"internal/schedule/backup_pg.go":           "pg_dump of the server's own database: a fixed command, no user input",
+	"internal/overlay/shell/monitors.go":       "the HUD on a workstation (window-manager calls), not part of the server",
+	"internal/mcp/tools_templates.go":          "dry_run_emit_pool: runs on the MCP server's machine (the user's own, over stdio), never on the API host",
 }
 
 func TestOnlyAllowedPackagesStartProcesses(t *testing.T) {

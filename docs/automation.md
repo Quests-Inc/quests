@@ -8,7 +8,7 @@ embedded in a text ([`embeds.md`](embeds.md)). The details of each live in their
 ## The rules
 
 1. **The server executes no user commands.** `quests-server` never starts a process from text a user or an owner
-   wrote. Its own fixed processes (`pg_dump` for backups) are not user code and take no input from the database.
+   wrote. Its own fixed processes (`pg_dump` for backups, `pdftotext` for attachment previews) are not user code: executable names and flags never come from the database. PDF bytes enter `pdftotext` through stdin under size and time limits, without a shell or user-supplied filename.
 2. **Code runs on a runner only.** A runner is `quests-runner` on a device the workspace owner registered (the
    server's own host included, as one more device). It runs with the rights of the user it was started as; that
    machine's owner is the one who decides what it may do.

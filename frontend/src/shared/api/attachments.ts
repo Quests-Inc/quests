@@ -142,3 +142,18 @@ export function deleteAttachmentRevision(
     method: 'DELETE',
   })
 }
+
+/** Small inert snippets; preview failures stay local to the card, without toast spam. */
+export async function getAttachmentPreview(
+  id: number,
+  revision: number,
+  signal: AbortSignal
+): Promise<{ kind: string; text: string }> {
+  const response = await fetch(`${BASE}/api/attachments/${id}/preview?revision=${revision}`, {
+    credentials: 'same-origin',
+    signal,
+  })
+  if (response.status === 401) onUnauthorized?.()
+  if (!response.ok) throw new Error(`Preview HTTP ${response.status}`)
+  return response.json()
+}

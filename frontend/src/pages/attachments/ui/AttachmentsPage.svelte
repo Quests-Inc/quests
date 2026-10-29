@@ -1,14 +1,16 @@
 <script lang="ts">
+  import './attachmentCards.css'
   import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import AttachmentGroupHead from './AttachmentGroupHead.svelte'
   import { createFoldedGroups } from '../model/foldedGroups.svelte.ts'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
+  import { fileKind } from '@/shared/lib/fileKind.ts'
   import AttachmentPanel from './AttachmentPanel.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
-  import { ATT_SPEC, attachmentCatalog, extOf, flattenAttachmentIndex, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments, thumbSrc } from '@/entities/attachment'
+  import { AttachmentPreview, ATT_SPEC, attachmentCatalog, extOf, flattenAttachmentIndex, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments, thumbSrc } from '@/entities/attachment'
   import { noteCatalog } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { EntityHistory } from '@/entities/history'
@@ -69,7 +71,13 @@
 
   let search = $state('')
   let sort = $state('new')
-  let grouped = $state(true)
+  const VIEWS = [
+    { id: 'list', label: 'Список' },
+    { id: 'grouped', label: 'По владельцу' },
+    { id: 'cards', label: 'Карточки' },
+  ] as const
+  let view = $state<'list' | 'grouped' | 'cards'>('grouped')
+  let grouped = $derived(view === 'grouped')
   let versionInput = $state((null as HTMLInputElement | null))
   const foldedGroups = createFoldedGroups()
 
@@ -262,16 +270,17 @@
           <option value={s.id}>{s.label}</option>
         {/each}
       </select>
-      <button
-        type="button"
-        class="attpage__tool"
-        class:attpage__tool--on={grouped}
-        title="Группировать по владельцу"
-        aria-pressed={grouped}
-        onclick={() => (grouped = !grouped)}
-      >
-        <Icon name="folder" size={16} />
-      </button>
+      <div class="attpage__seg" role="group" aria-label="Вид вложений">
+        {#each VIEWS as v (v.id)}
+          <button
+            type="button"
+            class="attpage__pill"
+            class:attpage__pill--on={view === v.id}
+            aria-pressed={view === v.id}
+            onclick={() => (view = v.id)}
+          >{v.label}</button>
+        {/each}
+      </div>
     </div>
     <FlagHints value={search} spec={ATT_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} />
     <div class="attpage__row2">
@@ -305,7 +314,7 @@
   </div>
 
   <div class="attpage__split">
-    <div class="attpage__list">
+    <div class="attpage__list" class:attpage__list--cards={view === 'cards'}>
       {#if attachments.length === 0}
         <p class="empty">Вложений пока нет — их вешают на квесты, квестлайны и заметки.</p>
       {:else if filtered.length === 0}
@@ -365,6 +374,7 @@
 {#snippet row(a: any, showOwner: boolean)}
   <article
     class="attpage__item"
+    style:--file-color={fileKind(a).color}
     class:attpage__item--on={a.id === selectedId}
     class:attpage__item--picked={grp.multi.has(a.id)}
     class:attpage__item--hidden={a.hidden}
@@ -374,11 +384,13 @@
     oncontextmenu={(e) => openAttMenu(e, a)}
   >
     <div class="attpage__thumb">
-      {#if isRaster(a)}
+      {#if view === 'cards'}
+        <AttachmentPreview {a} />
+      {:else if isRaster(a)}
         <img src={thumbSrc(a)} alt="" loading="lazy" />
       {:else}
         <span class="attpage__kind">
-          <FileKindIcon att={a} size={20} />
+          <FileKindIcon att={a} size={view === 'cards' ? 36 : 20} />
           <span class="attpage__ext">{extOf(a) || '···'}</span>
         </span>
       {/if}
@@ -524,23 +536,6 @@
 
   .attpage__select option {
     background: var(--color-bg-raised, #1a1a1a);
-  }
-
-  .attpage__tool {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    background: transparent;
-    color: var(--color-fg-muted, #9a9a9a);
-  }
-
-  .attpage__tool--on {
-    color: var(--color-accent, #c9a227);
-    border-color: var(--color-accent, #c9a227);
   }
 
   .attpage__seg {

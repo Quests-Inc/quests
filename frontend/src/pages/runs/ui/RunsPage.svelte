@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import Icon from '@/shared/ui/Icon.svelte'
+  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
   import { getRun, getScriptNodes, listRuns, type RunDetail, type RunSourceKind } from '@/shared/api/client.ts'
   import type { RunSummary } from '@/shared/api/execution.gen.ts'
@@ -23,6 +24,23 @@
   let error = $state('')
   let stateFilter = $state<'' | 'failed' | 'waiting' | 'done'>('')
   let source = $state<RunSourceKind | ''>('')
+  let sourceMenu = $state(false)
+  let sourceX = $state(0)
+  let sourceY = $state(0)
+  let sourceButton = $state<HTMLButtonElement | null>(null)
+  const sourceChoices = $derived([
+    { id: '', label: 'Любой источник', checked: !source || !!pinned },
+    ...Object.entries(SOURCE_WORDS).map(([id, label]) => ({ id, label, checked: !pinned && source === id })),
+  ])
+
+  function showSources() {
+    if (!sourceButton) return
+    const rect = sourceButton.getBoundingClientRect()
+    sourceX = rect.left
+    sourceY = rect.bottom + 4
+    sourceMenu = true
+  }
+
   /** A narrower filter that came from another tab: one script, or one source (a hook, a step…), with its title once known. */
   let script = $state<number | undefined>(undefined)
   let pinned = $state<{ kind: RunSourceKind; id: number } | undefined>(undefined)
@@ -174,10 +192,24 @@
             <button type="button" class="seg__pill" class:seg__pill--on={stateFilter === s.id} onclick={() => setState(s.id as typeof stateFilter)}>{s.label}</button>
           {/each}
         </div>
-        <select class="runs__source" aria-label="Что запустило" value={pinned ? '' : source} onchange={(e) => setSource((e.currentTarget as HTMLSelectElement).value as typeof source)}>
-          <option value="">Любой источник</option>
-          {#each Object.entries(SOURCE_WORDS) as [k, w] (k)}<option value={k}>{w}</option>{/each}
-        </select>
+        <button
+          bind:this={sourceButton}
+          type="button"
+          class="runs__source"
+          aria-label="Что запустило"
+          aria-haspopup="menu"
+          aria-expanded={sourceMenu}
+          onclick={() => sourceMenu ? (sourceMenu = false) : showSources()}
+          onkeydown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              showSources()
+            }
+          }}
+        >
+          <span>{pinned || !source ? 'Любой источник' : SOURCE_WORDS[source]}</span>
+          <Icon name="chevron-down" size={12} />
+        </button>
         {#if narrowLabel}
           <span class="runs__narrow" title="Показаны только эти запуски">
             {narrowLabel}
@@ -313,6 +345,19 @@
   </section>
 </SidebarLayout>
 
+<ContextMenu
+  open={sourceMenu}
+  anchor={sourceButton}
+  x={sourceX}
+  y={sourceY}
+  items={sourceChoices}
+  onSelect={(id) => setSource(id as typeof source)}
+  onClose={() => {
+    sourceMenu = false
+    sourceButton?.focus()
+  }}
+/>
+
 <style>
   .runs__side {
     display: flex;
@@ -328,9 +373,28 @@
     border-bottom: 1px solid var(--color-border, #333);
   }
   .runs__source {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
     flex: 1 1 8rem;
     min-width: 0;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: var(--color-bg-raised, #1a1a1a);
+    color: var(--color-fg, #e8e8e8);
+    font: inherit;
     font-size: var(--text-xs, 0.75rem);
+    cursor: pointer;
+  }
+  .runs__source:hover,
+  .runs__source[aria-expanded='true'] {
+    border-color: var(--color-accent, #c9a227);
+  }
+  .runs__source:focus-visible {
+    outline: 2px solid var(--color-accent, #c9a227);
+    outline-offset: 2px;
   }
   .runs__narrow {
     display: inline-flex;

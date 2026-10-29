@@ -75,7 +75,7 @@ RUN uv sync --locked --no-dev
 FROM debian:bookworm-slim AS api
 LABEL org.opencontainers.image.source="https://github.com/Quests-Inc/quests"
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
+    && apt-get install -y --no-install-recommends curl ca-certificates tzdata poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 # pg_dump for PostgreSQL backups: the client must be at least the server's major
 # version, which Debian's own package is not — take it from the PGDG repo.

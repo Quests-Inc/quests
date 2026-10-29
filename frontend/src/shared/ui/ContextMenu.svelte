@@ -15,7 +15,7 @@
   }
 
 
-  let { open = false, x = 0, y = 0, center = false, items = [], onSelect, onClose }: { open: boolean, x: number, y: number, /** x — середина якоря: меню встаёт по центру под ним, в пределах экрана. */ center?: boolean, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
+  let { open = false, x = 0, y = 0, center = false, items = [], onSelect, onClose, anchor = null }: { open: boolean, x: number, y: number, anchor?: HTMLElement | null, /** x — середина якоря: меню встаёт по центру под ним, в пределах экрана. */ center?: boolean, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
 
   type Branch = { id: string, items: CtxItem[], search?: CtxItem[], left: number, right: number, top: number, query: string }
 
@@ -33,6 +33,7 @@
   function place() {
     const el = menuEl
     if (!el) return
+    if (anchor) el.style.minWidth = `${anchor.getBoundingClientRect().width}px`
     const { width, height } = el.getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
@@ -118,6 +119,11 @@
         return
       }
       place()
+      if (anchor) {
+        const initial = menuEl.querySelector<HTMLButtonElement>('[aria-checked="true"]')
+          ?? menuEl.querySelector<HTMLButtonElement>('button:not(:disabled)')
+        initial?.focus()
+      }
     })
     const onResize = () => place()
     window.addEventListener('resize', onResize)
@@ -129,14 +135,23 @@
 
   $effect(() => {
     if (!open) return
-    const onKey = (event: { key: string; preventDefault: () => void }) => {
-      if (event.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (anchor && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        const choices = [...(menuEl?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
+        if (!choices.length) return
+        event.preventDefault()
+        const current = choices.indexOf(document.activeElement as HTMLButtonElement)
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? choices.length - 1
+          : (current + (event.key === 'ArrowDown' ? 1 : -1) + choices.length) % choices.length
+        choices[next]?.focus()
+      } else if (event.key === 'Escape') {
         event.preventDefault()
         onClose()
       }
     }
     const onPointer = (event: { target: any }) => {
       const el = event.target
+      if (el instanceof Node && anchor?.contains(el)) return
       if (el instanceof Element && el.closest('.ctx-menu')) return
       onClose()
     }
