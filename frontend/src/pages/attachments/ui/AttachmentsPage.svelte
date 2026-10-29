@@ -390,7 +390,7 @@
         <img src={thumbSrc(a)} alt="" loading="lazy" />
       {:else}
         <span class="attpage__kind">
-          <FileKindIcon att={a} size={view === 'cards' ? 36 : 20} />
+          <FileKindIcon att={a} size={20} />
           <span class="attpage__ext">{extOf(a) || '···'}</span>
         </span>
       {/if}

@@ -24,6 +24,7 @@
   let error = $state('')
   let stateFilter = $state<'' | 'failed' | 'waiting' | 'done'>('')
   let source = $state<RunSourceKind | ''>('')
+  let pinned = $state<{ kind: RunSourceKind; id: number } | undefined>(undefined)
   let sourceMenu = $state(false)
   let sourceX = $state(0)
   let sourceY = $state(0)
@@ -43,7 +44,6 @@
 
   /** A narrower filter that came from another tab: one script, or one source (a hook, a step…), with its title once known. */
   let script = $state<number | undefined>(undefined)
-  let pinned = $state<{ kind: RunSourceKind; id: number } | undefined>(undefined)
   let selected = $state<number | null>(null)
   let detail = $state<RunDetail | null>(null)
   let detailError = $state('')

@@ -169,8 +169,8 @@ jobs:
   # reverting it is the rollback. The token below is the only thing this repository holds for that: write access
   # to that one repository (contents + pull requests), nothing on the server.
   deploy:
-    needs: [meta, images]
-    if: ${{ !cancelled() && needs.meta.outputs.deploy == 'true' && (needs.images.result == 'success' || needs.images.result == 'skipped') }}
+    needs: [meta, checks, images]
+    if: ${{ !cancelled() && needs.meta.outputs.deploy == 'true' && (needs.images.result == 'success' || (needs.meta.outputs.build == 'false' && needs.images.result == 'skipped')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Open the release pull request in the deploy repository
