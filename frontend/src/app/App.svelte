@@ -645,7 +645,7 @@
     <!-- drawn below, outside the keyed viewport -->
   {:else if nav.view === 'runners'}
     <div class="journal__runners">
-      <RunnersPage active={nav.view === 'runners'} onOpenQuest={(id) => selectQuestFromUi(id)} />
+      <RunnersPage active={nav.view === 'runners'} />
     </div>
   {:else if nav.view === 'scripts'}
     <div class="journal__scripts"><ScriptsPage active={nav.view === 'scripts'} /></div>

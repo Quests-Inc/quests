@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Icon from '@/shared/ui/Icon.svelte'
+  import RefText from '@/shared/ui/RefText.svelte'
+  import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
+  import { refPreview } from '@/shared/lib/refPreview.ts'
+  import type { RunnerJob } from '@/shared/api/execution.gen.ts'
+  import type { RunnerView } from '@/shared/api/execution_http.gen.ts'
   import { cancelRunnerJob, createRunner, deleteRunner, getRunnerJobs, getRunners } from '@/shared/api/client.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { formatLocal, parseApiDate } from '@/shared/lib/time.ts'
@@ -11,10 +16,10 @@
    * Devices that run checks for us, and what they are doing: who is online,
    * what runs where, what waits in the queue, how the latest jobs ended.
    */
-  let { active = true, onOpenQuest }: { active?: boolean, onOpenQuest?: (id: number) => void } = $props()
+  let { active = true }: { active?: boolean } = $props()
 
-  let runners: any[] = $state([])
-  let jobs: any[] = $state([])
+  let runners: RunnerView[] = $state([])
+  let jobs: RunnerJob[] = $state([])
   let loaded = $state(false)
   let now = $state(Date.now())
   /** id of a finished job whose output is open */
@@ -30,10 +35,10 @@
   let queued = $derived(jobs.filter((j) => j.state === 'queued'))
   let finished = $derived(jobs.filter((j) => !OPEN_STATES.includes(j.state)))
   /** Finished jobs by what queued them (a step, a note, a template, else the title): a check every 5 minutes is one line. */
-  const groupKey = (j: any) =>
+  const groupKey = (j: RunnerJob) =>
     j.step_id ? `step:${j.step_id}` : j.note_id ? `note:${j.note_id}` : j.template_id ? `template:${j.template_id}` : `title:${j.title}`
   let groups = $derived.by(() => {
-    const m = new Map<string, any[]>()
+    const m = new Map<string, RunnerJob[]>()
     for (const j of finished) {
       const k = groupKey(j)
       const list = m.get(k)
@@ -43,6 +48,16 @@
     return [...m.entries()].map(([key, list]) => ({ key, last: list[0], list, failed: list.filter((j) => j.state !== 'success' && j.state !== 'canceled').length }))
   })
   let openGroup = $state<string | null>(null)
+
+  function jobRef(j: RunnerJob) {
+    if (j.step_id) return `step=${j.step_id}`
+    if (j.note_id) return `note=${j.note_id}`
+    if (j.template_id) return `template=${j.template_id}`
+    if (j.quest_id) return `quest=${j.quest_id}`
+    return null
+  }
+
+  const onRef = (ref: string, id: number) => openTarget({ kind: 'ref', ref, id })
 
   async function load() {
     try {
@@ -81,7 +96,7 @@
 
   const at = (iso: string | null | undefined) => (iso ? parseApiDate(iso)?.getTime() ?? null : null)
 
-  function presence(r: any) {
+  function presence(r: RunnerView) {
     if (r.revoked) return { cls: 'off', text: 'отозван' }
     if (!r.registered) return { cls: 'wait', text: 'ещё не подключён' }
     const seen = at(r.last_seen_at)
@@ -103,7 +118,7 @@
   }
   const KIND: Record<string, string> = { poll: 'опрос', once: 'разово', emit_pool: 'шаблон' }
 
-  function took(j: any) {
+  function took(j: RunnerJob) {
     const a = at(j.started_at) ?? at(j.assigned_at)
     const b = at(j.finished_at)
     return a && b ? span(b - a) : ''
@@ -138,7 +153,7 @@
     }
   }
 
-  async function revoke(r: any) {
+  async function revoke(r: RunnerView) {
     if (!confirm(`Отозвать раннер «${r.label}»? Его задания в очереди будут отменены.`)) return
     try {
       await deleteRunner(r.label)
@@ -148,7 +163,7 @@
     }
   }
 
-  async function cancel(j: any) {
+  async function cancel(j: RunnerJob) {
     try {
       await cancelRunnerJob(j.id)
       await load()
@@ -158,32 +173,56 @@
   }
 </script>
 
-<div class="runners">
-  <section class="runners__block">
-    <header class="runners__head">
-      <h2>Устройства</h2>
-      <form
-        class="runners__add"
-        onsubmit={(e) => {
-          e.preventDefault()
-          void add()
+{#snippet jobTitle(j: RunnerJob)}
+  {@const ref = jobRef(j)}
+  {#if ref}
+    <span use:refIcons use:refPreview={onRef}>
+      <a
+        class="md-ref"
+        href={`?${ref}`}
+        onclick={(event) => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+          event.preventDefault()
+          const [kind, id] = ref.split('=')
+          onRef(kind, Number(id))
         }}
-      >
-        <input
-          class="search"
-          type="text"
-          placeholder="метка нового раннера, напр. home"
-          maxlength="32"
-          bind:value={newLabel}
-          aria-label="Метка нового раннера"
-          spellcheck="false"
-        />
-        <button type="submit" class="btn" disabled={!newLabel.trim() || adding}>
-          <Icon name="add" size={14} />
-          <span>Добавить</span>
-        </button>
-      </form>
-    </header>
+      >{j.title || ref}</a>
+    </span>
+  {:else}
+    <RefText source={j.title || `задание ${j.id}`} {onRef} />
+  {/if}
+{/snippet}
+
+<div class="runners">
+  <header class="runners__intro">
+    <h1>Раннеры</h1>
+    <p>Устройства, очередь и результаты выполнения заданий.</p>
+  </header>
+  <details class="runners__block" open>
+    <summary>
+      <h2><Icon name="chevron-right" size={14} /> Устройства <span class="count">{runners.length}</span></h2>
+    </summary>
+    <form
+      class="runners__add"
+      onsubmit={(e) => {
+        e.preventDefault()
+        void add()
+      }}
+    >
+      <input
+        class="search"
+        type="text"
+        placeholder="метка нового раннера, напр. home"
+        maxlength="32"
+        bind:value={newLabel}
+        aria-label="Метка нового раннера"
+        spellcheck="false"
+      />
+      <button type="submit" class="btn" disabled={!newLabel.trim() || adding}>
+        <Icon name="add" size={14} />
+        <span>Добавить</span>
+      </button>
+    </form>
 
     {#if fresh}
       <div class="runners__fresh">
@@ -231,10 +270,12 @@
         {/each}
       </ul>
     {/if}
-  </section>
+  </details>
 
-  <section class="runners__block">
-    <h2>Выполняется {#if running.length}<span class="count">{running.length}</span>{/if}</h2>
+  <details class="runners__block" open>
+    <summary>
+      <h2><Icon name="chevron-right" size={14} /> Выполняется <span class="count">{running.length}</span></h2>
+    </summary>
     {#if !running.length}
       <p class="hint">Сейчас ничего не выполняется.</p>
     {:else}
@@ -245,11 +286,9 @@
             <div class="job__row">
               <span class="pill pill--run">{STATE[j.state]?.text}</span>
               <span class="job__title">
-                {#if j.quest_id && onOpenQuest}
-                  <button type="button" class="link" onclick={() => onOpenQuest?.(j.quest_id)}>{j.title || `задание ${j.id}`}</button>
-                {:else}{j.title || `задание ${j.id}`}{/if}
+                {@render jobTitle(j)}
               </span>
-              <span class="job__meta mono">{j.runner_label} · {KIND[j.kind] ?? j.kind}{started ? ` · ${span(now - started)}` : ''}</span>
+              <span class="job__meta">{j.runner_label} · {KIND[j.kind] ?? j.kind}{started ? ` · ${span(now - started)}` : ''}</span>
               <button type="button" class="btn btn--ghost" title="Остановить" onclick={() => cancel(j)}>
                 <Icon name="close" size={14} />
               </button>
@@ -265,10 +304,12 @@
         {/each}
       </ul>
     {/if}
-  </section>
+  </details>
 
-  <section class="runners__block">
-    <h2>Очередь {#if queued.length}<span class="count">{queued.length}</span>{/if}</h2>
+  <details class="runners__block" open>
+    <summary>
+      <h2><Icon name="chevron-right" size={14} /> Очередь <span class="count">{queued.length}</span></h2>
+    </summary>
     {#if !queued.length}
       <p class="hint">Очередь пуста.</p>
     {:else}
@@ -281,11 +322,9 @@
             <div class="job__row">
               <span class="pill pill--wait">ждёт</span>
               <span class="job__title">
-                {#if j.quest_id && onOpenQuest}
-                  <button type="button" class="link" onclick={() => onOpenQuest?.(j.quest_id)}>{j.title || `задание ${j.id}`}</button>
-                {:else}{j.title || `задание ${j.id}`}{/if}
+                {@render jobTitle(j)}
               </span>
-              <span class="job__meta mono">
+              <span class="job__meta">
                 {j.runner_label} · {KIND[j.kind] ?? j.kind}{waited ? ` · ждёт ${span(now - waited)}` : ''}{until ? ` · до ${new Date(until).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
               </span>
               <button type="button" class="btn btn--ghost" title="Убрать из очереди" onclick={() => cancel(j)}>
@@ -298,10 +337,12 @@
         {/each}
       </ul>
     {/if}
-  </section>
+  </details>
 
-  <section class="runners__block">
-    <h2>Недавние</h2>
+  <details class="runners__block" open>
+    <summary>
+      <h2><Icon name="chevron-right" size={14} /> Недавние <span class="count">{finished.length}</span></h2>
+    </summary>
     {#if !finished.length}
       <p class="hint">Заданий ещё не было.</p>
     {:else}
@@ -310,13 +351,23 @@
           {@const last = g.last}
           {@const st = STATE[last.state] ?? { text: last.state, cls: 'off' }}
           <li class="job">
-            <button type="button" class="job__row job__row--btn" onclick={() => (openGroup = openGroup === g.key ? null : g.key)} aria-expanded={openGroup === g.key}>
+            <div class="job__row">
               <span class="pill pill--{st.cls}">{st.text}</span>
-              <span class="job__title">{last.title || `задание ${last.id}`}</span>
-              <span class="job__meta mono">
-                {last.runner_label} · {KIND[last.kind] ?? last.kind}{g.list.length > 1 ? ` · ×${g.list.length}` : ''}{g.failed ? ` · ошибок ${g.failed}` : ''}
+              <span class="job__title">{@render jobTitle(last)}</span>
+              <span class="job__meta">
+                {last.runner_label} · {KIND[last.kind] ?? last.kind}{g.failed ? ` · ошибок ${g.failed}` : ''}
               </span>
-            </button>
+              <button
+                type="button"
+                class="job__toggle"
+                onclick={() => (openGroup = openGroup === g.key ? null : g.key)}
+                aria-expanded={openGroup === g.key}
+                aria-label={`История заданий: ${last.title || last.id}`}
+              >
+                <span>{g.list.length}</span>
+                <Icon name={openGroup === g.key ? 'chevron-down' : 'chevron-right'} size={14} />
+              </button>
+            </div>
             {#if openGroup === g.key}
               <ul class="jobs jobs--inner">
                 {#each g.list as j (j.id)}
@@ -325,7 +376,8 @@
                     <button type="button" class="job__row job__row--btn" onclick={() => (openJob = openJob === j.id ? null : j.id)} aria-expanded={openJob === j.id}>
                       <span class="pill pill--{jst.cls}">{jst.text}</span>
                       <span class="job__title">{j.finished_at ? formatLocal(j.finished_at) : `задание ${j.id}`}</span>
-                      <span class="job__meta mono">{j.attempt_no > 1 ? `попытка ${j.attempt_no}` : ''}{took(j) ? ` · ${took(j)}` : ''}</span>
+                      <span class="job__meta">{j.attempt_no > 1 ? `попытка ${j.attempt_no}` : ''}{took(j) ? ` · ${took(j)}` : ''}</span>
+                      <Icon name={openJob === j.id ? 'chevron-down' : 'chevron-right'} size={14} />
                     </button>
                     {#if j.reason}<p class="hint">{j.reason}</p>{/if}
                     {#if openJob === j.id}
@@ -347,7 +399,7 @@
         {/each}
       </ul>
     {/if}
-  </section>
+  </details>
 </div>
 
 <style>
@@ -355,79 +407,110 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 1rem 1.25rem 2rem;
     display: grid;
-    /* minmax(0, …): a long title must shrink (ellipsis), not widen the whole page */
     grid-template-columns: minmax(0, 1fr);
-    gap: 1.4rem;
     align-content: start;
-    max-width: 62rem;
+    gap: 1.25rem;
     width: 100%;
-    box-sizing: border-box;
+    max-width: 72rem;
     margin: 0 auto;
+    padding: 1.5rem 2rem 2rem;
+    font-family: var(--font-ui, sans-serif);
+    font-size: var(--text-sm, 0.875rem);
+  }
+
+  .runners__intro h1 {
+    margin: 0;
+    font-family: var(--font-display, serif);
+    font-size: var(--text-xl, 1.6rem);
+    font-weight: 600;
+  }
+
+  .runners__intro p {
+    margin: 0.35rem 0 0;
+    color: var(--color-fg-muted, #9a9a9a);
   }
 
   .runners__block {
     min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-lg, 12px);
+    background: var(--color-bg-raised, #1a1a1a);
   }
 
   .runners__block h2 {
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
-    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-  }
-
-  .runners__head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .runners__head h2 {
     margin: 0;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+  }
+
+  .runners__block > summary {
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--radius-md, 4px);
+  }
+
+  .runners__block > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .runners__block[open] > summary {
+    margin-bottom: 0.75rem;
+  }
+
+  .runners__block > summary:hover {
+    color: var(--color-accent, #c9a227);
+  }
+
+  .runners__block > summary:focus-visible {
+    outline: 2px solid var(--color-accent, #c9a227);
+    outline-offset: 4px;
+  }
+
+  .runners__block[open] > summary :global(.icon) {
+    transform: rotate(90deg);
   }
 
   .runners__add {
     display: flex;
-    gap: 0.4rem;
     flex: 1 1 18rem;
-    max-width: 26rem;
+    gap: 0.5rem;
+    max-width: 27rem;
+    margin: 0 0 0.75rem;
   }
 
   .runners__add .search {
-    flex: 1 1 auto;
+    flex: 1;
     min-width: 0;
   }
 
   .count {
-    font-size: 0.72rem;
-    padding: 0.05rem 0.45rem;
-    border-radius: 999px;
-    background: var(--pill-bg, #222);
+    padding: 0.05rem 0.4rem;
+    border-radius: var(--radius-md, 4px);
+    background: var(--color-bg-muted, #242424);
     color: var(--color-fg-muted, #9a9a9a);
-    font-weight: 500;
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
   }
 
   .hint {
-    margin: 0.25rem 0;
+    margin: 0.4rem 0;
     color: var(--color-fg-muted, #9a9a9a);
     font-size: var(--text-xs, 0.75rem);
     overflow-wrap: anywhere;
   }
 
   .runners__fresh {
-    margin: 0.4rem 0 0.8rem;
-    padding: 0.7rem 0.85rem;
-    border: 1px solid var(--color-accent, #c9a227);
-    border-radius: var(--pill-radius, 10px);
-    background: var(--pill-bg, #1a1a1a);
-    font-size: var(--text-sm, 0.85rem);
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--color-accent, #c9a227) 45%, var(--color-border, #333));
+    border-radius: var(--radius-md, 4px);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 5%, var(--color-bg-raised, #1a1a1a));
   }
 
   .runners__fresh p {
@@ -435,109 +518,100 @@
   }
 
   .runners__fresh pre {
-    margin: 0.4rem 0;
-    padding: 0.5rem 0.6rem;
+    margin: 0.6rem 0;
+    padding: 0.6rem;
     overflow-x: auto;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.3);
-    font-size: 0.78rem;
+    border-radius: var(--radius-md, 4px);
+    background: var(--pill-bg, #151515);
+    font-size: var(--text-xs, 0.75rem);
     user-select: all;
   }
 
   .runners__fresh-actions {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
 
   .runners__list,
-  .jobs--inner {
-    margin: 0.3rem 0 0 1rem;
-  }
   .jobs {
-    list-style: none;
-    margin: 0;
-    padding: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .runner {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem 0.8rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--pill-radius, 10px);
-    background: var(--pill-bg, #151515);
+    gap: 0.35rem 0.75rem;
+    min-width: 0;
+    padding: 0.75rem 0;
+  }
+
+  .runner + .runner,
+  .job + .job {
+    border-top: 1px solid var(--color-border, #333);
   }
 
   .runner__label {
     font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
-  .runner__state {
-    font-size: var(--text-xs, 0.78rem);
-  }
-
+  .runner__state,
   .runner__meta {
     color: var(--color-fg-muted, #9a9a9a);
     font-size: var(--text-xs, 0.75rem);
+  }
+
+  .runner__meta {
     flex: 1 1 auto;
     min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .runner__counts {
     display: flex;
-    gap: 0.3rem;
+    flex-wrap: wrap;
+    gap: 0.35rem;
   }
 
   .dot {
-    width: 0.6rem;
-    height: 0.6rem;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     flex: 0 0 auto;
-    background: #777;
+    background: var(--color-fg-subtle, #6e6e6e);
   }
 
   .dot--on {
-    background: #5cc46b;
-    box-shadow: 0 0 6px rgba(92, 196, 107, 0.6);
-  }
-
-  .dot--off {
-    background: #8a4040;
+    background: var(--color-success, #7a9e3a);
   }
 
   .dot--wait {
-    background: #c9a227;
+    background: var(--color-warning, #c47a20);
   }
 
   .job {
     min-width: 0;
-    padding: 0.45rem 0.75rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--pill-radius, 10px);
-    background: var(--pill-bg, #151515);
-  }
-
-  .job--run {
-    border-color: color-mix(in srgb, #4aa3df 50%, var(--color-border, #333));
+    padding: 0.8rem 0;
   }
 
   .job__row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.2rem 0.6rem;
+    gap: 0.4rem 0.75rem;
     min-width: 0;
   }
 
   .job__row--btn {
     width: 100%;
-    padding: 0;
+    padding: 0.35rem;
     border: 0;
+    border-radius: var(--radius-md, 4px);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -545,95 +619,178 @@
     cursor: pointer;
   }
 
+  .job__row--btn:hover,
+  .job__toggle:hover {
+    background: var(--color-bg-hover, #2a2a2a);
+  }
+
+  .job__row--btn:focus-visible,
+  .job__toggle:focus-visible {
+    outline: 2px solid var(--color-accent, #c9a227);
+    outline-offset: 2px;
+  }
+
   .job__title {
-    flex: 1 1 14rem;
+    flex: 1 1 16rem;
     min-width: 0;
-    /* quest · step: the step name is the tail, so wrap instead of cutting it off */
+    line-height: 1.5;
     overflow-wrap: anywhere;
+  }
+
+  .job__title :global(.md-ref) {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted var(--color-border-strong, #4a4a4a);
+  }
+
+  .job__title :global(.md-ref:hover) {
+    color: var(--color-accent, #c9a227);
+    border-bottom-color: currentColor;
   }
 
   .job__meta {
     flex: 0 1 auto;
     min-width: 0;
     color: var(--color-fg-muted, #9a9a9a);
-    font-size: 0.72rem;
+    font-size: var(--text-xs, 0.75rem);
+    font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
 
-  .link {
-    padding: 0;
-    border: 0;
+  .job__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
     background: transparent;
-    color: inherit;
+    color: var(--color-fg-muted, #9a9a9a);
     font: inherit;
-    text-decoration: underline dotted;
-    cursor: pointer;
-    text-align: left;
+    font-size: var(--text-xs, 0.75rem);
+    font-variant-numeric: tabular-nums;
   }
 
   .pill {
     flex: 0 0 auto;
-    padding: 0.05rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    border: 1px solid currentColor;
+    min-width: 4.5rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-md, 4px);
+    background: color-mix(in srgb, currentColor 9%, transparent);
     color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-xs, 0.75rem);
+    text-align: center;
   }
 
   .pill--run {
-    color: #4aa3df;
+    color: var(--color-info, #5a8a7a);
   }
 
   .pill--wait {
-    color: #c9a227;
+    color: var(--color-warning, #c47a20);
   }
 
   .pill--ok {
-    color: #5cc46b;
+    color: var(--color-success, #7a9e3a);
   }
 
-  .pill--bad {
-    color: #d96a6a;
+  .pill--bad,
+  .log--err {
+    color: var(--color-danger, #b54a3a);
   }
 
   .pill--warn {
-    color: #e0933a;
+    color: var(--color-warning, #c47a20);
   }
 
   .bar {
-    margin-top: 0.4rem;
-    height: 5px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.08);
+    margin-top: 0.65rem;
+    height: 4px;
+    border-radius: var(--radius-sm, 2px);
+    background: var(--color-bg-muted, #242424);
     overflow: hidden;
   }
 
   .bar span {
     display: block;
     height: 100%;
-    background: #4aa3df;
+    background: var(--color-info, #5a8a7a);
     transition: width 0.3s ease;
   }
 
+  .jobs--inner {
+    margin-top: 0.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: var(--pill-bg, #151515);
+  }
+
+  .job__out {
+    margin-top: 0.5rem;
+  }
+
   .log {
-    margin: 0.4rem 0 0;
-    padding: 0.4rem 0.55rem;
-    max-height: 12rem;
+    margin: 0.5rem 0 0;
+    padding: 0.65rem;
+    max-height: 16rem;
     overflow: auto;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.3);
-    font-size: 0.74rem;
+    border: 1px solid var(--color-border, #333);
+    border-radius: var(--radius-md, 4px);
+    background: var(--pill-bg, #151515);
+    font-size: var(--text-xs, 0.75rem);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
-  .log--err {
-    color: #e0a0a0;
-  }
-
   @media (max-width: 720px) {
-    .job__meta {
+    .runners {
+      padding: 1rem 0.75rem;
+      gap: 0.75rem;
+    }
+
+    .runners__block {
+      padding: 0.75rem;
+    }
+
+    .runners__add {
+      max-width: none;
       flex-basis: 100%;
+    }
+
+    .runner {
+      display: grid;
+      grid-template-columns: 0.5rem minmax(0, 1fr) auto;
+    }
+
+    .runner__label {
+      grid-area: 1 / 2;
+    }
+
+    .runner__state {
+      grid-area: 1 / 3;
+    }
+
+    .runner__meta {
+      grid-area: 2 / 2;
+    }
+
+    .runner__counts {
+      grid-area: 3 / 2;
+    }
+
+    .runner__rm {
+      grid-area: 2 / 3 / 4;
+      justify-self: end;
+    }
+
+    .job__title {
+      flex-basis: calc(100% - 7rem);
+    }
+
+    .job__meta {
+      flex: 1 1 12rem;
     }
   }
 </style>
