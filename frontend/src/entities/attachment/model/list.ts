@@ -108,3 +108,47 @@ export function groupByOwner(files: any[], ownerLabel: (a: any) => string) {
   }
   return [...m.values()].sort((x, y) => x.title.localeCompare(y.title, 'ru'))
 }
+
+/** Containers require explicit consent even if their MIME was detected as text. */
+export function isTextPreview(a: { filename: string; content_type_detected?: string }) {
+  const ext = a.filename.split('.').pop()?.toLowerCase() || ''
+  const mime = (a.content_type_detected || '').split(';')[0].trim().toLowerCase()
+  if (
+    ['pdf', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'zip'].includes(ext) ||
+    ['application/pdf', 'application/zip'].includes(mime)
+  )
+    return false
+  return (
+    mime.startsWith('text/') ||
+    [
+      'txt',
+      'md',
+      'csv',
+      'tsv',
+      'json',
+      'jsonl',
+      'xml',
+      'html',
+      'htm',
+      'svg',
+      'yaml',
+      'yml',
+      'toml',
+      'ini',
+      'conf',
+      'log',
+      'sql',
+      'py',
+      'js',
+      'ts',
+      'css',
+      'go',
+      'rs',
+      'sh',
+      'c',
+      'cpp',
+      'h',
+      'svelte',
+    ].includes(ext)
+  )
+}

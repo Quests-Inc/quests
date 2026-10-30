@@ -5,9 +5,11 @@ import { mount, unmount } from 'svelte'
 import type { AttachmentView } from '@/shared/api/knowledge_http.gen.ts'
 
 const calls: number[] = []
+const signals: AbortSignal[] = []
 let fail = false
 mock.module('@/shared/api/attachments.ts', () => ({
-  getAttachmentPreview: async (id: number) => {
+  getAttachmentPreview: async (id: number, _revision: number, signal: AbortSignal) => {
+    signals.push(signal)
     calls.push(id)
     if (fail) throw new Error('unavailable')
     return { kind: 'text', text: '<script>alert(1)</script>\nНачало файла' }
@@ -45,6 +47,7 @@ afterEach(() => {
   unmount(app)
   target.remove()
   calls.length = 0
+  signals.length = 0
   fail = false
   globalThis.IntersectionObserver = originalObserver
 })
@@ -83,4 +86,70 @@ test('HTML preview is highlighted without becoming executable markup', async () 
   expect(target.querySelector('pre .hljs-tag')).not.toBeNull()
   expect(target.querySelector('pre')?.textContent).toContain('<script>alert(1)</script>')
   expect(target.querySelector('script')).toBeNull()
+})
+
+for (const filename of ['file.pdf', 'file.docx', 'file.xlsx', 'file.pptx', 'file.zip']) {
+  test(`${filename} waits for explicit consent even with a text MIME`, async () => {
+    await open(filename)
+    reveal()
+    await tick()
+    expect(calls).toEqual([])
+    let stopped = false
+    const button = target.querySelector('button')!
+    expect(button.textContent).toContain('Показать превью')
+    const event = new MouseEvent('click', { bubbles: true })
+    const stop = event.stopPropagation.bind(event)
+    event.stopPropagation = () => {
+      stopped = true
+      stop()
+    }
+    button.dispatchEvent(event)
+    await tick()
+    await tick()
+    expect(calls).toEqual([1])
+    expect(stopped).toBe(true)
+    expect(target.querySelector('pre')).not.toBeNull()
+    reveal()
+    await tick()
+    expect(calls).toEqual([1])
+  })
+}
+
+test('failed manual preview settles without repeated automatic requests', async () => {
+  fail = true
+  await open('file.pdf')
+  target.querySelector('button')!.click()
+  await tick()
+  await tick()
+  expect(target.querySelector('button')?.textContent).toContain('Превью недоступно')
+  reveal()
+  await tick()
+  expect(calls).toEqual([1])
+})
+
+test('switching revisions aborts stale work and requires a fresh click', async () => {
+  const { default: Harness } = await import('./AttachmentPreviewHarness.svelte')
+  globalThis.IntersectionObserver = Observer as unknown as typeof IntersectionObserver
+  target = document.createElement('div')
+  document.body.append(target)
+  const file = { ...a, filename: 'file.pdf' }
+  const harness = mount(Harness, { target, props: { initial: file } })
+  app = harness
+  await tick()
+  target.querySelector('button')!.click()
+  await tick()
+  await tick()
+  expect(calls).toEqual([1])
+  harness.change({ ...file, revision: 2 })
+  await tick()
+  expect(signals[0].aborted).toBe(true)
+  expect(target.querySelector('pre')).toBeNull()
+  expect(target.querySelector('button')?.textContent).toContain('Показать превью')
+  expect(calls).toEqual([1])
+  harness.change(file)
+  await tick()
+  expect(calls).toEqual([1])
+  target.querySelector('button')!.click()
+  await tick()
+  expect(calls).toEqual([1, 1])
 })
