@@ -1,6 +1,9 @@
 import { expect, mock, test } from 'bun:test'
 
+import { flushSync, mount, unmount } from 'svelte'
+
 import type { LayoutDeps, LayoutState } from '@/pages/graph/model/layouts.svelte.ts'
+import GraphLayouts from '@/pages/graph/ui/GraphLayouts.svelte'
 
 const writes: { id: number; state?: LayoutState }[] = []
 mock.module('@/shared/api/graph.ts', () => ({
@@ -54,6 +57,15 @@ test('перезапись сначала показывает разницу, �
     added: [{ key: 'quest:1', title: 'Квест' }],
     removed: [{ key: 'note:2', title: 'Старая заметка' }],
   })
+  const target = document.createElement('div')
+  document.body.append(target)
+  const app = mount(GraphLayouts, { target, props: { layouts } })
+  flushSync()
+  // SidebarLayout needs a single root even while a dialog is open, including on mobile.
+  expect(target.children).toHaveLength(1)
+  expect(target.querySelector('aside [role="dialog"]')).not.toBeNull()
+  await unmount(app)
+  target.remove()
   layouts.cancelOverwrite()
   expect(layouts.overwriteAsk).toBeNull()
   expect(writes).toHaveLength(0)

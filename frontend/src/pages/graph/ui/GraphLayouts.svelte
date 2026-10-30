@@ -112,7 +112,6 @@
       {/each}
     </ul>
   {/if}
-</aside>
 
 <ModalShell open={layouts.overwriteAsk != null} onClose={layouts.cancelOverwrite} labelledby="overwrite-layout-title" maxWidth="38rem" closeDisabled={layouts.busy}>
   <ModalHead id="overwrite-layout-title" title="Перезаписать расклад?" onClose={layouts.cancelOverwrite} closeDisabled={layouts.busy} />
@@ -144,6 +143,8 @@
     if (id != null) void layouts.remove(id)
   }}
 />
+
+</aside>
 
 <style>
   /* The look of the other lists (scripts, runs): a raised panel, rows with a straight left rail that turns accent on the open one. */
