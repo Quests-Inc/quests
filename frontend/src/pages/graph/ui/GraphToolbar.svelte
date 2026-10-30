@@ -44,6 +44,8 @@
     onLayoutChange: () => void
     children?: import('svelte').Snippet
   } = $props()
+
+  const layoutLabel = $derived(LAYOUTS[layoutMode as keyof typeof LAYOUTS] ?? LAYOUTS.tree)
 </script>
 
 <div class="graph__tools">
@@ -73,7 +75,7 @@
     {/if}
   </div>
   <details class="graph__filter graph__defaults">
-    <summary title="Эти параметры применяются только при добавлении дерева">Новое дерево: {LAYOUTS[layoutMode]} · {depth}</summary>
+    <summary title="Эти параметры применяются только при добавлении дерева">Новое дерево: {layoutLabel} · {depth}</summary>
     <div class="graph__filter-pop">
       <label class="graph__ctl">Раскладка
         <select bind:value={layoutMode} onchange={onLayoutChange} aria-label="Раскладка нового дерева">
