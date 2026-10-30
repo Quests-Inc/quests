@@ -2,6 +2,7 @@
 // Сервер хранит состояние как есть; здесь его собирают со страницы и ставят обратно.
 import { tick } from 'svelte'
 
+import { diffLayoutEntities, type LayoutEntity, type GraphZone } from '@/entities/graph'
 import {
   createGraphLayout,
   deleteGraphLayout,
@@ -18,6 +19,9 @@ type Root = { type: string; id: number }
 
 /** Что лежит в раскладе. Камера — точка мира в центре поля и масштаб, чтобы не зависеть от размера окна. */
 export type LayoutState = {
+  entities?: LayoutEntity[]
+  zones?: GraphZone[]
+  trees?: Record<string, { depth: number; layout: string }>
   v: 1
   center: { type: string | null; id: number | null }
   roots: Root[]
@@ -44,6 +48,10 @@ export type LayoutDeps = {
   depth: { get: () => number; set: (d: number) => void }
   layout: { get: () => string; set: (l: string) => void }
   prefs: {
+    zones?: GraphZone[]
+    restoreZones?: (s: unknown) => void
+    trees?: Record<string, { depth: number; layout: string }>
+    restoreTrees?: (s: unknown) => void
     questStatuses: Set<string>
     shownTypes: Set<string>
     hidden: Set<string>
@@ -53,7 +61,9 @@ export type LayoutDeps = {
     restore: (s: { statuses?: string[]; types?: string[]; hidden?: string[]; expand?: string[] }) => void
   }
   folds: { expanded: Set<string>; loose: Set<string>; restore: (s: { expanded?: string[]; loose?: string[] }) => void }
-  nodes: () => { key: string; x: number; y: number; draft?: unknown }[]
+  titleOf?: (key: string) => string
+  entities?: () => LayoutEntity[]
+  nodes: () => { key: string; title?: string; x: number; y: number; draft?: unknown }[]
   saved: Map<string, Spot>
   cam: { get: () => Cam; set: (c: Cam) => void }
   stageSize: () => { w: number; h: number }
@@ -61,6 +71,13 @@ export type LayoutDeps = {
   settled: () => boolean
   applyLayout: () => void
 }
+
+const depsEntities = (d: LayoutDeps) =>
+  d.entities?.() ??
+  d
+    .nodes()
+    .filter((n) => !n.draft && !n.key.startsWith('cluster:'))
+    .map((n) => ({ key: n.key, title: n.title || n.key }))
 
 const round = (n: number) => Math.round(n * 10) / 10
 
@@ -75,6 +92,9 @@ export function captureLayout(d: LayoutDeps): LayoutState {
       ? { cx: round((size.w / 2 - cam.x) / cam.k), cy: round((size.h / 2 - cam.y) / cam.k), k: cam.k }
       : null
   return {
+    entities: depsEntities(d),
+    zones: d.prefs.zones?.map((z) => ({ ...z })) ?? [],
+    trees: d.prefs.trees ? { ...d.prefs.trees } : undefined,
     v: 1,
     center: { ...d.center() },
     roots: d.roots().map((r) => ({ type: r.type, id: r.id })),
@@ -115,8 +135,17 @@ export async function applyLayoutState(d: LayoutDeps, s: LayoutState) {
   await tick()
   if (s.depth) d.depth.set(s.depth)
   if (s.layout) d.layout.set(s.layout)
+  d.prefs.restoreTrees?.(
+    s.trees ??
+      Object.fromEntries(
+        [s.center, ...(s.roots ?? [])]
+          .filter((r) => r?.type && r.id)
+          .map((r) => [`${r.type}:${r.id}`, { depth: s.depth || 2, layout: s.layout || 'tree' }])
+      )
+  )
   d.prefs.restore({ statuses: s.statuses, types: s.types, hidden: s.hidden, expand: s.expand })
   d.prefs.restoreSizes(s.sizes ?? {})
+  d.prefs.restoreZones?.(s.zones ?? [])
   d.folds.restore(s.folds ?? {})
   d.saved.clear()
   for (const [k, p] of Object.entries(s.positions ?? {})) d.saved.set(k, p)
@@ -136,6 +165,13 @@ export function createGraphLayouts(deps: LayoutDeps) {
   let loaded = $state(false)
   let current = $state<number | null>(null)
   let busy = $state(false)
+  let overwriteAsk = $state<{
+    id: number
+    title: string
+    state: LayoutState
+    diff: ReturnType<typeof diffLayoutEntities>
+    legacy: boolean
+  } | null>(null)
 
   async function load() {
     try {
@@ -160,6 +196,25 @@ export function createGraphLayouts(deps: LayoutDeps) {
   }
 
   return {
+    get canSave() {
+      return !busy && deps.settled()
+    },
+    get overwriteAsk() {
+      return overwriteAsk
+    },
+    cancelOverwrite() {
+      if (!busy) overwriteAsk = null
+    },
+    async confirmOverwrite() {
+      const pending = overwriteAsk
+      if (!pending || busy) return
+      const l = await run(() => updateGraphLayout(pending.id, { state: pending.state }))
+      if (!l) return
+      overwriteAsk = null
+      current = l.id
+      await load()
+      toast(`Расклад «${l.title}» обновлён`, { kind: 'success', ttl: 1600 })
+    },
     get items() {
       return items
     },
@@ -175,6 +230,7 @@ export function createGraphLayouts(deps: LayoutDeps) {
     load,
     /** Сохранить текущую карту новым раскладом. */
     async saveNew(title: string) {
+      if (busy || !deps.settled()) return
       const l = await run(() => createGraphLayout(title, captureLayout(deps)))
       if (!l) return
       current = l.id
@@ -183,11 +239,15 @@ export function createGraphLayouts(deps: LayoutDeps) {
     },
     /** Записать текущую карту в существующий расклад. */
     async overwrite(id: number) {
-      const l = await run(() => updateGraphLayout(id, { state: captureLayout(deps) }))
+      if (busy || !deps.settled()) return
+      const state = captureLayout(deps)
+      const l = await run(() => getGraphLayout(id))
       if (!l) return
-      current = l.id
-      await load()
-      toast(`Расклад «${l.title}» обновлён`, { kind: 'success', ttl: 1600 })
+      const before = l.state as LayoutState
+      const diff = diffLayoutEntities(before, state)
+      for (const entity of diff.removed)
+        if (entity.title === entity.key) entity.title = deps.titleOf?.(entity.key) || entity.key
+      overwriteAsk = { id, title: l.title, state, diff, legacy: !before?.entities }
     },
     async open(id: number) {
       await run(async () => {

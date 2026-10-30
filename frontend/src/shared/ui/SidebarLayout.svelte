@@ -92,7 +92,8 @@
     overflow: hidden;
   }
   .sbl--collapsed {
-    grid-template-columns: 0 minmax(0, 1fr);
+    /* Keep a rail for the opener; zero-width panels still paint overflowing controls. */
+    grid-template-columns: 1.25rem minmax(0, 1fr);
   }
   .sbl--dragging {
     user-select: none;
@@ -105,6 +106,9 @@
   }
   .sbl--collapsed > :global(:first-child) {
     border-right: 0;
+    visibility: hidden;
+    pointer-events: none;
+    overflow: hidden;
   }
 
   .sbl__resize {
@@ -145,7 +149,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1rem;
+    width: 1.25rem;
     height: 2.25rem;
     padding: 0;
     transform: translateX(-50%);

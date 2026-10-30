@@ -1,5 +1,8 @@
 <script lang="ts">
   import Icon from '@/shared/ui/Icon.svelte'
+  import ModalShell from '@/shared/ui/ModalShell.svelte'
+  import ModalHead from '@/shared/ui/ModalHead.svelte'
+  import ModalFoot from '@/shared/ui/ModalFoot.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import { ago } from '@/shared/lib/time.ts'
@@ -60,7 +63,7 @@
       label="Название нового расклада"
       hint="Сохранить текущую карту — центр, фильтры, раскрытое и позиции карточек — под этим именем"
       createLabel="Сохранить текущую карту"
-      createBusy={!title.trim() || layouts.busy}
+      createBusy={!title.trim() || !layouts.canSave}
       onCreate={() => void saveNew()}
     />
   </form>
@@ -94,7 +97,7 @@
               <small>изменён {ago(l.updated_at)}</small>
             </button>
             <span class="glay__acts">
-              <button type="button" class="btn btn--ghost btn--icon" disabled={layouts.busy} title="Записать сюда текущую карту" aria-label="Записать сюда текущую карту" onclick={() => void layouts.overwrite(l.id)}>
+              <button type="button" class="btn btn--ghost btn--icon" disabled={!layouts.canSave} title="Записать сюда текущую карту" aria-label="Записать сюда текущую карту" onclick={() => void layouts.overwrite(l.id)}>
                 <Icon name="save" size={14} />
               </button>
               <button type="button" class="btn btn--ghost btn--icon" title="Переименовать" aria-label="Переименовать" onclick={() => startRename(l.id, l.title)}>
@@ -109,7 +112,24 @@
       {/each}
     </ul>
   {/if}
-</aside>
+
+<ModalShell open={layouts.overwriteAsk != null} onClose={layouts.cancelOverwrite} labelledby="overwrite-layout-title" maxWidth="38rem" closeDisabled={layouts.busy}>
+  <ModalHead id="overwrite-layout-title" title="Перезаписать расклад?" onClose={layouts.cancelOverwrite} closeDisabled={layouts.busy} />
+  <div class="modal__body">
+    <p>В «{layouts.overwriteAsk?.title}» будет записана текущая карта: настройки деревьев, позиции, фильтры и зоны.</p>
+    {#if layouts.overwriteAsk?.legacy}<p class="glay__empty">Для старого расклада состав восстановлен по сохранённым позициям и корням. Названия некоторых карточек могут быть недоступны.</p>{/if}
+    <div class="glay__diff">
+      {#each [['added', 'Добавлено'], ['removed', 'Убрано']] as [key, label] (key)}
+        {@const rows = key === 'added' ? layouts.overwriteAsk?.diff.added ?? [] : layouts.overwriteAsk?.diff.removed ?? []}
+        <section><h3>{label}: {rows.length}</h3>
+          {#if rows.length}<ul>{#each rows as entity (entity.key)}<li>{entity.title}{#if entity.title !== entity.key} <small>{entity.key}</small>{/if}</li>{/each}</ul>{:else}<p>Нет</p>{/if}
+        </section>
+      {/each}
+    </div>
+    <p>Сущности в журнале не удаляются. Будет заменён только сохранённый вид карты.</p>
+    <ModalFoot onCancel={layouts.cancelOverwrite} submitLabel="Перезаписать" submitIcon="save" onSubmit={() => void layouts.confirmOverwrite()} busy={layouts.busy} />
+  </div>
+</ModalShell>
 
 <ConfirmModal
   open={removing != null}
@@ -124,8 +144,13 @@
   }}
 />
 
+</aside>
+
 <style>
   /* The look of the other lists (scripts, runs): a raised panel, rows with a straight left rail that turns accent on the open one. */
+  .glay__diff { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .glay__diff ul { max-height: 16rem; overflow: auto; padding-left: 1.2rem; }
+  .glay__diff small { color: var(--color-fg-muted); }
   .glay {
     display: flex;
     flex-direction: column;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { computeTiers } from '@/entities/graph'
+  import { computeTiers, LAYOUTS } from '@/entities/graph'
   import { noteCatalog } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
@@ -50,6 +50,7 @@
   let notes = $derived(noteCatalog.list)
 
   const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
+  let zoneDrawing = $state(false)
   const saved = new Map<string, { x: number; y: number }>()
   // Поле, черновик и жесты читают друг друга только после сборки. Методы до этого не зовутся.
   let stage: ReturnType<typeof createGraphStage>
@@ -95,6 +96,8 @@
     askDrop: (op) => gd.askDrop(op),
   })
   query = createGraphQuery({
+    getTreeSettings: (key) => prefs.trees[key],
+    initTree: (key, depth) => { if (!prefs.trees[key]) prefs.setTree(key, { depth, layout: stage.layoutMode }) },
     getActive: () => active,
     getRootType: () => rootType ?? null,
     getRootId: () => rootId ?? null,
@@ -133,6 +136,7 @@
     loadDraft: () => gd.load(),
   })
   stage = createGraphStage({
+    getTrees: () => Object.entries(query.memberships).map(([key, keys]) => ({ key, keys, layout: prefs.trees[key]?.layout ?? stage.layoutMode })),
     getActive: () => active,
     getData: () => query.data,
     getDraft: () => gd.draft,
@@ -243,6 +247,12 @@
     prefs,
     folds,
     nodes: () => stage.nodes,
+    entities: () => stage.entities,
+    titleOf: (key) => {
+      const [kind, id] = key.split(':')
+      const catalog = kind === 'note' ? notes : kind === 'quest' ? quests : kind === 'questline' ? questlines : []
+      return catalog.find((n) => n.id === Number(id))?.title || stage.titleOf(key)
+    },
     saved,
     cam: { get: () => gest.cam, set: (c) => (gest.cam = c) },
     stageSize: () => stage.stageSize,
@@ -264,7 +274,7 @@
   let ownerless = $derived(stage.ownerless)
   let full = $derived(stage.full)
   let selectMode = $derived(stage.selectMode)
-  let canClear = $derived(query.canClear)
+  let canClear = $derived(query.canClear || prefs.zones.length > 0)
   let filteredOut = $derived(stage.filteredOut)
   let expanded = $derived(folds.expanded)
   let loose = $derived(folds.loose)
@@ -292,7 +302,36 @@
   let matches = $derived(found.items)
   let rootParsed = $derived(found.parsed)
   let ctx = $derived(menu.ctx)
-  let ctxItems = $derived(menu.items())
+  function targetTrees() {
+    const keys = menu.ctx.group ? stage.picked : new Set(menu.ctx.node ? [menu.ctx.node.key] : [])
+    const trees = Object.entries(query.memberships)
+    return [...new Set([...keys].map((key) => trees.find(([root]) => root === key)?.[0] ?? trees.find(([, members]) => members.includes(key))?.[0]).filter((key): key is string => !!key))]
+  }
+  let ctxItems = $derived.by(() => {
+    const items = menu.items()
+    const roots = targetTrees()
+    if (roots.length) items.push({ id: 'tree-settings', label: `Настройки деревьев (${roots.length})`, children: [
+      { id: 'tree-layout', label: 'Раскладка', children: Object.entries(LAYOUTS).map(([value, label]) => ({ id: `tree-layout:${value}`, label, checked: roots.every((key) => prefs.trees[key]?.layout === value) })) },
+      { id: 'tree-depth', label: 'Глубина', children: [1, 2, 3].map((value) => ({ id: `tree-depth:${value}`, label: String(value), checked: roots.every((key) => (prefs.trees[key]?.depth ?? 2) === value) })) },
+    ] })
+    return items
+  })
+  function selectContextAction(id: string) {
+    if (!id.startsWith('tree-layout:') && !id.startsWith('tree-depth:')) { void onCtxSelect(id); return }
+    const roots = targetTrees()
+    const affected = new Set(roots.flatMap((key) => query.memberships[key] ?? []))
+    // Pin every unaffected card; only an explicit layout action releases the chosen trees.
+    for (const n of stage.nodes) {
+      if (id.startsWith('tree-layout:') && affected.has(n.key)) saved.delete(n.key)
+      else saved.set(n.key, { x: n.x, y: n.y })
+    }
+    for (const key of roots) {
+      const old = prefs.trees[key] ?? { depth: 2, layout: stage.layoutMode }
+      prefs.setTree(key, id.startsWith('tree-layout:') ? { ...old, layout: id.slice(12) } : { ...old, depth: Number(id.slice(11)) })
+    }
+    if (id.startsWith('tree-layout:')) stage.applyLayout()
+    menu.close()
+  }
   let questModal = $derived(menu.questModal)
   let findModal = $derived(menu.findOpen)
 
@@ -308,7 +347,7 @@
   const relayout = stage.relayout
   const toggleFull = stage.toggleFull
   const onFullscreenChange = stage.onFullscreenChange
-  const clearMap = query.clearMap
+  const clearMap = async () => { await query.clearMap(); prefs.restoreZones([]) }
   const addToMap = query.addToMap
   const chooseRoot = query.chooseRoot
   const recenter = query.recenter
@@ -320,7 +359,6 @@
 
   function onLayoutChange() {
     prefs.layoutMode = stage.layoutMode
-    relayout()
   }
 
   function onKey(e: KeyboardEvent) {
@@ -401,17 +439,22 @@
     {questStatuses}
     {typesLabel}
     {shownTypes}
-    onChooseRoot={chooseRoot}
+    onChooseRoot={(m) => { query.rootQuery = ''; query.pickOpen = false; void addToMap(m.type, m.id) }}
     onToggleStatus={toggleStatus}
     onToggleType={toggleType}
     onLayoutChange={onLayoutChange}
   >
+    <button type="button" class="graph__btn" class:graph__btn--on={zoneDrawing} aria-pressed={zoneDrawing} disabled={prefs.zones.length >= 200 && !zoneDrawing} title="Нарисовать область на карте (до 200 зон)" onclick={() => zoneDrawing = !zoneDrawing}>＋ Зона</button>
     {#if expanded.size || loose.size}
       <button type="button" class="graph__btn" onclick={collapseAll}>Свернуть вложения</button>
     {/if}
   </GraphToolbar>
 
   <GraphCanvas
+    zones={prefs.zones}
+    {zoneDrawing}
+    onZonesChange={prefs.restoreZones}
+    onZoneFinish={() => zoneDrawing = false}
     {stage}
     {gest}
     {folds}
@@ -540,7 +583,7 @@
   x={ctx.x}
   y={ctx.y}
   items={ctxItems}
-  onSelect={onCtxSelect}
+  onSelect={selectContextAction}
   onClose={menu.close}
 />
 

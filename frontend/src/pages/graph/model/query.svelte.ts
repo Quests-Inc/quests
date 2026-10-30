@@ -18,6 +18,8 @@ function messageOf(e: unknown) {
 }
 
 export function createGraphQuery(deps: {
+  getTreeSettings?: (key: string) => { depth: number; layout: string } | undefined
+  initTree?: (key: string, depth: number) => void
   getActive: () => boolean
   getRootType: () => string | null
   getRootId: () => number | null
@@ -51,6 +53,7 @@ export function createGraphQuery(deps: {
   let depth = $state(2)
   let center = $state<Center>({ type: deps.getRootType(), id: deps.getRootId() })
   let data = $state<Graph | null>(null)
+  let memberships = $state<Record<string, string[]>>({})
   let loading = $state(false)
   let error = $state('')
   let rootQuery = $state('')
@@ -67,6 +70,7 @@ export function createGraphQuery(deps: {
     const key = `${rootType}:${rootId}:${deps.getNonce()}`
     if (key === lastRootKey) return
     lastRootKey = key
+    deps.initTree?.(`${rootType}:${rootId}`, depth)
     center = { type: rootType, id: rootId }
     deps.onRetarget()
   }
@@ -75,12 +79,15 @@ export function createGraphQuery(deps: {
   function load() {
     if (!deps.getActive()) return
     if (!center.type || !center.id) {
+      seq += 1
+      loading = false
+      memberships = {}
       lastDataJson = ''
       data = emptyGraph(depth)
       return
     }
     const c = center
-    const d = depth
+    const d = deps.getTreeSettings ? 2 : depth
     const extra = deps.getDraftRoots().filter((r) => !(r.type === c.type && r.id === c.id))
     const open = deps.getExpandKeys().map((k) => {
       const [ref, only] = k.split('>')
@@ -92,9 +99,28 @@ export function createGraphQuery(deps: {
     const mine = ++seq
     loading = true
     error = ''
-    fetchGraph(c.type, c.id, d, extra, open)
-      .then((g) => {
+    const roots = [{ type: c.type, id: c.id }, ...extra]
+    for (const r of roots) deps.initTree?.(`${r.type}:${r.id}`, d)
+    const requests = deps.getTreeSettings
+      ? roots.map((r) => fetchGraph(r.type!, r.id!, deps.getTreeSettings!(`${r.type}:${r.id}`)?.depth ?? d, [], open))
+      : [fetchGraph(c.type, c.id, d, extra, open)]
+    Promise.all(requests)
+      .then((graphs) => {
+        const first = graphs[0]
+        const g = {
+          ...first,
+          roots: roots.map((r) => `${r.type}:${r.id}`),
+          nodes: [...new Map(graphs.flatMap((g) => g.nodes).map((n) => [n.key, n])).values()].map((n) =>
+            roots.some((r) => `${r.type}:${r.id}` === n.key) ? { ...n, depth: 0 } : n
+          ),
+          edges: [...new Map(graphs.flatMap((g) => g.edges).map((e) => [`${e.from}|${e.to}|${e.kind}`, e])).values()],
+          truncated: graphs.some((g) => g.truncated),
+        }
+
         if (mine !== seq) return
+        memberships = Object.fromEntries(
+          graphs.map((g, i) => [`${roots[i].type}:${roots[i].id}`, g.nodes.map((n) => n.key)])
+        )
         const json = JSON.stringify(g)
         if (json !== lastDataJson) {
           lastDataJson = json
@@ -110,6 +136,7 @@ export function createGraphQuery(deps: {
   }
 
   function focus(type: string, id: number) {
+    deps.initTree?.(`${type}:${id}`, depth)
     deps.prepareFresh()
     center = { type, id }
     deps.onCenter(type, id)
@@ -150,6 +177,7 @@ export function createGraphQuery(deps: {
   }
 
   async function addToMap(type: string, id: number) {
+    deps.initTree?.(`${type}:${id}`, depth)
     if (!center.id) {
       deps.forgetPositions()
       center = { type, id }
@@ -170,6 +198,9 @@ export function createGraphQuery(deps: {
   }
 
   return {
+    get memberships() {
+      return memberships
+    },
     get depth() {
       return depth
     },

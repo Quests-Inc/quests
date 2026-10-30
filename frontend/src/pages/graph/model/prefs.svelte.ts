@@ -1,5 +1,5 @@
 // Настройки карты, которые помнит браузер: раскладка, скрытые карточки, фильтры квестов и видов, раскрытые связи.
-import { ENTITY_TYPES, LAYOUTS } from '@/entities/graph'
+import { ENTITY_TYPES, LAYOUTS, readZones, type GraphZone } from '@/entities/graph'
 import { QUEST_STATUSES, QUEST_STATUS_LABELS } from '@/shared/api/questConsts.ts'
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>
@@ -11,6 +11,8 @@ const KEYS = {
   types: 'quests.graph.types',
   expand: 'quests.graph.expand',
   sizes: 'quests.graph.sizes',
+  trees: 'quests.graph.trees',
+  zones: 'quests.graph.zones',
 }
 
 function readJSON(store: Store | null, key: string): unknown {
@@ -40,6 +42,20 @@ export function createGraphPrefs(store: Store | null) {
     }
   })()
   let layoutMode = layoutRaw && layoutRaw in LAYOUTS ? layoutRaw : 'tree'
+
+  type TreeSettings = { depth: number; layout: string }
+  const readTrees = (raw: unknown): Record<string, TreeSettings> => {
+    const out: Record<string, TreeSettings> = {}
+    if (raw && typeof raw === 'object')
+      for (const [key, value] of Object.entries(raw)) {
+        const v = value as TreeSettings
+        if (v && [1, 2, 3].includes(v.depth) && Object.hasOwn(LAYOUTS, v.layout))
+          out[key] = { depth: v.depth, layout: v.layout }
+      }
+    return out
+  }
+  let zones = $state<GraphZone[]>(readZones(readJSON(store, KEYS.zones)))
+  let trees = $state(readTrees(readJSON(store, KEYS.trees)))
 
   let hidden = $state(new Set<string>(strings(readJSON(store, KEYS.hidden))))
 
@@ -80,6 +96,24 @@ export function createGraphPrefs(store: Store | null) {
   }
 
   return {
+    get zones() {
+      return zones
+    },
+    restoreZones(raw: unknown) {
+      zones = readZones(raw)
+      write(store, KEYS.zones, zones)
+    },
+    get trees() {
+      return trees
+    },
+    setTree(key: string, settings: TreeSettings) {
+      trees = { ...trees, [key]: { ...settings } }
+      write(store, KEYS.trees, trees)
+    },
+    restoreTrees(raw: unknown) {
+      trees = readTrees(raw)
+      write(store, KEYS.trees, trees)
+    },
     /** Раскладка: 'tree' | 'down' | 'radial' | 'layers' | 'free'. */
     get layoutMode() {
       return layoutMode
