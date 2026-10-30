@@ -100,3 +100,19 @@ test('настройки деревьев переживают перезагр�
   restored.restoreTrees({ 'quest:5': { depth: 2, layout: 'tree' }, bad: { depth: 20, layout: 'missing' } })
   expect(restored.trees).toEqual({ 'quest:5': { depth: 2, layout: 'tree' } })
 })
+
+test('зоны сохраняются в браузере и проверяются при восстановлении', () => {
+  const values = new Map<string, string>()
+  const store = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value)
+    },
+  }
+  const p = createGraphPrefs(store)
+  const z = { id: 'a', title: 'Работа', color: '#6a8fbf', x: 10, y: -20, w: 600, h: 400 }
+  p.restoreZones([z, { ...z, id: 'invalid', w: 0 }])
+  expect(createGraphPrefs(store).zones).toEqual([z])
+  p.restoreZones([])
+  expect(createGraphPrefs(store).zones).toEqual([])
+})

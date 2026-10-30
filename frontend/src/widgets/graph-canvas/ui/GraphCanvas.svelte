@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GraphMinimap, GraphTools, RASTER, tintOf, type GraphNoteEditing } from '@/entities/graph'
+  import { GraphMinimap, GraphTools, RASTER, tintOf, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
   import type { Snippet } from 'svelte'
   import { createClusterFolds } from '../model/folds.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
@@ -9,6 +9,7 @@
   import GraphEdges from './GraphEdges.svelte'
   import GraphFoot from './GraphFoot.svelte'
   import GraphGroups from './GraphGroups.svelte'
+  import GraphZones from './GraphZones.svelte'
 
   type Stage = ReturnType<typeof createGraphStage>
   type Gest = ReturnType<typeof createGraphGestures>
@@ -41,8 +42,16 @@
     onClear,
     onRecenter,
     resize,
+    zones = [],
+    zoneDrawing = false,
+    onZonesChange = () => {},
+    onZoneFinish = () => {},
     children,
   }: {
+    zones?: GraphZone[]
+    zoneDrawing?: boolean
+    onZonesChange?: (zones: GraphZone[]) => void
+    onZoneFinish?: () => void
     stage: Stage
     resize?: ReturnType<typeof import('../model/resize.svelte.ts').createCardResize>
     gest: Gest
@@ -87,7 +96,7 @@
   class:graph__stage--full={stage.full}
   data-swipe={stage.view?.nodes?.length ? undefined : 'free'}
   bind:this={stage.el}
-  onpointerdowncapture={gest.onTouchDown}
+  onpointerdowncapture={(e) => { if (!(e.target as Element).closest('.zones, .zones__editor')) gest.onTouchDown(e) }}
   onpointerdown={gest.onBgDown}
   onpointermove={gest.onMove}
   onpointerup={gest.onUp}
@@ -114,6 +123,8 @@
   {:else if loading && !stage.view}
     <p class="graph__msg">Загрузка…</p>
   {/if}
+
+  <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish} />
 
   <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready}>
     <GraphEdges drawEdges={stage.drawEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />

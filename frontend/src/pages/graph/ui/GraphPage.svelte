@@ -50,6 +50,7 @@
   let notes = $derived(noteCatalog.list)
 
   const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
+  let zoneDrawing = $state(false)
   const saved = new Map<string, { x: number; y: number }>()
   // Поле, черновик и жесты читают друг друга только после сборки. Методы до этого не зовутся.
   let stage: ReturnType<typeof createGraphStage>
@@ -246,6 +247,12 @@
     prefs,
     folds,
     nodes: () => stage.nodes,
+    entities: () => stage.entities,
+    titleOf: (key) => {
+      const [kind, id] = key.split(':')
+      const catalog = kind === 'note' ? notes : kind === 'quest' ? quests : kind === 'questline' ? questlines : []
+      return catalog.find((n) => n.id === Number(id))?.title || stage.titleOf(key)
+    },
     saved,
     cam: { get: () => gest.cam, set: (c) => (gest.cam = c) },
     stageSize: () => stage.stageSize,
@@ -267,7 +274,7 @@
   let ownerless = $derived(stage.ownerless)
   let full = $derived(stage.full)
   let selectMode = $derived(stage.selectMode)
-  let canClear = $derived(query.canClear)
+  let canClear = $derived(query.canClear || prefs.zones.length > 0)
   let filteredOut = $derived(stage.filteredOut)
   let expanded = $derived(folds.expanded)
   let loose = $derived(folds.loose)
@@ -340,7 +347,7 @@
   const relayout = stage.relayout
   const toggleFull = stage.toggleFull
   const onFullscreenChange = stage.onFullscreenChange
-  const clearMap = query.clearMap
+  const clearMap = async () => { await query.clearMap(); prefs.restoreZones([]) }
   const addToMap = query.addToMap
   const chooseRoot = query.chooseRoot
   const recenter = query.recenter
@@ -437,12 +444,17 @@
     onToggleType={toggleType}
     onLayoutChange={onLayoutChange}
   >
+    <button type="button" class="graph__btn" class:graph__btn--on={zoneDrawing} aria-pressed={zoneDrawing} disabled={prefs.zones.length >= 200 && !zoneDrawing} title="Нарисовать область на карте (до 200 зон)" onclick={() => zoneDrawing = !zoneDrawing}>＋ Зона</button>
     {#if expanded.size || loose.size}
       <button type="button" class="graph__btn" onclick={collapseAll}>Свернуть вложения</button>
     {/if}
   </GraphToolbar>
 
   <GraphCanvas
+    zones={prefs.zones}
+    {zoneDrawing}
+    onZonesChange={prefs.restoreZones}
+    onZoneFinish={() => zoneDrawing = false}
     {stage}
     {gest}
     {folds}

@@ -152,3 +152,23 @@ test('расклад без центра очищает карту; те же д
   expect(m.st.center).toEqual({ type: null, id: null })
   expect(m.st.rootWrites).toBe(0)
 })
+
+test('zones and entity manifest survive capture/restore; old layouts clear zones', async () => {
+  const a = fakeMap()
+  const zone = { id: 'study', title: 'Учёба', color: '#6a8fbf', x: -20, y: 40, w: 600, h: 400 }
+  a.deps.prefs.zones = [zone]
+  a.deps.entities = () => [{ key: 'note:9', title: 'Заметка' }]
+  const state = captureLayout(a.deps)
+  expect(state.entities).toEqual([{ key: 'note:9', title: 'Заметка' }])
+  expect(state.zones).toEqual([zone])
+  const b = fakeMap()
+  let restored: unknown = null
+  b.deps.prefs.restoreZones = (z) => {
+    restored = z
+  }
+  await applyLayoutState(b.deps, state)
+  expect(restored).toEqual([zone])
+  delete state.zones
+  await applyLayoutState(b.deps, state)
+  expect(restored).toEqual([])
+})

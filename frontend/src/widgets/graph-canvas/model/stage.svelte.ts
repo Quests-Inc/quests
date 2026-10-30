@@ -80,6 +80,7 @@ export function createGraphStage(deps: {
   let frontSeq = 0
   let ownerless = $state<Set<string>>(new Set())
   let touched = $state<Map<string, number[]>>(new Map())
+  let entityManifest = $state<{ key: string; title: string }[]>([])
   let filteredOut = $state(0)
   let flashOp = $state<number | null>(null)
   let full = $state(false)
@@ -237,6 +238,9 @@ export function createGraphStage(deps: {
       questStatuses: deps.prefs.questStatuses,
       shownTypes: deps.prefs.shownTypes,
     })
+    entityManifest = vis.nodes
+      .filter((n) => !n.draft && !n.key.startsWith('cluster:'))
+      .map((n) => ({ key: n.key, title: n.title || n.key }))
     filteredOut = vis.filteredOut
     void buildTick
     if (!untrack(() => deps.getActive())) {
@@ -498,6 +502,9 @@ export function createGraphStage(deps: {
     },
     get touched() {
       return touched
+    },
+    get entities() {
+      return entityManifest
     },
     get filteredOut() {
       return filteredOut

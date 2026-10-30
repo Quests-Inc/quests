@@ -345,5 +345,5 @@ func graphTools(c *Client) []Tool {
 			}
 			return map[string]any{"root": res.Root, "depth": res.Depth, "truncated": trunc, "nodes": nodes, "edges": edges, "workspace": c.Workspace(ctx)}, nil
 		})
-	return []Tool{g}
+	return []Tool{g, graphLayoutTool(c)}
 }

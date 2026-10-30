@@ -90,6 +90,8 @@ The database is PostgreSQL (`QUESTS_DATABASE_URL`); `just dev-db` starts one in 
 
 ## More
 
+- Карта, зоны, сохранённые расклады и MCP: [`docs/graph-map.md`](docs/graph-map.md).
+
 - User systemd units: [`deploy/systemd/`](deploy/systemd/)
 - Deploying the server after a clone: [`deploy/SERVER.md`](deploy/SERVER.md)
 - Docker images (api / bot / frontend): [`deploy/docker/`](deploy/docker/)
