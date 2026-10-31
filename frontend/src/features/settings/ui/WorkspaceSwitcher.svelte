@@ -90,11 +90,11 @@
   {#if open}
     <div class="workspace-menu" role="menu" aria-label="Пространства">
       {#each wsx.list as workspace (workspace.id)}
-        <div class="workspace-entry">
+        <div class="workspace-entry" class:workspace-entry--current={workspace.id === wsx.current}>
           <button type="button" class="workspace-option" role="menuitemradio" aria-checked={workspace.id === wsx.current} disabled={wsx.busy} onclick={() => choose(workspace.id)} oncontextmenu={(event) => { event.preventDefault(); if (canManage && workspace.role === 'owner') edit(workspace, event) }}>
             <span class="workspace-icon" style:color={workspace.color || '#9a9a9a'}><Icon name={workspace.icon || 'layers'} size={16} /></span>
             <span class="workspace-name">{workspace.name}</span>
-            {#if workspace.id === wsx.current}<span class="workspace-check"><Icon name="checkmark" size={14} /></span>{/if}
+            {#if workspace.role}<span class="workspace-role">{workspace.role === 'owner' ? 'владелец' : 'участник'}</span>{/if}
           </button>
           {#if canManage && workspace.role === 'owner'}
             <button type="button" class="workspace-edit" title="Редактировать пространство" aria-label={`Редактировать пространство ${workspace.name}`} disabled={wsx.busy} onclick={(event) => edit(workspace, event)}><Icon name="edit" size={14} /></button>
@@ -117,22 +117,24 @@
 <style>
   .workspace-switcher { position: relative; min-width: 0; max-width: 13rem; margin-left: 0.65rem; }
   .workspace-trigger, .workspace-option { display: flex; align-items: center; gap: 0.5rem; font: inherit; font-size: var(--text-sm); cursor: pointer; color: var(--color-fg); }
-  .workspace-trigger { width: 100%; min-height: 2rem; padding: 0.35rem 0.55rem; border: 1px solid color-mix(in srgb, var(--workspace-color) 28%, var(--color-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--workspace-color) 7%, var(--color-bg-raised)); font-family: var(--font-display); }
+  .workspace-trigger { width: 100%; min-height: 2rem; padding: 0.35rem 0.55rem; border: 1px solid color-mix(in srgb, var(--workspace-color) 28%, var(--color-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--workspace-color) 7%, var(--color-bg-raised)); font-family: var(--font-display); line-height: 1; }
   .workspace-trigger:hover, .workspace-trigger[aria-expanded=true] { border-color: var(--workspace-color); background: color-mix(in srgb, var(--workspace-color) 12%, var(--color-bg-raised)); }
-  .workspace-icon, .workspace-arrow, .workspace-check { display: flex; flex-shrink: 0; }
+  .workspace-icon, .workspace-arrow { display: flex; flex-shrink: 0; }
   .workspace-icon { color: var(--workspace-color); }
   .workspace-arrow { color: var(--color-fg-muted); margin-left: auto; }
+  .workspace-trigger .workspace-name { position: relative; top: -1px; }
   .workspace-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
   .workspace-menu { position: absolute; top: calc(100% + 0.45rem); left: 0; z-index: 50; width: max-content; min-width: 13rem; max-width: min(22rem, calc(100vw - 3rem)); max-height: 65vh; overflow-y: auto; padding: 0.3rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-raised); box-shadow: 0 12px 28px -8px #0009; }
-  .workspace-entry { display: flex; align-items: center; }
+  .workspace-entry { display: flex; align-items: center; border-radius: var(--radius-sm); }
+  .workspace-entry--current { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
+  .workspace-entry:hover, .workspace-entry:focus-within { background: var(--color-bg-muted); }
   .workspace-entry .workspace-option { flex: 1; min-width: 0; }
   .workspace-edit { display: grid; place-items: center; flex-shrink: 0; width: 2rem; height: 2rem; border: 0; background: transparent; color: var(--color-fg-muted); cursor: pointer; border-radius: var(--radius-sm); }
-  .workspace-edit:hover { color: var(--color-fg); background: var(--color-bg-muted); }
+  .workspace-edit:hover { color: var(--color-fg); }
   .workspace-menu__actions { border-top: 1px solid var(--color-border); margin-top: 0.3rem; padding-top: 0.3rem; }
   .workspace-option { width: 100%; min-height: 2.25rem; border: 0; border-radius: var(--radius-sm); background: transparent; padding: 0.45rem 0.55rem; }
-  .workspace-option:hover, .workspace-option:focus-visible { background: var(--color-bg-muted); }
-  .workspace-option[aria-checked=true] { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
-  .workspace-check { color: var(--color-accent); margin-left: auto; }
+  .workspace-menu__actions .workspace-option:hover, .workspace-menu__actions .workspace-option:focus-visible { background: var(--color-bg-muted); }
+  .workspace-role { color: var(--color-fg-subtle); margin-left: auto; padding-left: 0.7rem; font-size: var(--text-xs); white-space: nowrap; }
   button:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 2px; }
   button:disabled { opacity: 0.5; cursor: wait; }
   .workspace-error { padding: 0.4rem 0.55rem; color: var(--color-danger); font-size: var(--text-sm); max-width: 18rem; }

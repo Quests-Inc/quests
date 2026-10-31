@@ -17,6 +17,7 @@
     clearCustom = $bindable(false),
     ownerLabel = 'этого элемента',
     allowUpload = true,
+    sectionLabels = false,
   }: {
     color?: string,
     icon?: string,
@@ -25,6 +26,7 @@
     clearCustom?: boolean,
     ownerLabel?: string,
     allowUpload?: boolean,
+    sectionLabels?: boolean,
   } = $props()
 
   let fileInput = $state((null as HTMLInputElement | null))
@@ -65,7 +67,7 @@
 </script>
 
 <div class="field">
-  <span class="label">Цвет</span>
+  {#if sectionLabels}<h5 class="cip__section-label">Цвет</h5>{:else}<span class="label">Цвет</span>{/if}
   <div class="cip__row">
     <div class="cip__swatches" role="radiogroup" aria-label="Цвет">
       {#each QUESTLINE_COLORS as c}
@@ -86,7 +88,7 @@
 </div>
 
 <div class="field">
-  <span class="label">Иконка</span>
+  {#if sectionLabels}<h5 class="cip__section-label">Иконка</h5>{:else}<span class="label">Иконка</span>{/if}
   <div class="cip__row">
     <div class="cip__icons" role="radiogroup" aria-label="Иконка">
       {#each QUESTLINE_ICONS as name}
@@ -136,6 +138,14 @@
 </div>
 
 <style>
+  .cip__section-label {
+    margin: var(--space-2, 0.5rem) 0 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
   .cip__row {
     display: flex;
     flex-wrap: wrap;

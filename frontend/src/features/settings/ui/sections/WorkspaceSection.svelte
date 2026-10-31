@@ -118,8 +118,8 @@
     {/if}
 
     {#if canManage}
-      <form onsubmit={(e) => { e.preventDefault(); saveWorkspaceAppearance(color, icon) }}>
-        <ColorIconPicker bind:color bind:icon allowUpload={false} />
+      <form class="appearance-form" onsubmit={(e) => { e.preventDefault(); saveWorkspaceAppearance(color, icon) }}>
+        <ColorIconPicker bind:color bind:icon allowUpload={false} sectionLabels />
         <button type="submit" class="btn" disabled={wsx.busy}>Сохранить оформление</button>
       </form>
     {/if}
@@ -204,6 +204,9 @@
 {#if wsx.error}<p class="err" role="alert">{wsx.error}</p>{/if}
 
 <style>
+  .appearance-form { display: grid; gap: 0.75rem; }
+  .appearance-form > .btn { justify-self: start; }
+
   .usage {
     display: grid;
     gap: 0.25rem;
