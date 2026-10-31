@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ColorIconPicker } from '@/entities/questline'
   import { ValueTable } from '@/entities/value'
   import SettingsBlock from './SettingsBlock.svelte'
   import DefaultRunner from './DefaultRunner.svelte'
@@ -8,6 +9,7 @@
     pickWorkspace,
     addWorkspace,
     saveName,
+    saveWorkspaceAppearance,
     removeCurrent,
     newInvite,
     dropMember,
@@ -17,6 +19,13 @@
 
   const mb = (n: number) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} ГБ` : `${(n / (1 << 20)).toFixed(n < 10 << 20 ? 1 : 0)} МБ`)
 
+  let color = $state('#9a9a9a')
+  let icon = $state('layers')
+  $effect(() => {
+    const current = wsx.list.find((w: { id: number }) => w.id === wsx.current)
+    color = current?.color || '#9a9a9a'
+    icon = current?.icon || 'layers'
+  })
   let newName = $state('')
   let renameTo = $state(currentWorkspaceName())
   let deleting = $state(false)
@@ -78,7 +87,7 @@
   </form>
 </SettingsBlock>
 
-{#if wsx.members.length}
+{#if wsx.loaded}
   <SettingsBlock title="Это пространство">
     {#if wsx.attachmentsQuota > 0}
       <div class="usage" title="Вложения всех версий файлов">
@@ -100,6 +109,13 @@
         <button type="submit" class="btn" disabled={wsx.busy || !renameTo.trim() || renameTo.trim() === currentWorkspaceName()}>
           Переименовать
         </button>
+      </form>
+    {/if}
+
+    {#if isOwner}
+      <form onsubmit={(e) => { e.preventDefault(); saveWorkspaceAppearance(color, icon) }}>
+        <ColorIconPicker bind:color bind:icon allowUpload={false} />
+        <button type="submit" class="btn" disabled={wsx.busy}>Сохранить оформление</button>
       </form>
     {/if}
 

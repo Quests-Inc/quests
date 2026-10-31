@@ -16,6 +16,7 @@
     pendingFile = $bindable(null),
     clearCustom = $bindable(false),
     ownerLabel = 'этого элемента',
+    allowUpload = true,
   }: {
     color?: string,
     icon?: string,
@@ -23,6 +24,7 @@
     pendingFile?: File | null,
     clearCustom?: boolean,
     ownerLabel?: string,
+    allowUpload?: boolean,
   } = $props()
 
   let fileInput = $state((null as HTMLInputElement | null))
@@ -108,6 +110,7 @@
         </span>
       {/if}
     </div>
+    {#if allowUpload}
     <div class="cip__custom">
       {#if previewUrl}
         <button type="button" class="btn btn--ghost" onclick={removeCustom}>Убрать свою</button>
@@ -128,6 +131,7 @@
         onchange={onFileChange}
       />
     </div>
+    {/if}
   </div>
 </div>
 

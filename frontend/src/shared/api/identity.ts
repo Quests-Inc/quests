@@ -157,3 +157,7 @@ export function seedStarter() {
 export function removeStarter() {
   return request<{ trashed: number }>('/api/workspace/starter', { method: 'DELETE' })
 }
+
+export function setWorkspaceAppearance(id: number, color: string, icon: string) {
+  return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ color, icon }) })
+}

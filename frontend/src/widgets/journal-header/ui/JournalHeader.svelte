@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '@/shared/ui/Icon.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+  import { WorkspaceSwitcher } from '@/features/settings'
   import HealthMeter from './HealthMeter.svelte'
   import { MAIN_TABS as MAIN, VIEW_GROUPS as GROUPS, type View, type ViewGroup as Group } from '@/shared/lib/viewTabs.ts'
 
@@ -161,6 +162,7 @@
 <header class="journal__header" bind:this={headerEl} use:watchRoom>
   <div class="header-left">
     <HealthMeter {health} {liveStatus} />
+    <WorkspaceSwitcher />
   </div>
 
   <div class="view-tabs" role="tablist" aria-label="Раздел">

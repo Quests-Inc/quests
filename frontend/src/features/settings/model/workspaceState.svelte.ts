@@ -1,5 +1,6 @@
 import {
   fetchWorkspaces,
+  setWorkspaceAppearance,
   createWorkspace,
   switchWorkspace,
   fetchMembers,
@@ -33,7 +34,8 @@ export function currentWorkspaceName() {
   return wsx.list.find((w: { id: any }) => w.id === wsx.current)?.name ?? ''
 }
 
-export async function loadWorkspaceState() {
+/** The header needs only the list, not the account/member management data. */
+export async function loadWorkspaceList() {
   try {
     const r = await fetchWorkspaces()
     wsx.list = r?.workspaces ?? []
@@ -41,14 +43,29 @@ export async function loadWorkspaceState() {
     wsx.attachmentsUsed = r?.attachments_used ?? 0
     wsx.attachmentsQuota = r?.attachments_quota ?? 0
     wsx.loaded = true
-    if (wsx.current) {
-      const m = await fetchMembers(wsx.current)
-      wsx.members = m?.members ?? []
-      wsx.myRole = m?.role ?? ''
-    }
+    wsx.myRole = wsx.list.find((w: { id: number }) => w.id === wsx.current)?.role ?? ''
   } catch {
     wsx.loaded = false
   }
+}
+
+export async function loadWorkspaceState() {
+  await loadWorkspaceList()
+  if (!wsx.loaded || !wsx.current) return
+  try {
+    const m = await fetchMembers(wsx.current)
+    wsx.members = m?.members ?? []
+    wsx.myRole = m?.role ?? ''
+  } catch {
+    wsx.members = []
+  }
+}
+
+export async function saveWorkspaceAppearance(color: string, icon: string) {
+  await act(async () => {
+    await setWorkspaceAppearance(wsx.current, color, icon)
+    wsx.list = wsx.list.map((w: { id: number }) => (w.id === wsx.current ? { ...w, color, icon } : w))
+  }, 'не удалось сохранить оформление')
 }
 
 /** Runs a mutation with the shared busy/error handling. */

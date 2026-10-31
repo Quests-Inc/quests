@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ var ErrWorkspaceName = errors.New("workspace name must not be empty")
 type Workspace struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	Icon      string    `json:"icon"`
 	CreatedAt time.Time `json:"created_at"`
 	Role      string    `json:"role,omitempty"`
 }
@@ -60,7 +63,7 @@ func (s *Store) ForEachWorkspace(ctx context.Context, fn func(ctx context.Contex
 // UserWorkspaces lists the workspaces a user belongs to.
 func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT w.id, w.name, w.created_at, m.role
+		SELECT w.id, w.name, w.created_at, m.role, w.color, w.icon
 		FROM workspace w JOIN workspace_member m ON m.workspace_id = w.id
 		WHERE m.user_id = ? AND w.deleted_at IS NULL ORDER BY w.id`, userID)
 	if err != nil {
@@ -71,7 +74,7 @@ func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, 
 	for rows.Next() {
 		var w Workspace
 		var created string
-		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Role); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Role, &w.Color, &w.Icon); err != nil {
 			return nil, err
 		}
 		w.CreatedAt, _ = timeutil.ParseFlexible(created)
@@ -125,7 +128,7 @@ func (s *Store) CreateWorkspace(ctx context.Context, userID int64, name string) 
 	if err := s.AddWorkspaceMember(ctx, id, userID, "owner"); err != nil {
 		return Workspace{}, err
 	}
-	return Workspace{ID: id, Name: name, CreatedAt: now, Role: "owner"}, nil
+	return Workspace{ID: id, Name: name, CreatedAt: now, Role: "owner", Color: "#9a9a9a", Icon: "layers"}, nil
 }
 
 // EnsureUserWorkspace gives a user without any workspace one: the seeded
@@ -148,7 +151,7 @@ func (s *Store) EnsureUserWorkspace(ctx context.Context, userID int64, username 
 		if err := s.AddWorkspaceMember(ctx, DefaultWorkspaceID, userID, "owner"); err != nil {
 			return Workspace{}, false, err
 		}
-		return Workspace{ID: DefaultWorkspaceID, Name: "Основное", Role: "owner"}, false, nil
+		return Workspace{ID: DefaultWorkspaceID, Name: "Основное", Role: "owner", Color: "#9a9a9a", Icon: "layers"}, false, nil
 	}
 	ws, err = s.CreateWorkspace(ctx, userID, username)
 	return ws, err == nil, err
@@ -156,7 +159,7 @@ func (s *Store) EnsureUserWorkspace(ctx context.Context, userID int64, username 
 
 // AllWorkspaces lists every workspace (for callers with no account).
 func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, color, icon FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +168,7 @@ func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
 	for rows.Next() {
 		var w Workspace
 		var created string
-		if err := rows.Scan(&w.ID, &w.Name, &created); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Color, &w.Icon); err != nil {
 			return nil, err
 		}
 		w.CreatedAt, _ = timeutil.ParseFlexible(created)
@@ -294,4 +297,40 @@ func (s *Store) PurgeWorkspace(ctx context.Context, id int64) error {
 func (s *Store) AbortWorkspace(ctx context.Context, id int64) error {
 	_, err := s.DB.ExecContext(ctx, `DELETE FROM workspace WHERE id = ?`, id)
 	return err
+}
+
+var ErrWorkspaceAppearance = errors.New("цвет: #RRGGBB; иконка: document, flag, map, layers, target или scroll")
+var workspaceColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// UpdateWorkspace changes only supplied fields; validation precedes the single write.
+func (s *Store) UpdateWorkspace(ctx context.Context, id int64, name, color, icon *string) error {
+	if name != nil {
+		n := strings.TrimSpace(*name)
+		if n == "" {
+			return ErrWorkspaceName
+		}
+		if len([]rune(n)) > 80 {
+			n = string([]rune(n)[:80])
+		}
+		name = &n
+	}
+	if color != nil && !workspaceColor.MatchString(*color) {
+		return ErrWorkspaceAppearance
+	}
+	if icon != nil {
+		switch *icon {
+		case "document", "flag", "map", "layers", "target", "scroll":
+		default:
+			return ErrWorkspaceAppearance
+		}
+	}
+	result, err := s.DB.ExecContext(ctx, `UPDATE workspace SET name=COALESCE(?,name), color=COALESCE(?,color), icon=COALESCE(?,icon) WHERE id=? AND deleted_at IS NULL`, name, color, icon, id)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

@@ -12,3 +12,5 @@ export { default as WorkspaceSection } from './ui/sections/WorkspaceSection.svel
 export * from './model/workspaceState.svelte.ts'
 
 export { default as TrashSection } from './ui/sections/TrashSection.svelte'
+
+export { default as WorkspaceSwitcher } from './ui/WorkspaceSwitcher.svelte'

@@ -26,7 +26,7 @@ Every description and every explaining paragraph is set into its surface as a **
 
 ## Header
 
-- Left: health. Middle: section tabs (labels give way to icons on narrow screens; groups open on hover). Right: actions.
+- Left: health, then the current workspace title with its colour/icon and a dropdown using the same switch operation as Settings. Workspace appearance is shared by members and editable by its owner in Settings → Workspace; built-in icons only. Middle: section tabs (labels give way to icons on narrow screens; groups open on hover). Right: actions.
 - **Right-hand actions are icons only**, each with the same verb in `title` and `aria-label`: «Новый квест» (accent), «Команда»,
   «Окружение», «Теги», «Новый квестлайн», «Настройки».
 - **All icons are drawn while there is room.** The row is measured (`ResizeObserver` on the grid cell); only when the next

@@ -323,21 +323,31 @@ func (h *Handler) renameWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name string `json:"name"`
+		Name  *string `json:"name"`
+		Color *string `json:"color"`
+		Icon  *string `json:"icon"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<14)).Decode(&body); err != nil {
 		httpx.WriteErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	switch err := h.Auth.RenameWorkspace(r.Context(), id, body.Name); {
-	case errors.Is(err, identity.ErrWorkspaceName):
+	if body.Name == nil && body.Color == nil && body.Icon == nil {
+		httpx.WriteErr(w, http.StatusUnprocessableEntity, "нужны название, цвет или иконка")
+		return
+	}
+	switch err := h.Auth.UpdateWorkspace(r.Context(), id, body.Name, body.Color, body.Icon); {
+	case errors.Is(err, identity.ErrWorkspaceName), errors.Is(err, identity.ErrWorkspaceAppearance):
 		httpx.WriteErr(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, identity.ErrNotFound):
 		httpx.WriteErr(w, http.StatusNotFound, "workspace not found")
 	case err != nil:
 		httpx.WriteErr(w, http.StatusInternalServerError, err.Error())
 	default:
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"id": id, "name": strings.TrimSpace(body.Name)})
+		out := map[string]any{"id": id, "ok": true}
+		if body.Name != nil {
+			out["name"] = strings.TrimSpace(*body.Name)
+		}
+		httpx.WriteJSON(w, http.StatusOK, out)
 	}
 }
 

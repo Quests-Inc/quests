@@ -23,6 +23,8 @@ export interface Member {
 export interface Workspace {
   id: number /* int64 */;
   name: string;
+  color: string;
+  icon: string;
   created_at: string;
   role?: string;
 }
