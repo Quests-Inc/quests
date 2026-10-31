@@ -74,7 +74,11 @@ func (s *Store) BindScript(ctx context.Context, subjectType string, subjectID, s
 		return errBad("в скрипте нет источника этой сущности: добавьте ноды")
 	}
 	if len(sc.Subjects) != 1 || sc.Subjects[0] != subjectType {
-		return errBad(fmt.Sprintf("скрипт читает %s, а привязывается к %s", strings.Join(sc.Subjects, ", "), subjectType))
+		message := fmt.Sprintf("скрипт читает %s, а привязывается к %s", strings.Join(sc.Subjects, ", "), subjectType)
+		if subjectType == SubjectStep && strings.Contains(","+strings.Join(sc.Subjects, ",")+",", ",quest,") {
+			message += "; для зеркала прогресса другого квеста используйте MCP follow_quest({step_id:ID_ШАГА,quest_id:ID_КВЕСТА}) или поле «Следит за квестом»; произвольный смешанный граф запускайте хуком"
+		}
+		return errBad(message)
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
 	_, err = s.DB.ExecContext(ctx, `INSERT INTO script_binding (subject_type, subject_id, script_id, created_at) VALUES (?, ?, ?, ?)

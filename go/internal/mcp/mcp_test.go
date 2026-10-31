@@ -141,8 +141,13 @@ func TestToolsListShape(t *testing.T) {
 		b, _ := json.Marshal(tl)
 		size += len(b)
 	}
+	for _, name := range []string{"add_step", "update_step", "update_steps", "script", "hook", "get_step"} {
+		if !strings.Contains(byName[name]["description"].(string), "follow_quest") {
+			t.Errorf("%s must point agents to follow_quest", name)
+		}
+	}
 	for _, n := range []string{"list_quests", "get_quest", "get_step", "update_steps", "set_note_flag", "list_workspaces", "switch_workspace",
-		"icon", "get_attachment", "set_tags", "list_secrets", "list_values", "set_value", "delete_value", "dry_run_emit_pool", "script", "hook"} {
+		"icon", "get_attachment", "set_tags", "list_secrets", "list_values", "set_value", "delete_value", "dry_run_emit_pool", "script", "hook", "follow_quest"} {
 		if byName[n] == nil {
 			t.Errorf("missing tool %s", n)
 		}
@@ -693,5 +698,48 @@ func TestScriptRunsAndTry(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("the runs query lacks %s: %s", want, joined)
 		}
+	}
+}
+
+func TestGetStepIncludesNativeFollows(t *testing.T) {
+	for _, mirror := range []string{`null`, `{"step_id":5,"quest_id":9,"parent_quest_id":2,"hook_id":1,"script_id":3}`} {
+		t.Run(mirror, func(t *testing.T) {
+			s, _ := newTestServer(t, &fakeAPI{routes: map[string]string{
+				"GET /api/steps/5":        `{"step":{"id":5,"script_id":null,"description":"text"},"quest":{"id":2}}`,
+				"GET /api/steps/5/mirror": mirror,
+			}})
+			responses := rpc(t, s, call(1, "get_step", `{"id":5}`))
+			body, failed := result(t, responses[0])
+			if failed {
+				t.Fatal(body)
+			}
+			var out map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(body), &out); err != nil {
+				t.Fatal(err)
+			}
+			var expected any
+			_ = json.Unmarshal([]byte(mirror), &expected)
+			canonical, _ := json.Marshal(expected)
+			if string(out["follows"]) != string(canonical) {
+				t.Fatalf("follows = %s, want %s", out["follows"], mirror)
+			}
+		})
+	}
+}
+
+func TestFollowQuestCreatesReplacesAndRemovesMirror(t *testing.T) {
+	f := &fakeAPI{routes: map[string]string{
+		"PUT /api/steps/5/mirror":    `{"step_id":5,"quest_id":9,"hook_id":1,"script_id":3}`,
+		"DELETE /api/steps/5/mirror": `null`,
+	}}
+	s, _ := newTestServer(t, f)
+	for _, args := range []string{`{"step_id":5,"quest_id":9}`, `{"step_id":5,"quest_id":10}`, `{"step_id":5}`} {
+		body, failed := result(t, rpc(t, s, call(1, "follow_quest", args))[0])
+		if failed {
+			t.Fatal(body)
+		}
+	}
+	if strings.Join(f.seen, "\n") != "GET /api/workspaces?\nPUT /api/steps/5/mirror?\nPUT /api/steps/5/mirror?\nDELETE /api/steps/5/mirror?" {
+		t.Fatal(f.seen)
 	}
 }

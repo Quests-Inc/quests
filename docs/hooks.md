@@ -29,6 +29,13 @@ the event, and a hook is not woken by an event its own chain made, nor by a chai
 
 ## A step that follows a quest
 
+MCP: use `follow_quest({step_id:1778,quest_id:188})` to make a step mirror another quest (сделать квест шагом другого квеста / следить за квестом / зависимость).
+Call it again with another `quest_id` to replace the link, or with only `step_id` to remove it.
+It uses the same API as the interface, managing the hook, script, cycle checks and initial synchronization.
+Do not use `script bind` or manually build a hook for this standard case. Custom graphs with different logic can still run from ordinary hooks.
+`get_step` returns `follows` with `step_id`, `quest_id`, `parent_quest_id`, `hook_id`, `script_id`, or null when unlinked.
+The target step's own `script_id` can be null: the mirror script belongs to the hook.
+
 A hook made by the step field «Следит за квестом» (`hook.mirror_step_id` names the step; it goes with the step) has the followed quest
 as its area, waits for `step_progress`, `step_completed`, `quest_updated`, `status_changed`, `quest_completed`, `quest_failed`, `quest_expired`,
 and runs a script of three nodes: `source.quest` (the followed quest, from the area) → `source.step` with `id` of the step →

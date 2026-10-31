@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -149,5 +150,18 @@ func TestTrashedNoteKeepsBinding(t *testing.T) {
 	trash(`DELETE FROM note WHERE id = 60`)
 	if n, err := st.PurgeOrphanBindings(ctx); err != nil || n != 1 {
 		t.Fatalf("a note erased for good frees it: %d %v", n, err)
+	}
+}
+
+func TestMixedQuestStepBindingSuggestsFollowQuest(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	sc, err := st.CreateScript(ctx, "mirror", "", mirrorGraph(1000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.BindScript(ctx, SubjectStep, 1000, sc.ID)
+	if err == nil || !strings.Contains(err.Error(), "follow_quest") {
+		t.Fatalf("expected mirror hint, got %v", err)
 	}
 }

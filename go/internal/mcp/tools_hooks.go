@@ -26,7 +26,7 @@ func hookTools(c *Client) []Tool {
 		IncludePrivate *bool    `json:"include_private,omitempty" desc:"create/update: let the events of private notes in (default false)"`
 		Limit          int      `json:"limit,omitempty" desc:"list: default 30, max 100"`
 	}
-	s := Typed("hook", "Workspace event hooks: an event (a quest, a step, a note, a variable, an attachment changed) runs a library script. Actions: list, get, create (events + script_id), update (any field; quest_id=0 detaches from the quest), delete, events (the catalog: aliases, kinds, the fields each event carries). The area (scope_kind/scope_id) and the limits keep a hook from storms. Owner-only for create/update/delete.",
+	s := Typed("hook", "For step/шаг mirror (следить за квестом, зависимость, make a quest a step of another), use follow_quest({step_id:1778,quest_id:188}); it manages the hook and script. Workspace event hooks: an event (a quest, a step, a note, a variable, an attachment changed) runs a library script. Actions: list, get, create (events + script_id), update (any field; quest_id=0 detaches from the quest), delete, events (the catalog: aliases, kinds, the fields each event carries). The area (scope_kind/scope_id) and the limits keep a hook from storms. Owner-only for create/update/delete.",
 		func(ctx context.Context, a args) (any, error) {
 			extra := map[string]any{}
 			if a.ScopeKind != nil {

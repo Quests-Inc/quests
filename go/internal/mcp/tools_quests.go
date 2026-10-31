@@ -171,7 +171,7 @@ func questTools(c *Client) []Tool {
 		MaxChars int   `json:"max_chars,omitempty"`
 		Offset   int   `json:"offset,omitempty"`
 	}
-	getStep := Typed("get_step", "One step with its full description and check settings, plus a brief of its quest.",
+	getStep := Typed("get_step", "One step with its full description and check settings, plus a brief of its quest and follows (quest_id, parent_quest_id, hook_id, script_id) for a native follow_quest mirror. A mirror is driven by its hook, so step.script_id may be null.",
 		func(ctx context.Context, a stepGet) (any, error) {
 			var resp struct {
 				Step  map[string]any `json:"step"`
@@ -187,7 +187,11 @@ func questTools(c *Client) []Tool {
 				}
 			}
 			withText(step, "description", str(resp.Step["description"]), a.MaxChars, a.Offset)
-			return map[string]any{"step": step, "quest": resp.Quest, "workspace": c.Workspace(ctx)}, nil
+			var follows map[string]any
+			if err := c.Do(ctx, http.MethodGet, fmt.Sprintf("/api/steps/%d/mirror", a.ID), nil, nil, &follows); err != nil {
+				return nil, err
+			}
+			return map[string]any{"step": step, "quest": resp.Quest, "follows": follows, "workspace": c.Workspace(ctx)}, nil
 		})
 
 	type createArgs struct {

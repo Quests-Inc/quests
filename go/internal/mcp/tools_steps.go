@@ -50,7 +50,7 @@ func stepTools(c *Client) []Tool {
 		stepIn
 		Quiet *bool `json:"quiet,omitempty"`
 	}
-	add := Typed("add_step", "Append a step to a quest. Returns the new step's id as last_step_id.",
+	add := Typed("add_step", "Append a step to a quest. Returns the new step's id as last_step_id. To make this step mirror another quest, use follow_quest, not script bind or a manual hook.",
 		func(ctx context.Context, a addArgs) (any, error) {
 			var q questMutation
 			path := fmt.Sprintf("/api/quests/%d/steps", a.QuestID)
@@ -66,7 +66,7 @@ func stepTools(c *Client) []Tool {
 		stepPatch
 		Quiet *bool `json:"quiet,omitempty"`
 	}
-	upd := Typed("update_step", "Change a step; progress_current>=progress_total closes it. Several steps at once: update_steps.",
+	upd := Typed("update_step", "Change a step; progress_current>=progress_total closes it. Several steps at once: update_steps. To link this step to another quest progress, use follow_quest.",
 		func(ctx context.Context, a updArgs) (any, error) {
 			body := a.body()
 			if len(body) == 0 {
@@ -99,7 +99,7 @@ func stepTools(c *Client) []Tool {
 		StepID  int64  `json:"step_id"`
 		QuestID *int64 `json:"quest_id,omitempty" desc:"the quest the step follows; leave out to stop following"`
 	}
-	follow := Typed("follow_quest", "Make a step follow another quest: its progress becomes the followed quest's steps done of steps there are, updated at every change (a hook and a script made for it). Without quest_id the step stops following. Refuses its own quest and circles.",
+	follow := Typed("follow_quest", "Step mirror / шаг следит за квестом / зависимость: make a quest a step of another quest using follow_quest({step_id:1778,quest_id:188}). Make a step follow another quest: its progress becomes the followed quest's steps done of steps there are, updated at every change (a hook and a script made for it). Without quest_id the step stops following. Replaces an existing link; omit quest_id to remove it. Refuses its own quest and circles.",
 		func(ctx context.Context, a followArgs) (any, error) {
 			path := fmt.Sprintf("/api/steps/%d/mirror", a.StepID)
 			if a.QuestID == nil {
@@ -125,7 +125,7 @@ func stepTools(c *Client) []Tool {
 		Ops     []op  `json:"ops" desc:"applied in order; a failed op does not stop the rest"`
 		Quiet   *bool `json:"quiet,omitempty"`
 	}
-	batch := Typed("update_steps", "Several step changes on one quest in one call: ops of add (title required) / update / delete. Returns a result per op and the quest's final progress_label.",
+	batch := Typed("update_steps", "Several step changes on one quest in one call: ops of add (title required) / update / delete. Returns a result per op and the quest's final progress_label. For a step that mirrors another quest via a hook/script, use follow_quest after adding the step.",
 		func(ctx context.Context, a batchArgs) (any, error) {
 			if len(a.Ops) == 0 {
 				return nil, &Err{422, "ops is empty"}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { bindScript, unbindScript, updateQuestStep } from '@/shared/api/client.ts'
+  import { addQuestStep, bindScript, unbindScript, updateQuestStep } from '@/shared/api/client.ts'
   import { checkPayload, questStepDraft, StepAutoCheck } from '@/entities/quest'
   import { HooksField } from '@/entities/hook/@x/quest'
   import { MentionTextarea } from '@/entities/template'
@@ -51,7 +51,7 @@
 
   async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
-    if (!step?.id || questId == null || saving) return
+    if ((!onDraft && questId == null) || saving) return
     const trimmed = draft.title.trim()
     if (!trimmed) {
       formError = 'Нужно название шага'
@@ -72,6 +72,12 @@
         onClose()
         return
       }
+      if (!step?.id) {
+        const saved = await addQuestStep(questId!, payload)
+        onSaved(saved)
+        onClose()
+        return
+      }
       // The script is bound before the rest is saved, so the step keeps its device and schedule; it is detached first for the
       // same reason in reverse (a command typed over a script replaces it on its own).
       const was = step.script_id != null ? String(step.script_id) : ''
@@ -79,7 +85,7 @@
       if (now && now !== was) await bindScript('step', step.id, Number(now))
       else if (!now && was && !String(draft.check_command || '').trim()) await unbindScript('step', step.id)
       const { script_id: _script, ...body } = payload
-      const saved = await updateQuestStep(questId, step.id, body)
+      const saved = await updateQuestStep(questId!, step.id, body)
       onSaved(saved)
       onClose()
     } catch (e) {
@@ -91,7 +97,7 @@
 </script>
 
 <ModalShell {open} {onClose} labelledby="step-modal-title" zIndex={45} maxWidth="32rem">
-  <ModalHead id="step-modal-title" title="Редактировать шаг" icon="edit" {onClose} />
+  <ModalHead id="step-modal-title" title={step?.id ? "Редактировать шаг" : "Добавить шаг"} icon="edit" {onClose} />
 
   {#if formError}
     <p class="modal__error">{formError}</p>

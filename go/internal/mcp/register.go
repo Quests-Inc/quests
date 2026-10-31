@@ -7,6 +7,7 @@ func Instructions() string {
 - The active workspace (list_workspaces / switch_workspace) applies to every call; mutation results say which one they hit.
 - description fields are markdown, titles are plain text. Link entities as quest=N, step=N, note=N, questline=N, template=N; images in notes only via upload_attachment + ![alt](attachment=N).
 - Every referenced entity must have its own full kind=ID token, even in a list or range: write quest=438, quest=440 or note=217, note=218, note=219. Never share a prefix across IDs: quest=438/440, quest=438, 440 and note=217…219 are not supported.
+- To make a quest a step of another quest (step mirror / следить за квестом / зависимость), use follow_quest({step_id:1778,quest_id:188}), not script bind or a manual hook. get_step.follows shows the link; omit quest_id to stop following.
 - Change steps with add_step / update_step / update_steps (several at once), not by rewriting a quest. Lifecycle (status, pin, title…) is update_quest.
 - Lay out what you create: before create_quest look at list_questlines (pass questline, or "none" on purpose) and list_tags; new notes go into a CATEGORY note (list_note_categories). Never leave work unsorted by default.
 - Scripts (checks, template emit): the script tool; a script is a graph of typed nodes — docs/adr/0003-script-graphs.md and docs/scripts.md (rules: docs/automation.md).

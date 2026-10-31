@@ -48,6 +48,7 @@
   let raw = $state('')
   let editing = $state('')
   let seenKey = ''
+  let loadVersion = 0
 
   const summary = $derived(
     valueSummary(
@@ -76,19 +77,19 @@
   }
 
   async function load() {
+    const version = ++loadVersion
     const kind = owner.kind
     const id = owner.id
     const key = hostKey(kind, id)
-    onEffective?.({})
     error = ''
     try {
       const list = await listValues(kind, id)
       if (kind === 'workspace') {
         const spaces = await fetchWorkspaces()
-        if (hostKey(owner.kind, owner.id) !== key) return
+        if (version !== loadVersion || hostKey(owner.kind, owner.id) !== key) return
         workspaceReadonly = spaces.workspaces.find((w) => w.id === spaces.current)?.role !== 'owner'
       }
-      if (hostKey(owner.kind, owner.id) !== key) return
+      if (version !== loadVersion || hostKey(owner.kind, owner.id) !== key) return
       own = list.own ?? []
       inherited = list.inherited ?? []
       truncated = !!list.truncated
@@ -96,11 +97,9 @@
       onEffective?.(effectiveText(effective))
       publishValues(key, liveOf(list.effective ?? []))
     } catch (e) {
-      if (hostKey(owner.kind, owner.id) !== key) return
+      if (version !== loadVersion || hostKey(owner.kind, owner.id) !== key) return
       error = e instanceof Error ? e.message : String(e)
-      own = []
-      inherited = []
-      publishValues(key, [])
+      // Keep the last successful values visible when a refresh fails.
     }
   }
 
@@ -111,6 +110,9 @@
     untrack(() => {
       if (key !== seenKey) {
         seenKey = key
+        own = []
+        inherited = []
+        onEffective?.({})
         void load()
         return
       }
