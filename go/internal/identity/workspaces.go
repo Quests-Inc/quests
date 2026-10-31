@@ -314,6 +314,21 @@ func (s *Store) UpdateWorkspace(ctx context.Context, id int64, name, color, icon
 		}
 		name = &n
 	}
+	if err := CheckWorkspaceAppearance(color, icon); err != nil {
+		return err
+	}
+	result, err := s.DB.ExecContext(ctx, `UPDATE workspace SET name=COALESCE(?,name), color=COALESCE(?,color), icon=COALESCE(?,icon) WHERE id=? AND deleted_at IS NULL`, name, color, icon, id)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func CheckWorkspaceAppearance(color, icon *string) error {
 	if color != nil && !workspaceColor.MatchString(*color) {
 		return ErrWorkspaceAppearance
 	}
@@ -323,14 +338,6 @@ func (s *Store) UpdateWorkspace(ctx context.Context, id int64, name, color, icon
 		default:
 			return ErrWorkspaceAppearance
 		}
-	}
-	result, err := s.DB.ExecContext(ctx, `UPDATE workspace SET name=COALESCE(?,name), color=COALESCE(?,color), icon=COALESCE(?,icon) WHERE id=? AND deleted_at IS NULL`, name, color, icon, id)
-	if err != nil {
-		return err
-	}
-	n, _ := result.RowsAffected()
-	if n == 0 {
-		return ErrNotFound
 	}
 	return nil
 }

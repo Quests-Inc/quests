@@ -7,6 +7,7 @@
 
   let {
     view,
+    canManageWorkspaces = true,
     liveStatus,
     health,
     onViewChange,
@@ -20,10 +21,11 @@
     onOpenAssistant,
   }: {
     view: View,
+    canManageWorkspaces?: boolean,
     liveStatus: string,
     health: { api: string, overlay: string, telegram: string, webdav?: string, db?: string, detail?: Record<string, any> },
     onViewChange: (v: View) => void,
-    onOpenSettings: () => void,
+    onOpenSettings: (opts?: { section?: string }) => void,
     onOpenTemplates: () => void,
     onOpenSecrets: () => void,
     onOpenTags: () => void,
@@ -162,7 +164,7 @@
 <header class="journal__header" bind:this={headerEl} use:watchRoom>
   <div class="header-left">
     <HealthMeter {health} {liveStatus} />
-    <WorkspaceSwitcher />
+    <WorkspaceSwitcher canManage={canManageWorkspaces} onOpenSettings={() => onOpenSettings({ section: 'workspace' })} />
   </div>
 
   <div class="view-tabs" role="tablist" aria-label="Раздел">

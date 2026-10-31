@@ -1,6 +1,7 @@
 import {
   fetchWorkspaces,
   setWorkspaceAppearance,
+  setWorkspaceDetails,
   createWorkspace,
   switchWorkspace,
   fetchMembers,
@@ -49,9 +50,9 @@ export async function loadWorkspaceList() {
   }
 }
 
-export async function loadWorkspaceState() {
+export async function loadWorkspaceState(withMembers = true) {
   await loadWorkspaceList()
-  if (!wsx.loaded || !wsx.current) return
+  if (!wsx.loaded || !wsx.current || !withMembers) return
   try {
     const m = await fetchMembers(wsx.current)
     wsx.members = m?.members ?? []
@@ -89,10 +90,10 @@ export async function pickWorkspace(id: number) {
   if (await act(() => switchWorkspace(id), 'не удалось переключить')) env.reload()
 }
 
-export async function addWorkspace(name: string) {
+export async function addWorkspace(name: string, appearance?: { color: string; icon: string }) {
   if (!name.trim()) return false
   const ok = await act(async () => {
-    const w = await createWorkspace(name.trim())
+    const w = await createWorkspace(name.trim(), appearance)
     await switchWorkspace(w.id)
   }, 'не удалось создать')
   if (ok) env.reload()
@@ -140,4 +141,11 @@ export async function doImport(file: Blob | File, secrets: any) {
     await switchWorkspace(r.workspace_id)
   }, 'не удалось импортировать')
   if (ok) setTimeout(() => env.reload(), 1800)
+}
+
+export async function saveWorkspaceDetails(id: number, name: string, color: string, icon: string) {
+  return act(async () => {
+    await setWorkspaceDetails(id, name.trim(), color, icon)
+    wsx.list = wsx.list.map((w: { id: number }) => (w.id === id ? { ...w, name: name.trim(), color, icon } : w))
+  }, 'не удалось сохранить пространство')
 }

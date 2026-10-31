@@ -42,6 +42,7 @@
   })
 
   const isOwner = $derived(wsx.myRole === 'owner')
+  const canManage = $derived(isOwner && !!username)
 
   async function makeInvite() {
     inviteUrl = await newInvite()
@@ -75,6 +76,7 @@
       </li>
     {/each}
   </ul>
+  {#if username}
   <form
     class="row"
     onsubmit={(e) => {
@@ -85,6 +87,9 @@
     <input type="text" class="grow" placeholder="Название нового пространства" maxlength="80" bind:value={newName} disabled={wsx.busy} />
     <button type="submit" class="btn" disabled={wsx.busy || !newName.trim()}>Создать</button>
   </form>
+  {:else}
+    <p class="note">Создание и управление пространствами доступны после входа в аккаунт.</p>
+  {/if}
 </SettingsBlock>
 
 {#if wsx.loaded}
@@ -97,7 +102,7 @@
     {:else}
       <p class="usage">Вложения: {mb(wsx.attachmentsUsed)}</p>
     {/if}
-    {#if isOwner}
+    {#if canManage}
       <form
         class="row"
         onsubmit={(e) => {
@@ -112,7 +117,7 @@
       </form>
     {/if}
 
-    {#if isOwner}
+    {#if canManage}
       <form onsubmit={(e) => { e.preventDefault(); saveWorkspaceAppearance(color, icon) }}>
         <ColorIconPicker bind:color bind:icon allowUpload={false} />
         <button type="submit" class="btn" disabled={wsx.busy}>Сохранить оформление</button>
@@ -134,7 +139,7 @@
       {/each}
     </ul>
 
-    {#if isOwner}
+    {#if canManage}
       <h5 class="sub">Приглашение</h5>
       {#if inviteUrl}
         <div class="row">
@@ -159,14 +164,14 @@
   {/if}
 
   {#if wsx.current}
-    <SettingsBlock title="Раннер по умолчанию" hint="Куда уходит код вставки script=N, если в ссылке нет ?on=. Несколько через запятую: берётся первый в сети. Пусто — единственный раннер пространства.">
+    <SettingsBlock title="Раннер по умолчанию" hint="Куда уходит код вставки script=N, если в ссылке нет ?on=. Выберите зарегистрированное устройство; запасные пробуются по порядку, начиная с первого в сети. Без выбора используется единственный доступный раннер пространства.">
       {#key wsx.current}
         <DefaultRunner readonly={!isOwner} />
       {/key}
     </SettingsBlock>
   {/if}
 
-  {#if isOwner}
+  {#if canManage}
     <SettingsBlock
       title="Опасная зона"
       danger

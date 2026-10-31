@@ -110,3 +110,9 @@ test('участники: свой выход подтверждается и п
   await ws.dropMember({ username: 'он', user_id: 2 }, 'я')
   expect(calls).toEqual([])
 })
+
+test('settings without an account load the list without requesting account-only members', async () => {
+  await ws.loadWorkspaceState(false)
+  expect(calls).toEqual(['list'])
+  expect(ws.wsx.loaded).toBe(true)
+})

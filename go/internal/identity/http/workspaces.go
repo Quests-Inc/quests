@@ -262,10 +262,16 @@ func (h *Handler) createWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name string `json:"name"`
+		Name  string  `json:"name"`
+		Color *string `json:"color"`
+		Icon  *string `json:"icon"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<14)).Decode(&body); err != nil {
 		httpx.WriteErr(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if err := identity.CheckWorkspaceAppearance(body.Color, body.Icon); err != nil {
+		httpx.WriteErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	ws, err := h.Provision(r.Context(), p.User.ID, body.Name, wsctx.From(r.Context()))
@@ -280,6 +286,19 @@ func (h *Handler) createWorkspace(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.WriteErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if body.Color != nil || body.Icon != nil {
+		if err := h.Auth.UpdateWorkspace(r.Context(), ws.ID, nil, body.Color, body.Icon); err != nil {
+			_ = h.Auth.AbortWorkspace(r.Context(), ws.ID)
+			httpx.WriteErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if body.Color != nil {
+			ws.Color = *body.Color
+		}
+		if body.Icon != nil {
+			ws.Icon = *body.Icon
+		}
 	}
 	httpx.WriteJSON(w, http.StatusCreated, ws)
 }

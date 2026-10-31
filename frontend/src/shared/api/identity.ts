@@ -49,8 +49,8 @@ export function fetchWorkspaces() {
   return request<WorkspacesView>('/api/workspaces')
 }
 
-export function createWorkspace(name: string) {
-  return request('/api/workspaces', { method: 'POST', body: JSON.stringify({ name }) })
+export function createWorkspace(name: string, appearance?: { color: string; icon: string }) {
+  return request('/api/workspaces', { method: 'POST', body: JSON.stringify({ name, ...appearance }) })
 }
 
 export function fetchMembers(workspaceId: number) {
@@ -160,4 +160,8 @@ export function removeStarter() {
 
 export function setWorkspaceAppearance(id: number, color: string, icon: string) {
   return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ color, icon }) })
+}
+
+export function setWorkspaceDetails(id: number, name: string, color: string, icon: string) {
+  return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name, color, icon }) })
 }

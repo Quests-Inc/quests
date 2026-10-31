@@ -597,6 +597,7 @@
     {liveStatus}
     {health}
     onViewChange={(v) => setView(v)}
+    canManageWorkspaces={!!username}
     onOpenSettings={openSettings}
     onOpenTemplates={openTemplates}
     onOpenSecrets={() => openSecrets()}

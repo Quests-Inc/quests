@@ -41,3 +41,5 @@ Every description and every explaining paragraph is set into its surface as a **
 - Labels above fields (`.label`), hints under them; sections of a form are named by what they hold.
 - Modals: `ModalShell` + `ModalHead` + `ModalFoot`; Escape and the cross close; the first field has focus.
 - Lists: a click opens, state is a dot / word with a hint, time is relative.
+
+The workspace menu opens after 500 ms of mouse hover (click and keyboard open it immediately). Its footer contains “Добавить пространство” and a direct link to workspace settings. Owners can edit a workspace's name, built-in icon and colour from its pencil button or context click. The default runner uses the registered-device picker, retaining ordered fallbacks; settings action rows have an explicit gap and wrap on narrow screens.

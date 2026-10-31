@@ -18,7 +18,15 @@
   <p class="hint">Учебные квесты, заметки, скрипты, выключенные хук и шаблон. Повторное добавление сохраняет ваши правки и не возвращает удалённые примеры.</p>
   {#if error}<p class="modal__error" role="alert">{error}</p>{/if}
   {#if result}<p role="status">{result}</p>{/if}
+  <div class="starter__actions">
   <button type="button" class="btn" disabled={busy || readonly} onclick={() => void run()}>Добавить примеры</button>
   <button type="button" class="btn btn--ghost" disabled={busy || readonly} onclick={() => (confirm = true)}>Убрать примеры…</button>
+  </div>
 </section>
 <ConfirmModal open={confirm} title="Убрать стартовые примеры?" message="Нетронутые примеры, шаблон и квестлайн отправятся в корзину. Изменённые вами примеры сохранятся. Повторное добавление не вернёт убранный набор." {busy} onCancel={() => (confirm = false)} onConfirm={() => void run(true)} />
+
+<style>
+  .starter { display: grid; gap: 0.75rem; }
+  .starter h3, .starter p { margin: 0; }
+  .starter__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+</style>

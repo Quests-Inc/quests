@@ -29,12 +29,8 @@
     { id: 'appearance', label: 'Внешний вид' },
     { id: 'hotkeys', label: 'Клавиши' },
     { id: 'examples', label: 'Примеры и гайды' },
-    ...(onLogout && wsx.loaded
-      ? [
-          { id: 'workspace', label: 'Пространство' },
-          { id: 'archive', label: 'Архив' },
-        ]
-      : []),
+    ...(wsx.loaded ? [{ id: 'workspace', label: 'Пространство' }] : []),
+    ...(onLogout && wsx.loaded ? [{ id: 'archive', label: 'Архив' }] : []),
     ...(onLogout ? [{ id: 'assistant', label: 'Ассистент' }, { id: 'connections', label: 'Подключения' }, { id: 'account', label: 'Аккаунт' }] : []),
   ])
 
@@ -44,9 +40,9 @@
 
   $effect(() => {
     if (!open) return
-    active = section && ['services', 'appearance', 'hotkeys', 'trash', 'examples'].includes(section) ? section : 'services'
+    active = section && ['services', 'appearance', 'hotkeys', 'trash', 'examples', 'workspace'].includes(section) ? section : 'services'
     pane = section ? 'content' : 'nav'
-    if (onLogout) void loadWorkspaceState()
+    if (onLogout || section === 'workspace') void loadWorkspaceState(!!onLogout)
   })
 
   const activeLabel = $derived(sections.find((s) => s.id === active)?.label ?? '')
