@@ -116,3 +116,18 @@ test('settings without an account load the list without requesting account-only 
   expect(calls).toEqual(['list'])
   expect(ws.wsx.loaded).toBe(true)
 })
+
+test('successful switch clears the entity id, failed switch and current workspace leave the URL intact', async () => {
+  ws.wsx.current = 1
+  history.replaceState(null, '', '/?note=78')
+  await ws.pickWorkspace(1)
+  expect(location.search).toBe('?note=78')
+  fail = 'switch:2'
+  await ws.pickWorkspace(2)
+  expect(location.search).toBe('?note=78')
+  expect(reloads).toBe(0)
+  fail = null
+  await ws.pickWorkspace(2)
+  expect(location.search).toBe('?tab=notes')
+  expect(reloads).toBe(1)
+})

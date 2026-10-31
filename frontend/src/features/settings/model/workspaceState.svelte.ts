@@ -11,6 +11,7 @@ import {
   deleteWorkspace,
   importWorkspace,
 } from '@/shared/api/client.ts'
+import { replaceSearch, searchAfterWorkspaceSwitch } from '@/shared/lib/urlSearch.ts'
 
 /** Workspaces of the signed-in account, shared by the settings sections.
  * Switching / creating / deleting reloads the page: every list in the app belongs to one workspace. */
@@ -30,6 +31,11 @@ export const wsx = $state({
 
 /** Браузерное окружение, которое можно подменить в тестах: перезагрузка страницы и адрес сервера. */
 export const env = { reload: () => location.reload(), origin: () => location.origin }
+
+function reloadWorkspace() {
+  replaceSearch(searchAfterWorkspaceSwitch(location.search))
+  env.reload()
+}
 
 export function currentWorkspaceName() {
   return wsx.list.find((w: { id: any }) => w.id === wsx.current)?.name ?? ''
@@ -87,7 +93,7 @@ async function act(fn: () => Promise<unknown>, failure: string) {
 
 export async function pickWorkspace(id: number) {
   if (id === wsx.current) return
-  if (await act(() => switchWorkspace(id), 'не удалось переключить')) env.reload()
+  if (await act(() => switchWorkspace(id), 'не удалось переключить')) reloadWorkspace()
 }
 
 export async function addWorkspace(name: string, appearance?: { color: string; icon: string }) {
@@ -96,7 +102,7 @@ export async function addWorkspace(name: string, appearance?: { color: string; i
     const w = await createWorkspace(name.trim(), appearance)
     await switchWorkspace(w.id)
   }, 'не удалось создать')
-  if (ok) env.reload()
+  if (ok) reloadWorkspace()
   return ok
 }
 
@@ -110,7 +116,7 @@ export async function saveName(name: string) {
 }
 
 export async function removeCurrent(confirmName: string) {
-  if (await act(() => deleteWorkspace(wsx.current, confirmName.trim()), 'не удалось удалить')) env.reload()
+  if (await act(() => deleteWorkspace(wsx.current, confirmName.trim()), 'не удалось удалить')) reloadWorkspace()
 }
 
 /** @returns the one-time link, or '' on failure */
@@ -128,7 +134,7 @@ export async function dropMember(m: { username: any; user_id: number }, me: any)
   if (!confirm(self ? 'Выйти из этого пространства?' : `Убрать ${m.username} из пространства?`)) return
   const ok = await act(() => removeMember(wsx.current, m.user_id), 'не удалось убрать')
   if (!ok) return
-  if (self) env.reload()
+  if (self) reloadWorkspace()
   else wsx.members = wsx.members.filter((x: { user_id: any }) => x.user_id !== m.user_id)
 }
 
@@ -140,7 +146,7 @@ export async function doImport(file: Blob | File, secrets: any) {
     wsx.notice = `Создано пространство «${r.name}». Команд без раннера убрано: ${rep.stripped_commands ?? 0}, битых ссылок: ${rep.dangling_refs ?? 0}.`
     await switchWorkspace(r.workspace_id)
   }, 'не удалось импортировать')
-  if (ok) setTimeout(() => env.reload(), 1800)
+  if (ok) setTimeout(() => reloadWorkspace(), 1800)
 }
 
 export async function saveWorkspaceDetails(id: number, name: string, color: string, icon: string) {
