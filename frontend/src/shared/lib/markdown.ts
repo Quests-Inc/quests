@@ -246,7 +246,7 @@ function shieldScripts(chunk: string) {
 
 function linkifyRefs(
   source: string,
-  opts: { labels?: Record<string, string>; values?: Record<string, string> } = {},
+  opts: { labels?: Record<string, string>; values?: Record<string, string>; valuesLoading?: boolean } = {},
   bag: string[] = []
 ) {
   const labels = opts.labels || {}
@@ -264,14 +264,19 @@ function linkifyRefs(
           bag.push(valueChip(`${kind}=${id}.${name}`, values[key]))
           return token
         }
+        if (opts.valuesLoading) {
+          const token = `⟦V${bag.length}⟧`
+          bag.push(valueChip(key, '…'))
+          return token
+        }
         const token = `%%HOLD${held.length}%%`
         held.push(full)
         return token
       })
       chunk = chunk.replace(MUSTACHE_RE, (full, name) => {
-        if (!Object.prototype.hasOwnProperty.call(values, name)) return full
+        if (!Object.prototype.hasOwnProperty.call(values, name) && !opts.valuesLoading) return full
         const token = `⟦V${bag.length}⟧`
-        bag.push(valueChip(name, values[name]))
+        bag.push(valueChip(name, values[name] ?? '…'))
         return token
       })
       chunk = chunk
@@ -311,12 +316,12 @@ function renderKey(text: string, labels: Record<string, string>, values: Record<
 /** Render markdown to sanitized HTML. Journal refs become in-app `?kind=id` links. `{{name}}` becomes a value. */
 export function renderMarkdown(
   source: any,
-  opts: { labels?: Record<string, string>; values?: Record<string, string> } = {}
+  opts: { labels?: Record<string, string>; values?: Record<string, string>; valuesLoading?: boolean } = {}
 ) {
   const text = String(source ?? '')
   if (!text.trim()) return ''
   const values = opts.values ?? {}
-  const key = renderKey(text, opts.labels ?? {}, values)
+  const key = renderKey(text, opts.labels ?? {}, values) + (opts.valuesLoading ? '\u0003loading' : '')
   const hit = renderCache.get(key)
   if (hit !== undefined) {
     renderCache.delete(key)

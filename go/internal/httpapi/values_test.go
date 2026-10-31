@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/quests-inc/quests/go/internal/execution"
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
@@ -259,5 +260,76 @@ func TestNetworkNodeNeedsThePolicyAndTheGrant(t *testing.T) {
 	}
 	if code, out := save(h2); code != http.StatusCreated {
 		t.Fatalf("granted: %d %v", code, out)
+	}
+}
+
+func TestCopyNoteValuesPreservesFormulasAndDoesNotOverwrite(t *testing.T) {
+	h, s := secretsServer(t)
+	ctx := wsctx.With(t.Context(), 1)
+	source, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "original"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "copy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	script, err := s.Store.Execution.CreateScript(ctx, "roll source", "", []byte(`{"nodes":[{"id":1,"type":"args","params":{"params":[{"name":"expr","type":"str"}]}},{"id":2,"type":"expr","params":{}},{"id":3,"type":"sink.result","params":{}}],"edges":[{"from":{"node":1,"port":"expr"},"to":{"node":2,"port":"expr"}},{"from":{"node":2,"port":"text"},"to":{"node":3,"port":"value"}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Store.Execution.SetRolledValue(ctx, execution.SecretOwner{Kind: execution.SecretOwnerNote, ID: source.ID}, "rolled", "int", "7", script.ID, "2к8+2"); err != nil {
+		t.Fatal(err)
+	}
+	sourceURL := "/api/notes/" + strconv.FormatInt(source.ID, 10)
+	targetURL := "/api/notes/" + strconv.FormatInt(target.ID, 10)
+	for _, pair := range []struct {
+		name string
+		body map[string]any
+	}{
+		{"hp", map[string]any{"type": "int", "value": 20}},
+		{"double", map[string]any{"type": "int", "formula": "hp * 2"}},
+	} {
+		if code, out := secretReq(h, http.MethodPut, sourceURL+"/values/"+pair.name, pair.body); code != 200 {
+			t.Fatalf("put %d %v", code, out)
+		}
+	}
+	if code, out := secretReq(h, http.MethodPost, targetURL+"/values/copy", map[string]any{"source_id": source.ID}); code != 204 {
+		t.Fatalf("copy %d %v", code, out)
+	}
+	code, out := secretReq(h, http.MethodGet, targetURL+"/values", nil)
+	if code != 200 {
+		t.Fatal(out)
+	}
+	own := out["own"].([]any)
+	if len(own) != 3 {
+		t.Fatal(out)
+	}
+	found := false
+	rolled := false
+	for _, v := range own {
+		row := v.(map[string]any)
+		if row["name"] == "rolled" {
+			rolled = true
+			roll := row["roll"].(map[string]any)
+			if row["value"] != float64(7) || roll["arg"] != "2к8+2" || roll["script"] != float64(script.ID) {
+				t.Fatal(row)
+			}
+		}
+		if row["name"] == "double" {
+			found = true
+			if row["formula"] != "hp * 2" || row["value"] != float64(40) {
+				t.Fatal(row)
+			}
+		}
+	}
+	if !found || !rolled {
+		t.Fatal(out)
+	}
+	if code, _ := secretReq(h, http.MethodPost, targetURL+"/values/copy", map[string]any{"source_id": source.ID}); code != 422 {
+		t.Fatalf("must refuse overwriting: %d", code)
+	}
+	if code, _ := secretReq(h, http.MethodPost, targetURL+"/values/copy", map[string]any{"source_id": 99999999}); code != 404 {
+		t.Fatalf("missing source: %d", code)
 	}
 }

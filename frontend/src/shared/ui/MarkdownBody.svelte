@@ -20,6 +20,7 @@
     class: className = '',
     labels = {},
     values = {},
+    valuesLoading = false,
     host,
     ownValues = false,
     onRef,
@@ -29,6 +30,7 @@
     class?: string,
     labels?: Record<string, string>,
     values?: Record<string, string>,
+    valuesLoading?: boolean,
     host?: { kind: string; id: number },
     /** The text reads the named values of `host` itself: load them here (a page that has its own value table passes `values`). */
     ownValues?: boolean,
@@ -125,7 +127,7 @@
   })
 
   let merged = $derived({ ...foreign, ...own, ...values })
-  let html = $derived(renderMarkdown(source, { labels, values: merged }))
+  let html = $derived(renderMarkdown(source, { labels, values: merged, valuesLoading }))
   let valueSig = $derived(
     Object.keys(merged)
       .sort()

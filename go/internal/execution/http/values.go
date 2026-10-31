@@ -42,6 +42,7 @@ type valueListJSON struct {
 }
 
 func (h *Handler) registerValueRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/notes/{id}/values/copy", h.copyNoteValues)
 	mux.HandleFunc("GET /api/workspace/values", h.listValues(workspaceSegment))
 	mux.HandleFunc("PUT /api/workspace/values/{name}", h.putValue(workspaceSegment))
 	mux.HandleFunc("DELETE /api/workspace/values/{name}", h.deleteValue(workspaceSegment))
@@ -412,4 +413,35 @@ func (h *Handler) valuesChanged(r *http.Request, o execution.SecretOwner, name, 
 	if h.ValuesChanged != nil {
 		h.ValuesChanged(r.Context(), events.ValueChange{OwnerKind: o.Kind, OwnerID: o.ID, Name: name, Type: typ, Value: value})
 	}
+}
+
+// copyNoteValues is used after creating a duplicate note; it never re-rolls scripts.
+func (h *Handler) copyNoteValues(w http.ResponseWriter, r *http.Request) {
+	target, ok := h.secretOwner(w, r, "notes")
+	if !ok {
+		return
+	}
+	var body struct {
+		SourceID int64 `json:"source_id"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil || body.SourceID < 1 {
+		writeErr(w, http.StatusBadRequest, "source_id required")
+		return
+	}
+	source := execution.SecretOwner{Kind: execution.SecretOwnerNote, ID: body.SourceID}
+	exists, err := h.Store.SecretOwnerExists(r.Context(), source)
+	if err != nil {
+		valueWriteErr(w, err)
+		return
+	}
+	if !exists {
+		writeErr(w, http.StatusNotFound, "note not found")
+		return
+	}
+	if err := h.Store.CopyNoteValues(r.Context(), body.SourceID, target.ID, fromMCP(r)); err != nil {
+		valueWriteErr(w, err)
+		return
+	}
+	h.valuesChanged(r, target, "", "", nil)
+	w.WriteHeader(http.StatusNoContent)
 }

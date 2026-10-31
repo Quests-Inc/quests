@@ -46,3 +46,9 @@ The «Переменные: записать несколько» node (`sink.va
 becomes a variable name; numbers, strings and booleans determine the scalar type. Nested objects, arrays, nulls, bad names,
 limits and an existing formula reject the entire write. The transaction either writes every field or writes nothing;
 change events are emitted only after commit. The single-variable node keeps its existing contract.
+
+## Дублирование заметки
+
+«Дублировать» создаёт заметку рядом с исходной и копирует её собственные обычные переменные: типы, текущие значения, формулы и источник повторного броска. Броски заново не выполняются. Унаследованные переменные остаются унаследованными через того же родителя.
+
+Собственные **секреты не копируются**. Секреты родителя и пространства по-прежнему доступны по обычным правилам наследования. Это правило относится к команде дублирования заметки, а не к экспорту/импорту пространства.

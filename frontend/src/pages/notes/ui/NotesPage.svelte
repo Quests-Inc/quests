@@ -4,6 +4,7 @@
   import { tick } from 'svelte'
   import {
     createNote,
+    duplicateNote as copyNote,
     deleteNote,
     getNote,
     updateNote,
@@ -546,12 +547,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     const row = noteById(id)
     if (!row) return
     try {
-      const created = await createNote({
-        title: `${row.title || `note=${id}`} (копия)`,
-        description: row.description ?? '',
-        parent_id: row.parent_id ?? null,
-        color: row.color,
-      })
+      const created = await copyNote(id)
       await onChanged()
       onSelect(created.id)
       toast('Заметка продублирована', { kind: 'success' })

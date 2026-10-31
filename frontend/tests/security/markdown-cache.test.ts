@@ -20,3 +20,15 @@ test('подписи ссылок входят в ключ кеша: смени�
 test('пустой текст — пустая строка', () => {
   expect(renderMarkdown('   ')).toBe('')
 })
+
+test('loading values use placeholders without poisoning the ready render cache; code stays literal', () => {
+  const source = '{{hp}} / {{note=259.ac}} / `{{hp}}`'
+  const ready = renderMarkdown(source)
+  expect(ready).toContain('{{hp}}')
+  const loading = renderMarkdown(source, { valuesLoading: true })
+  expect(loading).toContain('data-value="hp">…</span>')
+  expect(loading).toContain('data-value="note=259.ac">…</span>')
+  expect(loading).toContain('<code>{{hp}}</code>')
+  expect(renderMarkdown(source)).toBe(ready)
+  expect(renderMarkdown('{{hp}}', { values: { hp: '12' }, valuesLoading: true })).toContain('>12</span>')
+})

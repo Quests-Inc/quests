@@ -14,6 +14,8 @@
   type Crumb = { id: number | null; title: string }
 
   let noteValues = $state({} as Record<string, string>)
+  let valuesNoteId = $state<number | null>(null)
+  let valuesLoading = $state(true)
 
   /** Тело открытой заметки: шапка, редактор, предпросмотр, ссылки и вложения. Раскладка страницы остаётся у NotesPage. */
   let {
@@ -164,7 +166,11 @@
   >
     {#snippet tools()}
       {#if selectedId && !(ed.isPrivate && !ed.privateRevealed)}
-        <ValueTable variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text) => (noteValues = text)} />
+        <ValueTable variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text, load) => {
+          noteValues = text
+          valuesNoteId = load.id
+          valuesLoading = load.state === 'loading'
+        }} />
       {/if}
     {/snippet}
   </NoteHead>
@@ -211,7 +217,7 @@
           bind:this={previewEl}
           ondblclick={onStartBodyEdit}
         >
-          <MarkdownBody source={ed.description} {labels} {onRef} values={noteValues} host={selectedId ? { kind: 'note', id: selectedId } : undefined} />
+          <MarkdownBody source={ed.description} {labels} {onRef} values={valuesNoteId === selectedId ? noteValues : {}} valuesLoading={valuesNoteId !== selectedId || valuesLoading} host={selectedId ? { kind: 'note', id: selectedId } : undefined} />
         </div>
       {/if}
     </div>

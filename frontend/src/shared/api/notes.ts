@@ -79,3 +79,29 @@ export function searchInNote(id: number, q: string) {
 export function setNoteOutdated(id: number, outdated: boolean, reason = '') {
   return request(`/api/notes/${id}/outdated`, { method: 'PUT', body: JSON.stringify({ outdated, reason }) })
 }
+
+/** Copy persisted note data and its own values, retaining formulas and roll sources. */
+export async function duplicateNote(id: number) {
+  const source = await getNote(id)
+  const created = await createNote({
+    title: `${source.title || `note=${id}`} (копия)`,
+    description: source.description ?? '',
+    parent_id: source.parent_id ?? null,
+    color: source.color,
+    is_private: source.is_private,
+  })
+  try {
+    await request(`/api/notes/${created.id}/values/copy`, {
+      method: 'POST',
+      body: JSON.stringify({ source_id: id }),
+    })
+  } catch (error) {
+    try {
+      await deleteNote(created.id)
+    } catch {
+      throw new Error(`Не удалось скопировать переменные; неполная копия note=${created.id} осталась в списке`)
+    }
+    throw error
+  }
+  return created
+}

@@ -21,7 +21,7 @@
     owner: { kind: string; id: number }
     readonly?: boolean
     variant?: 'text' | 'icon' | 'hidden' | 'inline' | 'panel'
-    onEffective?: (text: Record<string, string>) => void
+    onEffective?: (text: Record<string, string>, load: { kind: string; id: number; state: 'loading' | 'ready' | 'error' }) => void
   } = $props()
 
   const NAME = /^[a-z][a-z0-9_]{0,23}$/
@@ -49,6 +49,7 @@
   let editing = $state('')
   let seenKey = ''
   let loadVersion = 0
+  let loaded = false
 
   const summary = $derived(
     valueSummary(
@@ -94,12 +95,14 @@
       inherited = list.inherited ?? []
       truncated = !!list.truncated
       const effective = (list.effective ?? []).filter((row) => !row.error && row.value != null)
-      onEffective?.(effectiveText(effective))
+      loaded = true
+      onEffective?.(effectiveText(effective), { kind, id, state: 'ready' })
       publishValues(key, liveOf(list.effective ?? []))
     } catch (e) {
       if (version !== loadVersion || hostKey(owner.kind, owner.id) !== key) return
       error = e instanceof Error ? e.message : String(e)
       // Keep the last successful values visible when a refresh fails.
+      if (!loaded) onEffective?.({}, { kind, id, state: 'error' })
     }
   }
 
@@ -110,9 +113,10 @@
     untrack(() => {
       if (key !== seenKey) {
         seenKey = key
+        loaded = false
         own = []
         inherited = []
-        onEffective?.({})
+        onEffective?.({}, { ...owner, state: 'loading' })
         void load()
         return
       }
