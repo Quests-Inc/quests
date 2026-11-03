@@ -239,6 +239,9 @@ func (p *formParser) ident() (formVal, error) {
 		break
 	}
 	word := p.s[start:p.i]
+	if p.take("(") {
+		return p.call(word)
+	}
 	switch word {
 	case "true":
 		return formVal{kind: vkBool, b: true}, nil
@@ -249,6 +252,43 @@ func (p *formParser) ident() (formVal, error) {
 		return formVal{}, &ValueError{Msg: "формула: имя «" + word + "»"}
 	}
 	return p.get(word)
+}
+
+// round uses decimal scaling and halves away from zero, as math.Round does.
+func (p *formParser) call(name string) (formVal, error) {
+	if name != "round" {
+		return formVal{}, &ValueError{Msg: "формула: неизвестная функция «" + name + "»"}
+	}
+	v, err := p.or()
+	if err != nil {
+		return formVal{}, err
+	}
+	digits := int64(0)
+	if p.take(",") {
+		d, err := p.or()
+		if err != nil {
+			return formVal{}, err
+		}
+		if d.kind != vkInt || d.i < 0 || d.i > 9 {
+			return formVal{}, &ValueError{Msg: "round: точность — целое от 0 до 9"}
+		}
+		digits = d.i
+	}
+	if !p.take(")") {
+		return formVal{}, &ValueError{Msg: "round: ожидается закрывающая скобка (один или два аргумента)"}
+	}
+	if !isNum(v) {
+		return formVal{}, &ValueError{Msg: "round: ожидается число"}
+	}
+	if v.kind == vkInt {
+		return v, nil
+	}
+	scale := math.Pow10(int(digits))
+	rounded := math.Round(v.f*scale) / scale
+	if digits == 0 {
+		return formVal{kind: vkInt, i: int64(rounded)}, nil
+	}
+	return formVal{kind: vkFloat, f: rounded}, nil
 }
 
 func (p *formParser) number() (formVal, error) {

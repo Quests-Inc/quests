@@ -35,7 +35,7 @@ var Catalog = []EventInfo{
 	{"note_created", FamilyNote, "заметка создана", []string{"note_id", "title"}},
 	{"note_updated", FamilyNote, "заметка изменена", []string{"note_id", "title"}},
 	{"note_deleted", FamilyNote, "заметка удалена", []string{"note_id", "title"}},
-	{"values_changed", FamilyValue, "переменная записана или удалена", []string{"owner_kind", "owner_id", "name", "type", "value"}},
+	{"values_changed", FamilyValue, "переменная записана или удалена", []string{"owner_kind", "owner_id", "name", "value_type", "value"}},
 	{"attachment_added", FamilyAttachment, "вложение добавлено", []string{"attachment_id", "owner_type", "owner_id", "title"}},
 	{"attachment_revision", FamilyAttachment, "новая версия вложения", []string{"attachment_id", "owner_type", "owner_id", "title"}},
 	{"template_emitted", FamilyTemplate, "шаблон выдал квест", []string{"template_id", "quest_id", "title", "period"}},

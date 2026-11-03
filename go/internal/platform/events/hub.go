@@ -289,7 +289,7 @@ func (h *Hub) ValuesChanged(workspace int64, c ValueChange) {
 		extra["name"] = c.Name
 	}
 	if c.Type != "" {
-		extra["type"] = c.Type
+		extra["value_type"] = c.Type
 	}
 	if c.Value != nil && c.Type != "str" {
 		extra["value"] = c.Value

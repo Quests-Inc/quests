@@ -88,3 +88,28 @@ func TestFormulaRejects(t *testing.T) {
 		}
 	}
 }
+
+func TestFormulaRound(t *testing.T) {
+	for _, tc := range []struct{ typ, formula, want string }{
+		{"float", "round(369.06000000000006, 2)", "369.06"},
+		{"int", "round(327.98750000000007)", "328"},
+		{"int", "round(2.5)", "3"}, {"int", "round(-2.5, 0)", "-3"},
+		{"float", "round(-1.25, 1)", "-1.3"}, {"int", "round(3, 2)", "3"},
+		{"float", "round(round(1.2345, 3) + 1.0, 2)", "2.24"},
+		{"float", "round(0.000000001, 9)", "0.000000001"}, {"int", "round(-0.1)", "0"},
+	} {
+		got := formOut(t, tc.typ, tc.formula)
+		if got.Error != "" || got.Value != tc.want {
+			t.Errorf("%s: %+v, want %s", tc.formula, got, tc.want)
+		}
+	}
+	for _, expr := range []string{`round("x")`, "round(true)", "round()", "round(1, -1)", "round(1, 10)", "round(1, 2.0)", "round(1, 2, 3)", "round(1", "unknown(1)"} {
+		if got := formOut(t, "float", expr); got.Error == "" {
+			t.Errorf("accepted %s", expr)
+		}
+	}
+	got := formOut(t, "float", "round(fat_g, precision)", StoredValue{Name: "fat_g", Type: "float", Value: "369.06000000000006"}, StoredValue{Name: "precision", Type: "int", Value: "2"})
+	if got.Error != "" || got.Value != "369.06" {
+		t.Fatalf("variables: %+v", got)
+	}
+}

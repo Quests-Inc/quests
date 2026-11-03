@@ -20,6 +20,13 @@ A variable is a literal or a formula over the other variables in scope: `(str - 
 strings join with `+`. A formula follows the variables it names. `note=12.str` (and `quest=`, `step=`, `questline=`,
 `template=`) reads a variable of another entity, in a formula and in a text.
 
+`round(value)` or `round(value, 0)` rounds to an integer; `round(value, digits)` rounds to 0–9 decimal places.
+`digits` must be an integer. Numeric arguments may be expressions or variables, including nested calls.
+Halves round away from zero: `round(2.5)` → 3, `round(-2.5)` → -3, `round(-1.25, 1)` → -1.3.
+Zero precision returns an `int`; positive precision preserves an integer input or returns a `float`.
+Calculations use binary floating point, so decimal values near a half follow their stored representation.
+For example, `round(369.06000000000006, 2)` → 369.06 and `round(327.98750000000007)` → 328.
+
 ## In texts, scripts and commands
 
 - A text shows a variable as `{{name}}` (`{{note=12.str}}` for another entity's); an embedding's formula reads it by name
@@ -32,7 +39,7 @@ strings join with `+`. A formula follows the variables it names. `note=12.str` (
 
 ## Changes
 
-A write (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner, and open
+A write (the table, the API, a script node, a runner) is announced on the socket as `values_changed` with the owner and `value_type` (the envelope `type` remains `quests_changed`), and open
 pages read the variables again. Hooks can wait for it (the «переменная» family, [`hooks.md`](hooks.md)).
 
 ## Where in the interface

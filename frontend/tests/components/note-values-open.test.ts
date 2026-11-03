@@ -2,6 +2,8 @@ import { expect, mock, test } from 'bun:test'
 
 import { flushSync, mount, unmount } from 'svelte'
 
+import { ANY_HOST, touchValues } from '@/shared/lib/valueLive.svelte.ts'
+
 import { cell } from './root.svelte.ts'
 
 const pending = new Map<number, (v: unknown) => void>()
@@ -67,6 +69,18 @@ test('opening and switching notes never renders raw variables or values from the
     await tick()
     flushSync()
     expect(body()).toBe('Здоровье: 12')
+    touchValues(ANY_HOST)
+    flushSync()
+    pending.get(260)!({ own: [], inherited: [], effective: [] })
+    await tick()
+    flushSync()
+    expect(body()).toBe('Здоровье: {{hp}}')
+    touchValues(ANY_HOST)
+    flushSync()
+    pending.get(260)!(values(42))
+    await tick()
+    flushSync()
+    expect(body()).toBe('Здоровье: 42')
   } finally {
     await unmount(app)
     target.remove()
