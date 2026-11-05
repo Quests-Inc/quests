@@ -1,5 +1,6 @@
 // Что показать на экране карты: уровень детализации карточек по видимой площади и модель миникарты.
-import type { GraphNodeView } from './types.ts'
+import { STUB } from './geometry.ts'
+import type { GraphEdgeView, GraphNodeView } from './types.ts'
 
 // How much of a card is built right now, by its share of the map area on screen:
 // 'lite' — frame only (< 0.5%, or well outside the window); 'title' — the head
@@ -120,4 +121,43 @@ export function fitCamera(
   }
   const k = Math.min(1, (stage.w - 40) / Math.max(1, x1 - x0), (stage.h - 40) / Math.max(1, y1 - y0))
   return { k, x: stage.w / 2 - ((x0 + x1) / 2) * k, y: stage.h / 2 - ((y0 + y1) / 2) * k }
+}
+
+/** World bounds with a screen-space buffer, so cards mount before entering the window. */
+export function viewportBounds(cam: { x: number; y: number; k: number }, stage: { w: number; h: number }) {
+  if (!stage.w || !stage.h || cam.k <= 0) return null
+  const pad = 240 / cam.k
+  return {
+    x0: -cam.x / cam.k - pad,
+    y0: -cam.y / cam.k - pad,
+    x1: (stage.w - cam.x) / cam.k + pad,
+    y1: (stage.h - cam.y) / cam.k + pad,
+  }
+}
+
+type ViewportBounds = ReturnType<typeof viewportBounds>
+
+export function boxInViewport(n: { x: number; y: number; w: number; h: number }, bounds: ViewportBounds) {
+  return (
+    !bounds ||
+    (n.x + n.w / 2 >= bounds.x0 &&
+      n.x - n.w / 2 <= bounds.x1 &&
+      n.y + n.h / 2 >= bounds.y0 &&
+      n.y - n.h / 2 <= bounds.y1)
+  )
+}
+
+/** Include crossing edges even when both cards are outside. Cubic curves stay inside their control hull. */
+export function edgeInViewport(e: GraphEdgeView, bounds: ViewportBounds) {
+  if (!bounds) return true
+  const endX = e.ex - e.fx * STUB
+  const endY = e.ey - e.fy * STUB
+  const off = Math.max(30, Math.abs(e.fx ? endX - e.sx : endY - e.sy) / 2)
+  const x0 = Math.min(e.sx, e.ex, e.sx + e.fx * off, endX - e.fx * off)
+  const x1 = Math.max(e.sx, e.ex, e.sx + e.fx * off, endX - e.fx * off)
+  const y0 = Math.min(e.sy, e.ey, e.sy + e.fy * off, endY - e.fy * off)
+  const y1 = Math.max(e.sy, e.ey, e.sy + e.fy * off, endY - e.fy * off)
+  // Arrowheads, highlight stroke and the menu hit area extend beyond the curve.
+  const pad = 32
+  return x1 + pad >= bounds.x0 && x0 - pad <= bounds.x1 && y1 + pad >= bounds.y0 && y0 - pad <= bounds.y1
 }

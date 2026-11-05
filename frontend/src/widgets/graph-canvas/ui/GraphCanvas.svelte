@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GraphMinimap, GraphTools, RASTER, tintOf, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
+  import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
   import type { Snippet } from 'svelte'
   import { createClusterFolds } from '../model/folds.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
@@ -80,6 +80,13 @@
     children?: Snippet
   } = $props()
 
+  // All cards mount during measurement. Once laid out, retain only the viewport and active editors.
+  const bounds = $derived(stage.ready ? viewportBounds(gest.cam, stage.stageSize) : null)
+  const renderedNodes = $derived((stage.view?.nodes ?? []).filter((n) =>
+    n.key === editing?.key || n.key === resize?.active || boxInViewport(n, bounds)))
+  const renderedGroups = $derived(stage.groups.filter((g) => boxInViewport(g, bounds)))
+  const renderedEdges = $derived(stage.drawEdges.filter((e) => edgeInViewport(e, bounds)))
+
   /** A step's quest: its colour tints the step. */
   const owners = $derived(
     new Map(stage.edges.filter((e) => e.kind === 'structure' && e.to.startsWith('step:') && e.from.startsWith('quest:')).map((e) => [e.to, stage.nodeMap.get(e.from)]))
@@ -127,9 +134,9 @@
   <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish} />
 
   <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready}>
-    <GraphEdges drawEdges={stage.drawEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
-    <GraphGroups groups={stage.groups} collapseKey={stage.collapseKey} onGroupDown={gest.onGroupDown} {onGroupCtx} onCollapse={folds.collapse} />
-    {#each stage.view?.nodes ?? [] as n (n.key)}
+    <GraphEdges drawEdges={renderedEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
+    <GraphGroups groups={renderedGroups} collapseKey={stage.collapseKey} onGroupDown={gest.onGroupDown} {onGroupCtx} onCollapse={folds.collapse} />
+    {#each renderedNodes as n (n.key)}
       <GraphCard
         {n}
         selected={n.key === stage.selectedKey}

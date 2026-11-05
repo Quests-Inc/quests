@@ -1,7 +1,36 @@
 import { expect, test } from 'bun:test'
 
 import { freeShift, restoreHandPlaced } from '../../src/entities/graph/model/placement.ts'
-import { computeTiers, minimapModel } from '../../src/entities/graph/model/viewport.ts'
+import {
+  computeTiers,
+  minimapModel,
+  viewportBounds,
+  boxInViewport,
+  edgeInViewport,
+} from '../../src/entities/graph/model/viewport.ts'
+
+test('viewport: screen buffer, partial cards, pan and zoom on a large map', () => {
+  const stage = { w: 1000, h: 800 }
+  const nodes = Array.from({ length: 10000 }, (_, i) => card(`note:${i}`, i * 500, 400))
+  const bounds = viewportBounds({ k: 1, x: 0, y: 0 }, stage)
+  expect(nodes.filter((n) => boxInViewport(n, bounds)).length).toBe(3)
+  expect(boxInViewport(card('partial', 1280, 400), bounds)).toBe(true)
+  expect(boxInViewport(card('outside', 1300, 400), bounds)).toBe(false)
+  const moved = viewportBounds({ k: 2, x: -10000, y: -400 }, stage)
+  expect(boxInViewport(nodes[10], moved)).toBe(true)
+  expect(boxInViewport(nodes[0], moved)).toBe(false)
+  expect(boxInViewport(nodes[9999], null)).toBe(true)
+  expect(viewportBounds({ k: 1, x: 0, y: 0 }, { w: 0, h: 0 })).toBeNull()
+})
+
+test('viewport: retain crossing curves and reject distant edges', () => {
+  const bounds = viewportBounds({ k: 1, x: 0, y: 0 }, { w: 1000, h: 800 })
+  expect(edgeInViewport({ sx: -2000, sy: 400, ex: 3000, ey: 400, fx: 1, fy: 0 }, bounds)).toBe(true)
+  expect(edgeInViewport({ sx: 9000, sy: 9000, ex: 9200, ey: 9200, fx: 0, fy: 1 }, bounds)).toBe(false)
+  expect(edgeInViewport({ sx: 9000, sy: 9000, ex: 9200, ey: 9200, fx: 0, fy: 1 }, null)).toBe(true)
+  // A long horizontal edge above the viewport must not count as crossing it.
+  expect(edgeInViewport({ sx: -9000, sy: -1000, ex: 9000, ey: -1000, fx: 1, fy: 0 }, bounds)).toBe(false)
+})
 
 const card = (key, x, y, extra = {}) => ({
   key,
