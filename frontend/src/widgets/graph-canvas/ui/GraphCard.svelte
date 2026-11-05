@@ -131,8 +131,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         style:--c-fill={tint && !ownerless ? tinted(t.color, tint) : undefined}
         style:--fill-w={tint && !ownerless ? '17%' : undefined}
         style:z-index={editingHere ? 1_000_000 : z}
-        style:left="{n.x - n.w / 2}px"
-        style:top="{n.y - n.h / 2}px"
+        style:transform="translate3d({n.x - n.w / 2}px, {n.y - n.h / 2}px, 0)"
+        style:will-change={ready ? 'transform' : undefined}
         class:gcard--sized={n.sw != null}
         class:gcard--resizing={resizing}
         style:width={n.sw != null ? `${n.sw}px` : big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
@@ -287,6 +287,10 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 
   .gcard {
     position: absolute;
+    left: 0;
+    top: 0;
+    /* Separate compositor layers let the browser reuse painted text while the map moves. */
+    contain: layout style;
     /* The card's own stacking context (z-index is set inline): its badges stay under cards above it. */
     z-index: 0;
     box-sizing: border-box;

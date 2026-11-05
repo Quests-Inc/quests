@@ -6,7 +6,7 @@ import type { Graph } from '@/shared/api/store.gen'
 import { createClusterFolds } from '@/widgets/graph-canvas/model/folds.svelte.ts'
 import { createGraphStage } from '@/widgets/graph-canvas/model/stage.svelte.ts'
 
-import { inRoot, watch } from './root.svelte.ts'
+import { cell, inRoot, watch } from './root.svelte.ts'
 
 const kinds = new Set(['questline', 'quest', 'step', 'note', 'attachment'])
 
@@ -47,7 +47,7 @@ function graph(): Graph {
 function make(getTrees?: () => { key: string; keys: string[]; layout: string }[]) {
   const saved = new Map<string, { x: number; y: number }>()
   const folds = createClusterFolds({ saved, getNodes: () => [], getGroups: () => [] })
-  let cam = { x: 0, y: 0, k: 1 }
+  const cam = cell({ x: 0, y: 0, k: 1 })
   let active = true
   const hidden = new Set<string>()
   const prefs = {
@@ -78,15 +78,23 @@ function make(getTrees?: () => { key: string; keys: string[]; layout: string }[]
     saved,
     folds,
     initialLayout: 'tree',
-    getCam: () => cam,
+    getCam: () => cam.value,
     setCam: (next) => {
-      cam = next
+      cam.value = next
     },
     clearMarquee: () => {},
     loadDraft: async () => {},
   })
   stage.el = el
-  return { stage, prefs, saved, cam: () => cam, setActive: (v: boolean) => (active = v), data }
+  return {
+    stage,
+    prefs,
+    saved,
+    cam: () => cam.value,
+    setCam: (v: typeof cam.value) => (cam.value = v),
+    setActive: (v: boolean) => (active = v),
+    data,
+  }
 }
 
 async function flush() {
@@ -95,6 +103,78 @@ async function flush() {
   await Promise.resolve()
   await Promise.resolve()
 }
+
+test('geometry and link marks are shared across card reads and unrelated updates', async () => {
+  const { stage } = make()
+  stage.compose()
+  await flush()
+  const cameraTick = cell(0)
+  let geometry = stage.drawEdges
+  let marks = stage.moreMap
+  const dispose = inRoot(() =>
+    watch(() => {
+      void cameraTick.value
+      geometry = stage.drawEdges
+      marks = stage.moreMap
+      expect(stage.drawEdges).toBe(geometry)
+      expect(stage.moreMap).toBe(marks)
+    })
+  )
+  try {
+    flushSync()
+    const firstGeometry = geometry
+    const firstMarks = marks
+    cameraTick.value++
+    flushSync()
+    expect(geometry).toBe(firstGeometry)
+    expect(marks).toBe(firstMarks)
+    stage.nodes[0].x += 100
+    stage.touch()
+    flushSync()
+    expect(geometry).not.toBe(firstGeometry)
+    stage.showEdge = { structure: false, reference: false, dependency: false }
+    flushSync()
+    expect(geometry).toEqual([])
+  } finally {
+    dispose()
+  }
+})
+
+test('minimap model is shared across rectangle reads and refreshes on camera and geometry changes', async () => {
+  const { stage, setCam } = make()
+  stage.compose()
+  await flush()
+  stage.stageSize.w = 800
+  stage.stageSize.h = 600
+  for (const n of stage.nodes) {
+    n.w = 240
+    n.h = 120
+  }
+  let model = stage.mini
+  const dispose = inRoot(() =>
+    watch(() => {
+      model = stage.mini
+      expect(model).not.toBeNull()
+      // The SVG reads these props for every rectangle; none may rebuild the graph model.
+      for (let i = 0; i < 600; i++) expect(stage.mini).toBe(model)
+    })
+  )
+  try {
+    flushSync()
+    const first = model
+    setCam({ x: -100, y: -50, k: 2 })
+    flushSync()
+    expect(model).not.toBe(first)
+    expect(model?.view).toEqual({ x: 50, y: 25, w: 400, h: 300 })
+    const moved = model
+    stage.nodes[0].x += 1000
+    stage.touch()
+    flushSync()
+    expect(model).not.toBe(moved)
+  } finally {
+    dispose()
+  }
+})
 
 test('сборка убирает квест вне статуса вместе с шагом и вписывает камеру', async () => {
   const { stage, cam } = make()

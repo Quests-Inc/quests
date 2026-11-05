@@ -198,12 +198,12 @@ export function createGraphStage(deps: {
     await tick()
     await tick()
     if (mine !== buildSeq || !el || !view) return
-    for (const n of view.nodes) {
-      const card = el.querySelector(`[data-gkey="${CSS.escape(n.key)}"]`)
-      if (card instanceof HTMLElement) {
-        n.w = card.offsetWidth
-        n.h = card.offsetHeight
-      }
+    const measured = nodesByKey()
+    for (const card of el.querySelectorAll<HTMLElement>('[data-gkey]')) {
+      const n = measured.get(card.dataset.gkey ?? '')
+      if (!n) continue
+      n.w = card.offsetWidth
+      n.h = card.offsetHeight
     }
     applyLayout()
     ready = true
@@ -429,6 +429,20 @@ export function createGraphStage(deps: {
     return g.type === 'attachment' && deps.folds.expanded.has(`cluster:${g.owner}`) ? `cluster:${g.owner}` : null
   }
 
+  // Shared across cards and reads; camera changes must not rebuild graph geometry or link marks.
+  const drawEdges = $derived.by(() => drawableEdges({ edges: edges(), nodes: nodes(), groups: groupsNow(), showEdge }))
+  const moreMap = $derived.by(() => {
+    const adj = hiddenNeighbors(deps.getData()?.edges ?? [], deps.prefs.hidden)
+    const shown = deps.prefs.shownTypes
+    const marks = new Map<string, { type: string; count: number }[]>()
+    for (const n of deps.getData()?.nodes ?? []) {
+      const row = borderMarks(n, adj, shown, statusOff)
+      if (row.length) marks.set(n.key, row)
+    }
+    return marks
+  })
+  const mini = $derived(minimapModel({ nodes: nodes(), ready, cam: deps.getCam(), stage: stageSize }))
+
   const map = () => nodesByKey()
 
   return {
@@ -457,7 +471,7 @@ export function createGraphStage(deps: {
       return groupsNow()
     },
     get drawEdges() {
-      return drawableEdges({ edges: edges(), nodes: nodes(), groups: groupsNow(), showEdge })
+      return drawEdges
     },
     get front() {
       return front
@@ -519,17 +533,10 @@ export function createGraphStage(deps: {
       return stageSize
     },
     get moreMap() {
-      const adj = hiddenNeighbors(deps.getData()?.edges ?? [], deps.prefs.hidden)
-      const shown = deps.prefs.shownTypes
-      const marks = new Map<string, { type: string; count: number }[]>()
-      for (const n of deps.getData()?.nodes ?? []) {
-        const row = borderMarks(n, adj, shown, statusOff)
-        if (row.length) marks.set(n.key, row)
-      }
-      return marks
+      return moreMap
     },
     get mini() {
-      return minimapModel({ nodes: nodes(), ready, cam: deps.getCam(), stage: stageSize })
+      return mini
     },
     get canRecenter() {
       const n = selectedKey ? map().get(selectedKey) : null
