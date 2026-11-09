@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 NEW_MIN = 50.0   # покрытие нового пакета, %
-SLACK = 5.      # допустимое проседание пакета, п.п.
+SLACK = .5      # допустимое проседание пакета, п.п.
 TINY = 30        # пакеты короче этого (операторов) не гейтятся поштучно
 
 profile, baseline_path = Path(sys.argv[1]), Path(__file__).resolve().parent.parent / "go" / ".coverage-baseline.json"
