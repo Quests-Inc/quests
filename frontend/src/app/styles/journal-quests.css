@@ -435,10 +435,13 @@
   color: var(--color-fg-muted, #9a9a9a);
   font-family: var(--font-ui, sans-serif);
   font-size: var(--text-sm, 0.875rem);
-  height: 100%;
   min-height: 0;
   display: grid;
   place-items: center;
+}
+
+.detail__empty {
+  height: 100%;
 }
 
 /* Quests picked with Ctrl/Shift-click: a tinted row and an accent bar on the left. Hover is deliberately
@@ -460,4 +463,12 @@
 /* The quest that is open in the detail pane and also picked: the right edge keeps the "open" mark. */
 .quest-row--picked.quest-row--active {
   border-right-color: color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
+}
+
+/* A short status label moves as one unit rather than splitting its words. */
+.auto-label,
+.period-badge,
+.sig-badge {
+  display: inline-block;
+  white-space: nowrap;
 }

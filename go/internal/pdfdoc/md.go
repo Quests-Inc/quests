@@ -9,10 +9,12 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	east "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
-var md = goldmark.New(goldmark.WithExtensions(extension.Table, extension.Strikethrough, extension.TaskList))
+var md = goldmark.New(goldmark.WithExtensions(extension.Table, extension.Strikethrough, extension.TaskList), goldmark.WithParserOptions(parser.WithInlineParsers(util.Prioritized(mathParser{}, 50)), parser.WithBlockParsers(util.Prioritized(mathBlockParser{}, 50))))
 
 // refRe is the journal's own reference syntax (frontend/src/lib/js/refs.js).
 var refRe = regexp.MustCompile(`\b(note|quest|questline|step|attachment|template)=(\d+)\b`)
@@ -35,6 +37,15 @@ func (r *Renderer) markdown(src string) {
 func (r *Renderer) blocks(parent ast.Node, src []byte) {
 	for n := parent.FirstChild(); n != nil && r.ok(); n = n.NextSibling() {
 		switch v := n.(type) {
+		case *mathBlock:
+			if !v.closed {
+				r.code("", strings.Split("$$"+v.source, "\n"))
+				continue
+			}
+			var toks []token
+			r.mathTokens(&mathNode{source: v.source, display: false}, bodyStyle(), &toks)
+			r.paragraph(toks, "center")
+			r.gap(2.4)
 		case *ast.Heading:
 			r.heading(v, src)
 		case *ast.Paragraph:
@@ -60,6 +71,10 @@ func (r *Renderer) blocks(parent ast.Node, src []byte) {
 			r.pdf.Line(r.x0, y, r.x0+r.w, y)
 			r.pdf.SetY(y + 1.5)
 		case *ast.HTMLBlock:
+			raw := strings.TrimSpace(strings.Join(blockLines(v, src), "\n"))
+			if strings.HasPrefix(raw, "<!--") && strings.HasSuffix(raw, "-->") {
+				continue
+			}
 			// Raw HTML is not rendered (the app sanitizes it away too): show it as text.
 			r.code("", blockLines(v, src))
 		case *east.Table:
@@ -181,6 +196,8 @@ func (r *Renderer) inlineTokens(n ast.Node, src []byte, st style) []token {
 func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 	for n := parent.FirstChild(); n != nil; n = n.NextSibling() {
 		switch v := n.(type) {
+		case *mathNode:
+			r.mathTokens(v, st, out)
 		case *ast.Text:
 			r.textWithRefs(st, string(v.Segment.Value(src)), out)
 			if v.HardLineBreak() || v.SoftLineBreak() { // the app renders soft breaks as breaks (marked breaks:true)
@@ -233,7 +250,10 @@ func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 				seg := v.Segments.At(i)
 				b.Write(seg.Value(src))
 			}
-			r.textTokens(st, b.String(), out)
+			raw := b.String()
+			if !strings.HasPrefix(strings.TrimSpace(raw), "<!--") {
+				r.textTokens(st, raw, out)
+			}
 		case *east.TaskCheckBox:
 			s := st
 			s.fam, s.bold = famSans, false

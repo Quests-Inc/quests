@@ -319,22 +319,6 @@
   .notes__split--combined {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 0 1.1rem;
-    background: linear-gradient(
-      to right,
-      transparent calc(50% - 0.5px),
-      var(--color-border, #333) calc(50% - 0.5px),
-      var(--color-border, #333) calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    );
-  }
-
-  .notes__split--combined :global(textarea.notes__edit) {
-    border-right: 0;
-    padding-right: 0.25rem;
-  }
-
-  .notes__split--combined .notes__preview {
-    padding-left: 0.25rem;
   }
 
   .notes__split--raw,
@@ -352,7 +336,7 @@
     min-height: 18rem;
     resize: none;
     overflow: hidden;
-    padding: 0.15rem 0.1rem;
+    padding: 0.75rem 1rem;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -362,25 +346,36 @@
     line-height: 1.5;
   }
 
-  .notes__preview {
+  .notes__split :global(textarea.notes__edit:focus) {
+    outline: none;
+  }
+
+  .notes__split :global(.mention-field--inside) {
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: var(--pill-radius, 12px);
+    background: var(--pill-bg, #0f0f0f);
+    box-shadow: var(--pill-shadow, none);
+  }
+
+  .notes__split :global(.mention-field--inside:focus-within) {
+    border-color: var(--color-accent);
+    outline: 2px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+    outline-offset: 2px;
+  }
+
+  .notes__preview.block--prose {
+    width: 100%;
     margin: 0;
-    padding: 0.15rem 0.25rem 0.15rem 0.85rem;
+    padding: 0.75rem 1rem;
     overflow: auto;
     min-height: 18rem;
     min-width: 0;
     overflow-wrap: break-word;
   }
 
-  .notes__split--formatted .notes__preview {
-    padding-left: 0.1rem;
-  }
-
   .notes__preview--doc {
     cursor: text;
-  }
-
-  .notes__split--raw :global(textarea.notes__edit) {
-    padding-left: 0.1rem;
   }
 
   .notes__attach {
@@ -395,14 +390,6 @@
       grid-template-columns: 1fr;
       gap: 0.85rem;
       background: none;
-    }
-    .notes__split--combined :global(textarea.notes__edit) {
-      border-bottom: 1px solid var(--color-border, #333);
-      padding-bottom: 0.85rem;
-      padding-right: 0.1rem;
-    }
-    .notes__split--combined .notes__preview {
-      padding-left: 0.1rem;
     }
   }
 </style>

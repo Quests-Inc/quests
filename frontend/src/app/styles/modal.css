@@ -21,7 +21,7 @@
 
 /* Head and foot stay pinned while a long form scrolls, so the close and save
    buttons are always in reach. */
-.modal .modal__head {
+:is(.modal, .formscope) .modal__head {
   position: sticky;
   top: 0;
   z-index: 3;
@@ -34,7 +34,7 @@
   background: var(--color-bg-raised, #1a1a1a);
 }
 
-.modal .modal__title {
+:is(.modal, .formscope) .modal__title {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
@@ -45,20 +45,20 @@
   color: var(--color-accent, #c9a227);
 }
 
-.modal .modal__title > span {
+:is(.modal, .formscope) .modal__title > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.modal .modal__head-actions {
+:is(.modal, .formscope) .modal__head-actions {
   display: flex;
   align-items: center;
   gap: var(--space-1, 0.25rem);
   flex-shrink: 0;
 }
 
-.modal .modal__error {
+:is(.modal, .formscope) .modal__error {
   margin: 0;
   padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
   background: color-mix(in srgb, var(--color-danger, #b54a3a) 18%, transparent);
@@ -66,18 +66,18 @@
   font-size: var(--text-sm, 0.875rem);
 }
 
-.modal > .values {
+:is(.modal, .formscope) > .values {
   margin: 0 var(--space-4, 1rem);
 }
 
-.modal .modal__form,
-.modal .modal__body {
+:is(.modal, .formscope) .modal__form,
+:is(.modal, .formscope) .modal__body {
   display: grid;
   gap: var(--space-3, 0.75rem);
   padding: var(--space-4, 1rem);
 }
 
-.modal .modal__text {
+:is(.modal, .formscope) .modal__text {
   margin: 0;
   font-family: var(--font-body, Georgia, serif);
   font-size: var(--text-sm, 0.875rem);
@@ -88,7 +88,7 @@
 /* Always the last child of a .modal__form/.modal__body: the negative margins
    let it span the dialog edge to edge and take over the body's bottom
    padding, so it can stick flush to the bottom of the scroll area. */
-.modal .modal__foot {
+:is(.modal, .formscope) .modal__foot {
   position: sticky;
   bottom: 0;
   z-index: 3;
@@ -102,20 +102,21 @@
   background: var(--color-bg-raised, #1a1a1a);
 }
 
-.modal .modal__foot-left,
-.modal .modal__foot-right {
+:is(.modal, .formscope) .modal__foot-left,
+:is(.modal, .formscope) .modal__foot-right {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
 }
 
-.modal .modal__foot-left {
+:is(.modal, .formscope) .modal__foot-left {
   gap: var(--space-1, 0.25rem);
 }
 
 /* --- fields --------------------------------------------------------------- */
 
 :is(.modal, .formscope) .field {
+  min-width: 0;
   display: grid;
   align-content: start;
   gap: var(--space-1, 0.25rem);
@@ -329,12 +330,12 @@
 /* Phone: the secondary actions on the left drop to icons; Cancel/Save keep
    their words. Order stays the same everywhere. */
 @media (max-width: 480px) {
-  .modal .modal__foot-left .btn {
+  :is(.modal, .formscope) .modal__foot-left .btn {
     width: 2rem;
     padding: 0;
   }
 
-  .modal .modal__foot-left .btn__text {
+  :is(.modal, .formscope) .modal__foot-left .btn__text {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -346,26 +347,26 @@
 
 /* --- time / duration ------------------------------------------------------ */
 
-.modal .time-24,
-.modal .dur {
+:is(.modal, .formscope) .time-24,
+:is(.modal, .formscope) .dur {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 
-.modal .time-24 select {
+:is(.modal, .formscope) .time-24 select {
   width: 3.6rem;
   padding-inline: 0.35rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-.modal .dur input[type='number'] {
+:is(.modal, .formscope) .dur input[type='number'] {
   width: 4rem;
 }
 
-.modal .time-24__sep,
-.modal .dur__unit {
+:is(.modal, .formscope) .time-24__sep,
+:is(.modal, .formscope) .dur__unit {
   color: var(--color-fg-subtle, #6e6e6e);
   font-size: var(--text-xs, 0.75rem);
 }

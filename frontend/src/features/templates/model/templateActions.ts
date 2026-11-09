@@ -48,7 +48,7 @@ export function createTemplateActions(deps: {
         return
       }
       deps.onChanged()
-      deps.notify(`Эмит: «${q.title || t.title}»`, 'success')
+      deps.notify(`Создан квест: «${q.title || t.title}»`, 'success')
     } catch (e) {
       const msg = messageOf(e)
       deps.setError(msg)

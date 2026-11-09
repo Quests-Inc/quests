@@ -144,7 +144,7 @@
   }
 </script>
 
-<SidebarLayout key="journal" class="journal__body">
+<SidebarLayout key="journal" hasSelection={selectedId != null} class="journal__body">
   {#snippet sidebar()}
   <QuestSidebar
     {loading}

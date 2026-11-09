@@ -49,7 +49,7 @@ test('TemplateList: строки, сводка, пометка падающег�
   expect(rows).toHaveLength(2)
   expect(rows[0].textContent).toContain('сводка 1')
   expect(rows[1].classList.contains('tpl-row--off')).toBe(true)
-  expect(rows[1].textContent).toContain('пул падает')
+  expect(rows[1].textContent).toContain('Ошибка выпуска')
 })
 
 test('TemplateList: действия строки зовут свои обработчики', () => {
@@ -57,7 +57,7 @@ test('TemplateList: действия строки зовут свои обраб
   const q = (sel: string, i = 0) => target.querySelectorAll(sel)[i] as HTMLElement
   q('.btn--accent').click()
   q('.tpl-row__main').click()
-  q('button[aria-label="Эмитировать сейчас"]').click()
+  q('button[aria-label="Выпустить сейчас"]').click()
   q('button[aria-label="Копировать шаблон"]').click()
   q('.switch').click()
   q('.tpl-row').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))

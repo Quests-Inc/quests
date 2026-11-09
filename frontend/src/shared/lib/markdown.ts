@@ -2,6 +2,8 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 
 import { highlightCode } from './codeHighlight.ts'
+import { mathExtensions, renderMathElements } from './markdownMath.ts'
+import { markTableTargets } from './markdownTargets.ts'
 import { REF_RE, refHref } from './refs.ts'
 import { escapeMdInline, scriptEmbedRe, scriptFlags, scriptHref, scriptLabel } from './scriptRef.ts'
 
@@ -26,6 +28,7 @@ const LANG_CANON: Record<string, string> = {
 marked.setOptions({ gfm: true, breaks: true })
 
 marked.use({
+  extensions: mathExtensions,
   renderer: {
     code({ text, lang }) {
       const rawLang = String(lang || '')
@@ -66,6 +69,10 @@ const PURIFY_OPTS = {
     'h2',
     'h3',
     'h4',
+    'h5',
+    'h6',
+    'del',
+    'input',
     'blockquote',
     'hr',
     'table',
@@ -79,7 +86,7 @@ const PURIFY_OPTS = {
     'span',
   ],
   ALLOWED_ATTR: ['href', 'rel', 'target', 'src', 'alt', 'align', 'class', 'scope'],
-  ADD_ATTR: ['data-lang'],
+  ADD_ATTR: ['data-md-table', 'data-md-row', 'data-lang', 'data-math', 'data-display', 'type', 'checked', 'disabled'],
   ALLOW_DATA_ATTR: false,
 }
 
@@ -161,6 +168,15 @@ function ensureLinkHook() {
   if (hooked || typeof window === 'undefined') return
   hooked = true
   DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'INPUT') {
+      if (node.getAttribute('type') !== 'checkbox') {
+        node.remove()
+        return
+      }
+      node.setAttribute('disabled', '')
+      node.removeAttribute('class')
+      return
+    }
     if (node.tagName === 'IMG') {
       // No external hosts, no data: URIs, no raw <img> — only attachment images.
       if (!ATTACHMENT_IMAGE_SRC_RE.test(node.getAttribute('src') || '')) {
@@ -192,7 +208,9 @@ function ensureLinkHook() {
 }
 
 function splitCode(src: string) {
-  return String(src || '').split(/(```[\s\S]*?```|`[^`]+`)/)
+  return String(src || '').split(
+    /(```[\s\S]*?```|`[^`]+`|\$\$[\s\S]*?\$\$|(?<![\\$])\$(?!\s)(?:\\.|[^$\n])+?(?<![\\\s])\$(?!\d))/
+  )
 }
 
 const MUSTACHE_RE = /\{\{\s*([a-z][a-z0-9_]{0,23})\s*\}\}/g
@@ -332,9 +350,10 @@ export function renderMarkdown(
   let dirty = marked.parse(linkifyRefs(text, opts, bag), { async: false })
   if (typeof dirty !== 'string' || typeof window === 'undefined') return ''
   ensureLinkHook()
-  dirty = shapeTables(dirty)
+  dirty = shapeTables(markTableTargets(dirty))
   let html = DOMPurify.sanitize(dirty, PURIFY_OPTS)
   if (bag.length) html = html.replace(/⟦V(\d+)⟧/g, (_, n) => bag[Number(n)] ?? '')
+  html = renderMathElements(html)
   renderCache.set(key, html)
   if (renderCache.size > RENDER_CACHE_MAX) renderCache.delete(renderCache.keys().next().value as string)
   return html

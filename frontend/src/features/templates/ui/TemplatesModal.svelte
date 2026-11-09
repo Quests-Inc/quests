@@ -44,6 +44,7 @@
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import TemplateList from './TemplateList.svelte'
+  import TemplatePage from './TemplatePage.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '@/entities/runner'
@@ -422,8 +423,9 @@
     event.preventDefault()
     event.stopPropagation()
     ctxId = t.id
-    ctxX = event.clientX
-    ctxY = event.clientY
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    ctxX = event.type === 'click' ? rect.right : event.clientX
+    ctxY = event.type === 'click' ? rect.bottom : event.clientY
     ctxOpen = true
   }
 
@@ -495,12 +497,14 @@
 </script>
 
 {#snippet content()}
+  {#if !embedded}
   <ModalHead
     id="templates-modal-title"
     title={view === 'list' ? 'Шаблоны' : view === 'create' ? 'Новый шаблон' : 'Редактировать шаблон'}
     icon="repeat"
     onClose={handleClose}
   />
+  {/if}
   {#if view === 'list'}
     <TemplateList {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
   {:else}
@@ -676,7 +680,7 @@
       <FormSection title="Контент" summary={poolSummary} bind:open={secPool}>
         <div class="field">
           <span class="label">
-            Скрипт пула
+            Скрипт выпуска
             <HelpTip label="Как работает скрипт">
               <p>Запускается при каждом появлении. Нода кода печатает один квест в JSON: <code>{'{title?, description?, significance?, questline?, tags?, deadline_at?, steps: [{title, …}]}'}</code>. Заданное в нём перекрывает поля шаблона, остальное берётся из шаблона. <code>{'{}'}</code> — квеста в этот день нет. Сбой команды и ответ не в JSON — ошибка попытки, выпуск повторится.</p>
               <p>Повторы скрипт не отслеживает: пока письмо не прочитано, квест про него будет появляться снова.</p>
@@ -756,7 +760,7 @@
   {/if}
 {/snippet}
 {#if embedded}
-  <section class="templates-page modal formscope">{@render content()}</section>
+  <TemplatePage title={view === 'list' ? 'Шаблоны' : view === 'create' ? 'Новый шаблон' : editing?.title || 'Редактировать шаблон'} onBack={view !== 'list' ? backToList : undefined} busy={saving || deleting}>{@render content()}</TemplatePage>
 {:else}
   <ModalShell {open} onClose={handleClose} labelledby="templates-modal-title" zIndex={40} maxWidth="36rem">{@render content()}</ModalShell>
 {/if}
@@ -782,8 +786,6 @@
 />
 
 <style>
-  .templates-page { max-width: 52rem; max-height: none; overflow: visible; margin: 0 auto; }
-
   .tz-line {
     gap: 0.35rem;
   }

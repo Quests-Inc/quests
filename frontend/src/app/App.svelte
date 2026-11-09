@@ -87,6 +87,10 @@
     },
   })
   const { setView, swipeTab, openGraph, onGraphCenter, openHistoryDay, clearQuest: clearSelectedQuest, openRef: onJournalRef } = nav
+  function onTabSwipe(dir: 1 | -1) {
+    if (dir === -1 && nav.view === 'journal') window.QuestsAndroid?.openSettings()
+    else swipeTab(dir)
+  }
   const selectQuestFromUi = nav.selectQuest
   const selectNoteFromUi = nav.selectNote
   const selectAttachmentFromUi = nav.selectAttachment
@@ -354,9 +358,8 @@
 
   onMount(() => {
     void refreshTemplates()
-    // Native swipe hosts (Android HubActivity, quest=192) drive tab switches
-    // through this instead of a full page reload — keeps the header mounted
-    // and lets setView()'s own transition animate the change.
+    // Native hosts select a landing tab without reloading the page.
+    // Touch gestures within the SPA are handled by tabSwipe.
     window.questsNav = {
       setTab: (name: any) => setView(name),
       currentTab: () => nav.view,
@@ -614,7 +617,7 @@
 
   <ToastHost />
 
-  <div class="journal__stage" use:tabSwipe={swipeTab}>
+  <div class="journal__stage" use:tabSwipe={onTabSwipe}>
   {#key nav.view}
   <div
     class="journal__viewport"
@@ -757,8 +760,6 @@
 </div>
 
 <JournalOverlays {desk} {questlines} {selected} />
-
-
 
 <SecretsModal
   open={secretsOpen}

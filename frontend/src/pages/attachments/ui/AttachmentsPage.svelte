@@ -11,7 +11,7 @@
   import AttachmentPanel from './AttachmentPanel.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
-  import { AttachmentPreview, ATT_SPEC, attachmentCatalog, extOf, flattenAttachmentIndex, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments, thumbSrc } from '@/entities/attachment'
+  import { AttachmentPreview, ATT_SPEC, attachmentCatalog, extOf, flattenAttachmentIndex, formatSize, formatWhen, groupByOwner, isRaster, ownerKind, sortAttachments } from '@/entities/attachment'
   import { noteCatalog } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
   import { EntityHistory } from '@/entities/history'
@@ -411,10 +411,8 @@
     oncontextmenu={(e) => openAttMenu(e, a)}
   >
     <div class="attpage__thumb">
-      {#if view === 'cards'}
+      {#if view === 'cards' || isRaster(a)}
         <AttachmentPreview {a} />
-      {:else if isRaster(a)}
-        <img src={thumbSrc(a)} alt="" loading="lazy" />
       {:else}
         <span class="attpage__kind">
           <FileKindIcon att={a} size={20} />
@@ -619,12 +617,6 @@
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-md, 4px);
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 5%, transparent);
-  }
-
-  .attpage__thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .attpage__kind {

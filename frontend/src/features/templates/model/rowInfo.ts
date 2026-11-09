@@ -40,7 +40,7 @@ export function templateMenuItems(
     { id: 'copy-id', label: `Копировать template=${t.id}` },
     { id: 'sep-copy', sep: true },
     { id: 'edit', label: 'Редактировать' },
-    { id: 'emit', label: 'Эмитировать сейчас' },
+    { id: 'emit', label: 'Выпустить сейчас' },
     // A template that makes its quest by a script or a command can be tried on its device, with its secrets, creating nothing.
     ...(t.script_id || t.emit_pool_command
       ? [{ id: 'emit-test', label: 'Проверить выпуск (квест не создаётся)' }]

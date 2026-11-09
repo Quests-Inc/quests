@@ -3,6 +3,7 @@
 import { rollValue } from '@/shared/api/client.ts'
 import { evalScriptText } from '@/shared/api/scripts.ts'
 
+import { findMarkdownTarget, targetResult, type MarkdownTarget } from './markdownTargets.ts'
 import { labelParts, MAX_AUTO_SCRIPTS, parseScriptHref } from './scriptRef.ts'
 import { hostKey, touchValues } from './valueLive.svelte.ts'
 
@@ -16,7 +17,7 @@ function valueHost(node: HTMLElement) {
 }
 
 /** `label` is the formula shown with its values as chips, then `tail`; without a label `text` is shown as is. */
-type Row = { text: string; label?: string; tail?: string; err: boolean; title: string }
+type Row = { text: string; label?: string; tail?: string; err: boolean; title: string; target?: MarkdownTarget }
 
 type Parsed = { id: number; arg: string; auto: boolean; hide: boolean; set: string; on: string }
 
@@ -35,6 +36,41 @@ function rowFor(parsed: Parsed, value: string | null, errTitle = ''): Row {
 /** Svelte action: makes the embedded-script links inside a rendered text live. */
 export function scriptEmbed(node: HTMLElement, initial: Record<string, string> = {}) {
   let names = initial
+  let alive = true
+  let currentHost = node.dataset.valueHost ?? ''
+  let hostRev = 0
+  const results = new Map<string, Row>()
+  const flashes = new Map<HTMLElement, number>()
+  let announcement: HTMLElement | null = null
+  const slot = (a: HTMLAnchorElement) =>
+    `${a.getAttribute('href')}\u0000${anchors()
+      .filter((v) => v.getAttribute('href') === a.getAttribute('href'))
+      .indexOf(a)}`
+  const reveal = (target: MarkdownTarget, scroll: boolean) => {
+    const el = findMarkdownTarget(node, target)
+    if (!el) return false
+    el.classList.add('md-target--selected')
+    if (scroll) {
+      el.scrollIntoView?.({
+        block: 'center',
+        behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+      })
+      el.classList.add('md-target--flash')
+      window.clearTimeout(flashes.get(el))
+      flashes.set(
+        el,
+        window.setTimeout(() => {
+          el.classList.remove('md-target--flash')
+          flashes.delete(el)
+        }, 1600)
+      )
+    }
+    return true
+  }
+  const paintTargets = () => {
+    for (const el of node.querySelectorAll('.md-target--selected')) el.classList.remove('md-target--selected')
+    for (const row of results.values()) if (row.target) reveal(row.target, false)
+  }
   let rev = 0
   const cache = new Map<string, Row>()
   let timer = 0
@@ -61,17 +97,38 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
   }
 
   const apply = (a: HTMLAnchorElement, row: Row) => {
-    if (!node.contains(a)) return
+    if (!alive || !node.contains(a)) return
+    a.dataset.resultPainted = '1'
+    if (a.nextElementSibling?.classList.contains('md-target-link')) a.nextElementSibling.remove()
     if (row.label != null) fillLabel(a, row.label, row.tail ?? '')
     else a.textContent = row.text
     a.classList.toggle('md-script--err', row.err)
     if (row.title) a.title = row.title
     else a.removeAttribute('title')
+    if (row.target) {
+      const target = document.createElement('button')
+      target.type = 'button'
+      target.dataset.targetLink = '1'
+      target.className = 'md-target-link'
+      const found = Boolean(findMarkdownTarget(node, row.target))
+      target.textContent = found ? 'К строке' : 'Строка недоступна'
+      target.disabled = !found
+      target.setAttribute('aria-label', found ? 'Перейти к строке результата' : 'Строка результата недоступна')
+      target.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        if (row.target) reveal(row.target, true)
+      })
+      a.after(target)
+      a.title = found ? 'Повторить расчёт' : 'Цель удалена, метки отсутствуют или повторяются'
+    }
   }
 
   const evalOne = async (a: HTMLAnchorElement, parsed: Parsed) => {
-    if (a.dataset.busy) return
+    if (!alive || a.dataset.busy) return
+    const generation = hostRev
     const key = cacheKey(node, parsed)
+    const owner = node.dataset.valueHost ?? ''
     a.dataset.busy = '1'
     a.classList.add('md-script--busy')
     try {
@@ -86,17 +143,34 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       } else {
         value = await evalScriptText(parsed.id, { _: parsed.arg }, host, parsed.on)
       }
-      const out = { value }
-      const row = rowFor(parsed, out.value)
+      if (!alive || !node.contains(a) || owner !== (node.dataset.valueHost ?? '') || generation !== hostRev) return
+      const structured = targetResult(value)
+      const row = rowFor(parsed, structured?.text ?? value)
+      if (structured) row.target = structured.target
+      results.set(slot(a), row)
+      paintTargets()
+      if (structured && !parsed.auto) reveal(structured.target, true)
+      if (!announcement || !node.contains(announcement)) {
+        announcement = document.createElement('span')
+        announcement.className = 'sr-only'
+        announcement.setAttribute('role', 'status')
+        node.append(announcement)
+      }
+      announcement.textContent = row.text
       if (parsed.auto) remember(key, row)
       apply(a, row)
     } catch (err) {
+      if (!alive || !node.contains(a) || owner !== (node.dataset.valueHost ?? '') || generation !== hostRev) return
       const row = rowFor(parsed, null, err instanceof Error ? err.message : String(err))
+      results.delete(slot(a))
+      paintTargets()
       if (parsed.auto) remember(key, row)
       apply(a, row)
     } finally {
-      delete a.dataset.busy
-      a.classList.remove('md-script--busy')
+      if (generation === hostRev) {
+        delete a.dataset.busy
+        a.classList.remove('md-script--busy')
+      }
     }
   }
 
@@ -113,6 +187,11 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       if (parsed?.set && !a.title) a.title = `Посчитать и записать в ${parsed.set}`
       if (parsed?.on && !a.title) a.title = `Выполнить на раннере ${parsed.on}`
       if (parsed && !parsed.hide && !a.dataset.settled && a.dataset.lrev !== String(rev)) fillLabel(a, parsed.arg, '')
+      const result = results.get(slot(a))
+      if (result && !a.dataset.resultPainted) {
+        a.dataset.resultPainted = '1'
+        apply(a, result)
+      }
       if (!parsed?.auto) continue
       if (a.dataset.settled) {
         used++
@@ -128,6 +207,7 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       }
       wait.push(a)
     }
+    paintTargets()
     return wait
   }
 
@@ -157,8 +237,31 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
   const mo = new MutationObserver(() => kick())
   const kick = () => {
     mo.disconnect()
+    const nextHost = node.dataset.valueHost ?? ''
+    if (currentHost !== nextHost) {
+      currentHost = nextHost
+      hostRev++
+      results.clear()
+      cache.clear()
+      for (const [el, timer] of flashes) {
+        window.clearTimeout(timer)
+        el.classList.remove('md-target--flash')
+      }
+      flashes.clear()
+      for (const jump of node.querySelectorAll('.md-target-link')) jump.remove()
+      announcement?.remove()
+      for (const a of anchors()) {
+        delete a.dataset.settled
+        delete a.dataset.resultPainted
+        delete a.dataset.lrev
+        delete a.dataset.busy
+        a.classList.remove('md-script--busy', 'md-script--err')
+        const parsed = parseScriptHref(a.getAttribute('href') || '')
+        if (parsed?.hide) a.textContent = '?'
+      }
+    }
     const wait = paint()
-    mo.observe(node, { childList: true, subtree: true })
+    mo.observe(node, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-value-host'] })
     const key = wait.map((a) => a.getAttribute('href')).join('\n')
     if (!wait.length) {
       window.clearTimeout(timer)
@@ -196,6 +299,11 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
       kick()
     },
     destroy() {
+      alive = false
+      for (const timer of flashes.values()) window.clearTimeout(timer)
+      results.clear()
+      announcement?.remove()
+      for (const jump of node.querySelectorAll('.md-target-link')) jump.remove()
       mo.disconnect()
       window.clearTimeout(timer)
       node.removeEventListener('click', onClick, true)

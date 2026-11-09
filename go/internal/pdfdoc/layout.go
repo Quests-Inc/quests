@@ -3,6 +3,7 @@ package pdfdoc
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -63,12 +64,14 @@ func bodyStyle() style { return style{fam: famSerif, size: 10, color: colText} }
 
 // token is a word, a space or a forced break; img marks an image (laid out as its own block).
 type token struct {
-	text  string
-	st    style
-	w     float64
-	space bool
-	brk   bool
-	img   *imageRef
+	text      string
+	st        style
+	w         float64
+	space     bool
+	brk       bool
+	img       *imageRef
+	math      *mathBox
+	mathScale float64
 }
 
 type imageRef struct {
@@ -96,10 +99,11 @@ type Renderer struct {
 	labels map[string]string
 	err    error
 
-	x0, w   float64 // current left edge and width of the content column
-	images  int
-	imgSeq  int
-	pageTop bool // nothing drawn on the current page yet
+	x0, w     float64 // current left edge and width of the content column
+	mathCount int
+	images    int
+	imgSeq    int
+	pageTop   bool // nothing drawn on the current page yet
 }
 
 func (r *Renderer) fail(err error) {
@@ -214,6 +218,11 @@ func (r *Renderer) layout(toks []token, width float64) []line {
 		}
 		cur.w = x
 		cur.h = r.lineHeight(cur.size)
+		for _, it := range cur.items {
+			if it.tok.math != nil {
+				cur.h = math.Max(cur.h, it.tok.math.h*it.tok.mathScale+1)
+			}
+		}
 		lines = append(lines, cur)
 		cur = line{}
 		x = 0
@@ -226,6 +235,10 @@ func (r *Renderer) layout(toks []token, width float64) []line {
 		}
 	}
 	for _, t := range toks {
+		if t.math != nil && t.w > width {
+			t.mathScale *= width / t.w
+			t.w = width
+		}
 		switch {
 		case t.brk:
 			if t.st.size > cur.size {
@@ -294,6 +307,10 @@ func (r *Renderer) drawLine(l line, x, y, width float64, align string) {
 	for _, it := range l.items {
 		t := it.tok
 		tx := x + off + it.x
+		if t.math != nil {
+			r.drawMath(t.math, tx, y+(l.h-t.math.h*t.mathScale)/2, t.mathScale)
+			continue
+		}
 		if t.st.bg != nil {
 			r.pdf.SetFillColor(t.st.bg[0], t.st.bg[1], t.st.bg[2])
 			r.pdf.Rect(tx, base-fontMM*0.85, t.w, fontMM*1.2, "F")

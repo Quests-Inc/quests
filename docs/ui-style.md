@@ -43,3 +43,17 @@ Every description and every explaining paragraph is set into its surface as a **
 - Lists: a click opens, state is a dot / word with a hint, time is relative.
 
 The workspace menu opens after 500 ms of mouse hover (click and keyboard open it immediately). Its footer contains “Добавить пространство” and a direct link to workspace settings. Owners can edit a workspace's name, built-in icon and colour from its pencil button or context click. The default runner uses the registered-device picker, retaining ordered fallbacks; settings action rows have an explicit gap and wrap on narrow screens.
+
+## Standalone pages and user Markdown
+
+A standalone tab is a page: it does not reuse `.modal` chrome, shadows, height limits or the close cross. Shared form
+primitives live under `.formscope` as well as `.modal`. “Back” returns to the list; save/cancel actions remain reachable.
+Templates have a searchable list, status and schedule filters, a result count, and an explicit row action menu. On narrow
+containers the title and actions occupy separate rows. Disabled templates keep their errors readable and say “выключен”.
+
+The pill rule above applies to UI descriptions/explanations. User Markdown quotes (`>`) are a distinct semantic block:
+muted text, a left border, no rounded background. See [markdown.md](markdown.md) for syntax, math/PDF limits and examples.
+
+Keep the present fonts, palette and character. Unify spacing, density, focus, empty/error states and action placement;
+do not introduce a new visual identity as part of a cleanup. Layout must respond to container width, not only viewport
+width: the same form may appear in a narrow pane on a wide screen. Grid children need `min-width: 0`, and footers wrap.

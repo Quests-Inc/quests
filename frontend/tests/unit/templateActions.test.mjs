@@ -45,7 +45,7 @@ test('дубликат и ошибка дубликата', async () => {
 test('эмит: успех показывает название квеста, ошибка — в строку ошибки и тост', async () => {
   const a = make()
   await a.act.emit({ id: 3, title: 'Шаблон' })
-  expect(a.log).toContainEqual(['notify', 'Эмит: «Квест»', 'success'])
+  expect(a.log).toContainEqual(['notify', 'Создан квест: «Квест»', 'success'])
   const b = make('emit')
   await b.act.emit({ id: 3 })
   expect(b.log).toEqual([

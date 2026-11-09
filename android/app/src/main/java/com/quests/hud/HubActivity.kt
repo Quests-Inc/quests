@@ -22,11 +22,8 @@ class HubActivity : AppCompatActivity() {
         binding.hubPager.orientation = ViewPager2.ORIENTATION_HORIZONTAL
         binding.hubPager.offscreenPageLimit = 1
         binding.hubPager.adapter = HubPagerAdapter(this)
-        // ViewPager2's own drag handling competes with SwipeCaptureLayout for
-        // the same gesture (it tries to intercept horizontal drags even on a
-        // page with nowhere to go, cancelling our capture first) — every
-        // page transition here goes through setCurrentItem() instead, called
-        // from each page's own SwipeCaptureLayout.
+        // The SPA owns its gestures and requests settings through its JS bridge.
+        // Settings uses SwipeCaptureLayout for the return gesture.
         binding.hubPager.isUserInputEnabled = false
 
         val startOnJournal = PrefsStore(this).isConfigured()

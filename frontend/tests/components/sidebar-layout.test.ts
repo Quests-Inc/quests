@@ -29,3 +29,43 @@ test('свёрнутая панель не рисует и не перехват
   await unmount(app)
   target.remove()
 })
+
+test('пустая панель раскрывается на узком экране, включая поворот, а выбранный элемент сохраняет состояние', async () => {
+  const original = window.matchMedia
+  let narrow = false
+  const media = new EventTarget()
+  Object.defineProperty(media, 'matches', { get: () => narrow })
+  window.matchMedia = ((query: string) =>
+    query === '(max-width: 640px)' ? media : original.call(window, query)) as typeof window.matchMedia
+  const target = document.createElement('div')
+  document.body.append(target)
+  let app: ReturnType<typeof mount> | undefined
+  try {
+    sidebars.setCollapsed('sidebar-regression', true)
+    app = mount(SidebarLayoutHarness, { target, props: { hasSelection: false } })
+    flushSync()
+    expect(sidebars.isCollapsed('sidebar-regression')).toBe(true)
+    narrow = true
+    media.dispatchEvent(new Event('change'))
+    flushSync()
+    expect(sidebars.isCollapsed('sidebar-regression')).toBe(false)
+    await unmount(app)
+    app = undefined
+
+    sidebars.setCollapsed('sidebar-regression', true)
+    app = mount(SidebarLayoutHarness, { target, props: { hasSelection: false } })
+    flushSync()
+    expect(sidebars.isCollapsed('sidebar-regression')).toBe(false)
+    await unmount(app)
+    app = undefined
+
+    sidebars.setCollapsed('sidebar-regression', true)
+    app = mount(SidebarLayoutHarness, { target, props: { hasSelection: true } })
+    flushSync()
+    expect(sidebars.isCollapsed('sidebar-regression')).toBe(true)
+  } finally {
+    if (app) await unmount(app)
+    target.remove()
+    window.matchMedia = original
+  }
+})

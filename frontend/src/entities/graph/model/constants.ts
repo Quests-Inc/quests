@@ -1,13 +1,15 @@
+import { ENTITY_COLORS } from '@/shared/lib/entityColors.ts'
+
 // Справочники карты связей: как выглядят узлы и рёбра каждого вида, размеры карточек, режимы раскладки.
 
 export const TYPES: Record<string, any> = {
-  quest: { label: 'Квест', glyph: '◆', color: '#c9a227' },
-  step: { label: 'Шаг', glyph: '•', color: '#8c97a8' },
-  note: { label: 'Заметка', glyph: '¶', color: '#b48ad6' },
-  attachment: { label: 'Вложение', glyph: '⎘', color: '#4f9fc7' },
-  questline: { label: 'Квестлайн', glyph: '☰', color: '#4fa56b' },
-  template: { label: 'Шаблон', glyph: '⟳', color: '#d9894a' },
-  cluster: { label: 'Вложения', glyph: '⎘', color: '#4f9fc7' },
+  quest: { label: 'Квест', glyph: '◆', color: ENTITY_COLORS.quest },
+  step: { label: 'Шаг', glyph: '•', color: ENTITY_COLORS.step },
+  note: { label: 'Заметка', glyph: '¶', color: ENTITY_COLORS.note },
+  attachment: { label: 'Вложение', glyph: '⎘', color: ENTITY_COLORS.attachment },
+  questline: { label: 'Квестлайн', glyph: '☰', color: ENTITY_COLORS.questline },
+  template: { label: 'Шаблон', glyph: '⟳', color: ENTITY_COLORS.template },
+  cluster: { label: 'Вложения', glyph: '⎘', color: ENTITY_COLORS.attachment },
 }
 export const EDGES: Record<string, any> = {
   structure: { label: 'Принадлежность', color: '#6e6e6e' },

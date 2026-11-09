@@ -51,3 +51,27 @@ parsed by precedence and computed in one node.
 
 A text does not hold its script: a script embedded only in texts goes to the trash, and the confirmation names the texts whose
 links break until it is restored ([`trash.md`](trash.md)). `GET /api/scripts/{id}/uses` lists them with `via: "text"`.
+
+## Table result targets
+
+The `Result` node still returns a string. A script may opt into a versioned JSON envelope, serialized as that string:
+
+```json
+{"kind":"markdown-target","version":1,"text":"Restart the service","target":{"table":"diagnostics","row":"restart"}}
+```
+
+The target is local to the rendered document, matched against hidden `table-id` / `row-id` comments documented in
+[markdown.md](markdown.md). Normal strings and unrelated JSON are unchanged. Only the complete version-1 envelope opts
+in. The display text is inserted as text, never as HTML. Missing/ambiguous targets do not trigger a fallback search.
+
+An explicit click scrolls to the row and briefly emphasizes it; then the row remains marked. `?auto` never scrolls.
+A separate keyboard-accessible “К строке” button revisits the result without running the script again. Each embedding
+keeps its own latest result until the note closes or that embedding runs again. These are local UI results: the source
+Markdown is not rewritten, no server state is saved, and the highlights are not exported. The same contract works for
+an encounter table and for a diagnostics/decision table; there is no D&D-specific logic.
+
+The table text remains in the note. Scripts should return stable row keys rather than duplicate descriptions. This first
+prototype does not add a table-data source node: a script that needs cell values can fetch its source note through the
+existing graph sources; a dedicated parsed-table source requires a separate design. Editing a row key requires updating
+its producer, as with an ordinary document anchor. Version 1 targets one row; columns, cells and multi-target envelopes
+are left for a confirmed use case.

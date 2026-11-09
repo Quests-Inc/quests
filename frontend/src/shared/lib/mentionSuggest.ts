@@ -1,4 +1,4 @@
-type Kind = 'questline' | 'quest' | 'step' | 'note' | 'attachment' | 'template'
+type Kind = 'questline' | 'quest' | 'step' | 'note' | 'attachment' | 'template' | 'script'
 type Mention = { kind: Kind; id: number; title: string; hint?: string; label: string }
 type Titled = { id: number; title?: string | null }
 type MentionSources = {
@@ -7,6 +7,7 @@ type MentionSources = {
   notes?: Titled[]
   attachments?: { id: number; filename?: string; comment?: string | null }[]
   templates?: Titled[]
+  scripts?: (Titled & { purpose?: string })[]
 }
 
 const KIND_LABEL: Record<Kind, string> = {
@@ -16,6 +17,7 @@ const KIND_LABEL: Record<Kind, string> = {
   note: 'заметка',
   attachment: 'файл',
   template: 'шаблон',
+  script: 'скрипт',
 }
 
 /**
@@ -26,11 +28,11 @@ const KIND_LABEL: Record<Kind, string> = {
  */
 export function matchMentions(
   query: string,
-  { quests = [], questlines = [], notes = [], attachments = [], templates = [] }: MentionSources = {},
+  { quests = [], questlines = [], notes = [], attachments = [], templates = [], scripts = [] }: MentionSources = {},
   limit = 8
 ): Mention[] {
   const q = query.trim().toLowerCase()
-  if (!q) return []
+  if (query && !q) return []
 
   const starts: Mention[] = []
   const contains: Mention[] = []
@@ -43,6 +45,7 @@ export function matchMentions(
     ;(idx === 0 ? starts : contains).push(item)
   }
 
+  for (const script of scripts) if (script.purpose === 'embed') push('script', script.id, script.title || '')
   for (const note of notes) push('note', note.id, note.title || '')
   for (const line of questlines) push('questline', line.id, line.title || '')
   for (const tpl of templates) push('template', tpl.id, tpl.title || '')

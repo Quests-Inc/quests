@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TemplateRead } from '@/shared/api/automation.gen'
+  import OptionPills from '@/shared/ui/OptionPills.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import { getRunStats } from '@/shared/api/client.ts'
   import type { SourceRunStats } from '@/shared/api/execution.gen.ts'
@@ -30,9 +31,19 @@
     onToggleEnabled(t: TemplateRead): void
   } = $props()
 
+  let search = $state('')
+  let state = $state('all')
+  let frequency = $state('all')
+  const stateOptions = [{ id: 'all', label: 'Все' }, { id: 'on', label: 'Включены' }, { id: 'off', label: 'Выключены' }, { id: 'error', label: 'С ошибкой' }]
+  const shown = $derived(templates.filter((t) => {
+    const query = search.trim().toLocaleLowerCase('ru')
+    const matches = !query || [t.title, t.description, rowMeta(t)].some((v) => String(v || '').toLocaleLowerCase('ru').includes(query))
+    return matches && (state === 'all' || state === 'on' && t.enabled || state === 'off' && !t.enabled || state === 'error' && (t.emit_pool_last_outcome === 'error' || runs[String(t.id)]?.last_state === 'failed')) && (frequency === 'all' || t.freq === frequency)
+  }))
+
   /** The latest emit run of each template that prints its quest by a command or a script (quest=490). */
   let runs = $state<Record<string, SourceRunStats>>({})
-  const RUN_WORDS: Record<string, string> = { done: 'последний эмит прошёл', failed: 'последний эмит упал', waiting: 'эмит ждёт раннер' }
+  const RUN_WORDS: Record<string, string> = { done: 'последний выпуск выполнен', failed: 'ошибка последнего выпуска', waiting: 'выпуск ждёт устройство' }
   $effect(() => {
     if (!templates.some((t) => t.emit_pool_command || t.script_id)) return
     void getRunStats('template')
@@ -46,29 +57,38 @@
       <p class="modal__error">{error}</p>
     {/if}
     <div class="toolbar">
+      <label class="tpl-search"><span class="sr-only">Поиск шаблонов</span><input type="search" placeholder="Найти шаблон…" bind:value={search} /></label>
       <button type="button" class="btn btn--accent" onclick={onCreate}>
         <Icon name="add" size={14} />
         <span>Новый шаблон</span>
       </button>
     </div>
+    <div class="tpl-filters">
+      <OptionPills options={stateOptions} bind:value={state} label="Состояние шаблонов" wrap />
+      <label class="tpl-frequency"><span class="sr-only">Периодичность</span><select bind:value={frequency} aria-label="Периодичность"><option value="all">Любое расписание</option><option value="daily">Каждый день</option><option value="weekly">По дням недели</option></select></label>
+      <span class="hint" role="status">{shown.length} из {templates.length}</span>
+    </div>
     {#if loading}
       <p class="hint">Загрузка…</p>
     {:else if templates.length === 0}
       <p class="hint">Пока нет шаблонов — создай дейлик или еженедельный.</p>
+    {:else if shown.length === 0}
+      <p class="hint">Шаблоны не найдены. Измените поиск или фильтры.</p>
+      <button type="button" class="btn btn--ghost" onclick={() => { search = ''; state = 'all'; frequency = 'all' }}>Сбросить фильтры</button>
     {:else}
       <ul class="tpl-list">
-        {#each templates as t (t.id)}
+        {#each shown as t (t.id)}
           <li class="tpl-row" class:tpl-row--off={!t.enabled} oncontextmenu={(e) => onMenu(e, t)}>
             <button type="button" class="tpl-row__main" onclick={() => onOpen(t)}>
               <span class="tpl-row__title">
                 {t.title}
                 {#if t.emit_pool_last_outcome === 'error'}
-                  <span class="tpl-row__err" title="Команда пула стабильно падает — все попытки за период исчерпаны">
-                    ⚠ пул падает
+                  <span class="tpl-row__err" title="Не удалось выпустить квест — попытки за период исчерпаны">
+                    ⚠ Ошибка выпуска
                   </span>
                 {/if}
               </span>
-              <span class="tpl-row__meta">{rowMeta(t)}</span>
+              <span class="tpl-row__meta">{rowMeta(t)}{!t.enabled ? ' · выключен' : ''}</span>
             </button>
             <div class="tpl-row__actions">
               {#if t.emit_pool_command || t.script_id}
@@ -77,8 +97,8 @@
                   type="button"
                   class="btn btn--ghost btn--icon tpl-row__runs tpl-row__runs--{last?.last_state ?? 'none'}"
                   onclick={() => openTarget({ kind: 'runs', source: { kind: 'template', id: t.id }, run: last?.last_id })}
-                  title={last ? `${RUN_WORDS[last.last_state] ?? last.last_state}. Запуски эмита` : 'Запуски эмита'}
-                  aria-label="Запуски эмита"
+                  title={last ? `${RUN_WORDS[last.last_state] ?? last.last_state}. Запуски выпуска` : 'Запуски выпуска'}
+                  aria-label="Запуски выпуска"
                 >
                   <Icon name="list" size={14} />
                 </button>
@@ -87,8 +107,8 @@
                 type="button"
                 class="btn btn--ghost btn--icon"
                 onclick={(e) => onEmit(t, e)}
-                title="Эмитировать сейчас"
-                aria-label="Эмитировать сейчас"
+                title="Выпустить сейчас"
+                aria-label="Выпустить сейчас"
               >
                 <Icon name="renew" size={14} />
               </button>
@@ -101,6 +121,7 @@
               >
                 <Icon name="copy" size={14} />
               </button>
+              <button type="button" class="btn btn--ghost btn--icon" aria-label="Действия шаблона" title="Действия шаблона" onclick={(e) => onMenu(e, t)}><Icon name="more" size={14} /></button>
               <button
                 type="button"
                 class="switch"
@@ -124,10 +145,23 @@
 
   .toolbar {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
+  .tpl-search { flex: 1; min-width: min(100%, 12rem); max-width: 32rem; }
+  .tpl-search input { width: 100%; }
+  .tpl-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+  .tpl-frequency { min-width: 0; }
+  .tpl-row__title { overflow-wrap: anywhere; }
+  @container (max-width: 40rem) {
+    .tpl-row { flex-wrap: wrap; padding: 0.25rem; }
+    .tpl-row__main { flex-basis: 100%; }
+    .tpl-row__actions { width: 100%; justify-content: flex-end; padding: 0 0.35rem 0.35rem; }
+  }
   .tpl-list {
+    container-type: inline-size;
     display: grid;
     gap: 0.35rem;
     margin: 0;
@@ -145,9 +179,7 @@
     background: color-mix(in srgb, var(--color-bg, #121212) 70%, transparent);
   }
 
-  .tpl-row--off {
-    opacity: 0.55;
-  }
+  .tpl-row--off .tpl-row__title { color: var(--color-fg-muted); }
 
   .tpl-row__main {
     display: grid;
@@ -168,6 +200,8 @@
   }
 
   .tpl-row__err {
+    display: inline-block;
+    white-space: nowrap;
     margin-left: 0.4em;
     padding: 0.05em 0.4em;
     border-radius: var(--radius-md, 4px);

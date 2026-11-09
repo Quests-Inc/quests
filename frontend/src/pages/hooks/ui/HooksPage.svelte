@@ -179,7 +179,7 @@
     {#if !loaded}
       <p class="empty">Загрузка…</p>
     {:else if hooks.length === 0}
-      <p class="empty">Хуков пока нет. Добавьте первый кнопкой «Хук» или в карточке квеста или шага.</p>
+      <p class="empty">Хуков пока нет. Добавьте первый кнопкой «+» или в карточке квеста или шага.</p>
     {:else if filtered.length === 0}
       <p class="empty">Ничего не найдено</p>
     {:else}
@@ -392,6 +392,7 @@
   }
 
   .hookpage__list {
+    flex: 1 1 auto;
     overflow: auto;
     padding: 0.35rem 0 1rem;
     min-height: 0;
@@ -456,6 +457,7 @@
   }
 
   .hookpage__chip {
+    white-space: nowrap;
     flex: 0 0 auto;
     padding: 0 0.3rem;
     border: 1px solid var(--color-border, #3a3a3a);

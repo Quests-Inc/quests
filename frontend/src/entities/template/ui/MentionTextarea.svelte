@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { ENTITY_COLORS } from '@/shared/lib/entityColors.ts'
+  import type { Script } from '@/shared/api/execution.gen.ts'
   import { getScripts, listValues } from '@/shared/api/client.ts'
   import { proseValue } from '@/shared/lib/valueText.ts'
   import { completeText, textCompletionToken, type TextToken } from '@/shared/lib/textCompletion.ts'
@@ -58,7 +60,15 @@
 
   let completion = $state<TextToken | null>(null)
   let insertOpen = $state(false)
-  let insertAt = 0
+  let insertRange = { start: 0, end: 0 }
+  let insertId = $state(0)
+  let scriptCatalog: Script[] | null = null
+  let scriptLoad: Promise<Script[]> | null = null
+  function loadMentionScripts() {
+    if (scriptCatalog) return Promise.resolve(scriptCatalog)
+    if (!scriptLoad) scriptLoad = getScripts().then((all) => { scriptCatalog = all; return all }).finally(() => { scriptLoad = null })
+    return scriptLoad
+  }
   let completionSeq = 0
   async function refreshCompletion(token: TextToken) {
     const seq = ++completionSeq
@@ -83,15 +93,26 @@
       return
     }
     mentionToken = token
-    mentionItems = matchMentions(token.query, {
+    const candidates = (scripts: Script[] = []) => matchMentions(token.query, {
       quests,
       questlines,
       notes,
       attachments,
       templates: templateStore.list,
-    }).filter((item) => !allowedKinds.length || allowedKinds.includes(item.kind))
+      scripts,
+    }, Number.MAX_SAFE_INTEGER).filter((item) => !allowedKinds.length || allowedKinds.includes(item.kind)).slice(0, 8)
+    mentionItems = candidates(scriptCatalog ?? [])
     mentionIndex = 0
     mentionOpen = mentionItems.length > 0
+    if (!allowedKinds.length && !disabled && !scriptCatalog) {
+      const seq = completionSeq
+      void loadMentionScripts().then((scripts) => {
+        if (seq !== completionSeq || mentionToken?.start !== token.start || mentionToken?.query !== token.query) return
+        mentionItems = candidates(scripts)
+        mentionIndex = 0
+        mentionOpen = mentionItems.length > 0
+      }).catch(() => { /* Entity references still work if the script catalog cannot be loaded. */ })
+    }
   }
 
   function onFieldInput(event: Event) {
@@ -102,6 +123,16 @@
 
   function pickMention(item: { kind: any; id: any; insertion?: string }) {
     if (!item || (!mentionToken && !completion)) return
+    if (item.kind === 'script' && mentionToken) {
+      insertRange = { start: mentionToken.start, end: mentionToken.start + mentionToken.query.length + 1 }
+      insertId = item.id
+      mentionOpen = false
+      mentionToken = null
+      completion = null
+      completionSeq++
+      insertOpen = true
+      return
+    }
     const { text: nextText, caret } = completion && item.insertion ? completeText(value, completion, item.insertion) : applyMention(value, mentionToken!, item)
     value = nextText
     mentionOpen = false
@@ -255,6 +286,9 @@
         event.preventDefault()
         event.stopPropagation()
         mentionOpen = false
+        mentionToken = null
+        completion = null
+        completionSeq++
         return
       }
     }
@@ -293,7 +327,7 @@
             onmousedown={(e) => e.preventDefault()}
             onclick={() => pickMention(item)}
           >
-            {#if item.label}<span class="mentions__kind">{item.label}</span>{/if}
+            {#if item.label}<span class="mentions__kind" style:color={ENTITY_COLORS[item.kind as keyof typeof ENTITY_COLORS] ?? 'var(--color-info, #5a8a9a)'}>{item.label}</span>{/if}
             <span class="mentions__title">{item.title}</span>
             {#if item.hint}<span class="mentions__hint">{item.hint}</span>{/if}
           </button>
@@ -301,18 +335,14 @@
       {/each}
     </ul>
   {/if}
-  {#if !allowedKinds.length && !disabled}
-    <button type="button" class="insert-script" onclick={() => { insertAt = el?.selectionStart ?? value.length; insertOpen = true }}>Вставить скрипт…</button>
-  {/if}
 </div>
-<InsertScriptModal open={insertOpen} onClose={() => (insertOpen = false)} onInsert={(text) => {
-  value = value.slice(0, insertAt) + text + value.slice(insertAt)
-  queueMicrotask(() => { el?.focus(); el?.setSelectionRange(insertAt + text.length, insertAt + text.length) })
+<InsertScriptModal open={insertOpen} selectedId={insertId} onClose={() => (insertOpen = false)} onInsert={(text) => {
+  const caret = insertRange.start + text.length
+  value = value.slice(0, insertRange.start) + text + value.slice(insertRange.end)
+  queueMicrotask(() => { el?.focus(); el?.setSelectionRange(caret, caret) })
 }} />
 
 <style>
-  .insert-script { border: 0; background: none; color: var(--color-fg-muted, #9a9a9a); font: inherit; font-size: 0.75rem; cursor: pointer; padding: 0.25rem 0; }
-  .mention-field--inside .insert-script { position: absolute; right: 1rem; top: 0.25rem; }
   .mention-field {
     position: relative;
     display: block;

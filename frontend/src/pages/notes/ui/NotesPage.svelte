@@ -607,7 +607,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
 <svelte:window onkeydown={onFindKey} />
 
-<SidebarLayout key="notes" class="notes">
+<SidebarLayout key="notes" hasSelection={selectedId != null} class="notes">
   {#snippet sidebar()}
   <NotesTree
     bind:search

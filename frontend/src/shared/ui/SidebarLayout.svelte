@@ -1,12 +1,21 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte'
+  import { untrack, type Snippet } from 'svelte'
+  import { MediaQuery } from 'svelte/reactivity'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { sidebars, SIDEBAR_MIN, SIDEBAR_MAX } from '@/shared/lib/sidebar.svelte.ts'
+  import { sidebars, SIDEBAR_MIN, SIDEBAR_MAX, SIDEBAR_ONE_PANE } from '@/shared/lib/sidebar.svelte.ts'
 
   /** A list on the left and the work on the right: one grid for every tab that has a list.
    * Owns the fold (the handle on the border), the shared width (drag the border) and the one-pane-at-a-time phone layout.
    * `sidebar` renders the list (one root element), `children` the work area (one root element). */
-  let { key, class: className = '', sidebar, children }: { key: string, class?: string, sidebar: Snippet, children: Snippet } = $props()
+  let { key, class: className = '', hasSelection = true, sidebar, children }: { key: string, class?: string, hasSelection?: boolean, sidebar: Snippet, children: Snippet } = $props()
+
+  const onePane = new MediaQuery(SIDEBAR_ONE_PANE)
+  $effect(() => {
+    if (onePane.current && !hasSelection) {
+      const sidebarKey = key
+      untrack(() => sidebars.setCollapsed(sidebarKey, false))
+    }
+  })
 
   let root = $state<HTMLElement | null>(null)
   let dragging = $state(false)

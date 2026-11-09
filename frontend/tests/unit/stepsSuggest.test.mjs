@@ -161,3 +161,15 @@ test('checkPayload: шаг со скриптом сохраняет распис
     run_on: 'home',
   })
 })
+
+test('bare @ lists available entities and only text-embedding scripts', () => {
+  const items = matchMentions('', {
+    notes: [{ id: 1, title: 'Заметка' }],
+    scripts: [
+      { id: 2, title: 'Расчёт', purpose: 'embed' },
+      { id: 3, title: 'Хук', purpose: 'hook' },
+    ],
+  })
+  expect(items.map((x) => x.kind)).toEqual(['script', 'note'])
+  expect(activeMentionToken('@', 1)).toEqual({ query: '', start: 0 })
+})
