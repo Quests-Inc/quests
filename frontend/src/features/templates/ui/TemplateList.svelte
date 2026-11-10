@@ -32,17 +32,17 @@
   } = $props()
 
   let search = $state('')
-  let state = $state('all')
+  let statusFilter = $state('all')
   let frequency = $state('all')
-  const stateOptions = [{ id: 'all', label: 'Все' }, { id: 'on', label: 'Включены' }, { id: 'off', label: 'Выключены' }, { id: 'error', label: 'С ошибкой' }]
-  const shown = $derived(templates.filter((t) => {
-    const query = search.trim().toLocaleLowerCase('ru')
-    const matches = !query || [t.title, t.description, rowMeta(t)].some((v) => String(v || '').toLocaleLowerCase('ru').includes(query))
-    return matches && (state === 'all' || state === 'on' && t.enabled || state === 'off' && !t.enabled || state === 'error' && (t.emit_pool_last_outcome === 'error' || runs[String(t.id)]?.last_state === 'failed')) && (frequency === 'all' || t.freq === frequency)
-  }))
+  const statusOptions = [{ id: 'all', label: 'Все' }, { id: 'on', label: 'Включены' }, { id: 'off', label: 'Выключены' }, { id: 'error', label: 'С ошибкой' }]
 
   /** The latest emit run of each template that prints its quest by a command or a script (quest=490). */
   let runs = $state<Record<string, SourceRunStats>>({})
+  const shown = $derived(templates.filter((t) => {
+    const query = search.trim().toLocaleLowerCase('ru')
+    const matches = !query || [t.title, t.description, rowMeta(t)].some((v) => String(v || '').toLocaleLowerCase('ru').includes(query))
+    return matches && (statusFilter === 'all' || statusFilter === 'on' && t.enabled || statusFilter === 'off' && !t.enabled || statusFilter === 'error' && (t.emit_pool_last_outcome === 'error' || runs[String(t.id)]?.last_state === 'failed')) && (frequency === 'all' || t.freq === frequency)
+  }))
   const RUN_WORDS: Record<string, string> = { done: 'последний выпуск выполнен', failed: 'ошибка последнего выпуска', waiting: 'выпуск ждёт устройство' }
   $effect(() => {
     if (!templates.some((t) => t.emit_pool_command || t.script_id)) return
@@ -64,7 +64,7 @@
       </button>
     </div>
     <div class="tpl-filters">
-      <OptionPills options={stateOptions} bind:value={state} label="Состояние шаблонов" wrap />
+      <OptionPills options={statusOptions} bind:value={statusFilter} label="Состояние шаблонов" wrap />
       <label class="tpl-frequency"><span class="sr-only">Периодичность</span><select bind:value={frequency} aria-label="Периодичность"><option value="all">Любое расписание</option><option value="daily">Каждый день</option><option value="weekly">По дням недели</option></select></label>
       <span class="hint" role="status">{shown.length} из {templates.length}</span>
     </div>
@@ -74,7 +74,7 @@
       <p class="hint">Пока нет шаблонов — создай дейлик или еженедельный.</p>
     {:else if shown.length === 0}
       <p class="hint">Шаблоны не найдены. Измените поиск или фильтры.</p>
-      <button type="button" class="btn btn--ghost" onclick={() => { search = ''; state = 'all'; frequency = 'all' }}>Сбросить фильтры</button>
+      <button type="button" class="btn btn--ghost" onclick={() => { search = ''; statusFilter = 'all'; frequency = 'all' }}>Сбросить фильтры</button>
     {:else}
       <ul class="tpl-list">
         {#each shown as t (t.id)}

@@ -50,3 +50,50 @@ func TestMathInvalidAndBounded(t *testing.T) {
 	}
 	render(t, Document{Blocks: []Block{{Type: BlockMarkdown, Markdown: "Ошибка $\\unknown{x}$; код `a_b`; цена $10 и $20."}}})
 }
+
+func TestMathCommandsAndErrors(t *testing.T) {
+	ok := []string{
+		`\sqrt{x}`, `\mathrm{d}x`, `\operatorname{tr}A`, `\mathit{abc}`,
+		`\left(\frac{a}{b}\right)`, `a\quad b\qquad c`, `a\,b\;c\:d\!e`,
+		`\% \{\} \_ \$ \# \&`, `\alpha+\beta\leq\gamma`, `x_{i}^{2}`, `x^2_i`,
+		`\text{тыс. руб.}`, `a = b \pm c \times d \div e \cdot f`,
+		`\sum_{i=1}^{n} i`, `{a+b}`,
+	}
+	for _, expr := range ok {
+		box, err := parseMath(expr, 10)
+		if err != nil {
+			t.Errorf("%s: %v", expr, err)
+			continue
+		}
+		if box.w <= 0 && expr != `a\,b\;c\:d\!e` {
+			t.Errorf("%s: empty box", expr)
+		}
+	}
+	bad := []string{
+		`a_{1}_{2}`, `a^{1}^{2}`, `}`, `_x`, `^x`, `\`, `\?`,
+		`\text`, `\text{a{b}`, `\text{a\b}`, `{a`, `a}`, strings.Repeat("a", 4097),
+		`\frac{1}`,
+	}
+	for _, expr := range bad {
+		if _, err := parseMath(expr, 10); err == nil {
+			t.Errorf("accepted %q", expr)
+		}
+	}
+	deep := strings.Repeat("{", 25) + "x" + strings.Repeat("}", 25)
+	if _, err := parseMath(deep, 10); err == nil {
+		t.Error("accepted too-deep group")
+	}
+}
+
+func TestMathMarkdownBlocks(t *testing.T) {
+	md := "строка $$\\alpha+\\beta$$\n\n$$\n\\frac{1}{2}\n$$\n\n$$\nбез закрытия\n"
+	out := render(t, Document{Blocks: []Block{{Type: BlockMarkdown, Markdown: md}}})
+	if len(out) < 1000 {
+		t.Fatalf("small PDF: %d", len(out))
+	}
+	var many strings.Builder
+	for i := 0; i < 201; i++ {
+		many.WriteString("$x$ ")
+	}
+	render(t, Document{Blocks: []Block{{Type: BlockMarkdown, Markdown: many.String()}}})
+}
