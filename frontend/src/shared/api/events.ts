@@ -1,5 +1,5 @@
-import type { EventRead } from './journal.gen'
 import { request } from './http.ts'
+import type { EventRead } from './journal.gen'
 
 export function listEvents() {
   return request<EventRead[]>('/api/calendar/events')
