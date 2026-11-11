@@ -23,7 +23,7 @@
     tabFromUrl,
   } from '@/app/model/route.ts'
   import { onMount, tick, untrack } from 'svelte'
-  import { cubicOut } from 'svelte/easing'
+  import { SLIDE_EASE, SLIDE_MS, slideTab } from '@/app/model/slideTab.ts'
   import { tabSwipe } from '@/shared/lib/tabSwipe.ts'
   import {
     listAllAttachments, listCategories, listNotes, listQuestlines, listQuests,
@@ -239,8 +239,6 @@
   let graphEl = $state((null as HTMLDivElement | null))
   let prevView = nav.view
   // One duration for every tab: the map (kept mounted, animated by hand) and the others (`slideTab`) must feel the same.
-  const SLIDE_MS = 110
-  const SLIDE_EASE = 'cubic-bezier(0.215, 0.61, 0.355, 1)'
   $effect(() => {
     const v = nav.view
     if (v === 'graph') graphSeen = true
@@ -263,17 +261,6 @@
       }
     }
   })
-
-  /** Horizontal slide for tab switches: forward enters from the right, back from the left. */
-  function slideTab(node: any, { dir, out = false }: any) {
-    const sign = out ? -dir : dir
-    return {
-      duration: SLIDE_MS,
-      delay: 0,
-      easing: cubicOut,
-      css: (t: number) => `transform: translateX(${(1 - t) * sign * 100}%)`,
-    }
-  }
 
   async function refreshHealth() {
     try {

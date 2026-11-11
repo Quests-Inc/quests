@@ -28,7 +28,8 @@
 
   async function reload() {
     try {
-      events = await listEvents()
+      const list = await listEvents()
+      events = Array.isArray(list) ? list : []
     } catch {
       events = []
     }

@@ -37,7 +37,7 @@
     onOpen,
   }: {
     active?: boolean
-    rootType?: 'quest' | 'note' | 'questline' | null
+    rootType?: 'quest' | 'note' | 'questline' | 'event' | null
     rootId?: number | null
     nonce?: number
     questlines?: { id: number; title?: string }[]

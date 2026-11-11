@@ -8,6 +8,24 @@
   import RefText from '@/shared/ui/RefText.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import type { EventRead } from '@/shared/api/journal.gen'
+  import {
+    actualWindow,
+    buildBarCaption,
+    buildBarTip,
+    clipToDay,
+    dayBounds,
+    dayKey,
+    eventBarCaption,
+    eventBarTip,
+    eventColor,
+    formatDayTitle,
+    formatTime,
+    monthEndKey,
+    monthKey,
+    monthStartKey,
+    parseDayKey,
+    sigKey,
+  } from '../model/day.ts'
 
   let {
     quests = [],
@@ -30,10 +48,6 @@
     onCreateEvent?: (dayKey: string) => void,
     onEditEvent?: (event: EventRead) => void,
   } = $props()
-
-  function eventColor(color: string | undefined) {
-    return color && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color) ? color : '#5a8a9a'
-  }
 
   function openQuestMenu(event: MouseEvent, id: number) {
     event.preventDefault()
@@ -71,103 +85,6 @@
 
   let rootEl: HTMLElement | null = $state(null)
   let dayMenu = $state({ open: false, x: 0, y: 0, key: '' })
-
-  function monthKey(d: Date) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  }
-
-  function dayKey(d: Date) {
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }
-
-  function monthStartKey(d = new Date()) {
-    return dayKey(new Date(d.getFullYear(), d.getMonth(), 1))
-  }
-
-  function monthEndKey(d = new Date()) {
-    return dayKey(new Date(d.getFullYear(), d.getMonth() + 1, 0))
-  }
-
-  function parseDayKey(key: string) {
-    const [y, m, d] = key.split('-').map(Number)
-    return new Date(y, m - 1, d)
-  }
-
-  function dayBounds(key: string) {
-    const start = parseDayKey(key)
-    start.setHours(0, 0, 0, 0)
-    const end = new Date(start)
-    end.setDate(end.getDate() + 1)
-    return { start, end }
-  }
-
-  function formatTime(d: Date) {
-    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  function formatDayTitle(key: string) {
-    return parseDayKey(key).toLocaleDateString('ru-RU', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-  }
-
-  function sigKey(q: { significance: any }) {
-    const s = String(q?.significance || 'common').toLowerCase()
-    if (['insignificant', 'common', 'uncommon', 'epic', 'legendary'].includes(s)) return s
-    return 'common'
-  }
-
-  /** Urgent window [deadline − duration, deadline]. Point if no duration. */
-  function questWindow(q: any): { start: Date, end: Date } | null {
-    const deadline = parseApiDate(q?.deadline_at)
-    if (!deadline) return null
-    const dur = Number(q.duration_seconds) || 0
-    if (dur > 0) {
-      return { start: new Date(deadline.getTime() - dur * 1000), end: deadline }
-    }
-    return { start: deadline, end: deadline }
-  }
-
-  /** Planned urgent window, clipped to actual finish when completed/failed. */
-  function actualWindow(q: any): { start: Date, end: Date, finish: Date | null, markKind: 'completed' | 'failed' | null } | null {
-    const planned = questWindow(q)
-    if (!planned) return null
-    const status = String(q.status || '')
-    let finish: Date | null = null
-    let markKind: 'completed' | 'failed' | null = null
-    if (status === 'completed') {
-      finish = parseApiDate(q.completed_at)
-      if (finish) markKind = 'completed'
-    } else if (status === 'failed') {
-      finish = parseApiDate(q.updated_at)
-      if (finish) markKind = 'failed'
-    }
-    if (!finish) {
-      return { start: planned.start, end: planned.end, finish: null, markKind: null }
-    }
-    // Fact load: from window open to finish (shorten or extend past deadline).
-    let start = planned.start
-    let end = finish
-    if (end.getTime() < start.getTime()) {
-      start = finish
-      end = finish
-    }
-    return { start, end, finish, markKind }
-  }
-
-  function clipToDay(win: { start: Date, end: Date }, dayStart: Date, dayEnd: Date) {
-    const s = Math.max(win.start.getTime(), dayStart.getTime())
-    const e = Math.min(win.end.getTime(), dayEnd.getTime())
-    if (e < s) return null
-    if (e === s) return { startMs: s, endMs: s, point: true }
-    return { startMs: s, endMs: e, point: false }
-  }
 
   /** Normalize from ≤ to. */
   let period = $derived.by(() => {
@@ -453,53 +370,6 @@
     if (hoveredId.startsWith('e:')) return dayLoad.eventRows.find((b) => b.id === id)?.caption ?? ''
     return ''
   })
-
-  function eventBarCaption(
-    ev: EventRead,
-    win: { start: Date, end: Date },
-    fromPrev: boolean,
-    endToday: boolean,
-  ) {
-    const title = String(ev.title || '?')
-    if (ev.all_day) {
-      const a = dayKey(win.start)
-      const b = dayKey(new Date(win.end.getTime() - 1))
-      return a === b ? `${title} · весь день` : `${title} · весь день · ${a} — ${b}`
-    }
-    const endLabel = formatTime(win.end)
-    const span = fromPrev
-      ? `${formatTime(win.start)} (${dayKey(win.start)}) → ${endLabel}${endToday ? '' : ` (${dayKey(win.end)})`}`
-      : `${formatTime(win.start)} → ${endLabel}${endToday ? '' : ` (${dayKey(win.end)})`}`
-    return `${title} · ${span}`
-  }
-
-  function eventBarTip(
-    ev: EventRead,
-    win: { start: Date, end: Date },
-    fromPrev: boolean,
-    endToday: boolean,
-  ) {
-    return eventBarCaption(ev, win, fromPrev, endToday)
-  }
-
-  function buildBarCaption(q: any, win: { start: Date, end: Date, finish: Date | null }, fromPrev: boolean, endToday: boolean, markKind: string | null) {
-    const title = String(q.title || '?')
-    const endLabel = formatTime(win.end)
-    const span = fromPrev
-      ? `${formatTime(win.start)} (${dayKey(win.start)}) → ${endLabel}${endToday ? '' : ` (${dayKey(win.end)})`}`
-      : `${formatTime(win.start)} → ${endLabel}${endToday ? '' : ` (${dayKey(win.end)})`}`
-    if (markKind === 'completed') return `${title} · выполнен · ${span}`
-    if (markKind === 'failed') return `${title} · провален · ${span}`
-    return `${title} · ${span}`
-  }
-
-  function buildBarTip(q: any, win: { start: Date, end: Date }, fromPrev: boolean, endToday: boolean) {
-    const parts = [String(q.title || '?')]
-    if (fromPrev) parts.push(`с ${formatTime(win.start)} (${dayKey(win.start)})`)
-    else parts.push(`с ${formatTime(win.start)}`)
-    parts.push(`до ${formatTime(win.end)}${endToday ? '' : ` (${dayKey(win.end)})`}`)
-    return parts.join(' · ')
-  }
 
   /** @returns whether day is now selected */
   function selectDay(key: string): boolean {

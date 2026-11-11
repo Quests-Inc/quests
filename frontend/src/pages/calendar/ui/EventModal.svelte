@@ -127,8 +127,8 @@
     }
   }
 
-  async function onSubmit(event: { preventDefault: () => void }) {
-    event.preventDefault()
+  async function onSubmit(submit: { preventDefault: () => void }) {
+    submit.preventDefault()
     if (!title.trim()) {
       formError = 'Нужно название'
       return
