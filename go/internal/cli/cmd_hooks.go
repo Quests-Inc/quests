@@ -8,7 +8,7 @@ import (
 
 func cmdHook(c *Client, args []string, asJSON bool) (int, error) {
 	if len(args) == 0 {
-		return 1, fmt.Errorf("hook: list|show|add|remove|enable|disable|events")
+		return 1, fmt.Errorf("hook: list|show|add|remove|enable|disable|signals")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -24,7 +24,7 @@ func cmdHook(c *Client, args []string, asJSON bool) (int, error) {
 		return cmdHookEnable(c, rest, asJSON, true)
 	case "disable":
 		return cmdHookEnable(c, rest, asJSON, false)
-	case "events":
+	case "signals":
 		return cmdHookEvents(c, asJSON)
 	default:
 		return 1, fmt.Errorf("hook: неизвестно %s", sub)
@@ -123,7 +123,7 @@ func cmdHookAdd(c *Client, args []string, asJSON bool) (int, error) {
 	}
 	body := map[string]any{
 		"name":        strings.TrimSpace(*name),
-		"events":      []string(events),
+		"signals":     []string(events),
 		"script_id":   *script,
 		"run_on":      strings.TrimSpace(*runOn),
 		"timeout_sec": *timeout,
@@ -199,7 +199,7 @@ func cmdHookEnable(c *Client, args []string, asJSON bool, enabled bool) (int, er
 }
 
 func cmdHookEvents(c *Client, asJSON bool) (int, error) {
-	raw, err := c.Get("/api/hook-events", nil)
+	raw, err := c.Get("/api/hook-signals", nil)
 	if err != nil {
 		// Offline fallback: the same aliases the server ships.
 		table := HookEventsTable()

@@ -8,6 +8,7 @@ import {
   deleteQuest,
   deleteQuestline,
   deleteQuestStep,
+  questToEvent,
   updateQuest,
   updateQuestStep,
 } from '@/shared/api/client.ts'
@@ -42,6 +43,7 @@ export function createJournalDesk(deps: {
   openSecrets: (owner: { kind: string; id: number } | null) => void
   onGraphDirty: () => void
   openGraph: (type: 'quest' | 'questline', id: number) => void
+  openEvent?: (id: number) => void
 }) {
   const remoteEdits = new Map<number, number>()
   const REMOTE_EDIT_TTL_MS = 8000
@@ -235,6 +237,16 @@ export function createJournalDesk(deps: {
     editLine: (line) => openEditQuestline(line),
     askDeleteLine: () => del.askLine(),
     askDeleteQuest: (q) => del.askQuest(q),
+    toEvent: (id) => {
+      if (!confirm('Сделать этот квест событием? Он уйдёт в корзину, шаги вместе с ним.')) return
+      void questToEvent(id)
+        .then((ev) => {
+          if (deps.getSelectedId() === id) deps.setSelectedId(null)
+          deps.reload()
+          deps.openEvent?.(ev.id)
+        })
+        .catch((e) => deps.setError(e instanceof Error ? e.message : 'Не удалось сделать событием'))
+    },
     editStep: (questId, step) => {
       stepModalQuestId = questId
       stepModalStep = step

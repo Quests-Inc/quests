@@ -24,8 +24,8 @@ type Hook struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
 	Enabled    bool      `json:"enabled"`
-	Events     []string  `json:"events"`
-	EventsRaw  []string  `json:"events_raw"`
+	Events     []string  `json:"signals"`
+	EventsRaw  []string  `json:"signals_raw"`
 	ScriptID   int64     `json:"script_id"`
 	QuestID    *int64    `json:"quest_id"`
 	RunOn      string    `json:"run_on"`
@@ -67,7 +67,7 @@ type HookIn struct {
 	TimeoutSec     *int
 }
 
-const hookCols = `h.id, h.name, h.enabled, h.events, h.events_raw, h.script_id, h.quest_id, h.run_on, h.timeout_sec, h.created_at, h.updated_at,
+const hookCols = `h.id, h.name, h.enabled, h.signals, h.signals_raw, h.script_id, h.quest_id, h.run_on, h.timeout_sec, h.created_at, h.updated_at,
 	h.scope_kind, h.scope_id, h.cooldown_sec, h.max_per_hour, h.include_private, h.disabled_reason`
 
 func scanHook(sc interface{ Scan(...any) error }) (Hook, error) {
@@ -329,7 +329,7 @@ func (s *Store) CreateHookIn(ctx context.Context, name string, events []string, 
 		return Hook{}, err
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO hook (name, enabled, events, events_raw, script_id, quest_id, run_on, timeout_sec, created_at, updated_at,
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO hook (name, enabled, signals, signals_raw, script_id, quest_id, run_on, timeout_sec, created_at, updated_at,
 			scope_kind, scope_id, cooldown_sec, max_per_hour, include_private)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		name, boolInt(enabled), encodeJSONStrings(expanded), encodeJSONStrings(raw), scriptID, nullable(quest), runOnOut, timeoutOut, now, now,
@@ -421,7 +421,7 @@ func (s *Store) UpdateHook(ctx context.Context, id int64, in HookIn) (Hook, erro
 		reason = "" // switched on by hand: the old reason is gone
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	res, err := s.DB.ExecContext(ctx, `UPDATE hook SET name = ?, enabled = ?, events = ?, events_raw = ?, script_id = ?, quest_id = ?, run_on = ?, timeout_sec = ?, updated_at = ?,
+	res, err := s.DB.ExecContext(ctx, `UPDATE hook SET name = ?, enabled = ?, signals = ?, signals_raw = ?, script_id = ?, quest_id = ?, run_on = ?, timeout_sec = ?, updated_at = ?,
 			scope_kind = ?, scope_id = ?, cooldown_sec = ?, max_per_hour = ?, include_private = ?, disabled_reason = ?
 		WHERE id = ?`, name, boolInt(enabled), encodeJSONStrings(expanded), encodeJSONStrings(raw), scriptID, nullable(quest), runOnOut, timeoutOut, now,
 		kind, nullable(scopeID), cooldown, perHour, boolInt(private), reason, id)
@@ -463,7 +463,7 @@ func HookEventsCatalog() map[string]any {
 			}
 		}
 	}
-	return map[string]any{"aliases": aliases, "kinds": kinds, "events": hooks.Catalog}
+	return map[string]any{"aliases": aliases, "kinds": kinds, "signals": hooks.Catalog}
 }
 
 // EnabledHooks returns the enabled hooks of the workspace that wait for the kind of event (the dispatcher asks on every event,

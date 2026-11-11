@@ -28,7 +28,7 @@ func (r *CheckRunner) scriptTitle(ctx context.Context, id int64) string {
 	return "script=" + strconv.FormatInt(id, 10)
 }
 
-// testEvent makes up the payload of an event of this kind about the subject, with the fields `source.event` reads.
+// testEvent makes up the payload of an event of this kind about the subject, with the fields `source.signal` reads.
 func testEvent(kind, subjType string, subjID int64) map[string]any {
 	ev := map[string]any{"kind": kind, "title": "проверка из редактора", "detail": "событие придумано для проверки скрипта"}
 	// The family is in the name of the kind (the catalog in platform/hooks names them so).

@@ -30,6 +30,7 @@ export function createJournalMenu(deps: {
   editLine: (line: Line) => void
   askDeleteLine: () => void
   askDeleteQuest: (quest: Quest) => void
+  toEvent?: (questId: number) => void
   editStep: (questId: number, step: Step) => void
   askDeleteStep: (d: { questId: number; stepId: number; title: string }) => void
   quest: {
@@ -145,6 +146,7 @@ export function createJournalMenu(deps: {
     const quest = deps.quests().find((q) => q.id === questId)
     if (!quest) return
     if (action === 'edit') return deps.editQuest(quest)
+    if (action === 'to-event') return void deps.toEvent?.(quest.id)
     if (action === 'pin') return void deps.quest.pin?.(quest, !quest.pinned)
     if (action.startsWith('delay-')) {
       const minutes = Number(action.slice('delay-'.length))

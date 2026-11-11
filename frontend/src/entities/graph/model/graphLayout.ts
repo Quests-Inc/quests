@@ -2,7 +2,7 @@
 // graph is capped at a couple of hundred nodes, so a library isn't worth its weight.
 
 /** Ideal edge length by kind: ownership hugs, references stand off. */
-const LEN: Record<string, number> = { structure: 110, dependency: 150, reference: 210 }
+const LEN: Record<string, number> = { structure: 110, dependency: 150, reference: 210, deadline: 160 }
 
 /** Lays out nodes in place (sets x/y). Root sits at the origin. */
 export function layoutGraph(
@@ -136,7 +136,7 @@ const TYPE_ORDER: Record<string, number> = {
   template: 4,
   questline: 5,
 }
-const EDGE_RANK: Record<string, number> = { structure: 0, dependency: 1, reference: 2 }
+const EDGE_RANK: Record<string, number> = { structure: 0, dependency: 1, deadline: 1, reference: 2 }
 /** Leaf siblings of these types, from this count up, are packed into a block.
  * Steps are not: a quest rarely has more than ten and they read better in a column. */
 const BALL_TYPES = new Set(['attachment'])

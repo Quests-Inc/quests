@@ -75,7 +75,7 @@ func hookJobs(t *testing.T, st *store.Store) int {
 }
 
 const echoHook = `{"nodes":[
-	{"id":1,"type":"source.event","params":{"family":"note"}},
+	{"id":1,"type":"source.signal","params":{"family":"note"}},
 	{"id":2,"type":"code","params":{"text":"echo ok"}},
 	{"id":3,"type":"sink.done"}],
  "edges":[
@@ -188,7 +188,7 @@ func TestHookWritingAVariableDoesNotLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	const g = `{"nodes":[
-		{"id":1,"type":"source.event","params":{"family":"value","owner":"note"}},
+		{"id":1,"type":"source.signal","params":{"family":"value","owner":"note"}},
 		{"id":2,"type":"sink.value","params":{"name":"mirror","type":"str"}}],
 	 "edges":[
 		{"from":{"node":1,"port":"ref"},"to":{"node":2,"port":"ref"}},

@@ -416,10 +416,6 @@
   cursor: pointer;
 }
 
-.opt-slider--compact .opt-slider__opt {
-  padding: 0.25rem 0.6rem;
-}
-
 .opt-slider__opt:disabled {
   cursor: not-allowed;
 }

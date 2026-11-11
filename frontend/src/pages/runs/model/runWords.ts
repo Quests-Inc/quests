@@ -59,7 +59,8 @@ export function filterFromUrl(href = location.href) {
   return {
     run: num('run'),
     script: num('script'),
-    source: kind && sourceId > 0 ? { kind: kind as RunSourceKind, id: sourceId } : undefined,
+    sourceKind: kind in SOURCE_WORDS ? (kind as RunSourceKind) : '',
+    source: kind in SOURCE_WORDS && sourceId > 0 ? { kind: kind as RunSourceKind, id: sourceId } : undefined,
     state: state === 'failed' || state === 'waiting' || state === 'done' ? state : '',
   } as const
 }

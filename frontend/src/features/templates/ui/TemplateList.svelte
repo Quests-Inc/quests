@@ -1,5 +1,8 @@
 <script lang="ts">
   import type { TemplateRead } from '@/shared/api/automation.gen'
+  import PageLayout from '@/shared/ui/PageLayout.svelte'
+  import Picker from '@/shared/ui/Picker.svelte'
+  import PageToolbar from '@/shared/ui/PageToolbar.svelte'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import { getRunStats } from '@/shared/api/client.ts'
@@ -8,6 +11,7 @@
 
   /** Список шаблонов в окне: строка с названием и сводкой, быстрые действия и переключатель «включён». */
   let {
+    standalone = false,
     error = '',
     loading,
     templates,
@@ -19,6 +23,7 @@
     onCopy,
     onToggleEnabled,
   }: {
+    standalone?: boolean
     error?: string
     loading: boolean
     templates: TemplateRead[]
@@ -52,22 +57,21 @@
   })
 </script>
 
-  <div class="modal__body">
-    {#if error}
-      <p class="modal__error">{error}</p>
-    {/if}
-    <div class="toolbar">
-      <label class="tpl-search"><span class="sr-only">Поиск шаблонов</span><input type="search" placeholder="Найти шаблон…" bind:value={search} /></label>
-      <button type="button" class="btn btn--accent" onclick={onCreate}>
-        <Icon name="add" size={14} />
-        <span>Новый шаблон</span>
+{#snippet tools()}
+    <PageToolbar>
+      <input class="search" type="search" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" bind:value={search} />
+      <button type="button" class="btn btn--accent btn--icon-only" title="Новый шаблон" aria-label="Новый шаблон" onclick={onCreate}>
+        <Icon name="add" size={16} />
       </button>
-    </div>
-    <div class="tpl-filters">
-      <OptionPills options={statusOptions} bind:value={statusFilter} label="Состояние шаблонов" wrap />
-      <label class="tpl-frequency"><span class="sr-only">Периодичность</span><select bind:value={frequency} aria-label="Периодичность"><option value="all">Любое расписание</option><option value="daily">Каждый день</option><option value="weekly">По дням недели</option></select></label>
+    </PageToolbar>
+    <PageToolbar>
+      <OptionPills options={statusOptions} bind:value={statusFilter} label="Состояние шаблонов" compact wrap />
+      <Picker options={[{id:"daily",label:"Каждый день"},{id:"weekly",label:"По дням недели"}]} value={frequency === "all" ? "" : frequency} onChange={v => frequency = v || "all"} noneLabel="Любое расписание" label="Периодичность" />
       <span class="hint" role="status">{shown.length} из {templates.length}</span>
-    </div>
+    </PageToolbar>
+{/snippet}
+{#snippet rows()}
+    {#if error}<p class="modal__error">{error}</p>{/if}
     {#if loading}
       <p class="hint">Загрузка…</p>
     {:else if templates.length === 0}
@@ -139,31 +143,28 @@
         {/each}
       </ul>
     {/if}
-  </div>
+{/snippet}
+{#if standalone}
+  <PageLayout>
+    {#snippet toolbar()}{@render tools()}{/snippet}
+    <div class="tpl-content">{@render rows()}</div>
+  </PageLayout>
+{:else}
+  <div class="modal__body">{@render tools()}{@render rows()}</div>
+{/if}
 
 <style>
-
-  .toolbar {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .tpl-search { flex: 1; min-width: min(100%, 12rem); max-width: 32rem; }
-  .tpl-search input { width: 100%; }
-  .tpl-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
-  .tpl-frequency { min-width: 0; }
+  .tpl-content { padding:0.5rem 0; font-size:var(--text-sm); }
   .tpl-row__title { overflow-wrap: anywhere; }
   @container (max-width: 40rem) {
-    .tpl-row { flex-wrap: wrap; padding: 0.25rem; }
+    .tpl-row { flex-wrap: wrap; padding: 0.5rem 0.75rem; }
     .tpl-row__main { flex-basis: 100%; }
     .tpl-row__actions { width: 100%; justify-content: flex-end; padding: 0 0.35rem 0.35rem; }
   }
   .tpl-list {
     container-type: inline-size;
     display: grid;
-    gap: 0.35rem;
+    gap: 0;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -173,10 +174,9 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    padding-right: 0.55rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    background: color-mix(in srgb, var(--color-bg, #121212) 70%, transparent);
+    padding:0.5rem 1rem;
+    border-bottom:1px solid var(--color-border);
+    background:transparent;
   }
 
   .tpl-row--off .tpl-row__title { color: var(--color-fg-muted); }
@@ -186,7 +186,7 @@
     flex: 1;
     gap: 0.15rem;
     min-width: 0;
-    padding: 0.55rem 0.75rem;
+    padding: 0;
     border: 0;
     background: transparent;
     color: inherit;

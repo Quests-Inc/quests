@@ -62,11 +62,13 @@ func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]Quest, error) {
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
 			l.title, l.color, l.icon, l.custom_icon, l.updated_at,
-			(fi.quest_id IS NOT NULL AND fi.dismissed_at IS NULL)
+			(fi.quest_id IS NOT NULL AND fi.dismissed_at IS NULL),
+			q.event_id, q.event_edge, q.event_dir, q.event_offset_seconds, oc.title
 		FROM quest q
 		LEFT JOIN questcategory c ON c.id = q.category_id
 		LEFT JOIN questline l ON l.id = q.questline_id
 		LEFT JOIN quest_failure_inbox fi ON fi.quest_id = q.id
+		LEFT JOIN event oc ON oc.id = q.event_id
 		WHERE 1=1`
 	args := []any{}
 	if f.Status != nil {
@@ -128,11 +130,13 @@ func (s *Store) GetQuest(ctx context.Context, id int64) (Quest, error) {
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
 			l.title, l.color, l.icon, l.custom_icon, l.updated_at,
-			(fi.quest_id IS NOT NULL AND fi.dismissed_at IS NULL)
+			(fi.quest_id IS NOT NULL AND fi.dismissed_at IS NULL),
+			q.event_id, q.event_edge, q.event_dir, q.event_offset_seconds, oc.title
 		FROM quest q
 		LEFT JOIN questcategory c ON c.id = q.category_id
 		LEFT JOIN questline l ON l.id = q.questline_id
 		LEFT JOIN quest_failure_inbox fi ON fi.quest_id = q.id
+		LEFT JOIN event oc ON oc.id = q.event_id
 		WHERE q.id = ?`, id)
 	quest, err := scanQuest(row)
 	if err == sql.ErrNoRows {
@@ -164,6 +168,9 @@ func scanQuest(row rowScanner) (Quest, error) {
 	var cSlug, cLabel, cColor sql.NullString
 	var lTitle, lColor, lIcon, lCustom sql.NullString
 	var lUpdated sql.NullString
+	var occID sql.NullInt64
+	var occEdge, occDir, occTitle sql.NullString
+	var occOffset sql.NullInt64
 	err := row.Scan(
 		&q.ID, &q.Title, &q.Description, &q.Status, &q.Significance, &pinned, &q.SortOrder,
 		&deadline, &duration, &catID, &lineID,
@@ -171,6 +178,7 @@ func scanQuest(row rowScanner) (Quest, error) {
 		&cSlug, &cLabel, &cColor,
 		&lTitle, &lColor, &lIcon, &lCustom, &lUpdated,
 		&failureInbox,
+		&occID, &occEdge, &occDir, &occOffset, &occTitle,
 	)
 	if err != nil {
 		return q, err
@@ -178,6 +186,24 @@ func scanQuest(row rowScanner) (Quest, error) {
 	q.Pinned, q.OverlayHidden = SplitPinState(pinned)
 	q.Automated = automated != 0
 	q.FailureInbox = failureInbox
+	if occID.Valid {
+		v := occID.Int64
+		q.EventID = &v
+	}
+	if occEdge.Valid {
+		q.EventEdge = occEdge.String
+	}
+	if occDir.Valid {
+		q.EventDir = occDir.String
+	}
+	if occOffset.Valid {
+		v := int(occOffset.Int64)
+		q.EventOffset = &v
+	}
+	if occTitle.Valid {
+		v := occTitle.String
+		q.EventTitle = &v
+	}
 	if source.Valid {
 		v := source.String
 		q.Source = &v
@@ -296,11 +322,13 @@ func (s *Store) createQuest(ctx context.Context, q Quest, changeKind, changeDeta
 		INSERT INTO quest (
 			title, description, status, significance, pinned, sort_order,
 			deadline_at, duration_seconds, category_id, questline_id,
-			created_at, updated_at, completed_at, template_id, period_key, automated, source
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			created_at, updated_at, completed_at, template_id, period_key, automated, source,
+			event_id, event_edge, event_dir, event_offset_seconds
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
 		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.CreatedAt), timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), nullI64(q.TemplateID), nullStr(q.PeriodKey), boolInt(q.Automated), nullStr(q.Source),
+		nullI64(q.EventID), nullStr(emptyStrPtr(q.EventEdge)), nullStr(emptyStrPtr(q.EventDir)), nullInt(q.EventOffset),
 	)
 	if err != nil {
 		return Quest{}, err
@@ -364,11 +392,13 @@ func (s *Store) UpdateQuest(ctx context.Context, q Quest, changeKind, changeDeta
 		UPDATE quest SET
 			title=?, description=?, status=?, significance=?, pinned=?, sort_order=?,
 			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
-			updated_at=?, completed_at=?, automated=?
+			updated_at=?, completed_at=?, automated=?,
+			event_id=?, event_edge=?, event_dir=?, event_offset_seconds=?
 		WHERE id=?`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
 		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
-		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated), q.ID,
+		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated),
+		nullI64(q.EventID), nullStr(emptyStrPtr(q.EventEdge)), nullStr(emptyStrPtr(q.EventDir)), nullInt(q.EventOffset), q.ID,
 	)
 	if err != nil {
 		return Quest{}, err
@@ -494,11 +524,13 @@ func (s *Store) UpdateQuestComment(ctx context.Context, q Quest, changeKind, cha
 		UPDATE quest SET
 			title=?, description=?, status=?, significance=?, pinned=?, sort_order=?,
 			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
-			updated_at=?, completed_at=?, automated=?
+			updated_at=?, completed_at=?, automated=?,
+			event_id=?, event_edge=?, event_dir=?, event_offset_seconds=?
 		WHERE id=?`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
 		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
-		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated), q.ID,
+		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated),
+		nullI64(q.EventID), nullStr(emptyStrPtr(q.EventEdge)), nullStr(emptyStrPtr(q.EventDir)), nullInt(q.EventOffset), q.ID,
 	)
 	if err != nil {
 		return Quest{}, err

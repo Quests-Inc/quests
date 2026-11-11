@@ -759,7 +759,9 @@
     </form>
   {/if}
 {/snippet}
-{#if embedded}
+{#if embedded && view === 'list'}
+  <TemplateList standalone {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
+{:else if embedded}
   <TemplatePage title={view === 'list' ? 'Шаблоны' : view === 'create' ? 'Новый шаблон' : editing?.title || 'Редактировать шаблон'} onBack={view !== 'list' ? backToList : undefined} busy={saving || deleting}>{@render content()}</TemplatePage>
 {:else}
   <ModalShell {open} onClose={handleClose} labelledby="templates-modal-title" zIndex={40} maxWidth="36rem">{@render content()}</ModalShell>

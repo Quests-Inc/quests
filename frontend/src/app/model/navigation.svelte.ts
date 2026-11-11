@@ -5,7 +5,7 @@ import { searchOfTarget, type OpenTarget } from '@/shared/lib/openTarget.ts'
 import { TAB_ORDER, type View } from '@/shared/lib/viewTabs.ts'
 
 export { TAB_ORDER, type View }
-export type GraphRoot = { type: 'quest' | 'note' | 'questline' | null; id: number | null }
+export type GraphRoot = { type: 'quest' | 'note' | 'questline' | 'event' | null; id: number | null }
 
 const validId = (id: unknown) => {
   const n = Number(id)
@@ -51,6 +51,10 @@ export function createNavigation(deps: {
     if (route.questId != null) {
       pendingSelectId = route.questId
       selectedId = route.questId
+    }
+    if (route.eventId != null) {
+      view = 'calendar'
+      queueMicrotask(() => window.dispatchEvent(new CustomEvent('quests:open-event', { detail: route.eventId })))
     }
   }
 
@@ -165,6 +169,12 @@ export function createNavigation(deps: {
       return
     }
     if (kind === 'template') deps.openTemplate(id)
+    if (kind === 'event') {
+      slideTo('calendar')
+      replaceSearch({ tab: 'calendar', event: id })
+      view = 'calendar'
+      window.dispatchEvent(new CustomEvent('quests:open-event', { detail: id }))
+    }
   }
 
   return {

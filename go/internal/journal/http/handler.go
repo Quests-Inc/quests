@@ -46,6 +46,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/quests/{id}", h.patchQuest)
 	mux.HandleFunc("POST /api/quests/{id}/ack-failure", h.ackFailure)
 	mux.HandleFunc("DELETE /api/quests/{id}", h.deleteQuest)
+	mux.HandleFunc("POST /api/quests/{id}/to-event", h.questToEvent)
 	mux.HandleFunc("POST /api/quests/{id}/steps", h.addStep)
 	mux.HandleFunc("PATCH /api/quests/{id}/steps/{step_id}", h.patchStep)
 	mux.HandleFunc("DELETE /api/quests/{id}/steps/{step_id}", h.deleteStep)
@@ -58,6 +59,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/tags/{id}", h.deleteTag)
 	mux.HandleFunc("PUT /api/quests/{id}/tags", h.putQuestTags)
 	mux.HandleFunc("PUT /api/templates/{id}/tags", h.putTemplateTags)
+
+	mux.HandleFunc("GET /api/calendar/events", h.listEvents)
+	mux.HandleFunc("POST /api/calendar/events", h.createEvent)
+	mux.HandleFunc("GET /api/calendar/events/{id}", h.getEvent)
+	mux.HandleFunc("PATCH /api/calendar/events/{id}", h.patchEvent)
+	mux.HandleFunc("DELETE /api/calendar/events/{id}", h.deleteEvent)
 
 	mux.HandleFunc("GET /api/questlines", h.listQuestlines)
 	mux.HandleFunc("POST /api/questlines", h.createQuestline)

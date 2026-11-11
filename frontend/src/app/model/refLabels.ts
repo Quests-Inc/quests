@@ -10,12 +10,14 @@ export function buildRefLabels({
   questlines,
   templates,
   attachments,
+  events = [],
 }: {
   notes: Titled[]
   quests: (Titled & { steps?: Titled[] })[]
   questlines: Titled[]
   templates: Titled[]
   attachments: { id: number; filename?: string }[]
+  events?: Titled[]
 }): Record<string, string> {
   const m: Record<string, string> = {}
   for (const n of notes) m[`note:${n.id}`] = n.title || `note=${n.id}`
@@ -30,6 +32,7 @@ export function buildRefLabels({
   for (const a of attachments) {
     m[`attachment:${a.id}`] = a.filename || `attachment=${a.id}`
   }
+  for (const e of events) m[`event:${e.id}`] = e.title || `event=${e.id}`
   return m
 }
 
@@ -40,6 +43,7 @@ export function buildRefIcons({
   notes,
   quests,
   questlines,
+  events = [],
 }: {
   notes: Iconed[]
   quests: (Iconed & {
@@ -48,12 +52,14 @@ export function buildRefIcons({
     questline_color?: string | null
   })[]
   questlines: Iconed[]
+  events?: Iconed[]
 }): Record<string, { icon?: string | null; url?: string | null; color?: string | null }> {
   const m: Record<string, { icon?: string | null; url?: string | null; color?: string | null }> = {}
   for (const n of notes) m[`note:${n.id}`] = { icon: n.icon, url: n.icon_url, color: n.color }
   for (const l of questlines) m[`questline:${l.id}`] = { icon: l.icon, url: l.icon_url, color: l.color }
   for (const q of quests)
     m[`quest:${q.id}`] = { icon: q.questline_icon, url: q.questline_icon_url, color: q.questline_color }
+  for (const e of events) m[`event:${e.id}`] = { icon: e.icon || 'calendar', color: e.color }
   return m
 }
 
@@ -78,16 +84,19 @@ type PQuest = {
   steps?: PStep[]
 }
 type PLine = { id: number; title?: string; description?: string }
+type PEvent = { id: number; title?: string; description?: string; all_day?: boolean; starts_at?: string }
 
 /** Карточка-превью по kind:id из каталогов в памяти (без запросов). Приватная заметка текст не отдаёт. */
 export function buildRefPreview({
   notes,
   quests,
   questlines,
+  events = [],
 }: {
   notes: PNote[]
   quests: PQuest[]
   questlines: PLine[]
+  events?: PEvent[]
 }) {
   return (kind: string, id: number): RefPreview | null => {
     if (kind === 'note') {
@@ -115,6 +124,18 @@ export function buildRefPreview({
         title: q.title || `quest=${id}`,
         meta,
         body: next?.title ? `Дальше: ${next.title}` : undefined,
+      }
+    }
+    if (kind === 'event') {
+      const e = events.find((x) => x.id === id)
+      if (!e) return null
+      const when = e.starts_at ? e.starts_at.slice(0, 10) : ''
+      return {
+        kind,
+        type: 'Событие',
+        title: e.title || `event=${id}`,
+        meta: [when, e.all_day ? 'весь день' : ''].filter(Boolean) as string[],
+        body: plainExcerpt(e.description || '', 160),
       }
     }
     if (kind === 'questline') {

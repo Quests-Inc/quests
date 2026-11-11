@@ -6,7 +6,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 const wrap = (cls: string, s: string) => `<span class="mdh-${cls}">${esc(s)}</span>`
 
-const REF = '(?:note|quest|questline|step|attachment|template)=\\d+\\b'
+const REF = '(?:note|quest|questline|step|attachment|template|event)=\\d+\\b'
 const FLAG = '(?:auto(?:=1)?|hide(?:=1)?|set=[a-z][a-z0-9_]{0,23}|on=[a-z0-9][a-z0-9_,-]{0,80})'
 
 /** Inline tokens, first match at the earliest position wins; at one position the earlier entry of the list does. */

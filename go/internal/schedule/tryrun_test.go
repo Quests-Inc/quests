@@ -23,7 +23,7 @@ func TestTryRunDryAndLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	const g = `{"nodes":[
-		{"id":1,"type":"source.event","params":{"family":"value","owner":"note"}},
+		{"id":1,"type":"source.signal","params":{"family":"value","owner":"note"}},
 		{"id":2,"type":"sink.value","params":{"name":"mirror","type":"str"}}],
 	 "edges":[
 		{"from":{"node":1,"port":"ref"},"to":{"node":2,"port":"ref"}},

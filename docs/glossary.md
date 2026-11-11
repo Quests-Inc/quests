@@ -6,6 +6,7 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 |---|---|---|---|
 | Журнал (Journal) | journal | journal | The main screen: the list of quests with a detail view |
 | Квест (Quest) | quest | journal | A task with a status, significance, deadline and steps |
+| Событие (Event) | event | journal | A start and an end on the calendar. A quest deadline may sit before or after either edge. Not a hook signal |
 | Шаг (Step) | step | journal | A part of a quest with progress; may have a check (a command or a script) |
 | Квестлайн (Questline) | questline | journal | A group of related quests with a shared colour and icon |
 | Раздел (Category) | category | journal | A category of quests |
@@ -13,7 +14,7 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 | История (History) | changelog | journal | The change log of entities |
 | Заметка (Note) | note | knowledge | A document in a tree; flags README, PRIVATE, CATEGORY, OUTDATED |
 | Вложение (Attachment) | attachment | knowledge | A file of a quest, questline or note; versions, ClamAV scan, stored on WebDAV |
-| Ссылка (Reference) | ref | knowledge | A mention of an entity in text: `quest=N`, `note=N`, `attachment=N`… |
+| Ссылка (Reference) | ref | knowledge | A mention of an entity in text: `quest=N`, `note=N`, `event=N`, `attachment=N`… |
 | Секрет (Secret) | secret | knowledge | An environment value for a command; inherited step > quest > template > questline > workspace |
 | Шаблон (Template) | template | automation | The rule of a periodic quest (schedule, mode, pool) |
 | Эмит (Emit) | emit | automation | Creating a quest from a template; with `emit_pool_command` a command prints the quest |
@@ -25,7 +26,8 @@ The Russian term (as in the interface) — the name in code — the meaning. The
 | Токен (Token) | token | identity | A bearer token for clients without a session (CLI, HUD, bot, MCP) |
 | Карта (Map) | graph | cross-cutting | The map of relations between entities |
 | Черновик карты (Map draft) | graph draft | cross-cutting | Edits on the map not applied until saved |
-| Хук (Hook) | hook | execution | An event (quest, step, note, variable, file) in an area → a library script; limits against storms ([hooks.md](hooks.md)) |
+| Сигнал (Signal) | signal | execution | What a hook waits for. A script reads it from `source.signal` |
+| Хук (Hook) | hook | execution | A signal (quest, step, note, variable, file) in an area → a library script; limits against storms ([hooks.md](hooks.md)) |
 | Скрипт (Script) | script | execution | A graph of typed nodes, versioned; runs as a check, an emit, a hook or an embedding ([scripts.md](scripts.md)) |
 | Нода (Node) | node | execution | One step of a script: source, code, parse, control, logic, sink |
 | Своя нода (Custom node) | custom node | execution | A node baked from other nodes or from one Code node, with editable fields |

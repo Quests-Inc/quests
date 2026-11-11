@@ -99,6 +99,7 @@ export function contextMenuItems({
       { id: 'graph', label: 'Открыть на карте' },
       { id: 'sep-copy', sep: true },
       { id: 'edit', label: 'Редактировать' },
+      { id: 'to-event', label: 'Сделать событием' },
       { id: 'add-step', label: 'Добавить шаг' },
       { id: 'pin', label: pinned ? 'Снять закреп' : 'Закрепить' },
       { id: 'sep-groups', sep: true },

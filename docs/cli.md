@@ -116,11 +116,11 @@ Delivery is through the graph evaluator (Code on a runner, or `sink.http` / `sin
 - Without `--quest` — workspace-wide: any event of the kind in this workspace.
 - With `--quest ID` — only that quest's events.
 
-Events (`--event` / `-e`, repeatable): aliases or raw kinds (`GET /api/hook-events`).
+Signals (`--event` / `-e`, repeatable): aliases or raw kinds (`GET /api/hook-signals`).
 
 ```bash
-quests hook events
-quests hook events --json
+quests hook signals
+quests hook signals --json
 ```
 
 Useful aliases: `complete`, `step`, `status`, `fail`, `created`, `deleted`.

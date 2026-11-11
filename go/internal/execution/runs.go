@@ -211,3 +211,17 @@ func (s *Store) PurgeRuns(ctx context.Context, before time.Time, keep int) (int6
 	}
 	return res.RowsAffected()
 }
+
+// FailOrphanRuns settles old waiting runs whose runner jobs have disappeared.
+// The grace period excludes a run being stored before its first job is queued.
+// Never rerun unknown code: its side effects may already have happened.
+func (s *Store) FailOrphanRuns(ctx context.Context, before time.Time) (int64, error) {
+	now := timeutil.ToDBUTC(timeutil.NowUTC())
+	res, err := s.DB.ExecContext(ctx, `UPDATE script_run SET state = ?, error = ?, updated_at = ?, finished_at = ?
+ WHERE state = ? AND updated_at < ? AND NOT EXISTS (SELECT 1 FROM runner_job j WHERE j.run_id = script_run.id)`,
+		RunFailed, "Результат выполнения потерян: у ожидающего запуска отсутствуют задания раннера. Код повторно не запускался.", now, now, RunWaiting, timeutil.ToDBUTC(before))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}

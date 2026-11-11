@@ -13,6 +13,7 @@
   import StepAutoChip from './StepAutoChip.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { formatLocal, localTimeZone } from '@/shared/lib/time.ts'
+  import { eventPhrase } from '@/shared/lib/event.ts'
   import { parseRefs } from '@/shared/lib/refs.ts'
   import { OPEN_STATUSES, periodBadge, questTimer, quantifiedProgress, significanceLabel, statusColor, downloadQuestPdfSimple, downloadQuestPdf as downloadQuestPdfRich } from '@/entities/quest'
   import { createQuestPdf } from '../model/pdfExport.svelte.ts'
@@ -605,6 +606,9 @@
       <div>
         <dt>Срок ({tzLabel})</dt>
         <dd>{formatLocal(q.deadline_at)}</dd>
+        {#if q.event_id}
+          <dd>{eventPhrase(q)}</dd>
+        {/if}
       </div>
     {/if}
     {#if q.source}

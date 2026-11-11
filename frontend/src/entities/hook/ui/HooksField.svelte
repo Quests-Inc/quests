@@ -55,8 +55,8 @@
       id: d.localId,
       name: d.name,
       enabled: d.enabled,
-      events: d.events,
-      events_raw: d.events,
+      signals: d.events,
+      signals_raw: d.events,
       script_id: Number(d.script_id) || 0,
       script_title: '',
       run_on: d.run_on,
@@ -110,7 +110,7 @@
     editingId = row.id
     name = row.name || ''
     enabled = row.enabled
-    events = [...(row.events?.length ? row.events : displayEvents(row))]
+    events = [...(row.signals?.length ? row.signals : displayEvents(row))]
     scriptId = row.script_id ? String(row.script_id) : ''
     runOn = row.run_on || ''
     thisQuest = row.quest_id != null
@@ -152,7 +152,7 @@
       const body = {
         name: name.trim(),
         enabled,
-        events: [...events],
+        signals: [...events],
         script_id: sid,
         run_on: runOn.trim(),
         quest_id: thisQuest ? questId : null,
@@ -223,7 +223,7 @@
           <button type="button" class="hooksfield__main" disabled={!canEdit} onclick={() => startEdit(row)}>
             <span class="hooksfield__title">{row.name || `хук #${Math.abs(row.id)}`}</span>
             <span class="hooksfield__meta">
-              {eventWords(expandEvents(displayEvents(row), hookCatalog.aliases), hookCatalog.events).join(', ')}
+              {eventWords(expandEvents(displayEvents(row), hookCatalog.aliases), hookCatalog.signals).join(', ')}
               · {row.script_title || (row.script_id ? `скрипт ${row.script_id}` : 'без скрипта')}
               {#if row.run_on}· {row.run_on}{/if}
               {#if live && row.quest_id == null}· весь журнал{/if}

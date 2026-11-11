@@ -1,4 +1,7 @@
 <script lang="ts">
+  import PageLayout from '@/shared/ui/PageLayout.svelte'
+  import PageToolbar from '@/shared/ui/PageToolbar.svelte'
+  import OptionPills from '@/shared/ui/OptionPills.svelte'
   import './attachmentCards.css'
   import './attachmentToolbar.css'
   import { parseQuery, passes, tokenValues, setToken, hasToken, helpLine } from '@/shared/lib/searchFlags.ts'
@@ -270,8 +273,9 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="attpage" class:attpage--detail={selected != null}>
-  <div class="attpage__tools">
-    <div class="attpage__row1">
+  <PageLayout>
+    {#snippet toolbar()}
+    <PageToolbar>
       <input
         class="search attpage__search"
         type="search"
@@ -308,37 +312,14 @@
       >
         <Icon name={VIEWS[viewIndex].icon} size={18} />
       </button>
-    </div>
+    </PageToolbar>
     <FlagHints value={search} spec={ATT_SPEC} parsed={parsedSearch} onPick={(v) => (search = v)} />
-    <div class="attpage__row2">
-      <div class="attpage__seg" role="group" aria-label="Тип владельца">
-        {#each KINDS as k (k.id)}
-          <button
-            type="button"
-            class="attpage__pill"
-            class:attpage__pill--on={kindFilter === k.id}
-            onclick={() => setKind(k.id)}>{k.label}</button
-          >
-        {/each}
-      </div>
-      <div class="attpage__seg" role="group" aria-label="Состояние">
-        {#each STATES as s (s.id)}
-          <button
-            type="button"
-            class="attpage__pill"
-            class:attpage__pill--on={stateFilter === s.id}
-            onclick={() => setState(s.id)}
-          >
-            {#if s.id === 'hidden'}<Icon name="eye-off" size={12} />{/if}
-            {s.label}
-            <span class="attpage__n"
-              >{s.id === 'active' ? activeCount : s.id === 'hidden' ? hiddenCount : attachments.length}</span
-            >
-          </button>
-        {/each}
-      </div>
-    </div>
-  </div>
+    <PageToolbar>
+      <OptionPills options={KINDS.map(k => ({id:k.id,label:k.label}))} value={kindFilter} onToggle={(v) => setKind(v as typeof kindFilter)} label="Тип владельца" compact wrap />
+      <OptionPills options={STATES.map(s => ({id:s.id,label:`${s.label} (${s.id === 'active' ? activeCount : s.id === 'hidden' ? hiddenCount : attachments.length})`}))} value={stateFilter} onToggle={(v) => setState(v as typeof stateFilter)} label="Состояние" compact wrap />
+    </PageToolbar>
+
+    {/snippet}
 
   <div class="attpage__split">
     <div class="attpage__list" class:attpage__list--cards={view === 'cards'}>
@@ -396,6 +377,7 @@
 
     {/if}
   </div>
+</PageLayout>
 </div>
 
 {#snippet row(a: any, showOwner: boolean)}
@@ -636,13 +618,6 @@
     min-width: 0;
     display: grid;
     gap: 0.15rem;
-  }
-
-  .attpage__name {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-width: 0;
   }
 
   .attpage__file {

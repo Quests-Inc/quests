@@ -219,7 +219,7 @@ func (s *Store) CancelOrphanJobs(ctx context.Context) (int64, error) {
 
 // PurgeRunnerJobs forgets finished jobs older than the cutoff.
 func (s *Store) PurgeRunnerJobs(ctx context.Context, before time.Time) (int64, error) {
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM runner_job WHERE state NOT IN ('queued','assigned','running') AND finished_at < ?`, timeutil.ToDBUTC(before))
+	res, err := s.DB.ExecContext(ctx, `DELETE FROM runner_job WHERE state NOT IN ('queued','assigned','running') AND finished_at < ? AND NOT EXISTS (SELECT 1 FROM script_run r WHERE r.id = runner_job.run_id AND r.state = 'waiting')`, timeutil.ToDBUTC(before))
 	if err != nil {
 		return 0, err
 	}

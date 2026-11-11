@@ -1,4 +1,7 @@
 <script lang="ts">
+  import PageLayout from '@/shared/ui/PageLayout.svelte'
+  import PageToolbar from '@/shared/ui/PageToolbar.svelte'
+  import OptionPills from '@/shared/ui/OptionPills.svelte'
   import { parseQuery, tokenValues, setToken, helpLine } from '@/shared/lib/searchFlags.ts'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -16,7 +19,6 @@
   } = $props()
 
   const PAGE = 100
-
 
   const ENTITIES = [
     { id: '', label: 'Всё' },
@@ -269,8 +271,9 @@
 </script>
 
 <div class="hist">
-  <div class="hist__tools">
-    <div class="hist__row">
+  <PageLayout>
+    {#snippet toolbar()}
+    <PageToolbar>
       <input
         class="search hist__search"
         type="search"
@@ -290,19 +293,10 @@
           <Icon name="close" size={12} /> Сбросить
         </button>
       {/if}
-    </div>
+    </PageToolbar>
     <FlagHints value={search} spec={histSpec} parsed={parsedSearch} onPick={(v) => (search = v)} />
-    <div class="hist__row">
-      <div class="hist__seg" role="group" aria-label="Что менялось">
-        {#each ENTITIES as e (e.id)}
-          <button
-            type="button"
-            class="hist__pill"
-            class:hist__pill--on={entity === e.id}
-            onclick={() => put('type', e.id)}>{e.label}</button
-          >
-        {/each}
-      </div>
+    <PageToolbar>
+      <OptionPills options={ENTITIES.map(e => ({id:e.id,label:e.label}))} value={entity} onToggle={(v) => put('type',v)} label="Что менялось" compact wrap />
       <select class="hist__select" bind:value={() => kindGroup, (v) => put('act', v)} aria-label="Вид события">
         {#each KIND_GROUPS as g (g.id)}
           <option value={g.id}>{g.label}</option>
@@ -328,8 +322,9 @@
           {/each}
         </select>
       {/if}
-    </div>
-  </div>
+    </PageToolbar>
+
+    {/snippet}
 
   <div class="hist__feed">
     {#if error}
@@ -369,29 +364,16 @@
       {/if}
     {/if}
   </div>
+</PageLayout>
 </div>
 
 <style>
   .hist {
+    --hist-h: 2.25rem;
     display: flex;
     flex-direction: column;
     min-height: 0;
     height: 100%;
-  }
-
-  .hist__tools {
-    --hist-h: 2.4rem;
-    display: grid;
-    gap: 0.55rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-
-  .hist__row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
   }
 
   .hist__search {
@@ -417,39 +399,6 @@
 
   .hist__select option {
     background: var(--color-bg-raised, #1a1a1a);
-  }
-
-  .hist__seg {
-    display: inline-flex;
-    box-sizing: border-box;
-    height: var(--hist-h);
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    overflow: hidden;
-  }
-
-  .hist__pill {
-    padding: 0 0.9rem;
-    border: 0;
-    border-right: 1px solid var(--color-border, #333);
-    background: transparent;
-    font: inherit;
-    font-size: var(--text-sm, 0.875rem);
-    color: var(--color-fg-muted, #9a9a9a);
-    cursor: pointer;
-  }
-
-  .hist__pill:last-child {
-    border-right: 0;
-  }
-
-  .hist__pill:hover {
-    color: var(--color-fg, #e8e8e8);
-  }
-
-  .hist__pill--on {
-    color: var(--color-fg, #e8e8e8);
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, transparent);
   }
 
   .hist__reset {
@@ -487,12 +436,6 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--color-fg-subtle, #6e6e6e);
-  }
-
-  .hist__n {
-    margin-left: 0.3rem;
-    opacity: 0.7;
-    font-variant-numeric: tabular-nums;
   }
 
   .hist__item {
@@ -582,10 +525,7 @@
   }
 
   @media (max-width: 40rem) {
-    .hist__tools {
-      padding: 0.6rem 0.75rem;
-    }
-    .hist__feed {
+      .hist__feed {
       padding: 0.25rem 0.75rem 1.5rem;
     }
     .hist__item {

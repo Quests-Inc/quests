@@ -1,7 +1,7 @@
 package hooks
 
 // EventInfo describes one kind of event a hook may wait for: which family of entity it is about, what it is called for a
-// person, and the fields of its payload (the same names a script reads from `source.event` or $QUESTS_PAYLOAD).
+// person, and the fields of its payload (the same names a script reads from `source.signal` or $QUESTS_PAYLOAD).
 type EventInfo struct {
 	Kind   string   `json:"kind"`
 	Family string   `json:"family"`
@@ -19,7 +19,7 @@ const (
 	FamilyTemplate   = "template"
 )
 
-// Catalog is every kind of event hooks know. It is the one list the interface, the MCP tool and the ports of `source.event` are built from.
+// Catalog is every kind of event hooks know. It is the one list the interface, the MCP tool and the ports of `source.signal` are built from.
 var Catalog = []EventInfo{
 	{"quest_created", FamilyQuest, "квест создан", []string{"quest_id", "title"}},
 	{"quest_appeared", FamilyQuest, "квест появился (по шаблону)", []string{"quest_id", "title"}},

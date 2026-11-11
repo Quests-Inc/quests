@@ -53,11 +53,15 @@ export const EdgeStructure = "structure"; // belongs to: step→quest, attachmen
 /**
  * Edge kinds. Kept few and drawn differently by the UI.
  */
-export const EdgeReference = "reference"; // a quest=N / note=N … token in the source's text
+export const EdgeReference = "reference"; // a quest=N / note=N / event=N … token in the source's text
 /**
  * Edge kinds. Kept few and drawn differently by the UI.
  */
 export const EdgeDependency = "dependency"; // order of steps, a step mirroring a quest, an instance of a template
+/**
+ * Edge kinds. Kept few and drawn differently by the UI.
+ */
+export const EdgeDeadline = "deadline"; // an event is the deadline for a quest («срок для»)
 /**
  * GraphNode is one entity on the map.
  */

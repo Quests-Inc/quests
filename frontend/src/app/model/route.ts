@@ -34,6 +34,7 @@ function idParam(name: string): number | null {
 export const questIdFromUrl = () => idParam('quest')
 export const noteIdFromUrl = () => idParam('note')
 export const attachmentIdFromUrl = () => idParam('attachment')
+export const eventIdFromUrl = () => idParam('event')
 
 export function tabFromUrl(): UrlTab | null {
   const raw = param('tab')
@@ -82,7 +83,8 @@ export function initialRoute(): {
   attachmentId?: number
   noteId?: number
   questId?: number
-  graphRoot?: { type: 'quest' | 'note' | 'questline'; id: number }
+  graphRoot?: { type: 'quest' | 'note' | 'questline' | 'event'; id: number }
+  eventId?: number
 } {
   const fromNote = noteIdFromUrl()
   const fromAtt = attachmentIdFromUrl()
@@ -93,10 +95,12 @@ export function initialRoute(): {
     if (fromTab !== 'graph') return { view: fromTab }
     const gid = Number(param('gid'))
     const gt = param('gt')
-    if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline'))
+    if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline' || gt === 'event'))
       return { view: 'graph', graphRoot: { type: gt, id: gid } }
     return { view: 'graph' }
   }
+  const fromEvent = eventIdFromUrl()
+  if (fromEvent != null) return { view: 'calendar', eventId: fromEvent }
   const fromQuest = questIdFromUrl()
   return fromQuest != null ? { questId: fromQuest } : {}
 }

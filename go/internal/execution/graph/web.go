@@ -371,10 +371,10 @@ func (g Graph) UsesNetwork(reg Registry) []string {
 	return out
 }
 
-// EventFamilies are the kinds of event `source.event` can be set to read; `any` gives the common ports only.
+// EventFamilies are the kinds of event `source.signal` can be set to read; `any` gives the common ports only.
 var EventFamilies = map[string]bool{"any": true, "quest": true, "step": true, "note": true, "value": true, "attachment": true, "template": true}
 
-// EventSourceParams are the parameters of `source.event`: which family of events the ports are shaped for (a hook script knows
+// EventSourceParams are the parameters of `source.signal`: which family of events the ports are shaped for (a hook script knows
 // what its hook waits for), and, for a variable, the kind of owner the `ref` output points at.
 type EventSourceParams struct {
 	Family string `json:"family,omitempty"`

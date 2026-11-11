@@ -110,7 +110,7 @@ type TryStart struct {
 	Inline      []byte
 	SubjectType string
 	SubjectID   int64
-	// EventKind makes an event of that kind about the subject for a script that reads `source.event`.
+	// EventKind makes an event of that kind about the subject for a script that reads `source.signal`.
 	EventKind string
 	Args      map[string]string
 	Live      bool

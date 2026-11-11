@@ -21,14 +21,21 @@ test('the run log reads its filter from the address', () => {
     run: 5,
     script: undefined,
     source: { kind: 'hook', id: 3 },
+    sourceKind: 'hook',
     state: 'failed',
   })
   expect(filterFromUrl('http://x/?tab=runs&script=9&state=bogus&src=hook:x')).toEqual({
     run: undefined,
     script: 9,
     source: undefined,
+    sourceKind: 'hook',
     state: '',
   })
+})
+
+test('source type alone survives URL parsing', () => {
+  expect(filterFromUrl('http://x/?src=note').sourceKind).toBe('note')
+  expect(filterFromUrl('http://x/?src=garbage:1').source).toBeUndefined()
 })
 
 test('a target becomes the query of the tab it opens, and goes to the registered handler', () => {

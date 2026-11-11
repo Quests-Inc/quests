@@ -1,4 +1,7 @@
 <script lang="ts">
+  import PageLayout from '@/shared/ui/PageLayout.svelte'
+  import PageToolbar from '@/shared/ui/PageToolbar.svelte'
+  import OptionPills from '@/shared/ui/OptionPills.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import {
@@ -125,55 +128,26 @@
 </script>
 
 <div class="hookpage">
-  <div class="hookpage__tools">
-    <div class="hookpage__top">
+  <PageLayout>
+    {#snippet toolbar()}
+    <PageToolbar>
       <input
         class="search hookpage__search"
         type="search"
-        placeholder="Поиск по названию, событию, скрипту…"
+        placeholder="Поиск по названию, сигналу, скрипту…"
         bind:value={search}
         aria-label="Поиск хуков"
       />
       <button type="button" class="btn btn--accent btn--icon-only" title="Новый хук" aria-label="Новый хук" onclick={() => openForm(null)}>
         <Icon name="add" size={16} />
       </button>
-    </div>
-    <div class="hookpage__row">
-      <div class="hookpage__seg" role="group" aria-label="Область">
-        {#each [
-          { id: 'all', label: 'Все' },
-          { id: 'quest', label: 'С областью' },
-          { id: 'workspace', label: 'Всё пространство' },
-        ] as s}
-          <button
-            type="button"
-            class="hookpage__pill"
-            class:hookpage__pill--on={scope === s.id}
-            onclick={() => (scope = s.id as typeof scope)}>{s.label}</button
-          >
-        {/each}
-      </div>
-      <div class="hookpage__seg" role="group" aria-label="Состояние">
-        {#each [
-          { id: 'all', label: 'Все' },
-          { id: 'on', label: 'Вкл' },
-          { id: 'off', label: 'Выкл' },
-        ] as s}
-          <button
-            type="button"
-            class="hookpage__pill"
-            class:hookpage__pill--on={stateFilter === s.id}
-            onclick={() => (stateFilter = s.id as typeof stateFilter)}
-          >
-            {s.label}
-            {#if s.id === 'all'}
-              <span class="hookpage__n">{hooks.length}</span>
-            {/if}
-          </button>
-        {/each}
-      </div>
-    </div>
-  </div>
+    </PageToolbar>
+    <PageToolbar>
+      <OptionPills options={[{id:'all',label:'Все'}, {id:'quest',label:'С областью'}, {id:'workspace',label:'Всё пространство'}]} value={scope} onToggle={(v) => scope = v as typeof scope} label="Область" compact />
+      <OptionPills options={[{id:'all',label:`Все (${hooks.length})`}, {id:'on',label:'Вкл'}, {id:'off',label:'Выкл'}]} value={stateFilter} onToggle={(v) => stateFilter = v as typeof stateFilter} label="Состояние" compact />
+    </PageToolbar>
+
+    {/snippet}
 
   <div class="hookpage__list">
     {#if !loaded}
@@ -219,7 +193,7 @@
               {/if}
             </div>
             <div class="hookpage__meta">
-              <span>{eventWords(h.events?.length ? h.events : expandEvents(displayEvents(h), hookCatalog.aliases), hookCatalog.events).join(', ')}</span>
+              <span>{eventWords(h.signals?.length ? h.signals : expandEvents(displayEvents(h), hookCatalog.aliases), hookCatalog.signals).join(', ')}</span>
               <span>{h.script_title || `скрипт ${h.script_id}`}</span>
               {#if h.run_on}<span>{h.run_on}</span>{/if}
             </div>
@@ -284,6 +258,7 @@
       {/each}
     {/if}
   </div>
+</PageLayout>
 </div>
 
 <HookModal open={formOpen} hook={editing} onClose={() => (formOpen = false)} onSaved={() => void load()} />
@@ -307,66 +282,9 @@
     height: 100%;
   }
 
-  .hookpage__tools {
-    display: grid;
-    gap: 0.55rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--color-border, #333);
-  }
-
-  .hookpage__top {
-    display: flex;
-    gap: 0.5rem;
-  }
-
   .hookpage__search {
     flex: 1 1 auto;
     min-width: 0;
-  }
-
-  .hookpage__row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
-
-  .hookpage__seg {
-    display: inline-flex;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    overflow: hidden;
-  }
-
-  .hookpage__pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.28rem 0.65rem;
-    border: 0;
-    border-right: 1px solid var(--color-border, #333);
-    background: transparent;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--color-fg-muted, #9a9a9a);
-    cursor: pointer;
-  }
-
-  .hookpage__pill:last-child {
-    border-right: 0;
-  }
-
-  .hookpage__pill:hover {
-    color: var(--color-fg, #e8e8e8);
-  }
-
-  .hookpage__pill--on {
-    color: var(--color-fg, #e8e8e8);
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, transparent);
-  }
-
-  .hookpage__n {
-    font-variant-numeric: tabular-nums;
-    opacity: 0.7;
   }
 
   .hookpage__runs {
@@ -438,13 +356,6 @@
     min-width: 0;
     display: grid;
     gap: 0.15rem;
-  }
-
-  .hookpage__name {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-width: 0;
   }
 
   .hookpage__file {

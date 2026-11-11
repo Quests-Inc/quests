@@ -234,7 +234,7 @@ func (r *CheckRunner) startHook(ctx context.Context, h execution.Hook, event eve
 
 // hookSubject picks the entity the graph's source reads. A hook with an area of one quest, step or note runs as that entity; a
 // workspace hook follows the graph (the entity the event names, else the workspace). A graph that reads only the event
-// (`source.event`) needs none and runs as the workspace.
+// (`source.signal`) needs none and runs as the workspace.
 func hookSubject(g graph.Graph, h execution.Hook, event events.Payload, workspaceID int64) (string, int64, error) {
 	want := graphSubject(g)
 	refs := refsOf(event)
@@ -275,7 +275,7 @@ func hookSubject(g graph.Graph, h execution.Hook, event events.Payload, workspac
 
 func graphSubject(g graph.Graph) string {
 	for _, n := range g.Nodes {
-		if kind, ok := strings.CutPrefix(n.Type, "source."); ok && kind != "event" {
+		if kind, ok := strings.CutPrefix(n.Type, "source."); ok && kind != "signal" {
 			return kind
 		}
 	}

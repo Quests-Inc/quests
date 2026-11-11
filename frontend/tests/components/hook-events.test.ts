@@ -5,9 +5,9 @@ import { displayEvents, newHookDraft } from '@/entities/hook/model/events.ts'
 import { statusWord } from '@/shared/lib/questStatus.ts'
 
 describe('hook events helpers', () => {
-  test('displayEvents prefers events_raw', () => {
-    expect(displayEvents({ events_raw: ['complete'], events: ['quest_completed'] })).toEqual(['complete'])
-    expect(displayEvents({ events: ['quest_completed'] })).toEqual(['quest_completed'])
+  test('displayEvents prefers signals_raw', () => {
+    expect(displayEvents({ signals_raw: ['complete'], signals: ['quest_completed'] })).toEqual(['complete'])
+    expect(displayEvents({ signals: ['quest_completed'] })).toEqual(['quest_completed'])
     expect(displayEvents({})).toEqual([])
   })
 
@@ -33,7 +33,7 @@ describe('hook events helpers', () => {
       { kind: 'quest_failed', family: 'quest', title: 'квест провален', fields: [] },
     ]
     expect(eventWords(['note_created', 'note_updated', 'quest_completed'], events)).toEqual([
-      'все события: заметка',
+      'все сигналы: заметка',
       'квест выполнен',
     ])
     expect(eventWords(['mystery'], events)).toEqual(['mystery'])

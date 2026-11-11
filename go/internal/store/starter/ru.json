@@ -255,7 +255,7 @@
       {
         "script_id": 5,
         "version": 1,
-        "graph": "{\"nodes\": [{\"id\": 1, \"type\": \"source.event\", \"params\": {\"family\": \"note\"}}, {\"id\": 2, \"type\": \"sink.done\"}], \"edges\": [{\"from\": {\"node\": 1, \"port\": \"title\"}, \"to\": {\"node\": 2, \"port\": \"trigger\"}}]}",
+        "graph": "{\"nodes\": [{\"id\": 1, \"type\": \"source.signal\", \"params\": {\"family\": \"note\"}}, {\"id\": 2, \"type\": \"sink.done\"}], \"edges\": [{\"from\": {\"node\": 1, \"port\": \"title\"}, \"to\": {\"node\": 2, \"port\": \"trigger\"}}]}",
         "created_at": "2026-10-28 00:00:00"
       }
     ],
@@ -267,8 +267,8 @@
         "updated_at": "2026-10-28 00:00:00",
         "name": "Учебный хук: изменения заметок",
         "enabled": 0,
-        "events": "note_updated",
-        "events_raw": "[\"note_updated\"]",
+        "signals": "note_updated",
+        "signals_raw": "[\"note_updated\"]",
         "script_id": 5,
         "scope_kind": "note_tree",
         "scope_id": 1

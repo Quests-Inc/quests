@@ -30,7 +30,7 @@ func scriptTools(c *Client) []Tool {
 		State       string            `json:"state,omitempty" enum:"waiting,done,failed" desc:"runs: only runs in this state"`
 		Before      int64             `json:"before,omitempty" desc:"runs: the next page goes on below this run id"`
 		Entity      string            `json:"entity,omitempty" desc:"try: the entity the sources read, kind=id (step=5, note=12, quest=3, template=2)"`
-		Event       string            `json:"event,omitempty" desc:"try: a made-up event of this kind about the entity, for a script that reads source.event (kinds: hook events)"`
+		Event       string            `json:"event,omitempty" desc:"try: a made-up event of this kind about the entity, for a script that reads source.signal (kinds: hook events)"`
 		Live        bool              `json:"live,omitempty" desc:"try: let the sinks write (default: dry, they only report)"`
 		On          string            `json:"on,omitempty" desc:"try: runner label for a script with a Code node (default: the workspace's default runner)"`
 	}

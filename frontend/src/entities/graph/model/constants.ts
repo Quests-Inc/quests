@@ -9,12 +9,14 @@ export const TYPES: Record<string, any> = {
   attachment: { label: 'Вложение', glyph: '⎘', color: ENTITY_COLORS.attachment },
   questline: { label: 'Квестлайн', glyph: '☰', color: ENTITY_COLORS.questline },
   template: { label: 'Шаблон', glyph: '⟳', color: ENTITY_COLORS.template },
+  event: { label: 'Событие', glyph: '◷', color: ENTITY_COLORS.event },
   cluster: { label: 'Вложения', glyph: '⎘', color: ENTITY_COLORS.attachment },
 }
 export const EDGES: Record<string, any> = {
   structure: { label: 'Принадлежность', color: '#6e6e6e' },
   reference: { label: 'Ссылка', color: '#c9a227' },
   dependency: { label: 'Зависимость', color: '#d0699b' },
+  deadline: { label: 'Срок для', color: '#5a8a9a' },
 }
 /** Attachments of one owner collapse into a cluster beyond this many. */
 export const CLUSTER_MIN = 6
@@ -36,11 +38,12 @@ export const LAYOUTS = {
 }
 
 /** Виды сущностей, которые можно показывать на карте. */
-export const ENTITY_TYPES = ['questline', 'quest', 'step', 'note', 'attachment']
+export const ENTITY_TYPES = ['questline', 'quest', 'step', 'note', 'attachment', 'event']
 export const ENTITY_LABELS: Record<string, string> = {
   questline: 'Квестлайны',
   quest: 'Квесты',
   step: 'Шаги',
   note: 'Заметки',
   attachment: 'Вложения',
+  event: 'События',
 }

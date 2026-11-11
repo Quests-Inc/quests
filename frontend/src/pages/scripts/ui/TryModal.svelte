@@ -38,7 +38,7 @@
   const argNames = $derived(
     ((argNode?.params as { params?: { name: string }[] } | undefined)?.params ?? []).map((p) => p.name).filter(Boolean)
   )
-  const eventNode = $derived(graph.nodes.find((n) => n.type === 'source.event'))
+  const eventNode = $derived(graph.nodes.find((n) => n.type === 'source.signal'))
   const eventFamily = $derived(((eventNode?.params as { family?: string } | undefined)?.family ?? 'any') as string)
 
   let kind = $state('note')
@@ -62,7 +62,7 @@
     run = null
     live = false
     if (!kinds.includes(kind)) kind = kinds[0]
-    if (eventNode && !events.length) void getHookEvents().then((c) => (events = c.events ?? [])).catch(() => {})
+    if (eventNode && !events.length) void getHookEvents().then((c) => (events = c.signals ?? [])).catch(() => {})
     if (needsRunner) void loadRunners()
   })
   $effect(() => {

@@ -57,3 +57,22 @@ muted text, a left border, no rounded background. See [markdown.md](markdown.md)
 Keep the present fonts, palette and character. Unify spacing, density, focus, empty/error states and action placement;
 do not introduce a new visual identity as part of a cleanup. Layout must respond to container width, not only viewport
 width: the same form may appear in a narrow pane on a wide screen. Grid children need `min-width: 0`, and footers wrap.
+
+
+## Page layouts (2026-11-10)
+
+Use `SidebarLayout` for journal, notes, scripts, graph and runs. Use `PageLayout` for hooks, attachments, history, templates and runners; calendar retains its dedicated layout. `PageLayout` owns the fixed top panel and scrollable work area. Do not repeat the active tab name as a page heading or add an introductory subtitle; retain titles for the specific entity being edited. Constrain readable forms inside the content, never centre the whole tab with an arbitrary maximum width. Internal split views remain page content.
+
+Compose toolbar rows with `PageToolbar`. Search grows; choice groups retain natural width and wrap at group boundaries. Reuse `OptionPills` for short choices, `Picker` for a single searchable choice, `FilterSelect` for multiple choices, `DateInput` and `RunnerPicker` for their respective fields. Do not recreate page-specific segmented controls. Use `FilterChip` for removable source filters; `SidebarPicked` remains for bulk selection. Headers have no decorative icon or accent colour.
+
+Pages own data, routing and domain actions; shared components own structure, responsive sizing and common interactions. Use Svelte snippets for composition rather than adding page-name switches. Modal chrome stays in modals; form primitives may be shared.
+
+Background refresh must retain displayed data, scroll and expanded blocks. Show the loading placeholder only for the initial selection; discard stale responses and stop polling inactive tabs. Failed refreshes keep previous data and allow another attempt.
+
+Toolbar controls belong in the PageLayout header, above the single separator. Do not put template search/filters inside modal/formscope content: this changes the field shape and spacing. Overview sections use flat rows and separators, not oversized raised cards. Search and create actions use the same shared field and icon-button sizing across tabs.
+
+Runners use the shared search parser and FlagHints instead of a device picker: free text matches device labels, hostnames and job titles; `device=main-pc status=queued` (or `:`) narrows both devices and jobs. Negative tokens exclude, repeated values are alternatives. A job status selects devices with matching jobs; online/offline selects jobs through their device. Section headings have a subtle tonal strip and space between sections; rows remain flat. Filtered empty states must describe no matches, not claim that jobs never existed.
+
+Runner content is grouped by device, with device presence and management in the group header and status badges in each job row. No separate device, running, queue or recent sections. Active jobs sort first; repeated finished checks group by source within the same device and expose their history. Missing devices retain a named group. Device registration lives behind the toolbar add action.
+
+Runner toolbar has two rows: search/add above, the view slider below. Search, add button and slider share a 2.25rem height. The view slider reads/writes `view=active|recent` in the same search string; selecting all removes that filter while preserving other text and filters.

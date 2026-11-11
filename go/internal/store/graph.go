@@ -14,8 +14,9 @@ import (
 // Edge kinds. Kept few and drawn differently by the UI.
 const (
 	EdgeStructure  = "structure"  // belongs to: step→quest, attachment→owner, quest→questline, child note→parent
-	EdgeReference  = "reference"  // a quest=N / note=N … token in the source's text
+	EdgeReference  = "reference"  // a quest=N / note=N / event=N … token in the source's text
 	EdgeDependency = "dependency" // order of steps, a step mirroring a quest, an instance of a template
+	EdgeDeadline   = "deadline"   // an event is the deadline for a quest («срок для»)
 )
 
 // GraphNode is one entity on the map.
@@ -302,6 +303,30 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		}
 		addNode("attachment", id, name, "").Mime = mime
 		addEdge(nodeKey(otype, owner), nodeKey("attachment", id), EdgeStructure)
+		return nil
+	}); err != nil {
+		return Graph{}, err
+	}
+
+	if err := scan(`SELECT id, title, COALESCE(color,''), COALESCE(icon,''), description FROM event`, func(r interface{ Scan(...any) error }) error {
+		var id int64
+		var title, color, icon, desc string
+		if err := r.Scan(&id, &title, &color, &icon, &desc); err != nil {
+			return err
+		}
+		n := addNode("event", id, title, "")
+		n.Desc = clip(desc, descQuest)
+		n.Icon, n.Color = icon, color
+		return nil
+	}); err != nil {
+		return Graph{}, err
+	}
+	if err := scan(`SELECT id, event_id FROM quest WHERE event_id IS NOT NULL`, func(r interface{ Scan(...any) error }) error {
+		var qid, eid int64
+		if err := r.Scan(&qid, &eid); err != nil {
+			return err
+		}
+		addEdge(nodeKey("event", eid), nodeKey("quest", qid), EdgeDeadline)
 		return nil
 	}); err != nil {
 		return Graph{}, err

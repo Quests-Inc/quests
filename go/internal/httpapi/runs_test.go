@@ -88,7 +88,7 @@ func TestRunLogOverHTTP(t *testing.T) {
 		t.Fatalf("code without a runner: %d", code)
 	}
 	code, srv := secretReq(h, http.MethodPost, "/api/scripts", json.RawMessage(`{"title":"зеркало","graph":{"nodes":[
-		{"id":1,"type":"source.event","params":{"family":"quest"}},{"id":2,"type":"sink.value","params":{"name":"m","type":"str"}}],
+		{"id":1,"type":"source.signal","params":{"family":"quest"}},{"id":2,"type":"sink.value","params":{"name":"m","type":"str"}}],
 		"edges":[{"from":{"node":1,"port":"ref"},"to":{"node":2,"port":"ref"}},{"from":{"node":1,"port":"kind"},"to":{"node":2,"port":"value"}}]}}`))
 	if code != http.StatusCreated {
 		t.Fatalf("server script: %d %v", code, srv)

@@ -11,6 +11,7 @@
     updateQuestStep,
     deleteQuestStep,
     listCategories,
+    listEvents,
     listQuestlines,
     listTags,
     bindScript,
@@ -23,6 +24,8 @@
     toLocalInputValue,
   } from '@/shared/lib/time.ts'
   import { durationLabel, partsToSeconds, plural, secondsToParts } from '@/shared/lib/duration.ts'
+  import { eventPhrase } from '@/shared/lib/event.ts'
+  import type { EventRead } from '@/shared/api/journal.gen'
   import { questStepDraft, questStepsPayload, StepsEditor } from '@/entities/quest'
   import { HooksField, type HookDraft } from '@/entities/hook/@x/quest'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -87,8 +90,14 @@
   let durationMinutes = $state('')
   /** Off = no deadline. */
   let deadlineOn = $state(false)
-  /** Unchecked = duration_seconds explicitly 0 ("no window", no auto-expire). */
-  let windowEnabled = $state(true)
+  /** time = «за окно до срока»; event = «за/через время до/после края события». */
+  let deadlineMode = $state<'time' | 'event'>('time')
+  let events: EventRead[] = $state([])
+  let eventId = $state('')
+  let eventEdge = $state<'start' | 'end'>('start')
+  let eventDir = $state<'before' | 'after'>('before')
+  let offsetHours = $state('')
+  let offsetMinutes = $state('')
   let steps = $state(([] as ReturnType<typeof questStepDraft>[]))
   let saving = $state(false)
   let deleting = $state(false)
@@ -138,15 +147,26 @@
   )
 
   let deadlineSummary = $derived.by(() => {
-    if (!deadlineOn || !deadlineDate) return 'без срока'
+    if (!deadlineOn) return 'без срока'
+    if (deadlineMode === 'event') {
+      const chosen = events.find((o) => String(o.id) === eventId)
+      const phrase = eventPhrase({
+        event_id: chosen ? chosen.id : eventId ? 1 : 0,
+        event_edge: eventEdge,
+        event_dir: eventDir,
+        event_offset_seconds: partsToSeconds(offsetHours, offsetMinutes) ?? 0,
+        event_title: chosen?.title,
+      })
+      return phrase || 'событие'
+    }
+    if (!deadlineDate) return 'без срока'
     const d = new Date(`${deadlineDate}T00:00`)
     const day = Number.isNaN(d.getTime())
       ? deadlineDate
       : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
     const when = `до ${day} ${deadlineHour}:${deadlineMinute}`
-    if (!windowEnabled) return `${when} · без окна`
     const dur = durationLabel(durationHours, durationMinutes)
-    return dur ? `${when} · окно ${dur}` : when
+    return dur ? `${when} · окно ${dur}` : `${when} · без окна`
   })
 
   let stepsSummary = $derived.by(() => {
@@ -172,7 +192,26 @@
     }
   }
 
-  function resetFromQuest(q: { title: string; description: any; status: string; significance: string; pinned: any; overlay_hidden: any; automated: any; sort_order: number; category_id: any; questline_id: any; deadline_at: any; duration_seconds: number; steps: any[]; tags: any[] }) {
+  function resetFromQuest(q: {
+    title: string
+    description: any
+    status: string
+    significance: string
+    pinned: any
+    overlay_hidden: any
+    automated: any
+    sort_order: number
+    category_id: any
+    questline_id: any
+    deadline_at: any
+    duration_seconds: number
+    event_id?: number | null
+    event_edge?: string
+    event_dir?: string
+    event_offset_seconds?: number | null
+    steps: any[]
+    tags: any[]
+  } | null) {
     title = q?.title ?? ''
     description = q?.description ?? defaults?.description ?? ''
     status = q?.status ?? 'active'
@@ -198,10 +237,12 @@
     } else {
       deadlineDate = ''
     }
-    // duration_seconds === 0 is an explicit "no window" (distinct from
-    // null/undefined, which just means "let the server auto-compute").
-    windowEnabled = q?.duration_seconds !== 0
     ;({ hours: durationHours, minutes: durationMinutes } = secondsToParts(q?.duration_seconds))
+    deadlineMode = q?.event_id ? 'event' : 'time'
+    eventId = q?.event_id ? String(q.event_id) : ''
+    eventEdge = q?.event_edge === 'end' ? 'end' : 'start'
+    eventDir = q?.event_dir === 'after' ? 'after' : 'before'
+    ;({ hours: offsetHours, minutes: offsetMinutes } = secondsToParts(q?.event_offset_seconds))
 
     steps = q?.steps?.length ? q.steps.map((s: any) => questStepDraft(s)) : [questStepDraft()]
     selectedTags = Array.isArray(q?.tags) ? q.tags.map((t: any) => ({ ...t })) : []
@@ -222,11 +263,12 @@
       deleting = false
       deleteConfirmOpen = false
       resetFromQuest(mode === 'edit' ? quest : null)
-      Promise.all([listCategories(), listQuestlines(), listTags()])
-        .then(([cats, lines, tags]) => {
+      Promise.all([listCategories(), listQuestlines(), listTags(), listEvents()])
+        .then(([cats, lines, tags, occ]) => {
           categories = Array.isArray(cats) ? cats : []
           questlines = Array.isArray(lines) ? lines : []
           tagCatalog = Array.isArray(tags) ? tags : []
+          events = Array.isArray(occ) ? occ : []
           if (mode === 'create' && defaults?.questline_id != null) {
             applyQuestline(String(defaults.questline_id))
           }
@@ -275,7 +317,7 @@
     saving = true
     formError = ''
     try {
-      const deadline_at = deadlineOn
+      const deadline_at = deadlineOn && deadlineMode === 'time'
         ? localInputToUtcIso(`${deadlineDate}T${deadlineHour}:${deadlineMinute}`)
         : null
       const payload: Record<string, any> = {
@@ -291,15 +333,24 @@
         questline_id: questlineId === '' ? null : Number(questlineId),
         tag_ids: selectedTags.map((t) => t.id),
         deadline_at,
+        event_id: null,
       }
-      if (!deadline_at) {
+      if (!deadlineOn) {
         payload.duration_seconds = null
-      } else if (!windowEnabled) {
-        // Explicit 0 = no urgency window, no auto-expire (see NormalizeDeadline).
+      } else if (deadlineMode === 'event') {
+        if (!eventId) {
+          formError = 'Выберите событие'
+          saving = false
+          return
+        }
+        payload.event_id = Number(eventId)
+        payload.event_edge = eventEdge
+        payload.event_dir = eventDir
+        payload.event_offset_seconds = partsToSeconds(offsetHours, offsetMinutes) ?? 0
         payload.duration_seconds = 0
       } else {
-        const dur = partsToSeconds(durationHours, durationMinutes)
-        if (dur != null) payload.duration_seconds = dur
+        // Empty or zero hours and minutes: no urgency window, no auto-expire.
+        payload.duration_seconds = partsToSeconds(durationHours, durationMinutes) ?? 0
       }
       let saved
       if (mode === 'edit' && onDraft) {
@@ -325,7 +376,7 @@
             await createHook({
               name: d.name.trim(),
               enabled: d.enabled,
-              events: d.events,
+              signals: d.events,
               script_id: sid,
               run_on: d.run_on.trim(),
               quest_id: d.thisQuest ? qid : null,
@@ -493,23 +544,56 @@
         <span class="hint">({localTimeZone()})</span>
       </label>
       {#if deadlineOn}
-        <div class="inline-line">
-          <DateInput bind:value={deadlineDate} label="Дата срока" />
-          <TimeSelect bind:hour={deadlineHour} bind:minute={deadlineMinute} label="Время срока" />
-        </div>
-        <div class="inline-line">
-          <label class="check">
-            <input type="checkbox" bind:checked={windowEnabled} />
-            Окно срочности
-          </label>
-          {#if windowEnabled}
-            <DurationInput bind:hours={durationHours} bind:minutes={durationMinutes} label="Окно срочности" />
+        <OptionPills
+          options={[{ id: 'time', label: 'Время' }, { id: 'event', label: 'Событие' }]}
+          bind:value={deadlineMode}
+          label="Срок от"
+          compact
+        />
+        {#if deadlineMode === 'time'}
+          <div class="inline-line deadline-phrase deadline-phrase--time">
+            <span>За</span>
+            <DurationInput bind:hours={durationHours} bind:minutes={durationMinutes} label="Окно" />
+            <span>до</span>
+            <DateInput bind:value={deadlineDate} label="Дата срока" />
+            <TimeSelect bind:hour={deadlineHour} bind:minute={deadlineMinute} label="Время срока" />
+            <HelpTip label="Что такое окно срочности">
+              <p>Окно — сколько времени до срока квест считается срочным: таймер, напоминание в HUD и Telegram. По истечении срока квест просрочен.</p>
+              <p>Пустые или нулевые часы и минуты — без окна: срок просто ориентир, без таймера и без автопросрочки.</p>
+            </HelpTip>
+          </div>
+        {:else}
+          <div class="inline-line deadline-phrase deadline-phrase--event">
+            <label>
+              <span class="sr-only">Когда</span>
+              <select bind:value={eventDir} aria-label="Когда">
+                <option value="before">За</option>
+                <option value="after">Через</option>
+              </select>
+            </label>
+            <DurationInput bind:hours={offsetHours} bind:minutes={offsetMinutes} label="Сдвиг" />
+            <span>{eventDir === 'after' ? 'после' : 'до'}</span>
+            <label>
+              <span class="sr-only">Край</span>
+              <select bind:value={eventEdge} aria-label="Край события">
+                <option value="start">начала</option>
+                <option value="end">конца</option>
+              </select>
+            </label>
+            <label class="deadline-event">
+              <span class="sr-only">Событие</span>
+              <select bind:value={eventId} aria-label="Событие">
+                <option value="">событие</option>
+                {#each events as o (o.id)}
+                  <option value={String(o.id)}>{o.title}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+          {#if events.length === 0}
+            <p class="hint">События задаются на календаре.</p>
           {/if}
-          <HelpTip label="Что такое окно срочности">
-            <p>Окно — сколько времени до срока квест считается срочным: таймер, напоминание в HUD и Telegram. По истечении срока квест просрочен.</p>
-            <p>Пустая длительность — окно от создания квеста до срока. Без окна срок — просто ориентир: без таймера и без автопросрочки.</p>
-          </HelpTip>
-        </div>
+        {/if}
       {/if}
     </FormSection>
 
@@ -580,6 +664,53 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .deadline-phrase {
+    align-items: center;
+    flex-wrap: nowrap;
+    font-family: var(--font-ui, sans-serif);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--color-fg, #e8e8e8);
+  }
+
+  .deadline-phrase :global(.dur__unit) {
+    font: inherit;
+    color: inherit;
+  }
+
+  .deadline-phrase select,
+  .deadline-phrase input[type='number'],
+  .deadline-phrase :global(.date-input__btn),
+  .deadline-phrase :global(.time-pick__btn) {
+    width: auto;
+    font: inherit;
+    color: inherit;
+    font-variant-numeric: inherit;
+  }
+
+  .deadline-phrase--time :global(.date-input) {
+    flex: 1 1 auto;
+    min-width: 8rem;
+  }
+
+  .deadline-phrase--time :global(.date-input__btn) {
+    width: 100%;
+  }
+
+  .deadline-phrase--event {
+    flex-wrap: nowrap;
+  }
+
+  .deadline-event {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .deadline-event select {
+    width: 100%;
   }
 
 </style>

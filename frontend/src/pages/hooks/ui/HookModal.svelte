@@ -54,7 +54,7 @@
     if (!open) return
     name = hook?.name ?? ''
     enabled = hook?.enabled ?? true
-    events = [...(hook?.events?.length ? hook.events : ['quest_completed'])]
+    events = [...(hook?.signals?.length ? hook.signals : ['quest_completed'])]
     scriptId = hook ? String(hook.script_id) : ''
     runOn = hook?.run_on ?? ''
     scopeKind = hook?.scope_kind || 'workspace'
@@ -69,13 +69,13 @@
   async function onSubmit(e: { preventDefault: () => void }): Promise<void> {
     e.preventDefault()
     const script = Number(scriptId)
-    if (!events.length) return void (formError = 'Выберите хотя бы одно событие')
+    if (!events.length) return void (formError = 'Выберите хотя бы один сигнал')
     if (!(script > 0)) return void (formError = 'Выберите скрипт')
     if (scopeKind !== 'workspace' && !(Number(scopeId) > 0)) return void (formError = 'Выберите сущность области хука')
     const body = {
       name: name.trim(),
       enabled,
-      events,
+      signals: events,
       script_id: script,
       run_on: runOn.trim().toLowerCase(),
       timeout_sec: Math.min(600, Math.max(1, Number(timeout) || 30)),
@@ -140,7 +140,7 @@
     {#if scopeKind === 'workspace' || scopeKind === 'note' || scopeKind === 'note_tree'}
       <label class="check">
         <input type="checkbox" bind:checked={includePrivate} disabled={saving} />
-        события приватных заметок тоже
+        сигналы приватных заметок тоже
       </label>
     {/if}
     <label class="field">

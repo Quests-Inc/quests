@@ -139,15 +139,22 @@ type Quest struct {
 	SortOrder       int
 	DeadlineAt      *time.Time
 	DurationSeconds *int
-	CategoryID      *int64
-	QuestlineID     *int64
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	CompletedAt     *time.Time
-	TemplateID      *int64
-	PeriodKey       *string
-	Source          *string // 'template:<id>' or the creating client; nil = unknown
-	Automated       bool
+	// Event binding. When EventID is set, DeadlineAt is derived from that event
+	// and DurationSeconds is 0: the urgency window belongs to an absolute deadline.
+	EventID     *int64
+	EventEdge   string // start | end
+	EventDir    string // before | after
+	EventOffset *int
+	EventTitle  *string
+	CategoryID  *int64
+	QuestlineID *int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	CompletedAt *time.Time
+	TemplateID  *int64
+	PeriodKey   *string
+	Source      *string // 'template:<id>' or the creating client; nil = unknown
+	Automated   bool
 	// FailureInbox: undismissed row in quest_failure_inbox (journal «Провалено»).
 	FailureInbox bool
 
@@ -193,20 +200,24 @@ type StepUpdate struct {
 }
 
 type QuestCreate struct {
-	Title           string       `json:"title"`
-	Description     string       `json:"description"`
-	Status          QuestStatus  `json:"status"`
-	Significance    Significance `json:"significance"`
-	Pinned          bool         `json:"pinned"`
-	OverlayHidden   bool         `json:"overlay_hidden"`
-	SortOrder       int          `json:"sort_order"`
-	DeadlineAt      *string      `json:"deadline_at"`
-	DurationSeconds *int         `json:"duration_seconds"`
-	CategoryID      *int64       `json:"category_id"`
-	QuestlineID     *int64       `json:"questline_id"`
-	Automated       bool         `json:"automated"`
-	Steps           []StepCreate `json:"steps"`
-	TagIDs          []int64      `json:"tag_ids"`
+	Title              string       `json:"title"`
+	Description        string       `json:"description"`
+	Status             QuestStatus  `json:"status"`
+	Significance       Significance `json:"significance"`
+	Pinned             bool         `json:"pinned"`
+	OverlayHidden      bool         `json:"overlay_hidden"`
+	SortOrder          int          `json:"sort_order"`
+	DeadlineAt         *string      `json:"deadline_at"`
+	DurationSeconds    *int         `json:"duration_seconds"`
+	EventID            *int64       `json:"event_id"`
+	EventEdge          string       `json:"event_edge"`
+	EventDir           string       `json:"event_dir"`
+	EventOffsetSeconds *int         `json:"event_offset_seconds"`
+	CategoryID         *int64       `json:"category_id"`
+	QuestlineID        *int64       `json:"questline_id"`
+	Automated          bool         `json:"automated"`
+	Steps              []StepCreate `json:"steps"`
+	TagIDs             []int64      `json:"tag_ids"`
 }
 
 func ClampStep(s *Step) {

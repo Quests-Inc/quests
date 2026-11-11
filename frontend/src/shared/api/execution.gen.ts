@@ -152,7 +152,7 @@ export interface TryStart {
   SubjectType: string;
   SubjectID: number /* int64 */;
   /**
-   * EventKind makes an event of that kind about the subject for a script that reads `source.event`.
+   * EventKind makes an event of that kind about the subject for a script that reads `source.signal`.
    */
   EventKind: string;
   Args: { [key: string]: string};
@@ -174,8 +174,8 @@ export interface Hook {
   id: number /* int64 */;
   name: string;
   enabled: boolean;
-  events: string[];
-  events_raw: string[];
+  signals: string[];
+  signals_raw: string[];
   script_id: number /* int64 */;
   quest_id?: number /* int64 */;
   run_on: string;

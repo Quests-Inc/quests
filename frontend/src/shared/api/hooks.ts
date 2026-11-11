@@ -5,8 +5,8 @@ export type Hook = {
   id: number
   name: string
   enabled: boolean
-  events: string[]
-  events_raw: string[]
+  signals: string[]
+  signals_raw: string[]
   script_id: number
   quest_id?: number | null
   /** workspace | quest | step | note | note_tree */
@@ -32,7 +32,7 @@ export type HookEventInfo = { kind: string; family: string; title: string; field
 export type HookEventsCatalog = {
   aliases: Record<string, string[]>
   kinds: string[]
-  events?: HookEventInfo[]
+  signals?: HookEventInfo[]
 }
 
 /** The area and the limits of a hook (the part of the body that is not the old quest_id). */
@@ -53,14 +53,14 @@ export function getHook(id: number) {
 }
 
 export function getHookEvents() {
-  return request<HookEventsCatalog>('/api/hook-events')
+  return request<HookEventsCatalog>('/api/hook-signals')
 }
 
 export function createHook(
   body: {
     name?: string
     enabled?: boolean
-    events: string[]
+    signals: string[]
     script_id: number
     quest_id?: number | null
     run_on?: string
@@ -75,7 +75,7 @@ export function updateHook(
   body: Partial<{
     name: string
     enabled: boolean
-    events: string[]
+    signals: string[]
     script_id: number
     quest_id: number | null
     run_on: string

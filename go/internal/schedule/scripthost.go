@@ -44,7 +44,7 @@ func (h dryHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.Tok
 
 func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, error) {
 	kind := strings.TrimPrefix(n.Type, "source.")
-	if kind == "event" {
+	if kind == "signal" {
 		return h.eventSource(n)
 	}
 	// The source names its entity; without an id it reads the one the run was triggered for (the script's binding).

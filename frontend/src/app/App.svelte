@@ -27,6 +27,7 @@
   import { tabSwipe } from '@/shared/lib/tabSwipe.ts'
   import {
     listAllAttachments, listCategories, listNotes, listQuestlines, listQuests,
+    listEvents,
     fetchHealth,
     fetchAuthState,
     logout as apiLogout,
@@ -118,6 +119,7 @@
   let historyNonce = $state(0)
   let categories = $state([])
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
+  let calendarEvents: { id: number, title?: string, description?: string, color?: string, icon?: string, all_day?: boolean, starts_at?: string }[] = $state([])
 
   let secretsOpen = $state(false)
   /** entity the secrets modal opens on (context menu → «Секреты»), or null */
@@ -133,25 +135,27 @@
   let selected = $derived(quests.find((q) => q.id === nav.selectedId) ?? null)
   /** Every card, hidden included — only the Attachments tab shows hidden ones. */
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
-  let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments }))
-  bindRefRegistries(() => ({ notes, quests, questlines, labels: refLabels }))
+  let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments, events: calendarEvents }))
+  bindRefRegistries(() => ({ notes, quests, questlines, events: calendarEvents, labels: refLabels }))
 
   async function load({ silent = false } = {}) {
     if (!silent) loading = true
     if (!silent) error = ''
     try {
-      const [next, cats, lines, nextNotes, attIndex] = await Promise.all([
+      const [next, cats, lines, nextNotes, attIndex, nextEvents] = await Promise.all([
         listQuests({}),
         listCategories(),
         listQuestlines(),
         listNotes().catch((): any[] => []),
         listAllAttachments().catch((): any => null),
+        listEvents().catch((): any[] => []),
       ])
       setQuests(next)
       setNotes(Array.isArray(nextNotes) ? nextNotes : [])
       setAttachmentIndex(attIndex && typeof attIndex === 'object' ? attIndex : null)
       categories = Array.isArray(cats) ? cats : []
       questlines = Array.isArray(lines) ? lines : []
+      calendarEvents = Array.isArray(nextEvents) ? nextEvents : []
       if (attIndex) {
         seedAttachmentIndex(attIndex, {
           questIds: next.map((q) => q.id),
@@ -223,6 +227,7 @@
     getRefLabels: () => refLabels,
     openSecrets: (owner) => openSecrets(owner),
     openGraph: (type, id) => openGraph(type, id),
+    openEvent: (id) => nav.openRef('event', id),
     onGraphDirty: () => {
       if (nav.view === 'graph') graphNonce += 1
     },
@@ -305,6 +310,9 @@
           return
         }
         if (msg?.type === 'quests_changed') {
+          if (msg.kind === 'event_updated' || msg.kind === 'event_deleted') {
+            window.dispatchEvent(new CustomEvent('quests:events-changed'))
+          }
           if (msg.quest_id != null && msg.source && msg.source !== 'web') {
             desk.noteRemote(msg.quest_id)
           }
@@ -658,7 +666,7 @@
       <HooksPage active={nav.view === 'hooks'} onOpenQuest={(id) => selectQuestFromUi(id)} />
     </div>
   {:else if nav.view === 'templates'}
-    <div class="journal__review-page">
+    <div class="journal__templates">
 <TemplatesModal
   open embedded
   focusId={templatesFocusId}

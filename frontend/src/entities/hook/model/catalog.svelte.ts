@@ -1,9 +1,9 @@
-// Каталог событий хуков (`GET /api/hook-events`): один на всё приложение, грузится один раз. По нему события называются
+// Каталог сигналов хуков (`GET /api/hook-signals`): один на всё приложение, грузится один раз. По нему сигналы называются
 // по-русски; коды остаются в подсказках.
 import { getHookEvents, type HookEventInfo } from '@/shared/api/client.ts'
 
 export const hookCatalog = $state({
-  events: [] as HookEventInfo[],
+  signals: [] as HookEventInfo[],
   aliases: {} as Record<string, string[]>,
   loaded: false,
 })
@@ -15,7 +15,7 @@ export function loadHookCatalog(): Promise<void> {
   if (inflight) return inflight
   inflight = getHookEvents()
     .then((c) => {
-      hookCatalog.events = c.events ?? []
+      hookCatalog.signals = c.signals ?? []
       hookCatalog.aliases = c.aliases ?? {}
       hookCatalog.loaded = true
     })
@@ -42,7 +42,7 @@ export function expandEvents(events: string[], aliases: Record<string, string[]>
   return [...out]
 }
 
-/** How a hook's events read: a whole family as «все события заметки», the rest by their titles. */
+/** How a hook's signals read: a whole family as «все сигналы: заметка», the rest by their titles. */
 export function eventWords(kinds: string[], events: HookEventInfo[]): string[] {
   if (!events.length) return kinds
   const chosen = new Set(kinds)
@@ -51,7 +51,7 @@ export function eventWords(kinds: string[], events: HookEventInfo[]): string[] {
   for (const fam of Object.keys(FAMILY_WORDS)) {
     const all = events.filter((e) => e.family === fam)
     if (all.length > 1 && all.every((e) => chosen.has(e.kind))) {
-      out.push(`все события: ${FAMILY_WORDS[fam].toLowerCase()}`)
+      out.push(`все сигналы: ${FAMILY_WORDS[fam].toLowerCase()}`)
       for (const e of all) seen.add(e.kind)
     }
   }

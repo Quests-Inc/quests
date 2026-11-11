@@ -538,22 +538,22 @@ func TestScriptToolListsCreatesAndBinds(t *testing.T) {
 
 func TestHookToolListsCreatesAndDetaches(t *testing.T) {
 	f := &fakeAPI{routes: map[string]string{
-		"GET /api/hooks":       `[{"id":4,"name":"лог","events":["quest_completed"],"script_id":3,"enabled":true}]`,
-		"GET /api/hooks/4":     `{"id":4,"name":"лог","script_id":3}`,
-		"GET /api/hook-events": `{"aliases":{"complete":["quest_completed"]},"kinds":["quest_completed"]}`,
-		"POST /api/hooks":      `{"id":5,"events":["quest_completed"],"script_id":3}`,
-		"PATCH /api/hooks/4":   `{"id":4,"quest_id":null}`,
-		"DELETE /api/hooks/4":  ``,
+		"GET /api/hooks":        `[{"id":4,"name":"лог","signals":["quest_completed"],"script_id":3,"enabled":true}]`,
+		"GET /api/hooks/4":      `{"id":4,"name":"лог","script_id":3}`,
+		"GET /api/hook-signals": `{"aliases":{"complete":["quest_completed"]},"kinds":["quest_completed"]}`,
+		"POST /api/hooks":       `{"id":5,"signals":["quest_completed"],"script_id":3}`,
+		"PATCH /api/hooks/4":    `{"id":4,"quest_id":null}`,
+		"DELETE /api/hooks/4":   ``,
 	}}
 	s, _ := newTestServer(t, f)
 	resps := rpc(t, s,
 		call(1, "hook", `{"action":"list"}`),
 		call(2, "hook", `{"action":"get","id":4}`),
-		call(3, "hook", `{"action":"events"}`),
-		call(4, "hook", `{"action":"create","events":["complete"],"script_id":3,"run_on":"dev"}`),
+		call(3, "hook", `{"action":"signals"}`),
+		call(4, "hook", `{"action":"create","signals":["complete"],"script_id":3,"run_on":"dev"}`),
 		call(5, "hook", `{"action":"update","id":4,"quest_id":0}`),
 		call(6, "hook", `{"action":"delete","id":4}`),
-		call(7, "hook", `{"action":"create","events":["complete"]}`),
+		call(7, "hook", `{"action":"create","signals":["complete"]}`),
 		call(8, "hook", `{"action":"update","id":4}`),
 	)
 	if text, isErr := result(t, resps[0]); isErr || !strings.Contains(text, `"total":1`) {

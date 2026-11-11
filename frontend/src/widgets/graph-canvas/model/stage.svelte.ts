@@ -68,7 +68,7 @@ export function createGraphStage(deps: {
   let ready = $state(false)
   let el = $state<HTMLDivElement | null>(null)
   let stageSize = $state({ w: 0, h: 0 })
-  let showEdge = $state<Record<string, boolean>>({ structure: true, reference: true, dependency: true })
+  let showEdge = $state<Record<string, boolean>>({ structure: true, reference: true, dependency: true, deadline: true })
   let layoutMode = $state(deps.initialLayout)
   let selectMode = $state(false)
   let picked = $state<Set<string>>(new Set())

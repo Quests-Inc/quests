@@ -9,41 +9,46 @@ import (
 
 // QuestRead is the wire JSON shape matching Python serializers.quest_to_read.
 type QuestRead struct {
-	ID               int64        `json:"id"`
-	Title            string       `json:"title"`
-	Description      string       `json:"description"`
-	Status           QuestStatus  `json:"status"`
-	Significance     Significance `json:"significance"`
-	Pinned           bool         `json:"pinned"`
-	OverlayHidden    bool         `json:"overlay_hidden"`
-	SortOrder        int          `json:"sort_order"`
-	DeadlineAt       *string      `json:"deadline_at"`
-	DurationSeconds  *int         `json:"duration_seconds"`
-	CategoryID       *int64       `json:"category_id"`
-	CategorySlug     *string      `json:"category_slug"`
-	CategoryLabel    *string      `json:"category_label"`
-	CategoryColor    *string      `json:"category_color"`
-	QuestlineID      *int64       `json:"questline_id"`
-	QuestlineTitle   *string      `json:"questline_title"`
-	QuestlineColor   *string      `json:"questline_color"`
-	QuestlineIcon    *string      `json:"questline_icon"`
-	QuestlineIconURL *string      `json:"questline_icon_url"`
-	CreatedAt        string       `json:"created_at"`
-	UpdatedAt        string       `json:"updated_at"`
-	CompletedAt      *string      `json:"completed_at"`
-	TemplateID       *int64       `json:"template_id"`
-	PeriodKey        *string      `json:"period_key"`
-	Source           *string      `json:"source"`
-	Automated        bool         `json:"automated"`
-	FailureInbox     bool         `json:"failure_inbox"`
-	Steps            []StepRead   `json:"steps"`
-	StepsDone        int          `json:"steps_done"`
-	StepsTotal       int          `json:"steps_total"`
-	ProgressLabel    string       `json:"progress_label"`
-	RemainingSeconds *int         `json:"remaining_seconds"`
-	TimerTone        *string      `json:"timer_tone"`
-	Urgent           bool         `json:"urgent"`
-	Tags             []Tag        `json:"tags"`
+	ID                 int64        `json:"id"`
+	Title              string       `json:"title"`
+	Description        string       `json:"description"`
+	Status             QuestStatus  `json:"status"`
+	Significance       Significance `json:"significance"`
+	Pinned             bool         `json:"pinned"`
+	OverlayHidden      bool         `json:"overlay_hidden"`
+	SortOrder          int          `json:"sort_order"`
+	DeadlineAt         *string      `json:"deadline_at"`
+	DurationSeconds    *int         `json:"duration_seconds"`
+	EventID            *int64       `json:"event_id"`
+	EventEdge          string       `json:"event_edge"`
+	EventDir           string       `json:"event_dir"`
+	EventOffsetSeconds *int         `json:"event_offset_seconds"`
+	EventTitle         *string      `json:"event_title"`
+	CategoryID         *int64       `json:"category_id"`
+	CategorySlug       *string      `json:"category_slug"`
+	CategoryLabel      *string      `json:"category_label"`
+	CategoryColor      *string      `json:"category_color"`
+	QuestlineID        *int64       `json:"questline_id"`
+	QuestlineTitle     *string      `json:"questline_title"`
+	QuestlineColor     *string      `json:"questline_color"`
+	QuestlineIcon      *string      `json:"questline_icon"`
+	QuestlineIconURL   *string      `json:"questline_icon_url"`
+	CreatedAt          string       `json:"created_at"`
+	UpdatedAt          string       `json:"updated_at"`
+	CompletedAt        *string      `json:"completed_at"`
+	TemplateID         *int64       `json:"template_id"`
+	PeriodKey          *string      `json:"period_key"`
+	Source             *string      `json:"source"`
+	Automated          bool         `json:"automated"`
+	FailureInbox       bool         `json:"failure_inbox"`
+	Steps              []StepRead   `json:"steps"`
+	StepsDone          int          `json:"steps_done"`
+	StepsTotal         int          `json:"steps_total"`
+	ProgressLabel      string       `json:"progress_label"`
+	RemainingSeconds   *int         `json:"remaining_seconds"`
+	TimerTone          *string      `json:"timer_tone"`
+	Urgent             bool         `json:"urgent"`
+	Tags               []Tag        `json:"tags"`
 	// Refs is populated only for a single-quest fetch (see Server.getQuest) —
 	// resolving note=N/attachment=N/... mentions for every row in a list
 	// response would be an N+1 query fan-out nobody needs there.
@@ -97,40 +102,45 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 	}
 
 	out := QuestRead{
-		ID:               q.ID,
-		Title:            q.Title,
-		Description:      q.Description,
-		Status:           q.Status,
-		Significance:     q.Significance,
-		Pinned:           q.Pinned,
-		OverlayHidden:    q.OverlayHidden,
-		SortOrder:        q.SortOrder,
-		DeadlineAt:       toISO(q.DeadlineAt),
-		DurationSeconds:  q.DurationSeconds,
-		CategoryID:       q.CategoryID,
-		CategorySlug:     q.CategorySlug,
-		CategoryLabel:    q.CategoryLabel,
-		CategoryColor:    q.CategoryColor,
-		QuestlineID:      q.QuestlineID,
-		QuestlineTitle:   q.QuestlineTitle,
-		QuestlineColor:   q.QuestlineColor,
-		QuestlineIcon:    q.QuestlineIcon,
-		QuestlineIconURL: iconURL,
-		CreatedAt:        *toISO(&q.CreatedAt),
-		UpdatedAt:        *toISO(&q.UpdatedAt),
-		CompletedAt:      toISO(q.CompletedAt),
-		TemplateID:       q.TemplateID,
-		PeriodKey:        q.PeriodKey,
-		Source:           q.Source,
-		Automated:        q.Automated,
-		FailureInbox:     q.FailureInbox,
-		StepsDone:        done,
-		StepsTotal:       total,
-		ProgressLabel:    label,
-		RemainingSeconds: rem,
-		TimerTone:        tone,
-		Urgent:           urgent,
-		Tags:             q.Tags,
+		ID:                 q.ID,
+		Title:              q.Title,
+		Description:        q.Description,
+		Status:             q.Status,
+		Significance:       q.Significance,
+		Pinned:             q.Pinned,
+		OverlayHidden:      q.OverlayHidden,
+		SortOrder:          q.SortOrder,
+		DeadlineAt:         toISO(q.DeadlineAt),
+		DurationSeconds:    q.DurationSeconds,
+		EventID:            q.EventID,
+		EventEdge:          q.EventEdge,
+		EventDir:           q.EventDir,
+		EventOffsetSeconds: q.EventOffset,
+		EventTitle:         q.EventTitle,
+		CategoryID:         q.CategoryID,
+		CategorySlug:       q.CategorySlug,
+		CategoryLabel:      q.CategoryLabel,
+		CategoryColor:      q.CategoryColor,
+		QuestlineID:        q.QuestlineID,
+		QuestlineTitle:     q.QuestlineTitle,
+		QuestlineColor:     q.QuestlineColor,
+		QuestlineIcon:      q.QuestlineIcon,
+		QuestlineIconURL:   iconURL,
+		CreatedAt:          *toISO(&q.CreatedAt),
+		UpdatedAt:          *toISO(&q.UpdatedAt),
+		CompletedAt:        toISO(q.CompletedAt),
+		TemplateID:         q.TemplateID,
+		PeriodKey:          q.PeriodKey,
+		Source:             q.Source,
+		Automated:          q.Automated,
+		FailureInbox:       q.FailureInbox,
+		StepsDone:          done,
+		StepsTotal:         total,
+		ProgressLabel:      label,
+		RemainingSeconds:   rem,
+		TimerTone:          tone,
+		Urgent:             urgent,
+		Tags:               q.Tags,
 	}
 	if out.Tags == nil {
 		out.Tags = []Tag{}

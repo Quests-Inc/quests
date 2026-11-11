@@ -125,6 +125,15 @@ export interface Quest {
   SortOrder: number /* int */;
   DeadlineAt?: string;
   DurationSeconds?: number /* int */;
+  /**
+   * Event binding. When EventID is set, DeadlineAt is derived from that event
+   * and DurationSeconds is 0: the urgency window belongs to an absolute deadline.
+   */
+  EventID?: number /* int64 */;
+  EventEdge: string; // start | end
+  EventDir: string; // before | after
+  EventOffset?: number /* int */;
+  EventTitle?: string;
   CategoryID?: number /* int64 */;
   QuestlineID?: number /* int64 */;
   CreatedAt: string;
@@ -187,11 +196,53 @@ export interface QuestCreate {
   sort_order: number /* int */;
   deadline_at?: string;
   duration_seconds?: number /* int */;
+  event_id?: number /* int64 */;
+  event_edge: string;
+  event_dir: string;
+  event_offset_seconds?: number /* int */;
   category_id?: number /* int64 */;
   questline_id?: number /* int64 */;
   automated: boolean;
   steps: StepCreate[];
   tag_ids: number /* int64 */[];
+}
+
+//////////
+// source: event.go
+
+export const EventEdgeStart = "start";
+export const EventEdgeEnd = "end";
+export const EventDirBefore = "before";
+export const EventDirAfter = "after";
+/**
+ * Event is a marked interval on the calendar. The interface calls it «Событие».
+ */
+export interface Event {
+  ID: number /* int64 */;
+  Title: string;
+  Description: string;
+  StartsAt: string;
+  EndsAt: string;
+  AllDay: boolean;
+  Color: string;
+  Icon: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+/**
+ * EventRead is an event as the API sends it.
+ */
+export interface EventRead {
+  id: number /* int64 */;
+  title: string;
+  description: string;
+  starts_at: string;
+  ends_at: string;
+  all_day: boolean;
+  color: string;
+  icon: string;
+  created_at: string;
+  updated_at: string;
 }
 
 //////////
@@ -261,6 +312,11 @@ export interface QuestRead {
   sort_order: number /* int */;
   deadline_at?: string;
   duration_seconds?: number /* int */;
+  event_id?: number /* int64 */;
+  event_edge: string;
+  event_dir: string;
+  event_offset_seconds?: number /* int */;
+  event_title?: string;
   category_id?: number /* int64 */;
   category_slug?: string;
   category_label?: string;

@@ -16,7 +16,7 @@ for an English version (quest=496). The terms themselves are in [`glossary.md`](
 4. **Buttons are verbs**: «Сохранить», «Запустить на…», «Восстановить». An ellipsis means a dialog opens before anything
    happens. An icon-only button has the same verb in its hint and its `aria-label`.
 5. **Tabs and sections are nouns, plural for lists**: «Скрипты», «Запуски», «Хуки»; a section of a form is what it holds
-   («События», «Где слушать», «Где выполнять код»).
+   («Сигналы», «Где слушать», «Где выполнять код»).
 6. **States are short**: a participle or an adjective agreeing with the thing («просрочен» for a quest, «готово» for a run,
    «выключен» for a hook). A filter that shows everything is «Все».
 7. **Empty states say what is missing and how to get it**: «Скриптов пока нет. «+» создаёт пустой.» A loading state says

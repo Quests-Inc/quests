@@ -6,4 +6,5 @@ export const ENTITY_COLORS = {
   attachment: '#4f9fc7',
   questline: '#4fa56b',
   template: '#d9894a',
+  event: '#5a8a9a',
 } as const

@@ -1,5 +1,6 @@
 // Клиент API разложен по темам; этот файл собирает всё обратно под прежним адресом.
 export * from './quests.ts'
+export * from './events.ts'
 export * from './system.ts'
 export * from './templates.ts'
 export * from './notes.ts'

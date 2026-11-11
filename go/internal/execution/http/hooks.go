@@ -18,7 +18,7 @@ func (h *Handler) registerHooks(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/hooks/{id}", h.getHook)
 	mux.HandleFunc("PATCH /api/hooks/{id}", h.patchHook)
 	mux.HandleFunc("DELETE /api/hooks/{id}", h.deleteHook)
-	mux.HandleFunc("GET /api/hook-events", h.listHookEvents)
+	mux.HandleFunc("GET /api/hook-signals", h.listHookEvents)
 }
 
 func hookErr(w http.ResponseWriter, err error) {
@@ -83,7 +83,7 @@ func (h *Handler) createHook(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Name       string   `json:"name"`
 		Enabled    *bool    `json:"enabled"`
-		Events     []string `json:"events"`
+		Events     []string `json:"signals"`
 		ScriptID   int64    `json:"script_id"`
 		QuestID    *int64   `json:"quest_id"`
 		RunOn      string   `json:"run_on"`
@@ -150,10 +150,10 @@ func (h *Handler) patchHook(w http.ResponseWriter, r *http.Request) {
 		}
 		in.Enabled = &b
 	}
-	if v, ok := raw["events"]; ok {
+	if v, ok := raw["signals"]; ok {
 		var ev []string
 		if err := json.Unmarshal(v, &ev); err != nil {
-			writeErr(w, http.StatusBadRequest, "events: string array")
+			writeErr(w, http.StatusBadRequest, "signals: string array")
 			return
 		}
 		in.Events = ev

@@ -29,6 +29,11 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 			if err == nil {
 				row.Title = &ql.Title
 			}
+		case "event":
+			ev, err := s.Store.Journal.GetEvent(r.Context(), ref.ID)
+			if err == nil {
+				row.Title = &ev.Title
+			}
 		case "step":
 			qid, err := s.Store.Journal.QuestIDForStep(r.Context(), ref.ID)
 			if err == nil {

@@ -67,8 +67,8 @@ Admin CLI: `quests-server egress status | enable <ws> | disable <ws> | log [<ws>
   `scope_id`. `quest_id` stays one release in step with a quest area and in the API.
 - **Events** have one catalog (`platform/hooks/catalog.go`): quest, step, note (`note_created/updated/deleted`), variable
   (`values_changed`: owner, name, type, and the value for a number or a yes/no, never for a text), file
-  (`attachment_added`, `attachment_revision`). The interface, the MCP `hook` tool and the ports of `source.event` read it.
-- **`source.event`** gives a hook script the event with typed ports by `family` (`quest`, `step`, `note`, `value` with an
+  (`attachment_added`, `attachment_revision`). The interface, the MCP `hook` tool and the ports of `source.signal` read it.
+- **`source.signal`** gives a hook script the event with typed ports by `family` (`quest`, `step`, `note`, `value` with an
   `owner`, `attachment`, `any`), including a `ref` and `secrets` of the entity. A graph that reads only the event runs as the
   workspace.
 - **Limits.** Per hook: `cooldown_sec` (a pause per event kind and entity; the first event runs at once, the later ones wait and

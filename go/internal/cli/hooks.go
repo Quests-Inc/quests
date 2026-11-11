@@ -13,8 +13,8 @@ type apiHook struct {
 	ID          int64    `json:"id"`
 	Name        string   `json:"name"`
 	Enabled     bool     `json:"enabled"`
-	Events      []string `json:"events"`
-	EventsRaw   []string `json:"events_raw"`
+	Events      []string `json:"signals"`
+	EventsRaw   []string `json:"signals_raw"`
 	ScriptID    int64    `json:"script_id"`
 	ScriptTitle string   `json:"script_title"`
 	QuestID     *int64   `json:"quest_id"`

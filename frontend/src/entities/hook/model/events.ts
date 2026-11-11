@@ -1,7 +1,7 @@
 /** Prefer aliases over raw kinds when showing a hook's events. */
-export function displayEvents(h: { events_raw?: string[]; events?: string[] }): string[] {
-  if (h.events_raw?.length) return h.events_raw
-  return h.events ?? []
+export function displayEvents(h: { signals_raw?: string[]; signals?: string[] }): string[] {
+  if (h.signals_raw?.length) return h.signals_raw
+  return h.signals ?? []
 }
 
 export type HookDraft = {

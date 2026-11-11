@@ -142,6 +142,24 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 		deadline = &t
 	}
 	d, dur := timeutil.NormalizeDeadline(deadline, body.DurationSeconds, body.DurationSeconds != nil, now)
+	if body.EventID != nil {
+		offset := 0
+		if body.EventOffsetSeconds != nil {
+			offset = *body.EventOffsetSeconds
+		}
+		probe := journal.Quest{DeadlineAt: d, DurationSeconds: dur}
+		if err := h.Store.ApplyEvent(r.Context(), &probe, body.EventID, body.EventEdge, body.EventDir, offset); err != nil {
+			if errors.Is(err, journal.ErrNotFound) {
+				writeErr(w, http.StatusUnprocessableEntity, "событие не найдено")
+				return
+			}
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		d, dur = probe.DeadlineAt, probe.DurationSeconds
+		body.EventEdge, body.EventDir = probe.EventEdge, probe.EventDir
+		body.EventOffsetSeconds = probe.EventOffset
+	}
 	catID, err := journal.ValidateCategoryID(r.Context(), h.Store, body.CategoryID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -172,6 +190,10 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 		SortOrder:       body.SortOrder,
 		DeadlineAt:      d,
 		DurationSeconds: dur,
+		EventID:         body.EventID,
+		EventEdge:       body.EventEdge,
+		EventDir:        body.EventDir,
+		EventOffset:     body.EventOffsetSeconds,
 		CategoryID:      catID,
 		QuestlineID:     lineID,
 		CreatedAt:       now,
@@ -376,6 +398,43 @@ func (h *Handler) patchQuest(w http.ResponseWriter, r *http.Request) {
 		d, dur := timeutil.NormalizeDeadline(q.DeadlineAt, q.DurationSeconds, durationExplicit, now)
 		q.DeadlineAt = d
 		q.DurationSeconds = dur
+	}
+	if v, ok := raw["event_id"]; ok {
+		if string(v) == "null" {
+			q.EventID = nil
+			q.EventEdge = ""
+			q.EventDir = ""
+			q.EventOffset = nil
+			q.EventTitle = nil
+		} else {
+			var id int64
+			if err := json.Unmarshal(v, &id); err != nil || id <= 0 {
+				writeErr(w, http.StatusUnprocessableEntity, "выберите событие")
+				return
+			}
+			edge, dir := q.EventEdge, q.EventDir
+			offset := 0
+			if q.EventOffset != nil {
+				offset = *q.EventOffset
+			}
+			if ev, ok := raw["event_edge"]; ok {
+				_ = json.Unmarshal(ev, &edge)
+			}
+			if dv, ok := raw["event_dir"]; ok {
+				_ = json.Unmarshal(dv, &dir)
+			}
+			if ov, ok := raw["event_offset_seconds"]; ok && string(ov) != "null" {
+				_ = json.Unmarshal(ov, &offset)
+			}
+			if err := h.Store.ApplyEvent(r.Context(), &q, &id, edge, dir, offset); err != nil {
+				if errors.Is(err, journal.ErrNotFound) {
+					writeErr(w, http.StatusUnprocessableEntity, "событие не найдено")
+					return
+				}
+				writeErr(w, http.StatusUnprocessableEntity, err.Error())
+				return
+			}
+		}
 	}
 	kind := "quest_updated"
 	detail := "изменено"

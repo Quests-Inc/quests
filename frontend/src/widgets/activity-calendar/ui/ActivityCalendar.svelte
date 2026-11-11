@@ -6,15 +6,34 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import DateInput from '@/shared/ui/DateInput.svelte'
   import RefText from '@/shared/ui/RefText.svelte'
+  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+  import type { EventRead } from '@/shared/api/journal.gen'
 
-  let { quests = [], labels = {}, onRef, onSelectQuest, onQuestContextMenu, onOpenHistory }: {
+  let {
+    quests = [],
+    events = [],
+    labels = {},
+    onRef,
+    onSelectQuest,
+    onQuestContextMenu,
+    onOpenHistory,
+    onCreateEvent,
+    onEditEvent,
+  }: {
     quests?: any[],
+    events?: EventRead[],
     labels?: Record<string, string>,
     onRef?: (kind: string, id: number) => void,
     onSelectQuest?: (id: number) => void,
     onQuestContextMenu?: (event: MouseEvent, id: number) => void,
     onOpenHistory?: (dayKey: string) => void,
+    onCreateEvent?: (dayKey: string) => void,
+    onEditEvent?: (event: EventRead) => void,
   } = $props()
+
+  function eventColor(color: string | undefined) {
+    return color && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color) ? color : '#5a8a9a'
+  }
 
   function openQuestMenu(event: MouseEvent, id: number) {
     event.preventDefault()
@@ -22,15 +41,36 @@
     onQuestContextMenu?.(event, id)
   }
 
+  function openDayMenu(event: MouseEvent, key: string) {
+    const t = event.target as HTMLElement
+    if (t.closest?.('.cal-card')) return
+    event.preventDefault()
+    event.stopPropagation()
+    dayMenu = { open: true, x: event.clientX, y: event.clientY, key }
+  }
+
+  function onDayMenu(id: string) {
+    const key = dayMenu.key
+    dayMenu.open = false
+    if (id === 'create') onCreateEvent?.(key)
+    if (id === 'history') onOpenHistory?.(key)
+  }
+
+  let dayMenuItems = $derived([
+    ...(onCreateEvent ? [{ id: 'create', label: 'Создать событие' }] : []),
+    ...(onOpenHistory ? [{ id: 'history', label: 'История дня' }] : []),
+  ])
+
   const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
   const HOUR_TICKS = [0, 6, 12, 18, 24]
 
   let rangeFrom: string = $state(monthStartKey(new Date()))
   let rangeTo: string = $state(monthEndKey(new Date()))
   let selectedKey: string | null = $state(null)
-  let hoveredId: number | null = $state(null)
+  let hoveredId: string | null = $state(null)
 
   let rootEl: HTMLElement | null = $state(null)
+  let dayMenu = $state({ open: false, x: 0, y: 0, key: '' })
 
   function monthKey(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -168,6 +208,34 @@
     return map
   })
 
+  /** Event bands: each day from the start through the last instant before the end. */
+  let eventsByDay: Record<string, EventRead[]> = $derived.by(() => {
+    const map: Record<string, EventRead[]> = {}
+    for (const o of events) {
+      const start = parseApiDate(o.starts_at)
+      const end = parseApiDate(o.ends_at)
+      if (!start || !end) continue
+      const push = (d: Date) => {
+        const key = dayKey(d)
+        if (!map[key]) map[key] = []
+        map[key].push(o)
+      }
+      if (end.getTime() <= start.getTime()) {
+        push(start)
+        continue
+      }
+      const last = new Date(end.getTime() - 1)
+      for (
+        let d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        d <= last;
+        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
+      ) {
+        push(d)
+      }
+    }
+    return map
+  })
+
   /** @param month 0-based */
   function buildMonth(year: number, month: number) {
     const first = new Date(year, month, 1)
@@ -218,6 +286,36 @@
     if (!selectedKey) return null
     const { start: dayStart, end: dayEnd } = dayBounds(selectedKey)
     const dayMs = dayEnd.getTime() - dayStart.getTime()
+
+    const eventRows: any[] = []
+    for (const ev of events) {
+      const start = parseApiDate(ev.starts_at)
+      const end = parseApiDate(ev.ends_at)
+      if (!start || !end || ev.id == null) continue
+      const win = { start, end: end.getTime() <= start.getTime() ? start : end }
+      const clipped = clipToDay(win, dayStart, dayEnd)
+      if (!clipped) continue
+      const fromPrev = win.start < dayStart
+      const toNext = win.end > dayEnd
+      const endToday = win.end > dayStart && win.end <= dayEnd
+      const left = (clipped.startMs - dayStart.getTime()) / dayMs
+      const rawW = (clipped.endMs - clipped.startMs) / dayMs
+      eventRows.push({
+        id: Number(ev.id),
+        event: ev,
+        title: String(ev.title || '?'),
+        color: eventColor(ev.color),
+        icon: ev.icon || 'calendar',
+        left,
+        width: clipped.point ? 0 : Math.max(rawW, 0.004),
+        point: clipped.point,
+        fromPrev,
+        toNext,
+        caption: eventBarCaption(ev, win, fromPrev, endToday),
+        tip: eventBarTip(ev, win, fromPrev, endToday),
+      })
+    }
+    eventRows.sort((a, b) => a.left - b.left || b.width - a.width || a.id - b.id)
 
     const onBoard: Set<number> = new Set()
     const rows: any[] = []
@@ -290,12 +388,12 @@
     }
     noWindow.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel) || a.id - b.id)
 
-    const events: any[] = []
+    const log: any[] = []
     for (const q of quests) {
       if (q?.id == null) continue
       const created = parseApiDate(q.created_at)
       if (created && created >= dayStart && created < dayEnd) {
-        events.push({
+        log.push({
           kind: 'issued',
           label: 'выдан',
           at: created,
@@ -305,7 +403,7 @@
       }
       const completed = parseApiDate(q.completed_at)
       if (completed && completed >= dayStart && completed < dayEnd) {
-        events.push({
+        log.push({
           kind: 'completed',
           label: QUEST_STATUS_LABELS.completed ?? 'выполнен',
           at: completed,
@@ -324,7 +422,7 @@
         const sameCreate =
           created && Math.abs(created.getTime() - updated.getTime()) < 2000
         if (!sameCreate) {
-          events.push({
+          log.push({
             kind: st,
             label: QUEST_STATUS_LABELS[st] ?? st,
             at: updated,
@@ -334,7 +432,7 @@
         }
       }
     }
-    events.sort(
+    log.sort(
       (a, b) => a.at.getTime() - b.at.getTime() || Number(a.quest.id) - Number(b.quest.id),
     )
 
@@ -342,14 +440,47 @@
       key: selectedKey,
       title: formatDayTitle(selectedKey),
       rows,
+      eventRows,
       noWindow,
-      events,
+      events: log,
     }
   })
 
-  let hoveredRow = $derived(
-    dayLoad?.rows.find((b) => b.id === hoveredId) ?? null,
-  )
+  let hoveredCaption = $derived.by(() => {
+    if (!hoveredId || !dayLoad) return ''
+    const id = Number(hoveredId.slice(2))
+    if (hoveredId.startsWith('q:')) return dayLoad.rows.find((b) => b.id === id)?.caption ?? ''
+    if (hoveredId.startsWith('e:')) return dayLoad.eventRows.find((b) => b.id === id)?.caption ?? ''
+    return ''
+  })
+
+  function eventBarCaption(
+    ev: EventRead,
+    win: { start: Date, end: Date },
+    fromPrev: boolean,
+    endToday: boolean,
+  ) {
+    const title = String(ev.title || '?')
+    if (ev.all_day) {
+      const a = dayKey(win.start)
+      const b = dayKey(new Date(win.end.getTime() - 1))
+      return a === b ? `${title} · весь день` : `${title} · весь день · ${a} — ${b}`
+    }
+    const endLabel = formatTime(win.end)
+    const span = fromPrev
+      ? `${formatTime(win.start)} (${dayKey(win.start)}) → ${endLabel}${endToday ? '' : ` (${dayKey(win.end)})`}`
+      : `${formatTime(win.start)} → ${endLabel}${endToday ? '' : ` (${dayKey(win.end)})`}`
+    return `${title} · ${span}`
+  }
+
+  function eventBarTip(
+    ev: EventRead,
+    win: { start: Date, end: Date },
+    fromPrev: boolean,
+    endToday: boolean,
+  ) {
+    return eventBarCaption(ev, win, fromPrev, endToday)
+  }
 
   function buildBarCaption(q: any, win: { start: Date, end: Date, finish: Date | null }, fromPrev: boolean, endToday: boolean, markKind: string | null) {
     const title = String(q.title || '?')
@@ -405,7 +536,7 @@
 
   async function onCellClick(key: string, e: MouseEvent) {
     const t = (e.target as HTMLElement)
-    if (t.closest?.('.cal-card')) return
+    if (t.closest?.('.cal-card, .cal-event')) return
     const open = selectDay(key)
     if (open) {
       await tick()
@@ -414,21 +545,22 @@
   }
 </script>
 
+{#snippet eventChip(event: EventRead, extra: string)}
+  <button
+    type="button"
+    class="cal-event {extra}"
+    style:--event-color={eventColor(event.color)}
+    title={event.title}
+    onclick={() => onEditEvent?.(event)}
+  >
+    <span class="cal-event__icon"><Icon name={event.icon || 'calendar'} size={12} /></span>
+    <span class="cal-event__title">{event.title}</span>
+  </button>
+{/snippet}
+
 <div class="activity-cal" aria-label="Календарь задач" bind:this={rootEl}>
   <header class="activity-cal__head">
-    <div class="activity-cal__head-row">
-      <h2 class="activity-cal__title">Календарь</h2>
-      {#if selectedKey}
-        <button
-          type="button"
-          class="btn activity-cal__jump"
-          onclick={scrollToSelectedDay}
-          title="Прокрутить к выбранному дню"
-        >
-          К выбранному дню
-        </button>
-      {/if}
-    </div>
+    <h2 class="activity-cal__title">Календарь</h2>
     <div class="activity-cal__period" role="group" aria-label="Период просмотра">
       <label class="activity-cal__period-field">
         <span>с</span>
@@ -463,6 +595,7 @@
                 aria-label="{cell.key}: {cell.items.length} задач"
                 aria-selected={cell.key === selectedKey}
                 onclick={(e) => onCellClick(cell.key, e)}
+                oncontextmenu={(e) => openDayMenu(e, cell.key)}
                 onkeydown={async (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
@@ -489,6 +622,12 @@
                   {/if}
                 </div>
                 <div class="activity-cal__cards">
+                  {#each eventsByDay[cell.key] || [] as event (event.id)}
+                    {@render eventChip(event, '')}
+                  {/each}
+                  {#if (eventsByDay[cell.key]?.length ?? 0) > 0 && cell.items.length > 0}
+                    <div class="activity-cal__split" role="separator"></div>
+                  {/if}
                   {#each cell.items as item (item.id)}
                     <button
                       type="button"
@@ -548,8 +687,8 @@
               type="button"
               class="btn day-load__icon-btn"
               onclick={() => onOpenHistory?.(selectedKey ?? '')}
-              title="События дня в истории"
-              aria-label="События дня в истории"
+              title="История дня"
+              aria-label="История дня"
             >
               <Icon name="scroll" size={16} />
             </button>
@@ -578,6 +717,18 @@
       </header>
 
       <div class="day-load__body">
+        {#if selectedKey && (eventsByDay[selectedKey] || []).length}
+          <div class="cal-events">
+            <h4 class="cal-events__title">События</h4>
+            <ul class="cal-events__list">
+              {#each eventsByDay[selectedKey] as event (event.id)}
+                <li>
+                  {@render eventChip(event, 'cal-events__item')}
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="day-board" aria-label="Доска дня" onmouseleave={() => (hoveredId = null)}>
           <div class="day-board__axis" aria-hidden="true">
@@ -589,20 +740,58 @@
             </div>
           </div>
 
-          {#if dayLoad.rows.length === 0}
-            <p class="day-tl__empty">Нет задач с окном/дедлайном в этот день</p>
+          {#if dayLoad.eventRows.length === 0 && dayLoad.rows.length === 0}
+            <p class="day-tl__empty">Нет задач с окном и нет событий в этот день</p>
           {:else}
             <div
               class="day-board__rows"
               role="list"
-              aria-label="{dayLoad.rows.length} квестов"
+              aria-label="{dayLoad.eventRows.length} событий, {dayLoad.rows.length} квестов"
             >
+              {#each dayLoad.eventRows as row (row.id)}
+                <div
+                  class="day-board__row"
+                  class:day-board__row--hover={hoveredId === `e:${row.id}`}
+                  role="listitem"
+                  onmouseenter={() => (hoveredId = `e:${row.id}`)}
+                >
+                  <button
+                    type="button"
+                    class="day-board__label"
+                    title={row.tip}
+                    onclick={() => onEditEvent?.(row.event)}
+                  >
+                    <span class="day-board__icon" style:color={row.color} aria-hidden="true">
+                      <Icon name={row.icon} size={12} />
+                    </span>
+                    <span class="day-board__title">{row.title}</span>
+                  </button>
+                  <div class="day-board__track">
+                    {#each HOUR_TICKS as h}
+                      <div class="day-tl__gridline" style:left="{(h / 24) * 100}%"></div>
+                    {/each}
+                    <button
+                      type="button"
+                      class="day-tl__bar day-board__bar day-tl__bar--event"
+                      class:day-tl__bar--point={row.point}
+                      class:day-tl__bar--from-prev={row.fromPrev}
+                      class:day-tl__bar--to-next={row.toNext}
+                      class:day-tl__bar--hover={hoveredId === `e:${row.id}`}
+                      style:--event-color={row.color}
+                      style:left="{row.left * 100}%"
+                      style:width="{Math.max(row.width * 100, row.point ? 0.35 : 0.4)}%"
+                      title={row.tip}
+                      onclick={() => onEditEvent?.(row.event)}
+                    ></button>
+                  </div>
+                </div>
+              {/each}
               {#each dayLoad.rows as row (row.id)}
                 <div
                   class="day-board__row"
-                  class:day-board__row--hover={hoveredId === row.id}
+                  class:day-board__row--hover={hoveredId === `q:${row.id}`}
                   role="listitem"
-                  onmouseenter={() => (hoveredId = row.id)}
+                  onmouseenter={() => (hoveredId = `q:${row.id}`)}
                 >
                   <button
                     type="button"
@@ -628,7 +817,7 @@
                       class:day-tl__bar--point={row.point}
                       class:day-tl__bar--from-prev={row.fromPrev}
                       class:day-tl__bar--to-next={row.toNext}
-                      class:day-tl__bar--hover={hoveredId === row.id}
+                      class:day-tl__bar--hover={hoveredId === `q:${row.id}`}
                       data-sig={row.significance}
                       data-status={row.status}
                       style:left="{row.left * 100}%"
@@ -640,7 +829,7 @@
                     {#if row.marker != null}
                       <span
                         class="day-tl__mark"
-                        class:day-tl__mark--hover={hoveredId === row.id}
+                        class:day-tl__mark--hover={hoveredId === `q:${row.id}`}
                         data-sig={row.significance}
                         data-kind={row.markKind}
                         style:left="{row.marker * 100}%"
@@ -655,8 +844,8 @@
           {/if}
 
           <div class="day-tl__caption" aria-live="polite">
-            {#if hoveredRow}
-              {hoveredRow.caption}
+            {#if hoveredCaption}
+              {hoveredCaption}
             {:else}
               <span class="day-tl__caption-hint">наведите на строку или событие</span>
             {/if}
@@ -670,8 +859,8 @@
               {#each dayLoad.noWindow as q (q.id)}
                 <li
                   class="day-nowin__item"
-                  class:day-nowin__item--hover={hoveredId === q.id}
-                  onmouseenter={() => (hoveredId = q.id)}
+                  class:day-nowin__item--hover={hoveredId === `q:${q.id}`}
+                  onmouseenter={() => (hoveredId = `q:${q.id}`)}
                   onmouseleave={() => (hoveredId = null)}
                 >
                   <time class="day-events__time">{q.timeLabel}</time>
@@ -690,7 +879,7 @@
         {/if}
 
         <div class="day-events">
-          <h4 class="day-events__title">События дня</h4>
+          <h4 class="day-events__title">История дня</h4>
           {#if dayLoad.events.length === 0}
             <p class="day-events__empty">Нет выдач и смен статуса</p>
           {:else}
@@ -698,8 +887,8 @@
               {#each dayLoad.events as ev (ev.kind + '-' + ev.quest.id + '-' + ev.at.getTime())}
                 <li
                   class="day-events__item"
-                  class:day-events__item--hover={hoveredId === Number(ev.quest.id)}
-                  onmouseenter={() => (hoveredId = Number(ev.quest.id))}
+                  class:day-events__item--hover={hoveredId === `q:${Number(ev.quest.id)}`}
+                  onmouseenter={() => (hoveredId = `q:${Number(ev.quest.id)}`)}
                   onmouseleave={() => (hoveredId = null)}
                 >
                   <time class="day-events__time">{ev.timeLabel}</time>
@@ -729,3 +918,12 @@
     </section>
   {/if}
 </div>
+
+<ContextMenu
+  open={dayMenu.open}
+  x={dayMenu.x}
+  y={dayMenu.y}
+  items={dayMenuItems}
+  onSelect={onDayMenu}
+  onClose={() => (dayMenu.open = false)}
+/>

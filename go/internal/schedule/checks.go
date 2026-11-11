@@ -461,6 +461,9 @@ func (r *CheckRunner) ExpireRunnerJobs(ctx context.Context) {
 	for _, j := range changed {
 		r.JobFinished(ctx, j)
 	}
+	if _, err := r.Store.Execution.FailOrphanRuns(ctx, timeutil.NowUTC().Add(-10*time.Minute)); err != nil {
+		log.Printf("checks: settle orphan script runs: %v", err)
+	}
 	if _, err := r.Store.Execution.PurgeRunnerJobs(ctx, timeutil.NowUTC().Add(-14*24*time.Hour)); err != nil {
 		log.Printf("checks: purge runner jobs: %v", err)
 	}

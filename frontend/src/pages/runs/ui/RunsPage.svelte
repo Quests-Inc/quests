@@ -1,7 +1,10 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import { sidebars, SIDEBAR_ONE_PANE } from '@/shared/lib/sidebar.svelte.ts'
   import Icon from '@/shared/ui/Icon.svelte'
-  import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+  import Picker from '@/shared/ui/Picker.svelte'
+  import OptionPills from '@/shared/ui/OptionPills.svelte'
+  import FilterChip from '@/shared/ui/FilterChip.svelte'
   import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
   import { getRun, getScriptNodes, listRuns, type RunDetail, type RunSourceKind } from '@/shared/api/client.ts'
   import type { RunSummary } from '@/shared/api/execution.gen.ts'
@@ -20,33 +23,20 @@
   const PAGE = 50
   let runs = $state<RunSummary[]>([])
   let loading = $state(false)
+  let listVersion = 0
   let more = $state(false)
   let error = $state('')
   let stateFilter = $state<'' | 'failed' | 'waiting' | 'done'>('')
   let source = $state<RunSourceKind | ''>('')
   let pinned = $state<{ kind: RunSourceKind; id: number } | undefined>(undefined)
-  let sourceMenu = $state(false)
-  let sourceX = $state(0)
-  let sourceY = $state(0)
-  let sourceButton = $state<HTMLButtonElement | null>(null)
-  const sourceChoices = $derived([
-    { id: '', label: 'Любой источник', checked: !source || !!pinned },
-    ...Object.entries(SOURCE_WORDS).map(([id, label]) => ({ id, label, checked: !pinned && source === id })),
-  ])
-
-  function showSources() {
-    if (!sourceButton) return
-    const rect = sourceButton.getBoundingClientRect()
-    sourceX = rect.left
-    sourceY = rect.bottom + 4
-    sourceMenu = true
-  }
-
+  const sourceChoices = Object.entries(SOURCE_WORDS).map(([id, label]) => ({ id, label }))
   /** A narrower filter that came from another tab: one script, or one source (a hook, a step…), with its title once known. */
   let script = $state<number | undefined>(undefined)
   let selected = $state<number | null>(null)
   let detail = $state<RunDetail | null>(null)
   let detailError = $state('')
+  let refreshError = $state('')
+  let requestVersion = 0
   let infos = $state<NodeInfo[]>([])
   let poll: ReturnType<typeof setTimeout> | undefined
 
@@ -59,43 +49,59 @@
   })
 
   async function load(append = false) {
+    const version = ++listVersion
     loading = true
     try {
       const before = append && runs.length ? runs[runs.length - 1].id : undefined
       const page = await listRuns({ ...filter(), before })
+      if (version !== listVersion) return
       runs = append ? [...runs, ...page] : page
       more = page.length === PAGE
       error = ''
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e)
+      if (version === listVersion) error = e instanceof Error ? e.message : String(e)
     } finally {
-      loading = false
+      if (version === listVersion) loading = false
     }
   }
 
   async function open(id: number | null, { push = true } = {}) {
     clearTimeout(poll)
+    const version = ++requestVersion
     selected = id
+    if (id != null && window.matchMedia(SIDEBAR_ONE_PANE).matches) sidebars.setCollapsed('runs', true)
     detail = null
+    refreshError = ''
     detailError = ''
     if (push) writeUrl()
     if (id == null) return
     try {
       const d = await getRun(id)
-      if (selected !== id) return
+      if (selected !== id || version !== requestVersion || !active) return
       detail = d
       // A run that waits for its runner is read again until it settles.
       if (d.state === 'waiting') poll = setTimeout((): void => void refreshOpen(id), 1500)
     } catch (e) {
-      if (selected === id) detailError = e instanceof Error ? e.message : String(e)
+      if (selected === id && version === requestVersion) detailError = e instanceof Error ? e.message : String(e)
     }
   }
 
   async function refreshOpen(id: number) {
     if (selected !== id || !active) return
-    await open(id, { push: false })
-    const i = runs.findIndex((r) => r.id === id)
-    if (detail && i !== -1 && runs[i].state !== detail.state) void load()
+    const version = ++requestVersion
+    try {
+      const next = await getRun(id)
+      if (selected !== id || version !== requestVersion || !active) return
+      detail = next
+      refreshError = ''
+      const i = runs.findIndex(r => r.id === id)
+      if (i !== -1 && runs[i].state !== next.state) void load()
+      if (next.state === 'waiting') poll = setTimeout((): void => void refreshOpen(id), 1500)
+    } catch (e) {
+      if (selected !== id || version !== requestVersion || !active) return
+      refreshError = `Не удалось обновить запуск: ${e instanceof Error ? e.message : String(e)}`
+      poll = setTimeout((): void => void refreshOpen(id), 5000)
+    }
   }
 
   function writeUrl() {
@@ -103,7 +109,7 @@
       tab: 'runs',
       run: selected ?? undefined,
       script,
-      src: pinned ? `${pinned.kind}:${pinned.id}` : undefined,
+      src: pinned ? `${pinned.kind}:${pinned.id}` : source || undefined,
       state: stateFilter || undefined,
     })
   }
@@ -114,7 +120,7 @@
     script = f.script
     pinned = f.source
     stateFilter = f.state
-    source = ''
+    source = f.sourceKind
     void load()
     void open(f.run ?? null, { push: false })
   }
@@ -130,6 +136,7 @@
     return () => {
       window.removeEventListener('quests:route', onRoute)
       clearTimeout(poll)
+      requestVersion++
     }
   })
 
@@ -183,38 +190,15 @@
   }
 </script>
 
-<SidebarLayout key="runs" class="runs">
+<SidebarLayout key="runs" hasSelection={selected != null} class="runs">
   {#snippet sidebar()}
     <aside class="runs__side" aria-label="Запуски">
       <div class="runs__filters">
-        <div class="seg" role="group" aria-label="Состояние">
-          {#each [{ id: '', label: 'Все' }, { id: 'failed', label: 'Ошибки' }, { id: 'waiting', label: 'Ждут' }] as s (s.id)}
-            <button type="button" class="seg__pill" class:seg__pill--on={stateFilter === s.id} onclick={() => setState(s.id as typeof stateFilter)}>{s.label}</button>
-          {/each}
-        </div>
-        <button
-          bind:this={sourceButton}
-          type="button"
-          class="runs__source"
-          aria-label="Что запустило"
-          aria-haspopup="menu"
-          aria-expanded={sourceMenu}
-          onclick={() => sourceMenu ? (sourceMenu = false) : showSources()}
-          onkeydown={(event) => {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              event.preventDefault()
-              showSources()
-            }
-          }}
-        >
-          <span>{pinned || !source ? 'Любой источник' : SOURCE_WORDS[source]}</span>
-          <Icon name="chevron-down" size={12} />
-        </button>
-        {#if narrowLabel}
-          <span class="runs__narrow" title="Показаны только эти запуски">
-            {narrowLabel}
-            <button type="button" class="btn btn--ghost btn--icon" aria-label="Показать все запуски" onclick={clearNarrow}><Icon name="close" size={12} /></button>
-          </span>
+        <OptionPills options={[{id:'',label:'Все'}, {id:'failed',label:'Ошибки'}, {id:'waiting',label:'Ждут'}, {id:'done',label:'Завершены'}]} value={stateFilter} onToggle={v => setState(v as typeof stateFilter)} label="Состояние" compact wrap />
+        <Picker options={sourceChoices} value={pinned?.kind ?? source} onChange={v => setSource(v as typeof source)} noneLabel="Любой источник" label="Тип источника" />
+        {#if narrowLabel}<FilterChip label={narrowLabel} onClear={clearNarrow} />{/if}
+        {#if stateFilter || source || pinned || script}
+          <button type="button" class="btn btn--ghost" onclick={() => { stateFilter = ''; source = ''; clearNarrow() }}>Сбросить фильтры</button>
         {/if}
       </div>
       <ul class="runs__list">
@@ -256,6 +240,7 @@
     {:else if !detail}
       <p class="runs__loading">Загрузка запуска…</p>
     {:else}
+      {#if refreshError}<p class="runs__error" role="status">{refreshError}</p>{/if}
       <header class="rd__head">
         <h2>
           <span class="run__dot run__dot--{detail.state}"></span>
@@ -345,19 +330,6 @@
   </section>
 </SidebarLayout>
 
-<ContextMenu
-  open={sourceMenu}
-  anchor={sourceButton}
-  x={sourceX}
-  y={sourceY}
-  items={sourceChoices}
-  onSelect={(id) => setSource(id as typeof source)}
-  onClose={() => {
-    sourceMenu = false
-    sourceButton?.focus()
-  }}
-/>
-
 <style>
   .runs__side {
     display: flex;
@@ -367,66 +339,11 @@
   }
   .runs__filters {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 0.4rem;
     padding: 0.5rem;
     border-bottom: 1px solid var(--color-border, #333);
-  }
-  .runs__source {
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex: 1 1 8rem;
-    min-width: 0;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    background: var(--color-bg-raised, #1a1a1a);
-    color: var(--color-fg, #e8e8e8);
-    font: inherit;
-    font-size: var(--text-xs, 0.75rem);
-    cursor: pointer;
-  }
-  .runs__source:hover,
-  .runs__source[aria-expanded='true'] {
-    border-color: var(--color-accent, #c9a227);
-  }
-  .runs__source:focus-visible {
-    outline: 2px solid var(--color-accent, #c9a227);
-    outline-offset: 2px;
-  }
-  .runs__narrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    max-width: 100%;
-    padding: 0.1rem 0.15rem 0.1rem 0.5rem;
-    border: 1px solid var(--color-accent, #c9a227);
-    border-radius: var(--radius-md, 4px);
-    font-size: var(--text-xs, 0.75rem);
-  }
-  .seg {
-    display: inline-flex;
-    border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
-    overflow: hidden;
-  }
-  .seg__pill {
-    padding: 0.28rem 0.6rem;
-    border: 0;
-    border-right: 1px solid var(--color-border, #333);
-    background: transparent;
-    color: var(--color-fg-muted, #9a9a9a);
-    font-size: var(--text-xs, 0.75rem);
-    cursor: pointer;
-  }
-  .seg__pill:last-child {
-    border-right: 0;
-  }
-  .seg__pill--on {
-    color: var(--color-fg, #e8e8e8);
-    background: color-mix(in srgb, var(--color-accent, #c9a227) 18%, transparent);
   }
   .runs__list {
     flex: 1 1 auto;

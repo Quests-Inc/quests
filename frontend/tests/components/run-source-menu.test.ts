@@ -27,23 +27,23 @@ test('source menu is themed, keyboard accessible and applies the selected filter
   document.body.append(target)
   app = mount(RunsPage, { target })
   await tick()
-  const trigger = target.querySelector<HTMLButtonElement>('[aria-label="Что запустило"]')!
+  const trigger = target.querySelector<HTMLButtonElement>('button[aria-label^="Тип источника:"]')!
   expect(target.querySelector('select')).toBeNull()
   trigger.click()
   await tick()
-  const choices = [...target.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')]
+  const choices = [...target.querySelectorAll<HTMLButtonElement>('[role="option"]')]
   expect(choices.map((c) => c.textContent?.replace('✓', '').trim())).toContain('заметка')
-  expect(document.activeElement).toBe(choices[0])
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-  expect(document.activeElement).toBe(choices[1])
+  expect(target.querySelector('input[aria-label="Поиск: Тип источника"]')).not.toBeNull()
   choices.find((c) => c.textContent?.trim() === 'заметка')!.click()
   await tick()
   expect(filters.at(-1)?.source_kind).toBe('note')
-  expect(target.querySelector('[role="menu"]')).toBeNull()
+  expect(target.querySelector('[role="listbox"]')).toBeNull()
   expect(document.activeElement).toBe(trigger)
   trigger.click()
   await tick()
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  target
+    .querySelector('input[aria-label="Поиск: Тип источника"]')!
+    .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   await tick()
   expect(trigger.getAttribute('aria-expanded')).toBe('false')
 })

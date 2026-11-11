@@ -69,3 +69,55 @@ func TestRunStoreAndItsJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOrphanRunReconciliation(t *testing.T) {
+	st := openSecretsDB(t)
+	ctx := context.Background()
+	snap := graph.Snapshot{States: map[int]graph.NodeState{2: graph.StateWaiting}}
+	create := func() int64 {
+		t.Helper()
+		id, err := st.CreateRun(ctx, NewScriptRun{GraphRef: "implicit:x", SubjectType: "step", SubjectID: 1000, Snapshot: snap})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	orphan, recent, live, terminal := create(), create(), create(), create()
+	old := timeutil.NowUTC().Add(-time.Hour)
+	for _, id := range []int64{orphan, live, terminal} {
+		if _, err := st.DB.ExecContext(ctx, `UPDATE script_run SET updated_at = ? WHERE id = ?`, timeutil.ToDBUTC(old), id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	node := 2
+	for _, id := range []int64{live, terminal} {
+		j, _, err := st.EnqueueJob(ctx, JobSpec{RunnerLabel: "pc", Kind: JobKindPoll, Command: "true", RunID: &id, RunNode: &node})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id == terminal {
+			if _, err := st.DB.ExecContext(ctx, `UPDATE runner_job SET state = 'success', finished_at = ? WHERE id = ?`, timeutil.ToDBUTC(old), j.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if n, err := st.PurgeRunnerJobs(ctx, timeutil.NowUTC()); err != nil || n != 0 {
+		t.Fatalf("must retain jobs of waiting runs: %d %v", n, err)
+	}
+	if n, err := st.FailOrphanRuns(ctx, timeutil.NowUTC().Add(-10*time.Minute)); err != nil || n != 1 {
+		t.Fatalf("reconcile: %d %v", n, err)
+	}
+	for _, id := range []int64{recent, live, terminal} {
+		r, _ := st.GetRun(ctx, id)
+		if r.State != RunWaiting {
+			t.Fatalf("changed valid run %d", id)
+		}
+	}
+	r, err := st.GetRun(ctx, orphan)
+	if err != nil || r.State != RunFailed || r.FinishedAt == nil || r.Error == "" || r.Snapshot.States[2] != graph.StateWaiting {
+		t.Fatalf("orphan: %+v %v", r, err)
+	}
+	if n, err := st.FailOrphanRuns(ctx, timeutil.NowUTC()); err != nil || n != 1 {
+		t.Fatalf("only recent jobless run remains: %d %v", n, err)
+	}
+}

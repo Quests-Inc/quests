@@ -36,7 +36,7 @@
 
   const groups = $derived(
     Object.keys(FAMILY_WORDS)
-      .map((family) => ({ family, label: FAMILY_WORDS[family], items: hookCatalog.events.filter((e) => e.family === family) }))
+      .map((family) => ({ family, label: FAMILY_WORDS[family], items: hookCatalog.signals.filter((e) => e.family === family) }))
       .filter((g) => g.items.length)
   )
 
@@ -90,9 +90,9 @@
 {/if}
 
 <div class="field">
-  <span class="label">События</span>
+  <span class="label">Сигналы</span>
   {#if !hookCatalog.loaded}
-    <p class="explain">Загрузка событий…</p>
+    <p class="explain">Загрузка сигналов…</p>
   {/if}
   {#each groups as g (g.family)}
     {@const kinds = g.items.map((e) => e.kind)}

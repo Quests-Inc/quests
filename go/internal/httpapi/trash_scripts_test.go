@@ -37,7 +37,7 @@ func TestScriptAndHookTrashOverHTTP(t *testing.T) {
 		t.Fatalf("script: %d %v", code, sc)
 	}
 	sid := jsonNum(sc["id"])
-	code, hk := secretReq(h, http.MethodPost, "/api/hooks", json.RawMessage(`{"name":"пинг","events":["complete"],"script_id":`+sid+`,"run_on":"home"}`))
+	code, hk := secretReq(h, http.MethodPost, "/api/hooks", json.RawMessage(`{"name":"пинг","signals":["complete"],"script_id":`+sid+`,"run_on":"home"}`))
 	if code != http.StatusCreated {
 		t.Fatalf("hook: %d %v", code, hk)
 	}

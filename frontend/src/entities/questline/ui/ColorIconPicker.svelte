@@ -18,6 +18,7 @@
     ownerLabel = 'этого элемента',
     allowUpload = true,
     sectionLabels = false,
+    icons = QUESTLINE_ICONS,
   }: {
     color?: string,
     icon?: string,
@@ -27,6 +28,7 @@
     ownerLabel?: string,
     allowUpload?: boolean,
     sectionLabels?: boolean,
+    icons?: string[],
   } = $props()
 
   let fileInput = $state((null as HTMLInputElement | null))
@@ -91,7 +93,7 @@
   {#if sectionLabels}<h5 class="cip__section-label">Иконка</h5>{:else}<span class="label">Иконка</span>{/if}
   <div class="cip__row">
     <div class="cip__icons" role="radiogroup" aria-label="Иконка">
-      {#each QUESTLINE_ICONS as name}
+      {#each icons as name}
         <button
           type="button"
           class="cip__icon"
