@@ -4,8 +4,7 @@
   import type { EventRead } from '@/shared/api/journal.gen'
   import { parseApiDate } from '@/shared/lib/time.ts'
   import { questCatalog } from '@/entities/quest'
-  import { ActivityCalendar } from '@/widgets/activity-calendar'
-  import { dayKey } from '@/widgets/activity-calendar/model/day.ts'
+  import { ActivityCalendar, dayKey } from '@/widgets/activity-calendar'
   import EventModal from './EventModal.svelte'
 
   let {

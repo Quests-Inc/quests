@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
-  import { slideTab } from '@/app/model/slideTab.ts'
+  import { slideTab } from '@/shared/lib/slideTab.ts'
   import { statusColor } from '@/entities/quest'
   import { QuestlineIcon } from '@/entities/questline'
   import Icon from '@/shared/ui/Icon.svelte'

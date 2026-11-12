@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { SLIDE_MS, slideTab } from '../../src/app/model/slideTab.ts'
+import { SLIDE_MS, slideTab } from '../../src/shared/lib/slideTab.ts'
 
 test('a forward tab enters from the right and a backward one from the left', () => {
   const forward = slideTab(null, { dir: 1 })
