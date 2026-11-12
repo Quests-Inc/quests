@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/quests-inc/quests/go/internal/journal"
+	"github.com/quests-inc/quests/go/internal/kernel"
+	"github.com/quests-inc/quests/go/internal/platform/httpx"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
@@ -80,7 +85,7 @@ func (h *Handler) patchEvent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	saved, err := h.Store.UpdateEvent(r.Context(), o)
+	saved, linked, err := h.Store.UpdateEvent(r.Context(), o)
 	if errors.Is(err, journal.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "событие не найдено")
 		return
@@ -91,6 +96,7 @@ func (h *Handler) patchEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	read := journal.EventToRead(saved)
 	h.publishEvent(r.Context(), "event_updated", read)
+	h.publishLinkedQuests(r.Context(), linked)
 	writeJSON(w, http.StatusOK, read)
 }
 
@@ -109,7 +115,7 @@ func (h *Handler) deleteEvent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := h.Store.DeleteEvent(r.Context(), id); err != nil {
+	if err := h.Store.DeleteEvent(r.Context(), id, h.DataDir); err != nil {
 		if errors.Is(err, journal.ErrNotFound) {
 			writeErr(w, http.StatusNotFound, "событие не найдено")
 			return
@@ -166,6 +172,103 @@ func (h *Handler) questToEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, read)
 }
 
+func eventCustomIcon(o journal.Event) string {
+	if o.CustomIcon != nil {
+		return *o.CustomIcon
+	}
+	return ""
+}
+
+func (h *Handler) getEventIcon(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	o, err := h.Store.GetEvent(r.Context(), id)
+	if errors.Is(err, journal.ErrNotFound) {
+		writeErr(w, 404, "событие не найдено")
+		return
+	}
+	custom := eventCustomIcon(o)
+	if custom == "" || !kernel.SafeIconName(custom) {
+		writeErr(w, 404, "иконка не найдена")
+		return
+	}
+	path := filepath.Join(h.DataDir, "event-icons", custom)
+	httpx.ServeIcon(w, r, path)
+}
+
+func (h *Handler) postEventIcon(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if _, err := h.Store.GetEvent(r.Context(), id); errors.Is(err, journal.ErrNotFound) {
+		writeErr(w, 404, "событие не найдено")
+		return
+	}
+	if err := r.ParseMultipartForm(600 << 10); err != nil {
+		writeErr(w, 400, "invalid multipart")
+		return
+	}
+	file, hdr, err := r.FormFile("file")
+	if err != nil {
+		writeErr(w, 400, "file required")
+		return
+	}
+	defer file.Close()
+	raw, err := io.ReadAll(io.LimitReader(file, 512*1024+1))
+	if err != nil || len(raw) == 0 || len(raw) > 512*1024 {
+		writeErr(w, 400, "icon too large or empty")
+		return
+	}
+	ct := hdr.Header.Get("Content-Type")
+	ext := ".png"
+	switch {
+	case strings.Contains(ct, "jpeg"), strings.HasSuffix(strings.ToLower(hdr.Filename), ".jpg"), strings.HasSuffix(strings.ToLower(hdr.Filename), ".jpeg"):
+		ext = ".jpg"
+	case strings.Contains(ct, "webp"), strings.HasSuffix(strings.ToLower(hdr.Filename), ".webp"):
+		ext = ".webp"
+	case strings.Contains(ct, "gif"), strings.HasSuffix(strings.ToLower(hdr.Filename), ".gif"):
+		ext = ".gif"
+	case strings.Contains(ct, "svg"), strings.HasSuffix(strings.ToLower(hdr.Filename), ".svg"):
+		ext = ".svg"
+	}
+	dir := filepath.Join(h.DataDir, "event-icons")
+	_ = os.MkdirAll(dir, 0o755)
+	name := strconv.FormatInt(id, 10) + ext
+	if err := os.WriteFile(filepath.Join(dir, name), raw, 0o644); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	saved, err := h.Store.SetEventIcon(r.Context(), id, name)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	read := journal.EventToRead(saved)
+	h.publishEvent(r.Context(), "event_updated", read)
+	writeJSON(w, 200, read)
+}
+
+func (h *Handler) deleteEventIcon(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	saved, err := h.Store.ClearEventIcon(r.Context(), id, h.DataDir)
+	if errors.Is(err, journal.ErrNotFound) {
+		writeErr(w, 404, "событие не найдено")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	read := journal.EventToRead(saved)
+	h.publishEvent(r.Context(), "event_updated", read)
+	writeJSON(w, 200, read)
+}
+
 func (h *Handler) publishEvent(ctx context.Context, kind string, o journal.EventRead) {
 	h.publishSilent(ctx, kind, o.Title, map[string]any{"event_id": o.ID})
+}
+
+// publishLinkedQuests wakes journal rows whose deadline was rewritten with the event.
+func (h *Handler) publishLinkedQuests(ctx context.Context, ids []int64) {
+	for _, id := range ids {
+		qid := id
+		h.publishSilent(ctx, "quest_updated", "", map[string]any{"quest_id": qid})
+	}
 }

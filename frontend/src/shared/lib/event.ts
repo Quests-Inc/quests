@@ -36,15 +36,19 @@ export function offsetLabel(seconds: number) {
   return parts.join(' ')
 }
 
-export function eventPhrase(q: {
-  event_id?: number | null
-  event_edge?: string
-  event_dir?: string
-  event_offset_seconds?: number | null
-  event_title?: string | null
-}) {
+export function eventPhrase(
+  q: {
+    event_id?: number | null
+    event_edge?: string
+    event_dir?: string
+    event_offset_seconds?: number | null
+    event_title?: string | null
+  },
+  opts: { asRef?: boolean } = {}
+) {
   if (!q?.event_id) return ''
-  const title = q.event_title ? `«${q.event_title}»` : 'события'
+  // asRef: token for RefText (title resolves from the catalog). Plain text keeps «title».
+  const title = opts.asRef ? `event=${q.event_id}` : q.event_title ? `«${q.event_title}»` : 'события'
   const n = Number(q.event_offset_seconds) || 0
   if (n <= 0) return q.event_edge === 'end' ? `в конце ${title}` : `в начале ${title}`
   const head = q.event_dir === 'after' ? 'через' : 'за'

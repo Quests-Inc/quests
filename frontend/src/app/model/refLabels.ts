@@ -59,7 +59,7 @@ export function buildRefIcons({
   for (const l of questlines) m[`questline:${l.id}`] = { icon: l.icon, url: l.icon_url, color: l.color }
   for (const q of quests)
     m[`quest:${q.id}`] = { icon: q.questline_icon, url: q.questline_icon_url, color: q.questline_color }
-  for (const e of events) m[`event:${e.id}`] = { icon: e.icon || 'calendar', color: e.color }
+  for (const e of events) m[`event:${e.id}`] = { icon: e.icon || 'calendar', url: e.icon_url, color: e.color }
   return m
 }
 

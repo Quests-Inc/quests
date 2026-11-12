@@ -12,12 +12,14 @@
     onSelectQuest,
     onQuestContextMenu,
     onOpenHistory,
+    onChanged,
   }: {
     labels?: Record<string, string>
     onRef?: (kind: string, id: number) => void
     onSelectQuest?: (id: number) => void
     onQuestContextMenu?: (event: MouseEvent, id: number) => void
     onOpenHistory?: (dayKey: string) => void
+    onChanged?: () => void
   } = $props()
 
   let quests = $derived(questCatalog.list)
@@ -91,8 +93,13 @@
   open={modalOpen}
   event={editing}
   dayKey={createDay}
+  {labels}
   onClose={() => (modalOpen = false)}
-  onSaved={reload}
+  onSaved={() => {
+    void reload()
+    onChanged?.()
+  }}
   {quests}
   onOpenQuest={onSelectQuest}
+  {onRef}
 />

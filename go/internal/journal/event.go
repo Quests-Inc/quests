@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -41,22 +44,25 @@ type Event struct {
 	AllDay      bool
 	Color       string
 	Icon        string
+	CustomIcon  *string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
 // EventRead is an event as the API sends it.
 type EventRead struct {
-	ID          int64  `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	StartsAt    string `json:"starts_at"`
-	EndsAt      string `json:"ends_at"`
-	AllDay      bool   `json:"all_day"`
-	Color       string `json:"color"`
-	Icon        string `json:"icon"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID          int64   `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	StartsAt    string  `json:"starts_at"`
+	EndsAt      string  `json:"ends_at"`
+	AllDay      bool    `json:"all_day"`
+	Color       string  `json:"color"`
+	Icon        string  `json:"icon"`
+	CustomIcon  *string `json:"custom_icon"`
+	IconURL     *string `json:"icon_url"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 }
 
 func EventToRead(o Event) EventRead {
@@ -71,6 +77,15 @@ func EventToRead(o Event) EventRead {
 		Icon:        o.Icon,
 		CreatedAt:   isoString(o.CreatedAt),
 		UpdatedAt:   isoString(o.UpdatedAt),
+	}
+	if o.CustomIcon != nil && *o.CustomIcon != "" {
+		icon := *o.CustomIcon
+		read.CustomIcon = &icon
+		u := fmt.Sprintf("/api/calendar/events/%d/icon", o.ID)
+		if iso := timeutil.ToUTCISO(&o.UpdatedAt); iso != nil {
+			u += "?v=" + *iso
+		}
+		read.IconURL = &u
 	}
 	return read
 }
@@ -112,9 +127,11 @@ func ResolveEventDeadline(start, end time.Time, edge, dir string, offset int) (t
 	return base.Add(-d), nil
 }
 
+const eventCols = `id, title, description, starts_at, ends_at, all_day, color, icon, custom_icon, created_at, updated_at`
+
 func (s *Store) ListEvents(ctx context.Context) ([]Event, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, title, description, starts_at, ends_at, all_day, color, icon, created_at, updated_at
+		SELECT `+eventCols+`
 		FROM event
 		ORDER BY starts_at, id`)
 	if err != nil {
@@ -134,7 +151,7 @@ func (s *Store) ListEvents(ctx context.Context) ([]Event, error) {
 
 func (s *Store) GetEvent(ctx context.Context, id int64) (Event, error) {
 	row := s.DB.QueryRowContext(ctx, `
-		SELECT id, title, description, starts_at, ends_at, all_day, color, icon, created_at, updated_at
+		SELECT `+eventCols+`
 		FROM event WHERE id = ?`, id)
 	o, err := scanEvent(row)
 	if err == sql.ErrNoRows {
@@ -166,9 +183,11 @@ func (s *Store) CreateEvent(ctx context.Context, o Event) (Event, error) {
 	return s.GetEvent(ctx, id)
 }
 
-func (s *Store) UpdateEvent(ctx context.Context, o Event) (Event, error) {
+// UpdateEvent saves the event and rewrites deadlines of linked quests. The
+// returned ids are those quests, so the HTTP layer can wake their peers.
+func (s *Store) UpdateEvent(ctx context.Context, o Event) (Event, []int64, error) {
 	if err := validEvent(&o); err != nil {
-		return Event{}, err
+		return Event{}, nil, err
 	}
 	o.UpdatedAt = timeutil.NowUTC()
 	res, err := s.DB.ExecContext(ctx, `
@@ -179,19 +198,27 @@ func (s *Store) UpdateEvent(ctx context.Context, o Event) (Event, error) {
 		timeutil.ToDBUTC(o.UpdatedAt), o.ID,
 	)
 	if err != nil {
-		return Event{}, err
+		return Event{}, nil, err
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return Event{}, ErrNotFound
+		return Event{}, nil, ErrNotFound
 	}
-	if err := s.recomputeEventQuests(ctx, o); err != nil {
-		return Event{}, err
+	ids, err := s.recomputeEventQuests(ctx, o)
+	if err != nil {
+		return Event{}, nil, err
 	}
-	return s.GetEvent(ctx, o.ID)
+	saved, err := s.GetEvent(ctx, o.ID)
+	return saved, ids, err
 }
 
-func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
+// DeleteEvent drops the event and clears the phrase on linked quests. dataDir
+// is where custom icon files live; pass "" to leave the file alone.
+func (s *Store) DeleteEvent(ctx context.Context, id int64, dataDir string) error {
+	cur, err := s.GetEvent(ctx, id)
+	if err != nil {
+		return err
+	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -211,7 +238,39 @@ func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
 	if n == 0 {
 		return ErrNotFound
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if dataDir != "" && cur.CustomIcon != nil && *cur.CustomIcon != "" {
+		_ = os.Remove(filepath.Join(dataDir, "event-icons", *cur.CustomIcon))
+	}
+	return nil
+}
+
+func (s *Store) SetEventIcon(ctx context.Context, id int64, filename string) (Event, error) {
+	now := timeutil.NowUTC()
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE event SET custom_icon=?, updated_at=? WHERE id=?`, filename, timeutil.ToDBUTC(now), id)
+	if err != nil {
+		return Event{}, err
+	}
+	return s.GetEvent(ctx, id)
+}
+
+func (s *Store) ClearEventIcon(ctx context.Context, id int64, dataDir string) (Event, error) {
+	cur, err := s.GetEvent(ctx, id)
+	if err != nil {
+		return Event{}, err
+	}
+	now := timeutil.NowUTC()
+	_, err = s.DB.ExecContext(ctx, `UPDATE event SET custom_icon=NULL, updated_at=? WHERE id=?`, timeutil.ToDBUTC(now), id)
+	if err != nil {
+		return Event{}, err
+	}
+	if cur.CustomIcon != nil && *cur.CustomIcon != "" {
+		_ = os.Remove(filepath.Join(dataDir, "event-icons", *cur.CustomIcon))
+	}
+	return s.GetEvent(ctx, id)
 }
 
 // ApplyEvent sets or clears a quest's event phrase and writes the resolved deadline.
@@ -252,12 +311,12 @@ func (s *Store) ApplyEvent(ctx context.Context, q *Quest, id *int64, edge, dir s
 	return nil
 }
 
-func (s *Store) recomputeEventQuests(ctx context.Context, o Event) error {
+func (s *Store) recomputeEventQuests(ctx context.Context, o Event) ([]int64, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, event_edge, event_dir, COALESCE(event_offset_seconds, 0)
 		FROM quest WHERE event_id = ?`, o.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 	type row struct {
@@ -270,15 +329,16 @@ func (s *Store) recomputeEventQuests(ctx context.Context, o Event) error {
 	for rows.Next() {
 		var r row
 		if err := rows.Scan(&r.id, &r.edge, &r.dir, &r.offset); err != nil {
-			return err
+			return nil, err
 		}
 		pending = append(pending, r)
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	_ = rows.Close()
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
+	ids := make([]int64, 0, len(pending))
 	for _, r := range pending {
 		edge, dir := "", ""
 		if r.edge.Valid {
@@ -289,15 +349,16 @@ func (s *Store) recomputeEventQuests(ctx context.Context, o Event) error {
 		}
 		at, err := ResolveEventDeadline(o.StartsAt, o.EndsAt, edge, dir, r.offset)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if _, err := s.DB.ExecContext(ctx, `
 			UPDATE quest SET deadline_at=?, duration_seconds=0, updated_at=? WHERE id=?`,
 			timeutil.ToDBUTC(at), now, r.id); err != nil {
-			return err
+			return nil, err
 		}
+		ids = append(ids, r.id)
 	}
-	return nil
+	return ids, nil
 }
 
 func validEvent(o *Event) error {
@@ -322,12 +383,17 @@ func validEvent(o *Event) error {
 func scanEvent(row rowScanner) (Event, error) {
 	var o Event
 	var starts, ends, created, updated string
+	var custom sql.NullString
 	var allDay int
-	err := row.Scan(&o.ID, &o.Title, &o.Description, &starts, &ends, &allDay, &o.Color, &o.Icon, &created, &updated)
+	err := row.Scan(&o.ID, &o.Title, &o.Description, &starts, &ends, &allDay, &o.Color, &o.Icon, &custom, &created, &updated)
 	if err != nil {
 		return o, err
 	}
 	o.AllDay = allDay != 0
+	if custom.Valid && custom.String != "" {
+		s := custom.String
+		o.CustomIcon = &s
+	}
 	var perr error
 	if o.StartsAt, perr = timeutil.ParseFlexible(starts); perr != nil {
 		return o, perr
@@ -370,7 +436,7 @@ func (s *Store) QuestToEvent(ctx context.Context, id int64) (Event, error) {
 		return Event{}, err
 	}
 	if err := s.TrashQuest(ctx, id, q.Title); err != nil {
-		_ = s.DeleteEvent(ctx, saved.ID)
+		_ = s.DeleteEvent(ctx, saved.ID, "")
 		return Event{}, err
 	}
 	return saved, nil

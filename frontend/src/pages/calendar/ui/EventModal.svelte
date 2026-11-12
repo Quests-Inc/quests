@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { createEvent, deleteEvent, updateEvent } from '@/shared/api/client.ts'
+  import {
+    clearEventIcon,
+    createEvent,
+    deleteEvent,
+    updateEvent,
+    uploadEventIcon,
+  } from '@/shared/api/client.ts'
   import { EVENT_COLOR, EVENT_ICONS, eventPhrase } from '@/shared/lib/event.ts'
   import { ColorIconPicker } from '@/entities/questline'
   import { localInputToUtcIso, parseApiDate, toLocalInputValue } from '@/shared/lib/time.ts'
@@ -9,20 +15,24 @@
   import ModalFoot from '@/shared/ui/ModalFoot.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
+  import RefText from '@/shared/ui/RefText.svelte'
   import TimeSelect from '@/shared/ui/TimeSelect.svelte'
 
   let {
     open = false,
     event = null,
     dayKey = '',
+    labels = {},
     onClose,
     onSaved,
     quests = [],
     onOpenQuest,
+    onRef,
   }: {
     open: boolean
     event?: EventRead | null
     dayKey?: string
+    labels?: Record<string, string>
     onClose: () => void
     onSaved: () => void
     quests?: {
@@ -35,12 +45,16 @@
       event_title?: string | null
     }[]
     onOpenQuest?: (id: number) => void
+    onRef?: (kind: string, id: number) => void
   } = $props()
 
   let title = $state('')
   let description = $state('')
   let color = $state(EVENT_COLOR)
   let icon = $state('calendar')
+  let iconUrl = $state((null as string | null))
+  let pendingFile = $state((null as File | null))
+  let clearCustom = $state(false)
   let allDay = $state(true)
   let startDate = $state('')
   let startHour = $state('00')
@@ -76,11 +90,14 @@
   $effect(() => {
     if (!open) return
     formError = ''
+    pendingFile = null
+    clearCustom = false
     if (event?.id) {
       title = event.title
       description = event.description || ''
       color = event.color || EVENT_COLOR
       icon = event.icon || 'calendar'
+      iconUrl = event.icon_url || null
       allDay = Boolean(event.all_day)
       const start = parts(event.starts_at)
       startDate = start.date
@@ -102,6 +119,7 @@
     description = ''
     color = EVENT_COLOR
     icon = 'calendar'
+    iconUrl = null
     allDay = true
     startDate = dayKey || ''
     endDate = dayKey || ''
@@ -154,8 +172,13 @@
         color,
         icon,
       }
-      if (event?.id) await updateEvent(event.id, payload)
-      else await createEvent(payload)
+      let saved = event?.id ? await updateEvent(event.id, payload) : await createEvent(payload)
+      if (pendingFile && saved?.id) {
+        saved = await uploadEventIcon(saved.id, pendingFile)
+      } else if (clearCustom && event?.id && iconUrl) {
+        saved = await clearEventIcon(event.id)
+      }
+      void saved
       onSaved()
       onClose()
     } catch (err) {
@@ -196,7 +219,15 @@
       <span class="label">Описание</span>
       <textarea rows="3" bind:value={description}></textarea>
     </label>
-    <ColorIconPicker bind:color bind:icon icons={EVENT_ICONS} allowUpload={false} ownerLabel="этого события" />
+    <ColorIconPicker
+      bind:color
+      bind:icon
+      {iconUrl}
+      bind:pendingFile
+      bind:clearCustom
+      icons={EVENT_ICONS}
+      ownerLabel="этого события"
+    />
     {#if event?.id}
       {@const linked = quests.filter((q) => q.event_id === event.id)}
       {#if linked.length}
@@ -206,7 +237,9 @@
             {#each linked as q (q.id)}
               <li>
                 <button type="button" class="event-quests__quest" onclick={() => onOpenQuest?.(q.id)}>{q.title}</button>
-                <span class="event-quests__phrase">{eventPhrase({ ...q, event_title: title || event.title })}</span>
+                <span class="event-quests__phrase">
+                  <RefText source={eventPhrase({ ...q, event_id: event.id }, { asRef: true })} {labels} {onRef} />
+                </span>
               </li>
             {/each}
           </ul>

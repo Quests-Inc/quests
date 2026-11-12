@@ -86,7 +86,7 @@ func TestEventStoreRoundTrip(t *testing.T) {
 	created.EndsAt = end.Add(time.Hour)
 	created.Color = "#c47a20"
 	created.Icon = "flag"
-	if _, err := st.UpdateEvent(ctx, created); err != nil {
+	if _, _, err := st.UpdateEvent(ctx, created); err != nil {
 		t.Fatal(err)
 	}
 	q, err = st.GetQuest(ctx, q.ID)
@@ -97,7 +97,7 @@ func TestEventStoreRoundTrip(t *testing.T) {
 		t.Fatalf("recomputed title: %+v", q.EventTitle)
 	}
 
-	if err := st.DeleteEvent(ctx, created.ID); err != nil {
+	if err := st.DeleteEvent(ctx, created.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	q, err = st.GetQuest(ctx, q.ID)
@@ -110,10 +110,10 @@ func TestEventStoreRoundTrip(t *testing.T) {
 	if q.DeadlineAt == nil {
 		t.Fatal("resolved deadline stays")
 	}
-	if err := st.DeleteEvent(ctx, created.ID); !errors.Is(err, ErrNotFound) {
+	if err := st.DeleteEvent(ctx, created.ID, ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("second delete: %v", err)
 	}
-	if _, err := st.UpdateEvent(ctx, created); !errors.Is(err, ErrNotFound) {
+	if _, _, err := st.UpdateEvent(ctx, created); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("update missing: %v", err)
 	}
 

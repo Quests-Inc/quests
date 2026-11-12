@@ -16,5 +16,6 @@ test('event phrase names the edge, the direction and the title', () => {
   expect(
     eventPhrase({ event_id: 1, event_title: 'День', event_edge: 'end', event_dir: 'after', event_offset_seconds: 120 })
   ).toBe('через 2 мин после конца «День»')
+  expect(eventPhrase({ event_id: 1, event_title: 'День', event_edge: 'end' }, { asRef: true })).toBe('в конце event=1')
   expect(eventPhrase({})).toBe('')
 })

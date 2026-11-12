@@ -3,6 +3,7 @@
   import { parseApiDate } from '@/shared/lib/time.ts'
   import { QUEST_STATUS_LABELS } from '@/shared/api/client.ts'
   import { statusColor } from '@/entities/quest'
+  import { QuestlineIcon } from '@/entities/questline'
   import Icon from '@/shared/ui/Icon.svelte'
   import DateInput from '@/shared/ui/DateInput.svelte'
   import RefText from '@/shared/ui/RefText.svelte'
@@ -50,16 +51,12 @@
   } = $props()
 
   function openQuestMenu(event: MouseEvent, id: number) {
-    event.preventDefault()
-    event.stopPropagation()
-    onQuestContextMenu?.(event, id)
+    event.preventDefault(); event.stopPropagation(); onQuestContextMenu?.(event, id)
   }
 
   function openDayMenu(event: MouseEvent, key: string) {
-    const t = event.target as HTMLElement
-    if (t.closest?.('.cal-card')) return
-    event.preventDefault()
-    event.stopPropagation()
+    if ((event.target as HTMLElement).closest?.('.cal-card')) return
+    event.preventDefault(); event.stopPropagation()
     dayMenu = { open: true, x: event.clientX, y: event.clientY, key }
   }
 
@@ -74,7 +71,6 @@
     ...(onCreateEvent ? [{ id: 'create', label: 'Создать событие' }] : []),
     ...(onOpenHistory ? [{ id: 'history', label: 'История дня' }] : []),
   ])
-
   const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
   const HOUR_TICKS = [0, 6, 12, 18, 24]
 
@@ -223,6 +219,7 @@
         title: String(ev.title || '?'),
         color: eventColor(ev.color),
         icon: ev.icon || 'calendar',
+        iconUrl: ev.icon_url || null,
         left,
         width: clipped.point ? 0 : Math.max(rawW, 0.004),
         point: clipped.point,
@@ -423,7 +420,9 @@
     title={event.title}
     onclick={() => onEditEvent?.(event)}
   >
-    <span class="cal-event__icon"><Icon name={event.icon || 'calendar'} size={12} /></span>
+    <span class="cal-event__icon">
+      <QuestlineIcon icon={event.icon || 'calendar'} iconUrl={event.icon_url || null} size="sm" />
+    </span>
     <span class="cal-event__title">{event.title}</span>
   </button>
 {/snippet}
@@ -632,7 +631,7 @@
                     onclick={() => onEditEvent?.(row.event)}
                   >
                     <span class="day-board__icon" style:color={row.color} aria-hidden="true">
-                      <Icon name={row.icon} size={12} />
+                      <QuestlineIcon icon={row.icon} iconUrl={row.iconUrl} size="sm" />
                     </span>
                     <span class="day-board__title">{row.title}</span>
                   </button>

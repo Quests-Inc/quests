@@ -226,6 +226,7 @@ export interface Event {
   AllDay: boolean;
   Color: string;
   Icon: string;
+  CustomIcon?: string;
   CreatedAt: string;
   UpdatedAt: string;
 }
@@ -241,6 +242,8 @@ export interface EventRead {
   all_day: boolean;
   color: string;
   icon: string;
+  custom_icon?: string;
+  icon_url?: string;
   created_at: string;
   updated_at: string;
 }

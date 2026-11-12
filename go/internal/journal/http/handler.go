@@ -65,6 +65,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/calendar/events/{id}", h.getEvent)
 	mux.HandleFunc("PATCH /api/calendar/events/{id}", h.patchEvent)
 	mux.HandleFunc("DELETE /api/calendar/events/{id}", h.deleteEvent)
+	mux.HandleFunc("GET /api/calendar/events/{id}/icon", h.getEventIcon)
+	mux.HandleFunc("POST /api/calendar/events/{id}/icon", h.postEventIcon)
+	mux.HandleFunc("DELETE /api/calendar/events/{id}/icon", h.deleteEventIcon)
 
 	mux.HandleFunc("GET /api/questlines", h.listQuestlines)
 	mux.HandleFunc("POST /api/questlines", h.createQuestline)

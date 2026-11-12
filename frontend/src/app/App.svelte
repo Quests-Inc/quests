@@ -119,7 +119,7 @@
   let historyNonce = $state(0)
   let categories = $state([])
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
-  let calendarEvents: { id: number, title?: string, description?: string, color?: string, icon?: string, all_day?: boolean, starts_at?: string }[] = $state([])
+  let calendarEvents: { id: number, title?: string, description?: string, color?: string, icon?: string, icon_url?: string | null, all_day?: boolean, starts_at?: string }[] = $state([])
 
   let secretsOpen = $state(false)
   /** entity the secrets modal opens on (context menu → «Секреты»), or null */
@@ -626,6 +626,7 @@
       onSelectQuest={selectQuestFromUi}
       onOpenHistory={openHistoryDay}
       onQuestContextMenu={(event, id) => desk.menu.openQuest(event, { id })}
+      onChanged={() => load({ silent: true })}
     />
   {:else if nav.view === 'notes'}
     <div class="journal__notes">

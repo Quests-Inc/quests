@@ -33,7 +33,11 @@ test('questTimer: нет срока, закрытый или просрочен�
   expect(questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active' }, now)).toBeNull()
   const t = questTimer({ deadline_at: '2026-03-01T10:30:00Z', status: 'active', duration_seconds: 3600 }, now)
   expect(t).toMatchObject({ rem: 1800, label: '30:00', tone: 'orange', detailLabel: '30:00 / 1:00:00' })
-  expect(questTimer({ deadline_at: '2026-03-01T10:30:00Z', status: 'active' }, now).tone).toBeNull()
+  // Without a window the remaining time is coloured against a week.
+  expect(questTimer({ deadline_at: '2026-03-01T10:30:00Z', status: 'active' }, now).tone).toBe('red')
+  expect(questTimer({ deadline_at: '2026-03-10T10:00:00Z', status: 'active', duration_seconds: 0 }, now).tone).toBe(
+    'green'
+  )
 })
 
 import { KINDS, detailOf } from '../../src/entities/history/model/historyKinds.ts'

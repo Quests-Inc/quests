@@ -607,7 +607,7 @@
         <dt>Срок ({tzLabel})</dt>
         <dd>{formatLocal(q.deadline_at)}</dd>
         {#if q.event_id}
-          <dd>{eventPhrase(q)}</dd>
+          <dd><RefText source={eventPhrase(q, { asRef: true })} {labels} {onRef} /></dd>
         {/if}
       </div>
     {/if}
@@ -672,7 +672,11 @@
 
       {#if selected.questline_id}
         {#key selected.questline_id}
-          <ValueTable owner={{ kind: 'questline', id: Number(selected.questline_id) }} onEffective={(text) => (lineValues = text)} />
+          <ValueTable
+            variant="hidden"
+            owner={{ kind: 'questline', id: Number(selected.questline_id) }}
+            onEffective={(text) => (lineValues = text)}
+          />
         {/key}
       {/if}
       {#if lineMeta.description}
