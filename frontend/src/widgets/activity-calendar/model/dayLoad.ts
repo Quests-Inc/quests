@@ -1,4 +1,4 @@
-import { QUEST_STATUS_LABELS } from '@/shared/api/client.ts'
+import { QUEST_STATUS_LABELS } from '@/shared/api/questConsts.ts'
 import type { EventRead } from '@/shared/api/journal.gen'
 import { parseApiDate } from '@/shared/lib/time.ts'
 
