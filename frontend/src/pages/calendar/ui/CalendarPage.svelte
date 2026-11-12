@@ -2,8 +2,10 @@
   import { onMount } from 'svelte'
   import { listEvents } from '@/shared/api/client.ts'
   import type { EventRead } from '@/shared/api/journal.gen'
+  import { parseApiDate } from '@/shared/lib/time.ts'
   import { questCatalog } from '@/entities/quest'
   import { ActivityCalendar } from '@/widgets/activity-calendar'
+  import { dayKey } from '@/widgets/activity-calendar/model/day.ts'
   import EventModal from './EventModal.svelte'
 
   let {
@@ -27,6 +29,8 @@
   let modalOpen = $state(false)
   let editing: EventRead | null = $state(null)
   let createDay = $state('')
+  let focusReq: { key: string; n: number } | null = $state(null)
+  let focusN = 0
 
   async function reload() {
     try {
@@ -40,6 +44,13 @@
 
   let pendingId = 0
 
+  function focusEventDay(row: EventRead) {
+    const start = parseApiDate(row.starts_at)
+    if (!start) return
+    focusN += 1
+    focusReq = { key: dayKey(start), n: focusN }
+  }
+
   function openById(id: number) {
     const row = events.find((e) => e.id === id)
     if (!row) {
@@ -47,7 +58,7 @@
       return
     }
     pendingId = 0
-    openEdit(row)
+    focusEventDay(row)
   }
 
   onMount(() => {
@@ -80,6 +91,7 @@
     {quests}
     {events}
     {labels}
+    {focusReq}
     {onRef}
     {onSelectQuest}
     {onQuestContextMenu}

@@ -110,7 +110,7 @@
       {/each}
       {#if previewUrl}
         <span class="cip__icon cip__icon--on cip__icon--custom" style="--line-color: {color}" title="Своя иконка">
-          <QuestlineIcon iconUrl={previewUrl} size="md" />
+          <QuestlineIcon iconUrl={previewUrl} size="sm" />
         </span>
       {/if}
     </div>
@@ -186,6 +186,7 @@
     justify-content: center;
     width: 2rem;
     height: 2rem;
+    overflow: hidden;
     border: 1px solid var(--color-border, #333);
     border-radius: var(--radius-sm, 2px);
     background: var(--color-bg-muted, #242424);
@@ -201,6 +202,13 @@
 
   .cip__icon--custom {
     cursor: default;
+    /* Match builtin Icon size={16}; QuestlineIcon sm is for denser chrome. */
+    color: var(--line-color, currentColor);
+  }
+
+  .cip__icon--custom :global(.ql-icon--custom) {
+    width: 1rem;
+    height: 1rem;
   }
 
   .cip__custom {

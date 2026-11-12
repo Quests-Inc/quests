@@ -171,10 +171,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-}
-
-.journal__calendar {
-  padding: var(--space-5, 1.5rem) var(--space-6, 2rem);
+  /* No top padding: sticky period nav must sit flush under the journal header. */
+  padding: 0 var(--space-6, 2rem) var(--space-5, 1.5rem);
   display: flex;
   flex-direction: column;
 }

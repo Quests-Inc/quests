@@ -171,9 +171,10 @@ export function createNavigation(deps: {
     if (kind === 'template') deps.openTemplate(id)
     if (kind === 'event') {
       slideTo('calendar')
-      replaceSearch({ tab: 'calendar', event: id })
+      replaceSearch({ event: id })
       view = 'calendar'
-      window.dispatchEvent(new CustomEvent('quests:open-event', { detail: id }))
+      // After the calendar tab mounts and subscribes to quests:open-event.
+      queueMicrotask(() => window.dispatchEvent(new CustomEvent('quests:open-event', { detail: id })))
     }
   }
 

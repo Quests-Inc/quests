@@ -125,5 +125,8 @@ test('openRef: разбор ссылок по видам', () => {
   expect(nav.view).toBe('notes')
   nav.openRef('attachment', 3)
   expect(nav.view).toBe('attachments')
+  nav.openRef('event', 9)
+  expect(nav.view).toBe('calendar')
+  expect(url()).toBe('/?event=9')
   nav.openRef('unknown', 1)
 })

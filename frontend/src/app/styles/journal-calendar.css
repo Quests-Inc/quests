@@ -13,13 +13,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4, 1rem);
+  padding-top: var(--space-5, 1.5rem);
 }
 
 .activity-cal__head {
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3, 0.75rem);
 }
 
 .activity-cal__title {
@@ -30,31 +28,136 @@
   color: var(--color-fg, #e8e8e8);
 }
 
-.activity-cal__period {
-  display: flex;
-  flex-wrap: wrap;
+.activity-cal__toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'scale today'
+    'period period';
   align-items: center;
-  gap: var(--space-3, 0.75rem);
+  column-gap: var(--space-3, 0.75rem);
+  row-gap: var(--space-3, 0.75rem);
 }
 
-.activity-cal__period-field {
-  display: inline-flex;
+.activity-cal__scale {
+  grid-area: scale;
+  min-width: 0;
+}
+
+.activity-cal__today {
+  grid-area: today;
+  justify-self: end;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-ui, sans-serif);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.activity-cal__today-icon {
+  display: none;
+}
+
+/* Narrow: only period flipping sticks under the journal header. */
+.activity-cal__period-nav {
+  grid-area: period;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: var(--space-2, 0.5rem);
+  margin: 0 calc(-1 * var(--space-6, 2rem));
+  padding: var(--space-2, 0.5rem) var(--space-6, 2rem);
+  border-bottom: 1px solid var(--color-border, #333);
+  background: var(--color-bg, #121212);
+}
+
+.activity-cal__period-label {
+  min-width: 10rem;
+  text-align: center;
   font-family: var(--font-ui, sans-serif);
   font-size: var(--text-sm, 0.875rem);
-  color: var(--color-fg-muted, #9a9a9a);
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--color-fg, #e8e8e8);
 }
 
-.activity-cal__period-field input[type='date'] {
-  height: 2rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--color-border, #333);
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-bg-muted, #242424);
-  color: var(--color-fg, #e8e8e8);
-  font: inherit;
-  color-scheme: dark;
+/* Wide: slider + period + today on one sticky row; н/м/с/г and calendar icon. */
+@media (min-width: 720px) {
+  .activity-cal__toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    /* Equal side columns keep ‹ период › on the true center line. */
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: 'scale period today';
+    margin: 0 calc(-1 * var(--space-6, 2rem));
+    padding: var(--space-2, 0.5rem) var(--space-6, 2rem);
+    border-bottom: 1px solid var(--color-border, #333);
+    background: var(--color-bg, #121212);
+  }
+
+  .activity-cal__scale {
+    justify-self: start;
+  }
+
+  .activity-cal__today {
+    justify-self: end;
+  }
+
+  .activity-cal__scale .opt-slider__full {
+    display: none;
+  }
+
+  .activity-cal__scale .opt-slider__short {
+    display: inline;
+  }
+
+  .activity-cal__scale .opt-slider__opt {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.55rem;
+  }
+
+  .activity-cal__today {
+    width: 2rem;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0;
+  }
+
+  .activity-cal__today-text {
+    display: none;
+  }
+
+  .activity-cal__today-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .activity-cal__period-nav {
+    position: static;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .activity-cal__period-label {
+    min-width: 8rem;
+  }
+}
+
+.activity-cal__stage {
+  display: grid;
+  grid-template: minmax(0, auto) / minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.activity-cal__slide {
+  grid-area: 1 / 1;
+  min-width: 0;
 }
 
 .activity-cal__months {
@@ -177,7 +280,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.35rem;
+  padding: 0.15rem;
   scrollbar-width: thin;
 }
 
@@ -518,10 +622,12 @@
 }
 
 .day-board__bar.day-tl__bar--event {
-  border-radius: 0.45rem;
+  border-radius: 3px;
   opacity: 1;
-  background: color-mix(in srgb, var(--event-color, #5a8a9a) 42%, var(--color-bg-muted, #242424));
-  box-shadow: inset 0 0 8px color-mix(in srgb, var(--event-color, #5a8a9a) 55%, transparent);
+  border: 0;
+  border-left: 3px solid var(--event-color, #5a8a9a);
+  background: color-mix(in srgb, var(--event-color, #5a8a9a) 14%, var(--color-bg-muted, #242424));
+  box-shadow: none;
 }
 
 .day-tl__mark {
@@ -662,16 +768,19 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
   width: 100%;
-  margin: 0 0 0.15rem;
-  padding: 0.12rem 0.35rem;
+  margin: 0;
+  padding: 0.12rem 0.35rem 0.12rem 0.4rem;
   border: 0;
-  border-radius: 0.55rem;
-  background: color-mix(in srgb, var(--event-color) 34%, var(--color-bg-raised, #1a1a1a));
-  box-shadow: inset 0 0 10px color-mix(in srgb, var(--event-color) 62%, transparent);
+  border-left: 3px solid var(--event-color);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--event-color) 12%, var(--color-bg-raised, #1a1a1a));
+  box-shadow: none;
   color: var(--color-fg, #e8e8e8);
   font: inherit;
+  font-family: var(--font-ui, sans-serif);
+  font-size: var(--text-xs, 0.75rem);
   text-align: left;
   cursor: pointer;
 }
@@ -679,10 +788,12 @@
 .cal-event__icon {
   display: inline-flex;
   flex-shrink: 0;
+  margin-left: auto;
   color: var(--event-color);
 }
 
 .cal-event__title {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

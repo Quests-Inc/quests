@@ -1,37 +1,34 @@
 <script lang="ts">
   import { tick } from 'svelte'
-  import { parseApiDate } from '@/shared/lib/time.ts'
-  import { QUEST_STATUS_LABELS } from '@/shared/api/client.ts'
+  import { slideTab } from '@/app/model/slideTab.ts'
   import { statusColor } from '@/entities/quest'
   import { QuestlineIcon } from '@/entities/questline'
   import Icon from '@/shared/ui/Icon.svelte'
-  import DateInput from '@/shared/ui/DateInput.svelte'
+  import OptionPills from '@/shared/ui/OptionPills.svelte'
   import RefText from '@/shared/ui/RefText.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import type { EventRead } from '@/shared/api/journal.gen'
+  import { dayKey, eventColor, parseDayKey } from '../model/day.ts'
   import {
-    actualWindow,
-    buildBarCaption,
-    buildBarTip,
-    clipToDay,
-    dayBounds,
-    dayKey,
-    eventBarCaption,
-    eventBarTip,
-    eventColor,
-    formatDayTitle,
-    formatTime,
-    monthEndKey,
-    monthKey,
-    monthStartKey,
-    parseDayKey,
-    sigKey,
-  } from '../model/day.ts'
+    buildBlocks,
+    buildDayLoad,
+    eventsByDayMap,
+    questsByDayMap,
+  } from '../model/dayLoad.ts'
+  import {
+    CAL_SCALES,
+    type CalScale,
+    periodBounds,
+    periodKey as makePeriodKey,
+    periodLabel,
+    shiftPeriodAnchor,
+  } from '../model/period.ts'
 
   let {
     quests = [],
     events = [],
     labels = {},
+    focusReq = null,
     onRef,
     onSelectQuest,
     onQuestContextMenu,
@@ -42,6 +39,8 @@
     quests?: any[],
     events?: EventRead[],
     labels?: Record<string, string>,
+    /** Jump to this day (period + select + scroll). Bump `n` to re-trigger the same day. */
+    focusReq?: { key: string; n: number } | null,
     onRef?: (kind: string, id: number) => void,
     onSelectQuest?: (id: number) => void,
     onQuestContextMenu?: (event: MouseEvent, id: number) => void,
@@ -73,292 +72,76 @@
   ])
   const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
   const HOUR_TICKS = [0, 6, 12, 18, 24]
+  const SCALE_OPTS = CAL_SCALES.map((s) => ({ id: s.id, label: s.label, short: s.short }))
 
-  let rangeFrom: string = $state(monthStartKey(new Date()))
-  let rangeTo: string = $state(monthEndKey(new Date()))
+  const initial = periodBounds('month', new Date())
+  let scale: CalScale = $state('month')
+  let rangeFrom: string = $state(initial.from)
+  let rangeTo: string = $state(initial.to)
+  let periodDir = $state(1)
   let selectedKey: string | null = $state(null)
   let hoveredId: string | null = $state(null)
 
   let rootEl: HTMLElement | null = $state(null)
   let dayMenu = $state({ open: false, x: 0, y: 0, key: '' })
 
-  /** Normalize from ≤ to. */
-  let period = $derived.by(() => {
-    let from = rangeFrom
-    let to = rangeTo
-    if (from > to) {
-      const t = from
-      from = to
-      to = t
-    }
-    return { from, to }
-  })
+  let period = $derived({ from: rangeFrom, to: rangeTo })
+  let slideKey = $derived(makePeriodKey(scale, period.from, period.to))
+  let navLabel = $derived(periodLabel(scale, period.from, period.to))
 
-  /** Cards on the month grid: deadline day, else created day. */
-  let questsByDay: Record<string, { id: number, title: string, status: string, significance: string, timeMs: number, timeLabel: string, done: boolean }[]> = $derived.by(() => {
-    const map: Record<string, any[]> = {}
-    for (const q of quests) {
-      const raw = q?.deadline_at || q?.created_at
-      const d = parseApiDate(raw)
-      if (!d || q?.id == null) continue
-      const key = dayKey(d)
-      const status = String(q.status || 'active')
-      const entry = {
-        id: Number(q.id),
-        title: String(q.title || '?'),
-        status,
-        significance: sigKey(q),
-        timeMs: d.getTime(),
-        timeLabel: formatTime(d),
-        done: status === 'completed',
-      }
-      if (!map[key]) map[key] = []
-      map[key].push(entry)
+  function applyPeriod(next: CalScale, anchor: Date, dir: number) {
+    const b = periodBounds(next, anchor)
+    if (b.from !== rangeFrom || b.to !== rangeTo || next !== scale) {
+      periodDir = dir
+      scale = next
+      rangeFrom = b.from
+      rangeTo = b.to
     }
-    for (const key of Object.keys(map)) {
-      map[key].sort((a, b) => a.timeMs - b.timeMs || a.id - b.id)
+    if (selectedKey && (selectedKey < b.from || selectedKey > b.to)) {
+      selectedKey = null
+      hoveredId = null
     }
-    return map
-  })
-
-  /** Event bands: each day from the start through the last instant before the end. */
-  let eventsByDay: Record<string, EventRead[]> = $derived.by(() => {
-    const map: Record<string, EventRead[]> = {}
-    for (const o of events) {
-      const start = parseApiDate(o.starts_at)
-      const end = parseApiDate(o.ends_at)
-      if (!start || !end) continue
-      const push = (d: Date) => {
-        const key = dayKey(d)
-        if (!map[key]) map[key] = []
-        map[key].push(o)
-      }
-      if (end.getTime() <= start.getTime()) {
-        push(start)
-        continue
-      }
-      const last = new Date(end.getTime() - 1)
-      for (
-        let d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-        d <= last;
-        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
-      ) {
-        push(d)
-      }
-    }
-    return map
-  })
-
-  /** @param month 0-based */
-  function buildMonth(year: number, month: number) {
-    const first = new Date(year, month, 1)
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const startPad = (first.getDay() + 6) % 7
-    const cells: ({ key: string, day: number, items: typeof questsByDay[string] } | null)[] = []
-    for (let i = 0; i < startPad; i++) cells.push(null)
-    for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(year, month, day)
-      const key = dayKey(d)
-      cells.push({ key, day, items: questsByDay[key] || [] })
-    }
-    while (cells.length % 7 !== 0) cells.push(null)
-    const label = first.toLocaleDateString('ru-RU', {
-      month: 'long',
-      year: 'numeric',
-    })
-    return { key: monthKey(first), label, cells }
   }
 
-  let months = $derived.by(() => {
-    void questsByDay
-    const fromD = parseDayKey(period.from)
-    const toD = parseDayKey(period.to)
-    const [fy, fm] = [fromD.getFullYear(), fromD.getMonth()]
-    const [ty, tm] = [toD.getFullYear(), toD.getMonth()]
-    const out: ReturnType<typeof buildMonth>[] = []
-    let y = fy
-    let m = fm
-    while (y < ty || (y === ty && m <= tm)) {
-      out.push(buildMonth(y, m))
-      m += 1
-      if (m > 11) {
-        m = 0
-        y += 1
-      }
-    }
-    return out
+  function setScale(next: CalScale) {
+    if (next === scale) return
+    const anchor = selectedKey ? parseDayKey(selectedKey) : new Date()
+    const b = periodBounds(next, anchor)
+    const dir = b.from > rangeFrom ? 1 : b.from < rangeFrom ? -1 : 1
+    applyPeriod(next, anchor, dir)
+  }
+
+  function stepPeriod(dir: number) {
+    const next = shiftPeriodAnchor(scale, parseDayKey(rangeFrom), dir)
+    applyPeriod(scale, next, dir)
+  }
+
+  async function goToDay(key: string) {
+    const dir = key > rangeTo ? 1 : key < rangeFrom ? -1 : periodDir
+    applyPeriod(scale, parseDayKey(key), dir)
+    selectedKey = key
+    hoveredId = null
+    await tick()
+    scrollToSelectedDay()
+  }
+
+  async function goToday() {
+    await goToDay(dayKey(new Date()))
+  }
+
+  let lastFocusN = -1
+  $effect(() => {
+    const req = focusReq
+    if (!req || req.n === lastFocusN) return
+    lastFocusN = req.n
+    void goToDay(req.key)
   })
 
+  let questsByDay = $derived(questsByDayMap(quests))
+  let eventsByDay = $derived(eventsByDayMap(events))
+  let months = $derived(buildBlocks(scale, period.from, period.to, questsByDay))
   let todayKey = $derived(dayKey(new Date()))
-
-  /**
-   * Day board: one row per quest with a deadline window on this day,
-   * no-window creates, and the event log.
-   */
-  let dayLoad = $derived.by(() => {
-    if (!selectedKey) return null
-    const { start: dayStart, end: dayEnd } = dayBounds(selectedKey)
-    const dayMs = dayEnd.getTime() - dayStart.getTime()
-
-    const eventRows: any[] = []
-    for (const ev of events) {
-      const start = parseApiDate(ev.starts_at)
-      const end = parseApiDate(ev.ends_at)
-      if (!start || !end || ev.id == null) continue
-      const win = { start, end: end.getTime() <= start.getTime() ? start : end }
-      const clipped = clipToDay(win, dayStart, dayEnd)
-      if (!clipped) continue
-      const fromPrev = win.start < dayStart
-      const toNext = win.end > dayEnd
-      const endToday = win.end > dayStart && win.end <= dayEnd
-      const left = (clipped.startMs - dayStart.getTime()) / dayMs
-      const rawW = (clipped.endMs - clipped.startMs) / dayMs
-      eventRows.push({
-        id: Number(ev.id),
-        event: ev,
-        title: String(ev.title || '?'),
-        color: eventColor(ev.color),
-        icon: ev.icon || 'calendar',
-        iconUrl: ev.icon_url || null,
-        left,
-        width: clipped.point ? 0 : Math.max(rawW, 0.004),
-        point: clipped.point,
-        fromPrev,
-        toNext,
-        caption: eventBarCaption(ev, win, fromPrev, endToday),
-        tip: eventBarTip(ev, win, fromPrev, endToday),
-      })
-    }
-    eventRows.sort((a, b) => a.left - b.left || b.width - a.width || a.id - b.id)
-
-    const onBoard: Set<number> = new Set()
-    const rows: any[] = []
-    for (const q of quests) {
-      const win = actualWindow(q)
-      if (!win || q?.id == null) continue
-      const clipped = clipToDay(win, dayStart, dayEnd)
-      if (!clipped) continue
-
-      const status = String(q.status || 'active')
-      const fromPrev = win.start < dayStart
-      const toNext = win.end >= dayEnd
-      const endToday = win.end >= dayStart && win.end < dayEnd
-
-      let markMs: number | null = null
-      let markKind: 'deadline' | 'completed' | 'failed' | null = null
-      if (win.finish && win.finish >= dayStart && win.finish < dayEnd) {
-        markMs = win.finish.getTime()
-        markKind = win.markKind
-      } else if (!win.finish && endToday) {
-        markMs = win.end.getTime()
-        markKind = 'deadline'
-      }
-
-      const left = (clipped.startMs - dayStart.getTime()) / dayMs
-      const rawW = (clipped.endMs - clipped.startMs) / dayMs
-      const width = clipped.point ? 0 : Math.max(rawW, 0.004)
-      const id = Number(q.id)
-      onBoard.add(id)
-
-      rows.push({
-        id,
-        title: String(q.title || '?'),
-        status,
-        significance: sigKey(q),
-        left,
-        width,
-        startMs: clipped.startMs,
-        endMs: clipped.endMs,
-        marker: markMs != null ? (markMs - dayStart.getTime()) / dayMs : null,
-        markKind,
-        point: clipped.point,
-        fromPrev,
-        toNext,
-        caption: buildBarCaption(q, win, fromPrev, endToday, markKind),
-        tip: buildBarTip(q, win, fromPrev, endToday),
-      })
-    }
-
-    rows.sort(
-      (a, b) =>
-        a.left - b.left || b.width - a.width || a.id - b.id,
-    )
-
-    /** Created today, no board row (load undefined — keep off the strip). */
-    const noWindow: any[] = []
-    for (const q of quests) {
-      if (q?.id == null) continue
-      const id = Number(q.id)
-      if (onBoard.has(id)) continue
-      const created = parseApiDate(q.created_at)
-      if (!created || created < dayStart || created >= dayEnd) continue
-      noWindow.push({
-        id,
-        title: String(q.title || '?'),
-        status: String(q.status || 'active'),
-        significance: sigKey(q),
-        timeLabel: formatTime(created),
-      })
-    }
-    noWindow.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel) || a.id - b.id)
-
-    const log: any[] = []
-    for (const q of quests) {
-      if (q?.id == null) continue
-      const created = parseApiDate(q.created_at)
-      if (created && created >= dayStart && created < dayEnd) {
-        log.push({
-          kind: 'issued',
-          label: 'выдан',
-          at: created,
-          timeLabel: formatTime(created),
-          quest: q,
-        })
-      }
-      const completed = parseApiDate(q.completed_at)
-      if (completed && completed >= dayStart && completed < dayEnd) {
-        log.push({
-          kind: 'completed',
-          label: QUEST_STATUS_LABELS.completed ?? 'выполнен',
-          at: completed,
-          timeLabel: formatTime(completed),
-          quest: q,
-        })
-      }
-      const updated = parseApiDate(q.updated_at)
-      const st = String(q.status || '')
-      if (
-        updated &&
-        updated >= dayStart &&
-        updated < dayEnd &&
-        (st === 'failed' || st === 'expired' || st === 'archived')
-      ) {
-        const sameCreate =
-          created && Math.abs(created.getTime() - updated.getTime()) < 2000
-        if (!sameCreate) {
-          log.push({
-            kind: st,
-            label: QUEST_STATUS_LABELS[st] ?? st,
-            at: updated,
-            timeLabel: formatTime(updated),
-            quest: q,
-          })
-        }
-      }
-    }
-    log.sort(
-      (a, b) => a.at.getTime() - b.at.getTime() || Number(a.quest.id) - Number(b.quest.id),
-    )
-
-    return {
-      key: selectedKey,
-      title: formatDayTitle(selectedKey),
-      rows,
-      eventRows,
-      noWindow,
-      events: log,
-    }
-  })
+  let dayLoad = $derived(selectedKey ? buildDayLoad(selectedKey, quests, events) : null)
 
   let hoveredCaption = $derived.by(() => {
     if (!hoveredId || !dayLoad) return ''
@@ -380,13 +163,7 @@
     if (!selectedKey) return
     const d = parseDayKey(selectedKey)
     d.setDate(d.getDate() + delta)
-    const key = dayKey(d)
-    selectedKey = key
-    hoveredId = null
-    if (key < rangeFrom) rangeFrom = key
-    if (key > rangeTo) rangeTo = key
-    await tick()
-    scrollToSelectedDay()
+    await goToDay(dayKey(d))
   }
 
   function scrollToSelectedDay() {
@@ -420,112 +197,154 @@
     title={event.title}
     onclick={() => onEditEvent?.(event)}
   >
+    <span class="cal-event__title">{event.title}</span>
     <span class="cal-event__icon">
       <QuestlineIcon icon={event.icon || 'calendar'} iconUrl={event.icon_url || null} size="sm" />
     </span>
-    <span class="cal-event__title">{event.title}</span>
   </button>
 {/snippet}
 
 <div class="activity-cal" aria-label="Календарь задач" bind:this={rootEl}>
   <header class="activity-cal__head">
     <h2 class="activity-cal__title">Календарь</h2>
-    <div class="activity-cal__period" role="group" aria-label="Период просмотра">
-      <label class="activity-cal__period-field">
-        <span>с</span>
-        <DateInput bind:value={rangeFrom} label="Период с" />
-      </label>
-      <label class="activity-cal__period-field">
-        <span>по</span>
-        <DateInput bind:value={rangeTo} label="Период по" />
-      </label>
-    </div>
   </header>
+  <div class="activity-cal__toolbar">
+    <div class="activity-cal__scale">
+      <OptionPills
+        options={SCALE_OPTS}
+        value={scale}
+        compact
+        label="Масштаб календаря"
+        onToggle={(id) => setScale(id as CalScale)}
+      />
+    </div>
+    <div class="activity-cal__period-nav" role="group" aria-label="Листание периода">
+      <button
+        type="button"
+        class="btn day-load__icon-btn"
+        aria-label="Предыдущий период"
+        onclick={() => stepPeriod(-1)}
+      >
+        ‹
+      </button>
+      <span class="activity-cal__period-label">{navLabel}</span>
+      <button
+        type="button"
+        class="btn day-load__icon-btn"
+        aria-label="Следующий период"
+        onclick={() => stepPeriod(1)}
+      >
+        ›
+      </button>
+    </div>
+    <button
+      type="button"
+      class="btn activity-cal__today"
+      onclick={goToday}
+      title="Сегодня"
+      aria-label="Сегодня"
+    >
+      <span class="activity-cal__today-text">Сегодня</span>
+      <span class="activity-cal__today-icon" aria-hidden="true">
+        <Icon name="calendar" size={16} />
+      </span>
+    </button>
+  </div>
 
-  <div class="activity-cal__months">
-    {#each months as month (month.key)}
-      <section class="activity-cal__month">
-        <h3 class="activity-cal__month-label">{month.label}</h3>
-        <div class="activity-cal__weekdays" aria-hidden="true">
-          {#each WEEKDAYS as w}
-            <span>{w}</span>
-          {/each}
-        </div>
-        <div class="activity-cal__grid" role="grid" aria-label={month.label}>
-          {#each month.cells as cell}
-            {#if cell}
-              <div
-                class="activity-cal__cell"
-                class:activity-cal__cell--today={cell.key === todayKey}
-                class:activity-cal__cell--selected={cell.key === selectedKey}
-                role="gridcell"
-                tabindex="0"
-                data-day-key={cell.key}
-                aria-label="{cell.key}: {cell.items.length} задач"
-                aria-selected={cell.key === selectedKey}
-                onclick={(e) => onCellClick(cell.key, e)}
-                oncontextmenu={(e) => openDayMenu(e, cell.key)}
-                onkeydown={async (e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    const open = selectDay(cell.key)
-                    if (open) {
-                      await tick()
-                      scrollToDayPanel()
-                    }
-                  }
-                }}
-              >
-                <div class="activity-cal__cell-head">
-                  <span class="activity-cal__daynum">{cell.day}</span>
-                  {#if cell.items.length > 0}
-                    {@const doneN = cell.items.filter((i) => i.done).length}
-                    <span class="activity-cal__count">
-                      {#if doneN > 0}
-                        <span class="activity-cal__done" title="Выполнено: {doneN}">
-                          <Icon name="check" size={10} />{doneN}
-                        </span>
-                      {/if}
-                      {cell.items.length}
-                    </span>
-                  {/if}
-                </div>
-                <div class="activity-cal__cards">
-                  {#each eventsByDay[cell.key] || [] as event (event.id)}
-                    {@render eventChip(event, '')}
-                  {/each}
-                  {#if (eventsByDay[cell.key]?.length ?? 0) > 0 && cell.items.length > 0}
-                    <div class="activity-cal__split" role="separator"></div>
-                  {/if}
-                  {#each cell.items as item (item.id)}
-                    <button
-                      type="button"
-                      class="cal-card"
-                      class:cal-card--done={item.done}
-                      data-sig={item.significance}
-                      data-status={item.status}
-                      title={item.title}
-                      onclick={() => onSelectQuest?.(item.id)}
-                      oncontextmenu={(e) => openQuestMenu(e, item.id)}
-                    >
-                      <span
-                        class="cal-card__status"
-                        style:background={statusColor(item.status)}
-                        aria-hidden="true"
-                      ></span>
-                      <RefText class="cal-card__title" source={item.title} {labels} {onRef} />
-                      <span class="cal-card__time">{item.timeLabel}</span>
-                    </button>
-                  {/each}
-                </div>
+  <div class="activity-cal__stage">
+    {#key slideKey}
+      <div
+        class="activity-cal__slide"
+        in:slideTab={{ dir: periodDir }}
+        out:slideTab={{ dir: periodDir, out: true }}
+      >
+        <div class="activity-cal__months">
+          {#each months as month (month.key)}
+            <section class="activity-cal__month">
+              <h3 class="activity-cal__month-label">{month.label}</h3>
+              <div class="activity-cal__weekdays" aria-hidden="true">
+                {#each WEEKDAYS as w}
+                  <span>{w}</span>
+                {/each}
               </div>
-            {:else}
-              <div class="activity-cal__cell activity-cal__cell--empty" aria-hidden="true"></div>
-            {/if}
+              <div class="activity-cal__grid" role="grid" aria-label={month.label}>
+                {#each month.cells as cell}
+                  {#if cell}
+                    <div
+                      class="activity-cal__cell"
+                      class:activity-cal__cell--today={cell.key === todayKey}
+                      class:activity-cal__cell--selected={cell.key === selectedKey}
+                      role="gridcell"
+                      tabindex="0"
+                      data-day-key={cell.key}
+                      aria-label="{cell.key}: {cell.items.length} задач"
+                      aria-selected={cell.key === selectedKey}
+                      onclick={(e) => onCellClick(cell.key, e)}
+                      oncontextmenu={(e) => openDayMenu(e, cell.key)}
+                      onkeydown={async (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          const open = selectDay(cell.key)
+                          if (open) {
+                            await tick()
+                            scrollToDayPanel()
+                          }
+                        }
+                      }}
+                    >
+                      <div class="activity-cal__cell-head">
+                        <span class="activity-cal__daynum">{cell.day}</span>
+                        {#if cell.items.length > 0}
+                          {@const doneN = cell.items.filter((i) => i.done).length}
+                          <span class="activity-cal__count">
+                            {#if doneN > 0}
+                              <span class="activity-cal__done" title="Выполнено: {doneN}">
+                                <Icon name="check" size={10} />{doneN}
+                              </span>
+                            {/if}
+                            {cell.items.length}
+                          </span>
+                        {/if}
+                      </div>
+                      <div class="activity-cal__cards">
+                        {#each eventsByDay[cell.key] || [] as event (event.id)}
+                          {@render eventChip(event, '')}
+                        {/each}
+                        {#if (eventsByDay[cell.key]?.length ?? 0) > 0 && cell.items.length > 0}
+                          <div class="activity-cal__split" role="separator"></div>
+                        {/if}
+                        {#each cell.items as item (item.id)}
+                          <button
+                            type="button"
+                            class="cal-card"
+                            class:cal-card--done={item.done}
+                            data-sig={item.significance}
+                            data-status={item.status}
+                            title={item.title}
+                            onclick={() => onSelectQuest?.(item.id)}
+                            oncontextmenu={(e) => openQuestMenu(e, item.id)}
+                          >
+                            <span
+                              class="cal-card__status"
+                              style:background={statusColor(item.status)}
+                              aria-hidden="true"
+                            ></span>
+                            <RefText class="cal-card__title" source={item.title} {labels} {onRef} />
+                            <span class="cal-card__time">{item.timeLabel}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="activity-cal__cell activity-cal__cell--empty" aria-hidden="true"></div>
+                  {/if}
+                {/each}
+              </div>
+            </section>
           {/each}
         </div>
-      </section>
-    {/each}
+      </div>
+    {/key}
   </div>
 
   {#if dayLoad}

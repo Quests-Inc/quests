@@ -8,6 +8,8 @@
   type PillOption = {
     id: string,
     label: string,
+    /** Compact label; shown instead of `label` when the parent opts in via CSS. */
+    short?: string,
     kind?: 'status' | 'sig' | 'cat',
     color?: string,
     none?: boolean,
@@ -69,8 +71,14 @@
       aria-pressed={multi ? on : undefined}
       {disabled}
       onclick={() => choose(opt.id)}
+      title={opt.short ? opt.label : undefined}
     >
-      {opt.label}
+      {#if opt.short}
+        <span class="opt-slider__full">{opt.label}</span>
+        <span class="opt-slider__short">{opt.short}</span>
+      {:else}
+        {opt.label}
+      {/if}
     </button>
   {/each}
 </div>

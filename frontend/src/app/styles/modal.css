@@ -420,6 +420,11 @@
   cursor: not-allowed;
 }
 
+/* Dual labels: parent shows .opt-slider__short (e.g. calendar wide toolbar). */
+.opt-slider__short {
+  display: none;
+}
+
 /* Portrait: wrap into rows rather than scrolling sideways. */
 @media (orientation: portrait) {
   .opt-slider {
