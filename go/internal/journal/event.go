@@ -189,8 +189,13 @@ func (s *Store) UpdateEvent(ctx context.Context, o Event) (Event, []int64, error
 	if err := validEvent(&o); err != nil {
 		return Event{}, nil, err
 	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Event{}, nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
 	o.UpdatedAt = timeutil.NowUTC()
-	res, err := s.DB.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		UPDATE event SET title=?, description=?, starts_at=?, ends_at=?, all_day=?, color=?, icon=?, updated_at=?
 		WHERE id=?`,
 		o.Title, o.Description, timeutil.ToDBUTC(o.StartsAt), timeutil.ToDBUTC(o.EndsAt), boolInt(o.AllDay),
@@ -204,8 +209,11 @@ func (s *Store) UpdateEvent(ctx context.Context, o Event) (Event, []int64, error
 	if n == 0 {
 		return Event{}, nil, ErrNotFound
 	}
-	ids, err := s.recomputeEventQuests(ctx, o)
+	ids, err := s.recomputeEventQuests(ctx, tx, o)
 	if err != nil {
+		return Event{}, nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return Event{}, nil, err
 	}
 	saved, err := s.GetEvent(ctx, o.ID)
@@ -274,7 +282,7 @@ func (s *Store) ClearEventIcon(ctx context.Context, id int64, dataDir string) (E
 }
 
 // ApplyEvent sets or clears a quest's event phrase and writes the resolved deadline.
-// A set phrase has no urgency window: the window belongs to the absolute-deadline form.
+// Changing the source must not change the urgency window or expiry policy.
 func (s *Store) ApplyEvent(ctx context.Context, q *Quest, id *int64, edge, dir string, offset int) error {
 	if id == nil {
 		q.EventID = nil
@@ -299,9 +307,7 @@ func (s *Store) ApplyEvent(ctx context.Context, q *Quest, id *int64, edge, dir s
 		return err
 	}
 	at = timeutil.EnsureUTC(at)
-	zero := 0
 	q.DeadlineAt = &at
-	q.DurationSeconds = &zero
 	q.EventID = id
 	q.EventEdge = edge
 	q.EventDir = dir
@@ -311,8 +317,8 @@ func (s *Store) ApplyEvent(ctx context.Context, q *Quest, id *int64, edge, dir s
 	return nil
 }
 
-func (s *Store) recomputeEventQuests(ctx context.Context, o Event) ([]int64, error) {
-	rows, err := s.DB.QueryContext(ctx, `
+func (s *Store) recomputeEventQuests(ctx context.Context, tx *sql.Tx, o Event) ([]int64, error) {
+	rows, err := tx.QueryContext(ctx, `
 		SELECT id, event_edge, event_dir, COALESCE(event_offset_seconds, 0)
 		FROM quest WHERE event_id = ?`, o.ID)
 	if err != nil {
@@ -351,9 +357,9 @@ func (s *Store) recomputeEventQuests(ctx context.Context, o Event) ([]int64, err
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.DB.ExecContext(ctx, `
-			UPDATE quest SET deadline_at=?, duration_seconds=0, updated_at=? WHERE id=?`,
-			timeutil.ToDBUTC(at), now, r.id); err != nil {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE quest SET deadline_at=?, updated_at=?, status=CASE WHEN status='expired' AND ?::timestamp>?::timestamp THEN 'active' ELSE status END WHERE id=?`,
+			timeutil.ToDBUTC(at), now, timeutil.ToDBUTC(at), now, r.id); err != nil {
 			return nil, err
 		}
 		ids = append(ids, r.id)

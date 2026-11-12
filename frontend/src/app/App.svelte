@@ -146,7 +146,7 @@
         listQuests({}),
         listCategories(),
         listQuestlines(),
-        listNotes().catch((): any[] => []),
+        listNotes({catalog:true}).catch((): any[] => []),
         listAllAttachments().catch((): any => null),
         listEvents().catch((): any[] => []),
       ])

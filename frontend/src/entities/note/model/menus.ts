@@ -2,6 +2,7 @@
 import { compareNotes, isUnder } from './tree.ts'
 
 export interface MenuItem {
+  entity?: { kind: string; id: number }
   id: string
   label?: string
   sep?: boolean
@@ -120,7 +121,12 @@ export function moveTargetItems(note: Row | null, notes: Row[], hasChildren: (id
       items.push({ id: `sep-move-${items.length}`, sep: true })
     }
     for (const n of group) {
-      items.push({ id: `move:${n.id}`, label: n.title || `note=${n.id}`, checked: note?.parent_id === n.id })
+      items.push({
+        id: `move:${n.id}`,
+        entity: { kind: 'note', id: n.id },
+        label: n.title || `note=${n.id}`,
+        checked: note?.parent_id === n.id,
+      })
     }
   }
   return items
@@ -184,7 +190,11 @@ export function moveSearchItems(movedIds: number[], notes: Row[]): MenuItem[] {
     if (movedIds.includes(n.id) || movedIds.some((m) => isUnder(notes, n.id, m))) continue
     const parent = byId(notes, n.parent_id)
     const title = n.title || `note=${n.id}`
-    items.push({ id: `move:${n.id}`, label: parent ? `${title} — ${parent.title || `note=${parent.id}`}` : title })
+    items.push({
+      id: `move:${n.id}`,
+      entity: { kind: 'note', id: n.id },
+      label: parent ? `${title} — ${parent.title || `note=${parent.id}`}` : title,
+    })
   }
   return items
 }

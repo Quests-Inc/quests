@@ -178,19 +178,20 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 		}
 
 		q := journal.Quest{
-			Title:           tmpl.Title,
-			Description:     tmpl.Description,
-			Status:          journal.StatusActive,
-			Significance:    journal.Significance(tmpl.Significance),
-			Pinned:          tmpl.Pinned,
-			OverlayHidden:   tmpl.OverlayHidden,
-			SortOrder:       tmpl.SortOrder,
-			DeadlineAt:      deadline,
-			DurationSeconds: duration,
-			CreatedAt:       now,
-			UpdatedAt:       now,
-			Automated:       tmpl.Automated,
-			Steps:           steps,
+			Title:            tmpl.Title,
+			Description:      tmpl.Description,
+			Status:           journal.StatusActive,
+			Significance:     journal.Significance(tmpl.Significance),
+			Pinned:           tmpl.Pinned,
+			OverlayHidden:    tmpl.OverlayHidden,
+			SortOrder:        tmpl.SortOrder,
+			DeadlineAt:       deadline,
+			DurationSeconds:  duration,
+			ExpireOnDeadline: &tmpl.ExpireOnDeadline,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+			Automated:        tmpl.Automated,
+			Steps:            steps,
 		}
 		if poolFailed {
 			q.Status = journal.StatusFailed
@@ -452,18 +453,19 @@ func materializeManual(ctx context.Context, st *store.Store, hub *events.Hub, te
 	}
 
 	q := journal.Quest{
-		Title:           tmpl.Title,
-		Description:     tmpl.Description,
-		Status:          journal.StatusActive,
-		Significance:    journal.Significance(tmpl.Significance),
-		Pinned:          tmpl.Pinned,
-		SortOrder:       tmpl.SortOrder,
-		DeadlineAt:      deadline,
-		DurationSeconds: duration,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Automated:       tmpl.Automated,
-		Steps:           steps,
+		Title:            tmpl.Title,
+		Description:      tmpl.Description,
+		Status:           journal.StatusActive,
+		Significance:     journal.Significance(tmpl.Significance),
+		Pinned:           tmpl.Pinned,
+		SortOrder:        tmpl.SortOrder,
+		DeadlineAt:       deadline,
+		DurationSeconds:  duration,
+		ExpireOnDeadline: &tmpl.ExpireOnDeadline,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+		Automated:        tmpl.Automated,
+		Steps:            steps,
 	}
 	if tmpl.Significance == "" {
 		q.Significance = journal.SigCommon

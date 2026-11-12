@@ -182,6 +182,28 @@ export function createNoteEditor(deps: {
       if (saving) return
       // Список, полученный до нашего сохранения, несёт более старую строку.
       if (detail?.updated_at && row.updated_at && row.updated_at <= detail.updated_at) return
+      if (row.description_complete === false) {
+        void getNote(id)
+          .then((full) => {
+            if (
+              loadedId !== id ||
+              saving ||
+              (detail?.updated_at && full.updated_at && full.updated_at <= detail.updated_at)
+            )
+              return
+            const next = noteFormFromRow(full)
+            if (noteFormsEqual(next, saved)) return
+            if (noteFormsEqual(formDraft(), saved)) {
+              detail = full
+              saved = next
+              apply(next)
+            } else external = next
+          })
+          .catch((e) => {
+            error = messageOf(e)
+          })
+        return
+      }
       const next = noteFormFromRow(row)
       if (noteFormsEqual(next, saved)) return
       if (noteFormsEqual(formDraft(), saved)) void adoptExternal(id)

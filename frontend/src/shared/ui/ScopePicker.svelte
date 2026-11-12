@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from './SearchState.svelte'
   import { tick } from 'svelte'
   import Icon from './Icon.svelte'
   import { watchPopover } from '@/shared/lib/popover.ts'
@@ -59,11 +61,12 @@
     return `${base} › ${line?.title ?? `квестлайн ${questline}`}`
   })
 
+  const remoteSearch = createEntitySearch(() => sub && query.trim() ? {q:query,types:['questline'],allowed:{questline:linesFor(sub.cat).map(l=>l.id)}} : null)
   const subLines = $derived.by(() => {
     if (!sub) return []
     const all = linesFor(sub.cat)
     const q = query.trim().toLowerCase()
-    return q ? all.filter((l) => l.title.toLowerCase().includes(q)) : all
+    return q ? (remoteSearch.hits ?? []).flatMap(h=>{const line=all.find(l=>l.id===h.id);return line?[line]:[]}) : all
   })
   const subTotal = $derived(sub ? linesFor(sub.cat).length : 0)
 
@@ -285,6 +288,7 @@
           bind:value={query}
           oninput={() => (subIdx = 0)}
         />
+      <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
       {/if}
       <div class="scope__list">
         {#each subLines as l, j (l.id)}

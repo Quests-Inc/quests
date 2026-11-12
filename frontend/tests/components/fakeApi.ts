@@ -112,6 +112,44 @@ export function installFakeApi(data = fixtureData(), opts: { authRequired?: bool
     if (init.body) (bodies[`${method} ${url.pathname}`] ??= []).push(JSON.parse(init.body))
     const p = url.pathname
     const body = init.body && typeof init.body === 'string' ? JSON.parse(init.body) : null
+    if (method === 'POST' && p === '/api/search') {
+      const sources: Record<string, { id: number; title?: string; description?: string }[]> = {
+        quest: data.quests,
+        note: data.notes,
+        questline: data.questlines,
+        step: data.quests.flatMap((q) => q.steps),
+      }
+      const q = String(body.q || '')
+        .trim()
+        .toLowerCase()
+      const identity = /^(?:([a-z]+)\s*[=:]\s*)?(\d+)$/.exec(q)
+      const found = Object.entries(sources).flatMap(([kind, items]) =>
+        items
+          .filter(
+            (x) =>
+              body.types.includes(kind) &&
+              (!body.allowed?.[kind] || body.allowed[kind].includes(x.id)) &&
+              (identity
+                ? (!identity[1] || identity[1] === kind) && Number(identity[2]) === x.id
+                : `${x.title || ''} ${x.description || ''}`.toLowerCase().includes(q))
+          )
+          .map((x) => ({
+            kind,
+            id: x.id,
+            title: x.title,
+            where: identity ? 'id' : 'title',
+            snippet: '',
+            score: identity ? 10000 : 100,
+          }))
+      )
+      const offset = body.offset || 0,
+        limit = body.limit || 30
+      return json({
+        hits: found.slice(offset, offset + limit),
+        more: offset + limit < found.length,
+        next: Math.min(found.length, offset + limit),
+      })
+    }
     if (method === 'POST' && p === '/api/quests') {
       const q = { ...data.quests[0], id: data.quests.length + 1, steps: [], ...body }
       data.quests.push(q)

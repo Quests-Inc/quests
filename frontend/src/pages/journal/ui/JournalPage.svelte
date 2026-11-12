@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import { questCatalog, groupQuestsByCategory, inScope, listOpenOrAll, questSpec, scopeQuestlineChoices, type CategoryScope } from '@/entities/quest'
   import { noteCatalog } from '@/entities/note'
   import { QuestDetail } from '@/widgets/quest-detail'
   import { QuestSidebar } from '@/widgets/quest-sidebar'
   import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
-  import { questMatchesQuery } from '@/shared/lib/search.ts'
   import { parseQuery, passes, setToken, tokenValues } from '@/shared/lib/searchFlags.ts'
 
   let {
@@ -105,7 +106,12 @@
     return questlines.find((l) => (l.title || '').replace(/\s+/g, '_').toLowerCase() === v.toLowerCase())?.id ?? null
   })
   const scopeQuestlinesFor = (cat: CategoryScope) => scopeQuestlineChoices({ scopeCategoryId: cat, questlines, quests, showAll: showAllQuests })
-  let matchedQuests = $derived(quests.filter((q) => questMatchesQuery(q, parsedQuestSearch.text) && passes(parsedQuestSearch, questQuerySpec, q)))
+  const remoteSearch = createEntitySearch(() => searchQuery.trim() ? {q:parsedQuestSearch.text, types:['quest','step'], allowed:{quest:quests.filter(q => passes(parsedQuestSearch,questQuerySpec,q)).map(q=>q.id),step:quests.filter(q => passes(parsedQuestSearch,questQuerySpec,q)).flatMap(q=>(q.steps ?? []).map(s=>s.id))}} : null, {all:true})
+  let matchedQuests = $derived.by(() => {
+    if (remoteSearch.hits == null) return quests.filter(q => passes(parsedQuestSearch,questQuerySpec,q))
+    const ids = new Set(remoteSearch.hits.map(h => h.kind === 'step' ? h.parent_id : h.id))
+    return quests.filter(q => ids.has(q.id))
+  })
   let listedQuests = $derived(listOpenOrAll(matchedQuests, { showAll: showAllQuests, statusTokens: tokenValues(parsedQuestSearch, 'status') }))
   let scopedQuests = $derived(inScope(listedQuests, { categoryId: scopeCategoryId, questlineId: scopeQuestlineId }))
   let byCategory = $derived(groupQuestsByCategory(scopedQuests, categories, questlines))
@@ -146,6 +152,7 @@
 
 <SidebarLayout key="journal" hasSelection={selectedId != null} class="journal__body">
   {#snippet sidebar()}
+  <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
   <QuestSidebar
     {loading}
     {quests}

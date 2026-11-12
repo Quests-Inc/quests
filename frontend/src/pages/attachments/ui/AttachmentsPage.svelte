@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import PageLayout from '@/shared/ui/PageLayout.svelte'
   import PageToolbar from '@/shared/ui/PageToolbar.svelte'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
@@ -129,18 +131,17 @@
   let hiddenCount = $derived(attachments.filter((a) => a.hidden).length)
   let activeCount = $derived(attachments.length - hiddenCount)
 
-  let filtered = $derived.by(() => {
-    const q = parsedSearch.text.toLowerCase()
+  let eligible = $derived.by(() => {
     const out = attachments.filter((a) => {
       if (!passes(parsedSearch, ATT_SPEC, a)) return false
       if (stateFilter === 'active' && a.hidden) return false
-      if (!q) return true
-      return `${a.filename || ''} ${a.comment || ''} ${ownerLabel(a)} ${a.content_type_detected || ''}`
-        .toLowerCase()
-        .includes(q)
+      return true
     })
     return sortAttachments(out, sort)
   })
+  const remoteSearch = createEntitySearch(() => parsedSearch.text.trim() ? {q:parsedSearch.text,types:['attachment'],allowed:{attachment:eligible.map(x=>x.id)}} : null,{all:true})
+  let filtered = $derived(remoteSearch.select(eligible,'attachment'))
+
 
   let groups = $derived.by(() => {
     if (!grouped) return []
@@ -276,6 +277,7 @@
   <PageLayout>
     {#snippet toolbar()}
     <PageToolbar>
+      <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
       <input
         class="search attpage__search"
         type="search"

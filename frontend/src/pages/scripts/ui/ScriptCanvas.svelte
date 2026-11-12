@@ -68,8 +68,8 @@
                     {
                       id: 'gk',
                       label: 'Скрипты',
-                      children: scripts.map((x) => ({ id: `ins:script:${x.id}`, label: x.title })),
-                      search: scripts.map((x) => ({ id: `ins:script:${x.id}`, label: x.title })),
+                      children: scripts.map((x) => ({ id: `ins:script:${x.id}`, entity:{kind:'script',id:x.id}, label: x.title })),
+                      search: scripts.map((x) => ({ id: `ins:script:${x.id}`, entity:{kind:'script',id:x.id}, label: x.title })),
                     },
                   ]
                 : []),

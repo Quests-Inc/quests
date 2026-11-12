@@ -2,6 +2,8 @@ package model
 
 import (
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/overlay/api"
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 	"strings"
 	"time"
 )
@@ -36,35 +38,13 @@ func RemainingSeconds(deadlineAt *string, now time.Time) (int, bool) {
 	return int(deadline.Sub(now.UTC()).Seconds()), true
 }
 
-// IsUrgent is true in [deadline−duration, deadline] or after deadline.
-func IsUrgent(deadlineAt *string, durationSeconds *int, now time.Time) bool {
-	if rem, ok := RemainingSeconds(deadlineAt, now); ok && rem <= 0 {
-		return true
+func deadlineState(q api.Quest, now time.Time) timeutil.DeadlineState {
+	d, ok := parseUTC(q.DeadlineAt)
+	if !ok {
+		return timeutil.DeadlineState{}
 	}
-	deadline, ok := parseUTC(deadlineAt)
-	if !ok || durationSeconds == nil || *durationSeconds <= 0 {
-		return false
-	}
-	start := deadline.Add(-time.Duration(*durationSeconds) * time.Second)
-	// Match Python: start < now (exclusive of the exact start instant).
-	return now.UTC().After(start)
-}
-
-// TimerTone is green|orange|red by remaining fraction of duration.
-func TimerTone(deadlineAt *string, durationSeconds *int, now time.Time) string {
-	rem, ok := RemainingSeconds(deadlineAt, now)
-	if !ok || durationSeconds == nil || *durationSeconds <= 0 {
-		return ""
-	}
-	frac := float64(rem) / float64(*durationSeconds)
-	switch {
-	case frac > 2.0/3.0:
-		return "green"
-	case frac > 1.0/3.0:
-		return "orange"
-	default:
-		return "red"
-	}
+	expire := q.ExpireOnDeadline == nil || *q.ExpireOnDeadline
+	return timeutil.DeadlineAt(&d, q.DurationSeconds, expire, now)
 }
 
 // FormatRemaining renders a countdown like m:ss or h:mm:ss.

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import { untrack } from 'svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -46,11 +48,8 @@
   let uses = $state<ScriptUse[]>([])
   let folded = $state<Set<string>>(new Set())
   let search = $state('')
-  const shown = $derived.by(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return scriptsList.items
-    return scriptsList.items.filter((s) => [s.title, s.description ?? '', ...(s.subjects ?? [])].some((t) => t.toLowerCase().includes(q)))
-  })
+  const remoteSearch = createEntitySearch(() => search.trim() ? {q:search,types:['script']} : null, {all:true})
+  const shown = $derived(remoteSearch.select(scriptsList.items,'script'))
   const groups = $derived(groupScripts(shown, PURPOSES, PURPOSE_NONE))
   function fold(key: string) {
     const next = new Set(folded)
@@ -330,7 +329,8 @@
       </div>
     {:else}
       <div class="scripts__bar">
-        <input type="text" class="scripts__title" bind:value={ed.title} aria-label="Название скрипта" />
+        <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
+      <input type="text" class="scripts__title" bind:value={ed.title} aria-label="Название скрипта" />
         <button type="button" class="btn scripts__ver" title="Посмотреть версии, сравнить или откатить" onclick={() => (versionsOpen = true)}>Версия {ed.version}{ed.dirty ? ' · не сохранён' : ''}</button>
         <div class="detail__actions">
           <button

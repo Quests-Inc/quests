@@ -17,6 +17,7 @@ export interface NoteVerdict {
  * NoteListItem is a note in a list: its fields, the verdict of its check, and — in a popularity sort — why it ranks where it does.
  */
 export interface NoteListItem extends NoteRead, NoteVerdict {
+  description_complete?: boolean;
   popularity?: NotePopularity;
 }
 /**

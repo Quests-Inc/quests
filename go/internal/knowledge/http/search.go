@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/quests-inc/quests/go/internal/knowledge"
+	"github.com/quests-inc/quests/go/internal/platform/search"
 )
 
 // searchNotes ranks notes against a query: stemmed words in Russian and English, prefixes, the
@@ -24,21 +25,16 @@ func (h *Handler) searchNotes(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, "unknown flag: "+want.bad+" (known: "+noteFlagNames+")")
 		return
 	}
-	if want.active() {
-		// Filtering happens after ranking: look at the widest candidate set, then cut to the limit.
-		opts.Limit = 50
+	for _, v := range want.include {
+		opts.Filters = append(opts.Filters, search.Filter{Key: "flag", Values: []string{v}})
+	}
+	for _, v := range want.exclude {
+		opts.Filters = append(opts.Filters, search.Filter{Key: "flag", Values: []string{v}, Not: true})
 	}
 	hits, err := h.Store.SearchNotes(r.Context(), q.Get("q"), opts)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
-	}
-	if want.active() {
-		hits, err = h.filterHitsByFlags(r, hits, want, limit)
-		if err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"q": strings.TrimSpace(q.Get("q")), "hits": hits, "marks": []string{knowledge.MarkOpen, knowledge.MarkClose}})
 }
@@ -105,56 +101,4 @@ func parseNoteFlagFilter(raw string) noteFlagFilter {
 		}
 	}
 	return f
-}
-
-func (h *Handler) filterHitsByFlags(r *http.Request, hits []knowledge.SearchHit, f noteFlagFilter, limit int) ([]knowledge.SearchHit, error) {
-	rows, err := h.Store.ListNotes(r.Context(), knowledge.NoteFilter{})
-	if err != nil {
-		return nil, err
-	}
-	checks, _ := h.Store.NoteChecks(r.Context())
-	byID := make(map[int64]knowledge.Note, len(rows))
-	for _, n := range rows {
-		byID[n.ID] = n
-	}
-	has := func(id int64, flag string) bool {
-		n := byID[id]
-		switch flag {
-		case "outdated":
-			return checks[id].Outdated
-		case "readme":
-			return n.IsReadme
-		case "private":
-			return n.IsPrivate
-		case "category":
-			return n.IsCategory
-		case "pinned":
-			return n.Pinned
-		case "check":
-			return checks[id].Active()
-		}
-		return false
-	}
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
-	out := make([]knowledge.SearchHit, 0, len(hits))
-next:
-	for _, h := range hits {
-		for _, fl := range f.include {
-			if !has(h.ID, fl) {
-				continue next
-			}
-		}
-		for _, fl := range f.exclude {
-			if has(h.ID, fl) {
-				continue next
-			}
-		}
-		out = append(out, h)
-		if len(out) >= limit {
-			break
-		}
-	}
-	return out, nil
 }

@@ -143,7 +143,7 @@ func questTools(c *Client) []Tool {
 			inc := includeSet(a.Include, "steps")
 			out := map[string]any{}
 			for _, k := range []string{"id", "title", "status", "significance", "pinned", "overlay_hidden", "automated", "failure_inbox",
-				"deadline_at", "duration_seconds", "category_id", "category_slug", "questline_id", "questline_title",
+				"deadline_at", "duration_seconds", "expire_on_deadline", "event_id", "event_edge", "event_dir", "event_offset_seconds", "event_title", "category_id", "category_slug", "questline_id", "questline_title",
 				"created_at", "updated_at", "completed_at", "progress_label", "steps_done", "steps_total", "tags"} {
 				if v, ok := q[k]; ok {
 					out[k] = v
@@ -195,21 +195,20 @@ func questTools(c *Client) []Tool {
 		})
 
 	type createArgs struct {
-		Title           string   `json:"title" desc:"plain text"`
-		Description     *string  `json:"description,omitempty" desc:"markdown"`
-		Status          string   `json:"status,omitempty" enum:"active,expired,frozen,completed,failed,archived"`
-		Significance    string   `json:"significance,omitempty" enum:"insignificant,common,uncommon,epic,legendary"`
-		Pinned          *bool    `json:"pinned,omitempty" desc:"always on the HUD; excludes overlay_hidden"`
-		OverlayHidden   *bool    `json:"overlay_hidden,omitempty" desc:"never on the HUD"`
-		Automated       *bool    `json:"automated,omitempty" desc:"fewer overlay toasts"`
-		SortOrder       *int     `json:"sort_order,omitempty"`
-		DeadlineAt      *string  `json:"deadline_at,omitempty" desc:"ISO UTC, e.g. 2026-08-20T10:20:00Z"`
-		DurationSeconds *int     `json:"duration_seconds,omitempty" desc:"reminder window that opens this long before deadline_at"`
-		Category        string   `json:"category,omitempty" desc:"id or name; ignored when questline is given (it inherits)"`
-		Questline       string   `json:"questline" desc:"REQUIRED: id or name of the project this quest belongs to (list_questlines), or \"none\" to deliberately leave it standalone"`
-		Steps           []stepIn `json:"steps,omitempty"`
-		TagIDs          []int64  `json:"tag_ids,omitempty" desc:"pick from list_tags, max 5; a quest without tags is usually a miss"`
-		Quiet           *bool    `json:"quiet,omitempty" desc:"default true: no overlay toast"`
+		Title         string  `json:"title" desc:"plain text"`
+		Description   *string `json:"description,omitempty" desc:"markdown"`
+		Status        string  `json:"status,omitempty" enum:"active,expired,frozen,completed,failed,archived"`
+		Significance  string  `json:"significance,omitempty" enum:"insignificant,common,uncommon,epic,legendary"`
+		Pinned        *bool   `json:"pinned,omitempty" desc:"always on the HUD; excludes overlay_hidden"`
+		OverlayHidden *bool   `json:"overlay_hidden,omitempty" desc:"never on the HUD"`
+		Automated     *bool   `json:"automated,omitempty" desc:"fewer overlay toasts"`
+		SortOrder     *int    `json:"sort_order,omitempty"`
+		deadlineFields
+		Category  string   `json:"category,omitempty" desc:"id or name; ignored when questline is given (it inherits)"`
+		Questline string   `json:"questline" desc:"REQUIRED: id or name of the project this quest belongs to (list_questlines), or \"none\" to deliberately leave it standalone"`
+		Steps     []stepIn `json:"steps,omitempty"`
+		TagIDs    []int64  `json:"tag_ids,omitempty" desc:"pick from list_tags, max 5; a quest without tags is usually a miss"`
+		Quiet     *bool    `json:"quiet,omitempty" desc:"default true: no overlay toast"`
 	}
 	create := Typed("create_quest", "Create a quest (optionally with steps). Returns {id, ok, workspace, status, progress_label}.",
 		func(ctx context.Context, a createArgs) (any, error) {
@@ -238,11 +237,8 @@ func questTools(c *Client) []Tool {
 			if a.SortOrder != nil {
 				body["sort_order"] = *a.SortOrder
 			}
-			if a.DeadlineAt != nil {
-				body["deadline_at"] = *a.DeadlineAt
-			}
-			if a.DurationSeconds != nil {
-				body["duration_seconds"] = *a.DurationSeconds
+			if err := a.put(body); err != nil {
+				return nil, err
 			}
 			ql, err := resolveID(ctx, c, "/api/questlines", a.Questline, "title")
 			if err != nil {
@@ -284,22 +280,23 @@ func questTools(c *Client) []Tool {
 		})
 
 	type updateArgs struct {
-		ID              int64   `json:"id"`
-		Title           *string `json:"title,omitempty"`
-		Description     *string `json:"description,omitempty" desc:"markdown; replaces the whole text"`
-		Status          string  `json:"status,omitempty" enum:"active,expired,frozen,completed,failed,archived"`
-		Significance    string  `json:"significance,omitempty" enum:"insignificant,common,uncommon,epic,legendary"`
-		Pinned          *bool   `json:"pinned,omitempty"`
-		OverlayHidden   *bool   `json:"overlay_hidden,omitempty"`
-		Automated       *bool   `json:"automated,omitempty"`
-		SortOrder       *int    `json:"sort_order,omitempty"`
-		DeadlineAt      *string `json:"deadline_at,omitempty"`
-		DurationSeconds *int    `json:"duration_seconds,omitempty"`
-		CategoryID      *int64  `json:"category_id,omitempty"`
-		QuestlineID     *int64  `json:"questline_id,omitempty"`
-		ClearQuestline  bool    `json:"clear_questline,omitempty"`
-		TagIDs          []int64 `json:"tag_ids,omitempty" desc:"replaces the tag set, max 5"`
-		Quiet           *bool   `json:"quiet,omitempty"`
+		ID            int64   `json:"id"`
+		Title         *string `json:"title,omitempty"`
+		Description   *string `json:"description,omitempty" desc:"markdown; replaces the whole text"`
+		Status        string  `json:"status,omitempty" enum:"active,expired,frozen,completed,failed,archived"`
+		Significance  string  `json:"significance,omitempty" enum:"insignificant,common,uncommon,epic,legendary"`
+		Pinned        *bool   `json:"pinned,omitempty"`
+		OverlayHidden *bool   `json:"overlay_hidden,omitempty"`
+		Automated     *bool   `json:"automated,omitempty"`
+		SortOrder     *int    `json:"sort_order,omitempty"`
+		deadlineFields
+		CategoryID     *int64  `json:"category_id,omitempty"`
+		QuestlineID    *int64  `json:"questline_id,omitempty"`
+		ClearEvent     bool    `json:"clear_event,omitempty" desc:"detach event binding, preserving the resolved date unless deadline_at is given"`
+		ClearDeadline  bool    `json:"clear_deadline,omitempty" desc:"remove any fixed or event-derived deadline"`
+		ClearQuestline bool    `json:"clear_questline,omitempty"`
+		TagIDs         []int64 `json:"tag_ids,omitempty" desc:"replaces the tag set, max 5"`
+		Quiet          *bool   `json:"quiet,omitempty"`
 	}
 	update := Typed("update_quest", "Change a quest's fields or lifecycle (status). Only given fields change. Steps: add_step/update_step/update_steps.",
 		func(ctx context.Context, a updateArgs) (any, error) {
@@ -328,11 +325,18 @@ func questTools(c *Client) []Tool {
 			if a.SortOrder != nil {
 				body["sort_order"] = *a.SortOrder
 			}
-			if a.DeadlineAt != nil {
-				body["deadline_at"] = *a.DeadlineAt
+			if err := a.put(body); err != nil {
+				return nil, err
 			}
-			if a.DurationSeconds != nil {
-				body["duration_seconds"] = *a.DurationSeconds
+			if a.ClearDeadline {
+				body["event_id"] = nil
+				body["deadline_at"] = nil
+			}
+			if a.ClearEvent {
+				if a.EventID != nil {
+					return nil, &Err{422, "clear_event conflicts with event_id"}
+				}
+				body["event_id"] = nil
 			}
 			if a.CategoryID != nil {
 				body["category_id"] = *a.CategoryID

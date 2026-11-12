@@ -58,6 +58,7 @@ export interface TemplateRead {
   emit_chance: number /* float64 */;
   emit_limits: { [key: string]: any};
   duration_seconds?: number /* int */;
+  expire_on_deadline: boolean;
   deadline_time?: string;
   emit_window_start?: string;
   emit_window_end?: string;

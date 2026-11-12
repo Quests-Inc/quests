@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import type { TemplateRead } from '@/shared/api/automation.gen'
   import PageLayout from '@/shared/ui/PageLayout.svelte'
   import Picker from '@/shared/ui/Picker.svelte'
@@ -43,11 +45,12 @@
 
   /** The latest emit run of each template that prints its quest by a command or a script (quest=490). */
   let runs = $state<Record<string, SourceRunStats>>({})
-  const shown = $derived(templates.filter((t) => {
-    const query = search.trim().toLocaleLowerCase('ru')
-    const matches = !query || [t.title, t.description, rowMeta(t)].some((v) => String(v || '').toLocaleLowerCase('ru').includes(query))
+  const eligible = $derived(templates.filter((t) => {
+    const matches = true
     return matches && (statusFilter === 'all' || statusFilter === 'on' && t.enabled || statusFilter === 'off' && !t.enabled || statusFilter === 'error' && (t.emit_pool_last_outcome === 'error' || runs[String(t.id)]?.last_state === 'failed')) && (frequency === 'all' || t.freq === frequency)
   }))
+  const remoteSearch = createEntitySearch(() => search.trim() ? {q:search,types:['template'],allowed:{template:eligible.map(t=>t.id)}} : null,{all:true})
+  const shown = $derived(remoteSearch.select(eligible,'template'))
   const RUN_WORDS: Record<string, string> = { done: 'последний выпуск выполнен', failed: 'ошибка последнего выпуска', waiting: 'выпуск ждёт устройство' }
   $effect(() => {
     if (!templates.some((t) => t.emit_pool_command || t.script_id)) return
@@ -58,6 +61,7 @@
 </script>
 
 {#snippet tools()}
+    <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
     <PageToolbar>
       <input class="search" type="search" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" bind:value={search} />
       <button type="button" class="btn btn--accent btn--icon-only" title="Новый шаблон" aria-label="Новый шаблон" onclick={onCreate}>

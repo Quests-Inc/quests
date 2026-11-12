@@ -135,12 +135,13 @@ type Quest struct {
 	Pinned       bool
 	// OverlayHidden: never shown in the HUD. Stored in the same column as Pinned
 	// (1 always, 0 default, -1 never), so the two are mutually exclusive.
-	OverlayHidden   bool
-	SortOrder       int
-	DeadlineAt      *time.Time
-	DurationSeconds *int
+	OverlayHidden    bool
+	SortOrder        int
+	DeadlineAt       *time.Time
+	DurationSeconds  *int
+	ExpireOnDeadline *bool
 	// Event binding. When EventID is set, DeadlineAt is derived from that event
-	// and DurationSeconds is 0: the urgency window belongs to an absolute deadline.
+	// independently of the urgency window and expiry policy.
 	EventID     *int64
 	EventEdge   string // start | end
 	EventDir    string // before | after
@@ -209,6 +210,7 @@ type QuestCreate struct {
 	SortOrder          int          `json:"sort_order"`
 	DeadlineAt         *string      `json:"deadline_at"`
 	DurationSeconds    *int         `json:"duration_seconds"`
+	ExpireOnDeadline   *bool        `json:"expire_on_deadline"`
 	EventID            *int64       `json:"event_id"`
 	EventEdge          string       `json:"event_edge"`
 	EventDir           string       `json:"event_dir"`

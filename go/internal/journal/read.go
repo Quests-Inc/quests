@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 	"github.com/quests-inc/quests/go/internal/refs"
 )
 
@@ -19,6 +20,7 @@ type QuestRead struct {
 	SortOrder          int          `json:"sort_order"`
 	DeadlineAt         *string      `json:"deadline_at"`
 	DurationSeconds    *int         `json:"duration_seconds"`
+	ExpireOnDeadline   bool         `json:"expire_on_deadline"`
 	EventID            *int64       `json:"event_id"`
 	EventEdge          string       `json:"event_edge"`
 	EventDir           string       `json:"event_dir"`
@@ -76,18 +78,13 @@ type StepRead struct {
 
 func ToQuestRead(q Quest, now time.Time) QuestRead {
 	done, total, label := ProgressLabel(q.Steps)
-	rem := remaining(q.DeadlineAt, now)
-	overdue := q.Status == StatusExpired || (rem != nil && *rem <= 0)
-	var tone *string
-	urgent := false
-	if overdue {
-		rem = nil
+	state := timeutil.DeadlineAt(q.DeadlineAt, q.DurationSeconds, ExpiresOnDeadline(q), now)
+	rem, tone, urgent := state.Remaining, state.Tone, state.Urgent
+	if q.Status == StatusExpired {
 		t := "overdue"
+		rem = nil
 		tone = &t
 		urgent = true
-	} else {
-		tone = timerTone(q.DeadlineAt, q.DurationSeconds, now)
-		urgent = inUrgent(q.DeadlineAt, q.DurationSeconds, now)
 	}
 
 	var iconURL *string
@@ -112,6 +109,7 @@ func ToQuestRead(q Quest, now time.Time) QuestRead {
 		SortOrder:          q.SortOrder,
 		DeadlineAt:         toISO(q.DeadlineAt),
 		DurationSeconds:    q.DurationSeconds,
+		ExpireOnDeadline:   ExpiresOnDeadline(q),
 		EventID:            q.EventID,
 		EventEdge:          q.EventEdge,
 		EventDir:           q.EventDir,
@@ -181,45 +179,4 @@ func toISO(t *time.Time) *string {
 	tt := t.UTC()
 	s := tt.Format("2006-01-02T15:04:05.000000Z")
 	return &s
-}
-
-func remaining(deadline *time.Time, now time.Time) *int {
-	if deadline == nil {
-		return nil
-	}
-	rem := int(deadline.UTC().Sub(now.UTC()).Seconds())
-	return &rem
-}
-
-func inUrgent(deadline *time.Time, duration *int, now time.Time) bool {
-	if deadline == nil || duration == nil || *duration <= 0 {
-		return false
-	}
-	start := deadline.UTC().Add(-time.Duration(*duration) * time.Second)
-	return start.Before(now.UTC())
-}
-
-func timerTone(deadline *time.Time, duration *int, now time.Time) *string {
-	if deadline == nil || duration == nil || *duration <= 0 {
-		return nil
-	}
-	rem := remaining(deadline, now)
-	if rem == nil {
-		return nil
-	}
-	dur := *duration
-	if dur < 1 {
-		dur = 1
-	}
-	frac := float64(*rem) / float64(dur)
-	var tone string
-	switch {
-	case frac > 2.0/3.0:
-		tone = "green"
-	case frac > 1.0/3.0:
-		tone = "orange"
-	default:
-		tone = "red"
-	}
-	return &tone
 }

@@ -141,13 +141,26 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 		}
 		deadline = &t
 	}
-	d, dur := timeutil.NormalizeDeadline(deadline, body.DurationSeconds, body.DurationSeconds != nil, now)
+	if body.DurationSeconds != nil && *body.DurationSeconds < 0 {
+		writeErr(w, 422, "duration_seconds must be nonnegative")
+		return
+	}
+	duration := body.DurationSeconds
+	if duration == nil {
+		zero := 0
+		duration = &zero
+	}
+	d, dur := timeutil.NormalizeDeadline(deadline, duration, true, now)
+	if body.EventID != nil && deadline != nil {
+		writeErr(w, 422, "choose event_id or a fixed deadline_at")
+		return
+	}
 	if body.EventID != nil {
 		offset := 0
 		if body.EventOffsetSeconds != nil {
 			offset = *body.EventOffsetSeconds
 		}
-		probe := journal.Quest{DeadlineAt: d, DurationSeconds: dur}
+		probe := journal.Quest{DeadlineAt: d, DurationSeconds: duration}
 		if err := h.Store.ApplyEvent(r.Context(), &probe, body.EventID, body.EventEdge, body.EventDir, offset); err != nil {
 			if errors.Is(err, journal.ErrNotFound) {
 				writeErr(w, http.StatusUnprocessableEntity, "событие не найдено")
@@ -156,7 +169,7 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
-		d, dur = probe.DeadlineAt, probe.DurationSeconds
+		d, dur = timeutil.NormalizeDeadline(probe.DeadlineAt, duration, true, now)
 		body.EventEdge, body.EventDir = probe.EventEdge, probe.EventDir
 		body.EventOffsetSeconds = probe.EventOffset
 	}
@@ -180,26 +193,31 @@ func (h *Handler) createQuest(w http.ResponseWriter, r *http.Request) {
 			catID = c
 		}
 	}
+	expires := true
+	if body.ExpireOnDeadline != nil {
+		expires = *body.ExpireOnDeadline
+	}
 	q := journal.Quest{
-		Title:           body.Title,
-		Description:     body.Description,
-		Status:          body.Status,
-		Significance:    body.Significance,
-		Pinned:          body.Pinned && !body.OverlayHidden,
-		OverlayHidden:   body.OverlayHidden && !body.Pinned,
-		SortOrder:       body.SortOrder,
-		DeadlineAt:      d,
-		DurationSeconds: dur,
-		EventID:         body.EventID,
-		EventEdge:       body.EventEdge,
-		EventDir:        body.EventDir,
-		EventOffset:     body.EventOffsetSeconds,
-		CategoryID:      catID,
-		QuestlineID:     lineID,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Automated:       body.Automated,
-		Source:          httpx.RequestSource(r),
+		ExpireOnDeadline: &expires,
+		Title:            body.Title,
+		Description:      body.Description,
+		Status:           body.Status,
+		Significance:     body.Significance,
+		Pinned:           body.Pinned && !body.OverlayHidden,
+		OverlayHidden:    body.OverlayHidden && !body.Pinned,
+		SortOrder:        body.SortOrder,
+		DeadlineAt:       d,
+		DurationSeconds:  dur,
+		EventID:          body.EventID,
+		EventEdge:        body.EventEdge,
+		EventDir:         body.EventDir,
+		EventOffset:      body.EventOffsetSeconds,
+		CategoryID:       catID,
+		QuestlineID:      lineID,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+		Automated:        body.Automated,
+		Source:           httpx.RequestSource(r),
 	}
 	if len(body.Steps) == 0 {
 		q.Steps = []journal.Step{{Title: body.Title, ProgressTotal: 1, SortOrder: 0}}
@@ -292,8 +310,6 @@ func (h *Handler) patchQuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	beforeStatus := q.Status
-	deadlineTouched := false
-	durationExplicit := false
 	if v, ok := raw["title"]; ok {
 		_ = json.Unmarshal(v, &q.Title)
 	}
@@ -360,81 +376,8 @@ func (h *Handler) patchQuest(w http.ResponseWriter, r *http.Request) {
 	if v, ok := raw["automated"]; ok {
 		_ = json.Unmarshal(v, &q.Automated)
 	}
-	if v, ok := raw["deadline_at"]; ok {
-		deadlineTouched = true
-		if string(v) == "null" {
-			q.DeadlineAt = nil
-		} else {
-			var s string
-			if err := json.Unmarshal(v, &s); err == nil {
-				t, err := timeutil.ParseFlexible(s)
-				if err != nil {
-					writeErr(w, http.StatusUnprocessableEntity, "invalid deadline_at")
-					return
-				}
-				q.DeadlineAt = &t
-			}
-		}
-	}
-	if v, ok := raw["duration_seconds"]; ok {
-		durationExplicit = true
-		if string(v) == "null" {
-			q.DurationSeconds = nil
-		} else {
-			var n int
-			_ = json.Unmarshal(v, &n)
-			q.DurationSeconds = &n
-		}
-	}
-	now := timeutil.NowUTC()
-	q.UpdatedAt = now
-	if q.Status == journal.StatusCompleted && q.CompletedAt == nil {
-		q.CompletedAt = &now
-	}
-	if q.Status != journal.StatusCompleted {
-		q.CompletedAt = nil
-	}
-	if deadlineTouched || durationExplicit || (q.DeadlineAt != nil && q.DurationSeconds == nil) {
-		d, dur := timeutil.NormalizeDeadline(q.DeadlineAt, q.DurationSeconds, durationExplicit, now)
-		q.DeadlineAt = d
-		q.DurationSeconds = dur
-	}
-	if v, ok := raw["event_id"]; ok {
-		if string(v) == "null" {
-			q.EventID = nil
-			q.EventEdge = ""
-			q.EventDir = ""
-			q.EventOffset = nil
-			q.EventTitle = nil
-		} else {
-			var id int64
-			if err := json.Unmarshal(v, &id); err != nil || id <= 0 {
-				writeErr(w, http.StatusUnprocessableEntity, "выберите событие")
-				return
-			}
-			edge, dir := q.EventEdge, q.EventDir
-			offset := 0
-			if q.EventOffset != nil {
-				offset = *q.EventOffset
-			}
-			if ev, ok := raw["event_edge"]; ok {
-				_ = json.Unmarshal(ev, &edge)
-			}
-			if dv, ok := raw["event_dir"]; ok {
-				_ = json.Unmarshal(dv, &dir)
-			}
-			if ov, ok := raw["event_offset_seconds"]; ok && string(ov) != "null" {
-				_ = json.Unmarshal(ov, &offset)
-			}
-			if err := h.Store.ApplyEvent(r.Context(), &q, &id, edge, dir, offset); err != nil {
-				if errors.Is(err, journal.ErrNotFound) {
-					writeErr(w, http.StatusUnprocessableEntity, "событие не найдено")
-					return
-				}
-				writeErr(w, http.StatusUnprocessableEntity, err.Error())
-				return
-			}
-		}
+	if !h.applyQuestDates(w, r, raw, &q) {
+		return
 	}
 	kind := "quest_updated"
 	detail := "изменено"

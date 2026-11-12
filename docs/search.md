@@ -1,13 +1,14 @@
 # Searching notes
 
-`GET /api/notes/search?q=…&limit=…` (MCP: `search_notes`). In the interface it is the «Поиск» (Search) field on the «Заметки» (Notes) tab
-(from two characters: a ranked list with snippets; until the answer arrives the old filter over the tree stays).
+Entity lists and pickers now share [the entity-search contract](entity-search.md). The notes endpoint below is a compatibility adapter over that matcher.
+
+`GET /api/notes/search?q=…&limit=…` (MCP: `search_notes`). The web Notes tab uses the shared `/api/search` route from any non-empty query, with explicit pending/error states and ranked snippets. It does not substitute a local tree matcher.
 
 ## What it can do (PostgreSQL)
 
 - **Word forms, Russian and English:** “квесты / квестов”, “deploy / deploys” share a stem (`tsvector` of both
-  configurations, column `note.search_tsv`, a GIN index, migration `d1f3a5c7e9b2`).
-- **Relevance, not a substring:** a title weighs more than the text (`ts_rank_cd`), and results are ordered by rank.
+  configurations). The older `note.search_tsv` GIN index remains in the schema; the shared projection matcher computes its vectors directly.
+- **Relevance, not a substring:** a title weighs more than the text (shared title/body tiers), with bounded reading-history weighting inside a tier.
 - **Prefix of the last word:** “депл” → “деплой”; not applied to a word with `-`, in quotes or followed by a space.
 - **Keyboard layout:** “ltgkjq” is also searched as “деплой” (and the other way round).
 - **Typos in the title:** `pg_trgm` (`word_similarity > 0.45`); such results come after real ones (`where: fuzzy`).
@@ -16,8 +17,7 @@
 - **Explainability:** every result says where it matched: `title` | `body` | `fuzzy`.
 - **Privacy:** notes flagged `PRIVATE` are never given to agents (`X-Quests-Source: mcp`); workspaces are isolated by RLS.
 
-If PostgreSQL search is unavailable (no extension, a schema in the middle of a migration), the query falls back to a simplified in-memory
-count: words in the title and text, layout, snippets; no morphology and no typos.
+Search failures are reported explicitly; the UI does not silently substitute a different local matching algorithm.
 
 ## Filters in search fields (quest=371)
 
@@ -36,8 +36,7 @@ Parsing is shared: `frontend/src/shared/lib/searchFlags.ts`, hints are `shared/u
 | History | `type:quest\|note\|attachment`, `act:done\|new\|edit\|miss\|del`, `line:<id>`, `cat:<category>`, `tag:<tag>`, `when:today\|7\|30`, `day:YYYY-MM-DD`: all the page's selectors; the address bar keeps only `q=` (the old `?et=&kg=…` turn into tokens) |
 | Map centre, “find an entity” | `type:quest\|note\|questline`, `flag:outdated\|pinned`, `status:active\|done\|failed\|frozen` |
 
-The flag filter over the ranked notes results works at the candidate level (up to 50); for MCP and
-`GET /api/notes/search?flags=outdated,-private` it is done on the server.
+Note flags are evaluated on the server before ranking and limiting, including through the legacy notes-search and MCP endpoints.
 
 ## Searching inside a note
 

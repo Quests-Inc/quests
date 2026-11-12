@@ -119,7 +119,7 @@ func IsInUrgentWindow(deadline *time.Time, duration *int, now time.Time) bool {
 	if deadline == nil || duration == nil || *duration <= 0 {
 		return false
 	}
-	return WindowStart(*deadline, *duration).Before(EnsureUTC(now))
+	return !EnsureUTC(now).Before(WindowStart(*deadline, *duration)) && EnsureUTC(now).Before(EnsureUTC(*deadline))
 }
 
 func TimerTone(deadline *time.Time, duration *int, now time.Time) *string {
@@ -127,7 +127,7 @@ func TimerTone(deadline *time.Time, duration *int, now time.Time) *string {
 		return nil
 	}
 	rem := RemainingSeconds(deadline, now)
-	if rem == nil {
+	if rem == nil || *rem <= 0 {
 		return nil
 	}
 	dur := *duration

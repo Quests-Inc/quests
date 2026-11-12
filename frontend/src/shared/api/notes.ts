@@ -11,8 +11,8 @@ export function runNoteCheck(id: number) {
   return request(`/api/notes/${id}/check/run`, { method: 'POST' })
 }
 
-export function listNotes() {
-  return request<NoteListItem[]>('/api/notes')
+export function listNotes(options: { catalog?: boolean } = {}) {
+  return request<NoteListItem[]>(options.catalog ? '/api/notes?catalog=1' : '/api/notes')
 }
 
 export function getNote(id: number) {

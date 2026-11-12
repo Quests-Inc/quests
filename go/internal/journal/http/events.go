@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/quests-inc/quests/go/internal/journal"
 	"github.com/quests-inc/quests/go/internal/kernel"
@@ -59,7 +60,7 @@ type eventBody struct {
 }
 
 func (h *Handler) createEvent(w http.ResponseWriter, r *http.Request) {
-	o, err := decodeEvent(r, 0)
+	o, err := h.decodeEvent(r, 0)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -80,7 +81,11 @@ func (h *Handler) patchEvent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	o, err := decodeEvent(r, id)
+	o, err := h.decodeEvent(r, id)
+	if errors.Is(err, journal.ErrNotFound) {
+		writeErr(w, 404, "событие не найдено")
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -127,8 +132,15 @@ func (h *Handler) deleteEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func decodeEvent(r *http.Request, id int64) (journal.Event, error) {
+func (h *Handler) decodeEvent(r *http.Request, id int64) (journal.Event, error) {
 	var body eventBody
+	if id > 0 {
+		current, err := h.Store.GetEvent(r.Context(), id)
+		if err != nil {
+			return journal.Event{}, err
+		}
+		body = eventBody{Title: current.Title, Description: current.Description, StartsAt: current.StartsAt.Format(time.RFC3339Nano), EndsAt: current.EndsAt.Format(time.RFC3339Nano), AllDay: current.AllDay, Color: current.Color, Icon: current.Icon}
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return journal.Event{}, errors.New("invalid JSON")
 	}

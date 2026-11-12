@@ -125,9 +125,10 @@ export interface Quest {
   SortOrder: number /* int */;
   DeadlineAt?: string;
   DurationSeconds?: number /* int */;
+  ExpireOnDeadline?: boolean;
   /**
    * Event binding. When EventID is set, DeadlineAt is derived from that event
-   * and DurationSeconds is 0: the urgency window belongs to an absolute deadline.
+   * independently of the urgency window and expiry policy.
    */
   EventID?: number /* int64 */;
   EventEdge: string; // start | end
@@ -196,6 +197,7 @@ export interface QuestCreate {
   sort_order: number /* int */;
   deadline_at?: string;
   duration_seconds?: number /* int */;
+  expire_on_deadline?: boolean;
   event_id?: number /* int64 */;
   event_edge: string;
   event_dir: string;
@@ -315,6 +317,7 @@ export interface QuestRead {
   sort_order: number /* int */;
   deadline_at?: string;
   duration_seconds?: number /* int */;
+  expire_on_deadline: boolean;
   event_id?: number /* int64 */;
   event_edge: string;
   event_dir: string;

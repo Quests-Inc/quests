@@ -1,8 +1,11 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from './SearchState.svelte'
   import { filterMenuItems } from '@/shared/lib/menuSearch.ts'
 
   type CtxItem = {
+    entity?: {kind:string;id:number},
     id: string,
     label?: string,
     danger?: boolean,
@@ -25,7 +28,18 @@
   let placed = $state(false)
   /** Открытые подменю по глубине: [0] — от пункта корня, [1] — от пункта в нём и т.д. */
   let branches: Branch[] = $state([])
-  const shownOf = (b: Branch) => (b.search && b.query.trim() ? filterMenuItems(b.search, b.query) : b.items)
+  const searchedBranch = $derived(branches.findLast(b=>b.query.trim() && b.search?.some(i=>i.entity)))
+  const menuSearch = createEntitySearch(() => {
+    if (!open || !searchedBranch) return null
+    const allowed:Record<string,number[]>={}
+    for (const i of searchedBranch.search ?? []) if(i.entity) (allowed[i.entity.kind] ??= []).push(i.entity.id)
+    return {q:searchedBranch.query,types:Object.keys(allowed),allowed,limit:40}
+  })
+  const shownOf = (b: Branch) => {
+    if (!b.search || !b.query.trim()) return b.items
+    if (b !== searchedBranch) return filterMenuItems(b.search,b.query)
+    return (menuSearch.hits ?? []).flatMap(h=>{const item=b.search?.find(i=>i.entity?.kind===h.kind && i.entity.id===h.id);return item?[item]:[]})
+  }
   const focusOnMount = (node: HTMLElement) => node.focus({ preventScroll: true })
 
   const PAD = 8
@@ -228,6 +242,7 @@
             if (e.key === 'Enter' && shown[0]) pick(shown[0])
           }}
         />
+        {#if searchedBranch}<SearchState pending={menuSearch.pending} error={menuSearch.error} />{/if}
       {/if}
       {#if b.search && !shown.length}
         <div class="ctx-menu__empty">Ничего не найдено</div>

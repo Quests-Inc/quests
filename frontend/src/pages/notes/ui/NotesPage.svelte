@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch, searchFilters } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import { createNoteScroll, revealOpenRow } from '../model/noteScroll.ts'
   import { createTitleEdit } from '../model/noteTitleEdit.svelte.ts'
   import { tick } from 'svelte'
@@ -8,7 +10,6 @@
     deleteNote,
     getNote,
     updateNote,
-    searchNotes,
     setNoteOutdated,
   } from '@/shared/api/client.ts'
   import { createNoteActions } from '../model/noteActions.svelte.ts'
@@ -90,39 +91,10 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   let searchText = $derived(parsedSearch.text)
   const flagOk = (n: any) => passes(parsedSearch, NOTE_SPEC, n)
 
-  let filtered = $derived.by(() => {
-    const q = searchText.toLowerCase()
-    if (!q && !parsedSearch.active) return notes
-    return withAncestors(
-      notes,
-      notes.filter((n) => flagOk(n) && (!q || `${n.title || ''} ${n.description || ''}`.toLowerCase().includes(q))),
-    )
-  })
-
+  let filtered = $derived(withAncestors(notes, notes.filter(flagOk)))
   let searchActive = $derived(search.trim().length > 0)
-
-  /** Ranked server results for the query (null = not asked / unavailable → the tree filter above stays). */
-  let searchHits = $state((null as any[] | null))
-  $effect(() => {
-    const q = searchText
-    if (q.length < 2) {
-      searchHits = null
-      return
-    }
-    let stale = false
-    const timer = setTimeout(async () => {
-      try {
-        const r = await searchNotes(q, parsedSearch.active ? 50 : 30)
-        if (!stale) searchHits = (r?.hits ?? []).filter((h: { id: number }) => flagOk(noteById(h.id) ?? h))
-      } catch {
-        if (!stale) searchHits = null
-      }
-    }, 220)
-    return () => {
-      stale = true
-      clearTimeout(timer)
-    }
-  })
+  const remoteSearch = createEntitySearch(() => searchActive ? {q: searchText, types:['note'], filters:searchFilters(parsedSearch, NOTE_SPEC)} : null, {all:true})
+  let searchHits = $derived(remoteSearch.hits)
 
   /** Grouping key for the tree: the open note's own live `ed.parentId` field
    * (even before it's written into noteDrafts — that only happens once the
@@ -609,6 +581,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
 <SidebarLayout key="notes" hasSelection={selectedId != null} class="notes">
   {#snippet sidebar()}
+  <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
   <NotesTree
     bind:search
     {parsedSearch}

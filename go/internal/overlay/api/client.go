@@ -41,16 +41,17 @@ func New(cfg config.Config) *Client {
 
 // Quest is the HUD-relevant slice of /api/quests JSON.
 type Quest struct {
-	ID              int64   `json:"id"`
-	Title           string  `json:"title"`
-	Status          string  `json:"status"`
-	Pinned          bool    `json:"pinned"`
-	OverlayHidden   bool    `json:"overlay_hidden"`
-	DeadlineAt      *string `json:"deadline_at"`
-	DurationSeconds *int    `json:"duration_seconds"`
-	CategorySlug    string  `json:"category_slug"`
-	Urgent          bool    `json:"urgent"`
-	Steps           []Step  `json:"steps"`
+	ID               int64   `json:"id"`
+	Title            string  `json:"title"`
+	Status           string  `json:"status"`
+	Pinned           bool    `json:"pinned"`
+	OverlayHidden    bool    `json:"overlay_hidden"`
+	DeadlineAt       *string `json:"deadline_at"`
+	DurationSeconds  *int    `json:"duration_seconds"`
+	ExpireOnDeadline *bool   `json:"expire_on_deadline"`
+	CategorySlug     string  `json:"category_slug"`
+	Urgent           bool    `json:"urgent"`
+	Steps            []Step  `json:"steps"`
 }
 
 // Step is an open/closed quest step.

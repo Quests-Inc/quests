@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { createEntitySearch, searchFilters, searchTypes } from '@/shared/lib/entitySearch.svelte.ts'
+  import { parseQuery } from '@/shared/lib/searchFlags.ts'
+
   import { computeTiers, LAYOUTS } from '@/entities/graph'
   import { noteCatalog } from '@/entities/note'
-  import { questCatalog } from '@/entities/quest'
+  import { ENTITY_SPEC, questCatalog } from '@/entities/quest'
   import { DraftEntityModal, QuestModal, StepModal } from '@/features/quest-edit'
   import { FindEntityModal } from '@/features/find-entity'
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
@@ -95,7 +98,10 @@
     addOp: (kind, payload) => gd.addOp(kind, payload),
     askDrop: (op) => gd.askDrop(op),
   })
+  const parsedRootSearch = $derived(parseQuery(query?.rootQuery ?? '',ENTITY_SPEC))
+  const rootSearch = createEntitySearch(() => query?.rootQuery.trim() ? {q:parsedRootSearch.text,types:searchTypes(parsedRootSearch,['quest','note','questline']),filters:searchFilters(parsedRootSearch,ENTITY_SPEC).filter(f=>f.key!=='type'),limit:12} : null)
   query = createGraphQuery({
+    searchResults: () => ({parsed:parsedRootSearch,items:(rootSearch.hits ?? []).map(h=>({type:h.kind,id:h.id,title:h.title})),pending:rootSearch.pending,error:rootSearch.error}),
     getTreeSettings: (key) => prefs.trees[key],
     initTree: (key, depth) => { if (!prefs.trees[key]) prefs.setTree(key, { depth, layout: stage.layoutMode }) },
     getActive: () => active,

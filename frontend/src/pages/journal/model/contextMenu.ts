@@ -2,6 +2,7 @@
 import { QUEST_SIGNIFICANCES, QUEST_STATUSES, QUEST_STATUS_LABELS } from '@/shared/api/questConsts.ts'
 
 export interface MenuItem {
+  entity?: { kind: string; id: number }
   id: string
   label?: string
   sep?: boolean
@@ -14,7 +15,10 @@ export interface MenuItem {
 
 /** «Без квестлайна» и все линии: цели для переноса группы квестов. */
 function moveTargets(lines: { id: number; title: string }[]): MenuItem[] {
-  return [{ id: 'move:none', label: 'Без квестлайна' }, ...lines.map((l) => ({ id: `move:${l.id}`, label: l.title }))]
+  return [
+    { id: 'move:none', label: 'Без квестлайна' },
+    ...lines.map((l) => ({ id: `move:${l.id}`, entity: { kind: 'questline', id: l.id }, label: l.title })),
+  ]
 }
 
 export function contextMenuItems({

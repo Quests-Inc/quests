@@ -136,6 +136,7 @@ func (s *Server) routes() *http.ServeMux {
 	if s.Metrics != nil {
 		mux.Handle("GET /metrics", s.Metrics.Handler(s.MetricsToken))
 	}
+	mux.HandleFunc("POST /api/search", s.searchEntities)
 	mux.HandleFunc("GET /api/health", s.getHealth)
 	mux.HandleFunc("POST /api/health/heartbeat", s.postHeartbeat)
 	mux.HandleFunc("GET /api/sync", s.getSync)

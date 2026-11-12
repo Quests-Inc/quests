@@ -177,7 +177,7 @@
 
     <div class="field">
       <span class="label">Раздел</span>
-      <Picker options={categoryOptions} bind:value={categoryId} label="Раздел" />
+      <Picker kind="category" options={categoryOptions} bind:value={categoryId} label="Раздел" />
     </div>
 
     <ColorIconPicker bind:color bind:icon {iconUrl} bind:pendingFile bind:clearCustom ownerLabel="этого квестлайна" />

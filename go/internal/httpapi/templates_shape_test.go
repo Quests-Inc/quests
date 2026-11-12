@@ -56,7 +56,7 @@ func TestTemplateJSONShapeAndCopy(t *testing.T) {
 
 	want := []string{"automated", "category_color", "category_id", "category_label", "category_slug", "created_at",
 		"deadline_time", "description", "duration_seconds", "emit_chance", "emit_limits", "emit_mode", "emit_pool_command",
-		"emit_pool_last_outcome", "emit_run_on", "emit_window_end", "emit_window_start", "enabled", "freq", "id",
+		"emit_pool_last_outcome", "emit_run_on", "emit_window_end", "emit_window_start", "enabled", "expire_on_deadline", "freq", "id",
 		"overlay_hidden", "pinned", "questline_color", "questline_icon", "questline_icon_url", "questline_id",
 		"questline_title", "script_id", "significance", "sort_order", "steps", "tags", "timezone", "title", "updated_at", "weekdays"}
 	if got := keys(raw); !slices.Equal(got, want) {

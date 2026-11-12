@@ -15,25 +15,26 @@ import (
 
 // templateFields is a template's editable part; unset (nil) fields are not sent.
 type templateFields struct {
-	Title           *string        `json:"title,omitempty"`
-	Description     *string        `json:"description,omitempty" desc:"markdown"`
-	Freq            *string        `json:"freq,omitempty" enum:"daily,weekly"`
-	Weekdays        *string        `json:"weekdays,omitempty" desc:"weekly: comma list, 0=Mon..6=Sun"`
-	Timezone        *string        `json:"timezone,omitempty"`
-	EmitMode        *string        `json:"emit_mode,omitempty" enum:"fixed,surprise"`
-	EmitChance      *float64       `json:"emit_chance,omitempty"`
-	EmitWindowStart *string        `json:"emit_window_start,omitempty"`
-	EmitWindowEnd   *string        `json:"emit_window_end,omitempty"`
-	EmitPoolCommand *string        `json:"emit_pool_command,omitempty" desc:"shell one-liner or #!script printing ONE quest as JSON; runs on emit_run_on"`
-	EmitRunOn       *string        `json:"emit_run_on,omitempty" desc:"runner label (required with a command)"`
-	EmitLimits      map[string]int `json:"emit_limits,omitempty" desc:"max_steps, max_title, max_description, max_command"`
-	DeadlineTime    *string        `json:"deadline_time,omitempty"`
-	DurationSeconds *int           `json:"duration_seconds,omitempty"`
-	Significance    *string        `json:"significance,omitempty" enum:"insignificant,common,uncommon,epic,legendary"`
-	Pinned          *bool          `json:"pinned,omitempty"`
-	OverlayHidden   *bool          `json:"overlay_hidden,omitempty"`
-	Enabled         *bool          `json:"enabled,omitempty"`
-	Automated       *bool          `json:"automated,omitempty"`
+	Title            *string        `json:"title,omitempty"`
+	Description      *string        `json:"description,omitempty" desc:"markdown"`
+	Freq             *string        `json:"freq,omitempty" enum:"daily,weekly"`
+	Weekdays         *string        `json:"weekdays,omitempty" desc:"weekly: comma list, 0=Mon..6=Sun"`
+	Timezone         *string        `json:"timezone,omitempty"`
+	EmitMode         *string        `json:"emit_mode,omitempty" enum:"fixed,surprise"`
+	EmitChance       *float64       `json:"emit_chance,omitempty"`
+	EmitWindowStart  *string        `json:"emit_window_start,omitempty"`
+	EmitWindowEnd    *string        `json:"emit_window_end,omitempty"`
+	EmitPoolCommand  *string        `json:"emit_pool_command,omitempty" desc:"shell one-liner or #!script printing ONE quest as JSON; runs on emit_run_on"`
+	EmitRunOn        *string        `json:"emit_run_on,omitempty" desc:"runner label (required with a command)"`
+	EmitLimits       map[string]int `json:"emit_limits,omitempty" desc:"max_steps, max_title, max_description, max_command"`
+	DeadlineTime     *string        `json:"deadline_time,omitempty"`
+	ExpireOnDeadline *bool          `json:"expire_on_deadline,omitempty" desc:"created quests expire after due, independently of their urgency window"`
+	DurationSeconds  *int           `json:"duration_seconds,omitempty"`
+	Significance     *string        `json:"significance,omitempty" enum:"insignificant,common,uncommon,epic,legendary"`
+	Pinned           *bool          `json:"pinned,omitempty"`
+	OverlayHidden    *bool          `json:"overlay_hidden,omitempty"`
+	Enabled          *bool          `json:"enabled,omitempty"`
+	Automated        *bool          `json:"automated,omitempty"`
 }
 
 // templateBody is the request body of templateFields plus the resolved category/questline and steps.
@@ -306,7 +307,7 @@ func runEmitPool(ctx context.Context, command string, env map[string]string) map
 			break
 		}
 		known := map[string]bool{"title": true, "description": true, "significance": true, "pinned": true, "deadline_at": true,
-			"duration_seconds": true, "questline": true, "questline_id": true, "category": true, "category_id": true,
+			"duration_seconds": true, "expire_on_deadline": true, "questline": true, "questline_id": true, "category": true, "category_id": true,
 			"tags": true, "tag_ids": true, "automated": true, "steps": true}
 		var ignored []string
 		for k := range v {

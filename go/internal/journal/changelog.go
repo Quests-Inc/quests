@@ -3,9 +3,11 @@ package journal
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/quests-inc/quests/go/internal/platform/search"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
@@ -49,6 +51,7 @@ func (s *Store) ListChangeLog(ctx context.Context, f ChangeLogFilter) ([]map[str
 		limit = 500
 	}
 	query := strings.ToLower(strings.TrimSpace(f.Query))
+	identityKind, identityID, identityQuery := search.Identity(query)
 
 	where := []string{"1=1"}
 	args := []any{}
@@ -145,7 +148,8 @@ func (s *Store) ListChangeLog(ctx context.Context, f ChangeLogFilter) ([]map[str
 		for _, m := range batch {
 			if query != "" {
 				hay := strings.ToLower(m["title"].(string) + " " + m["detail"].(string))
-				if !strings.Contains(hay, query) {
+				identityMatch := identityQuery && ((identityKind == "" || identityKind == fmt.Sprint(m["entity_type"])) && fmt.Sprint(m["entity_id"]) == fmt.Sprint(identityID))
+				if !identityMatch && (identityKind != "" || !strings.Contains(hay, query)) {
 					continue
 				}
 			}

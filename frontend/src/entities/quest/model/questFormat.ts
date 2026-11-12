@@ -29,26 +29,22 @@ export function quantifiedProgress(q: { steps_total: any; progress_label: any })
   return q.progress_label || null
 }
 
-/** When the quest has a deadline but no urgency window, colour the remaining
- *  time against a week so far-away dates stay green and near ones go red. */
-const OPEN_DEADLINE_WINDOW = 7 * 86400
-
+/** Both fixed and event-derived deadlines use their real urgency window. */
 export function questTimer(q: any, nowMs: number) {
-  if (!q?.deadline_at) return null
-  if (q.status === 'completed' || q.status === 'failed') return null
+  if (!q?.deadline_at || (q.status && !OPEN_STATUSES.has(q.status))) return null
   const rem = remainingFromDeadline(q.deadline_at, nowMs)
-  if (rem == null || rem <= 0) return null
-  // duration_seconds === 0 is an explicit "no window" (event phrase or empty
-  // hours/minutes in QuestModal). Still tone by a week so the countdown is
-  // not a flat grey next to quests that do have a window.
-  const windowSec = Number(q.duration_seconds) > 0 ? Number(q.duration_seconds) : OPEN_DEADLINE_WINDOW
-  const tone = q.timer_tone || timerTone(rem, windowSec) || null
-  const remLabel = formatRemaining(rem)
-  const durLabel = Number(q.duration_seconds) > 0 ? formatRemaining(q.duration_seconds) : null
-  return {
-    rem,
-    label: remLabel,
-    tone,
-    detailLabel: durLabel ? `${remLabel} / ${durLabel}` : remLabel,
+  if (rem == null) return null
+  if (rem <= 0) {
+    const overdue = q.status === 'expired' || (q.expire_on_deadline ?? true)
+    return {
+      rem,
+      label: overdue ? 'просрочено' : 'срок наступил',
+      tone: overdue ? 'overdue' : null,
+      detailLabel: overdue ? 'просрочено' : 'срок наступил',
+    }
   }
+  const tone = timerTone(rem, Number(q.duration_seconds))
+  const label = formatRemaining(rem)
+  const window = Number(q.duration_seconds) > 0 ? formatRemaining(q.duration_seconds) : null
+  return { rem, label, tone, detailLabel: window ? `${label} / ${window}` : label }
 }

@@ -39,6 +39,7 @@ func (h *Handler) RegisterNotes(mux *http.ServeMux) {
 
 func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 	var f knowledge.NoteFilter
+	f.Catalog = r.URL.Query().Get("catalog") == "1"
 	if v := r.URL.Query().Get("parent_id"); v != "" {
 		if strings.EqualFold(v, "null") || v == "-" {
 			f.ParentUnset = true
@@ -72,7 +73,12 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 	for _, n := range rows {
 		read := knowledge.NoteToRead(n)
 		redactPrivateNote(r, n, &read)
-		out = append(out, NoteListItem{NoteRead: read, NoteVerdict: verdictOf(checks[n.ID])})
+		item := NoteListItem{NoteRead: read, NoteVerdict: verdictOf(checks[n.ID])}
+		if f.Catalog {
+			complete := false
+			item.DescriptionComplete = &complete
+		}
+		out = append(out, item)
 	}
 	if fl := r.URL.Query().Get("flags"); fl != "" {
 		kept, ferr := filterNoteFlags(out, fl)

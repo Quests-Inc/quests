@@ -12,29 +12,30 @@ import (
 
 // TemplateRow is a template as the scheduler needs it to decide what is due and to build a quest from it.
 type TemplateRow struct {
-	ID              int64
-	Title           string
-	Description     string
-	Pinned          bool
-	OverlayHidden   bool
-	SortOrder       int
-	DurationSeconds sql.NullInt64
-	Freq            string
-	Weekdays        string
-	Enabled         bool
-	Timezone        string
-	DeadlineTime    sql.NullString
-	Significance    string
-	EmitMode        string
-	EmitChance      float64
-	EmitWindowStart sql.NullString
-	EmitWindowEnd   sql.NullString
-	EmitPoolCommand sql.NullString
-	EmitRunOn       sql.NullString
-	EmitLimits      sql.NullString
-	CategoryID      sql.NullInt64
-	QuestlineID     sql.NullInt64
-	Automated       bool
+	ID               int64
+	Title            string
+	Description      string
+	Pinned           bool
+	OverlayHidden    bool
+	SortOrder        int
+	DurationSeconds  sql.NullInt64
+	ExpireOnDeadline bool
+	Freq             string
+	Weekdays         string
+	Enabled          bool
+	Timezone         string
+	DeadlineTime     sql.NullString
+	Significance     string
+	EmitMode         string
+	EmitChance       float64
+	EmitWindowStart  sql.NullString
+	EmitWindowEnd    sql.NullString
+	EmitPoolCommand  sql.NullString
+	EmitRunOn        sql.NullString
+	EmitLimits       sql.NullString
+	CategoryID       sql.NullInt64
+	QuestlineID      sql.NullInt64
+	Automated        bool
 }
 
 // TemplateStepRow is one step of a template.
@@ -52,7 +53,7 @@ type TemplateStepRow struct {
 	ScriptID             sql.NullInt64
 }
 
-const templateRowColumns = `id, title, description, pinned, sort_order, duration_seconds, freq, weekdays,
+const templateRowColumns = `id, title, description, pinned, sort_order, duration_seconds, expire_on_deadline, freq, weekdays,
 			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
 			emit_window_start, emit_window_end, emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, automated`
@@ -63,7 +64,7 @@ func scanTemplateRow(r rowScan) (TemplateRow, error) {
 	var t TemplateRow
 	var pinned, enabled, automated int
 	if err := r.Scan(
-		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.Freq, &t.Weekdays,
+		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.ExpireOnDeadline, &t.Freq, &t.Weekdays,
 		&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
 		&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits, &t.EmitRunOn,
 		&t.CategoryID, &t.QuestlineID, &automated,

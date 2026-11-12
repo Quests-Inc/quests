@@ -57,7 +57,7 @@ type ListFilter struct {
 func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]Quest, error) {
 	q := `
 		SELECT q.id, q.title, q.description, q.status, q.significance, q.pinned, q.sort_order,
-			q.deadline_at, q.duration_seconds, q.category_id, q.questline_id,
+			q.deadline_at, q.duration_seconds, q.expire_on_deadline, q.category_id, q.questline_id,
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
 			l.title, l.color, l.icon, l.custom_icon, l.updated_at,
@@ -125,7 +125,7 @@ func (s *Store) ListQuests(ctx context.Context, f ListFilter) ([]Quest, error) {
 func (s *Store) GetQuest(ctx context.Context, id int64) (Quest, error) {
 	row := s.DB.QueryRowContext(ctx, `
 		SELECT q.id, q.title, q.description, q.status, q.significance, q.pinned, q.sort_order,
-			q.deadline_at, q.duration_seconds, q.category_id, q.questline_id,
+			q.deadline_at, q.duration_seconds, q.expire_on_deadline, q.category_id, q.questline_id,
 			q.created_at, q.updated_at, q.completed_at, q.template_id, q.period_key, q.automated, q.source,
 			c.slug, c.label, c.color,
 			l.title, l.color, l.icon, l.custom_icon, l.updated_at,
@@ -170,9 +170,10 @@ func scanQuest(row rowScanner) (Quest, error) {
 	var occID sql.NullInt64
 	var occEdge, occDir, occTitle sql.NullString
 	var occOffset sql.NullInt64
+	var expireOnDeadline int
 	err := row.Scan(
 		&q.ID, &q.Title, &q.Description, &q.Status, &q.Significance, &pinned, &q.SortOrder,
-		&deadline, &duration, &catID, &lineID,
+		&deadline, &duration, &expireOnDeadline, &catID, &lineID,
 		&created, &updated, &completed, &tmplID, &period, &automated, &source,
 		&cSlug, &cLabel, &cColor,
 		&lTitle, &lColor, &lIcon, &lCustom, &lUpdated,
@@ -184,6 +185,8 @@ func scanQuest(row rowScanner) (Quest, error) {
 	}
 	q.Pinned, q.OverlayHidden = SplitPinState(pinned)
 	q.Automated = automated != 0
+	expires := expireOnDeadline != 0
+	q.ExpireOnDeadline = &expires
 	q.FailureInbox = failureInbox
 	if occID.Valid {
 		v := occID.Int64
@@ -320,12 +323,12 @@ func (s *Store) createQuest(ctx context.Context, q Quest, changeKind, changeDeta
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO quest (
 			title, description, status, significance, pinned, sort_order,
-			deadline_at, duration_seconds, category_id, questline_id,
+			deadline_at, duration_seconds, expire_on_deadline, category_id, questline_id,
 			created_at, updated_at, completed_at, template_id, period_key, automated, source,
 			event_id, event_edge, event_dir, event_offset_seconds
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
-		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
+		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), boolInt(ExpiresOnDeadline(q)), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.CreatedAt), timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), nullI64(q.TemplateID), nullStr(q.PeriodKey), boolInt(q.Automated), nullStr(q.Source),
 		nullI64(q.EventID), nullStr(emptyStrPtr(q.EventEdge)), nullStr(emptyStrPtr(q.EventDir)), nullInt(q.EventOffset),
 	)
@@ -390,12 +393,12 @@ func (s *Store) UpdateQuest(ctx context.Context, q Quest, changeKind, changeDeta
 	_, err = tx.ExecContext(ctx, `
 		UPDATE quest SET
 			title=?, description=?, status=?, significance=?, pinned=?, sort_order=?,
-			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
+			deadline_at=?, duration_seconds=?, expire_on_deadline=?, category_id=?, questline_id=?,
 			updated_at=?, completed_at=?, automated=?,
 			event_id=?, event_edge=?, event_dir=?, event_offset_seconds=?
 		WHERE id=?`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
-		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
+		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), boolInt(ExpiresOnDeadline(q)), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated),
 		nullI64(q.EventID), nullStr(emptyStrPtr(q.EventEdge)), nullStr(emptyStrPtr(q.EventDir)), nullInt(q.EventOffset), q.ID,
 	)
@@ -522,12 +525,12 @@ func (s *Store) UpdateQuestComment(ctx context.Context, q Quest, changeKind, cha
 	_, err = tx.ExecContext(ctx, `
 		UPDATE quest SET
 			title=?, description=?, status=?, significance=?, pinned=?, sort_order=?,
-			deadline_at=?, duration_seconds=?, category_id=?, questline_id=?,
+			deadline_at=?, duration_seconds=?, expire_on_deadline=?, category_id=?, questline_id=?,
 			updated_at=?, completed_at=?, automated=?,
 			event_id=?, event_edge=?, event_dir=?, event_offset_seconds=?
 		WHERE id=?`,
 		q.Title, q.Description, string(q.Status), string(q.Significance), PinState(q.Pinned, q.OverlayHidden), q.SortOrder,
-		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), nullI64(q.CategoryID), nullI64(q.QuestlineID),
+		nullTime(q.DeadlineAt), nullInt(q.DurationSeconds), boolInt(ExpiresOnDeadline(q)), nullI64(q.CategoryID), nullI64(q.QuestlineID),
 		timeutil.ToDBUTC(q.UpdatedAt), nullTime(q.CompletedAt), boolInt(q.Automated),
 		nullI64(q.EventID), nullStr(emptyStrPtr(q.EventEdge)), nullStr(emptyStrPtr(q.EventDir)), nullInt(q.EventOffset), q.ID,
 	)

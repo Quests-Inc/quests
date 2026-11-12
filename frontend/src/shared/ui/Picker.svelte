@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from './SearchState.svelte'
+  import { entityMatches, rankIdentity } from '@/shared/lib/entitySearch.ts'
   import { tick } from 'svelte'
   import Icon from './Icon.svelte'
   import { placePopover, watchPopover } from '@/shared/lib/popover.ts'
@@ -13,6 +16,7 @@
    */
   let {
     options,
+    kind = '',
     value = $bindable(''),
     noneLabel = 'Нет',
     label = '',
@@ -20,6 +24,7 @@
     id = undefined,
     onChange,
   }: {
+    kind?: string,
     options: { id: string, label: string, color?: string }[],
     value?: string,
     noneLabel?: string,
@@ -39,9 +44,11 @@
 
   let all = $derived([{ id: '', label: noneLabel, color: '' }, ...options])
   let current = $derived(all.find((o) => o.id === value) ?? all[0])
+  const remoteSearch = createEntitySearch(() => kind && open && query.trim() ? {q:query,types:[kind],allowed:{[kind]:options.map(o=>Number(o.id)).filter(Number.isSafeInteger)}} : null)
   let shown = $derived.by(() => {
     const q = query.trim().toLowerCase()
-    return q ? all.filter((o) => o.id !== '' && o.label.toLowerCase().includes(q)) : all
+    if (kind && q) return (remoteSearch.hits ?? []).flatMap(h => {const option=all.find(o=>o.id===String(h.id));return option?[option]:[]})
+    return q ? rankIdentity(all.filter((o) => o.id !== '' && entityMatches(q, kind, o.id, o.label)), q, o => ({kind,id:o.id})) : all
   })
 
   function place() {
@@ -144,7 +151,8 @@
       oninput={() => (active = 0)}
       onkeydown={onSearchKey}
     />
-    <ul bind:this={listEl} class="picker__list" role="listbox" aria-label={label || undefined}>
+    <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
+      <ul bind:this={listEl} class="picker__list" role="listbox" aria-label={label || undefined}>
       {#each shown as opt, i (opt.id)}
         <li role="none">
           <button

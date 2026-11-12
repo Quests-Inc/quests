@@ -16,9 +16,10 @@ type NoteVerdict struct {
 
 // NoteListItem is a note in a list: its fields, the verdict of its check, and — in a popularity sort — why it ranks where it does.
 type NoteListItem struct {
-	knowledge.NoteRead `tstype:",extends"`
-	NoteVerdict        `tstype:",extends"`
-	Popularity         *knowledge.NotePopularity `json:"popularity,omitempty"`
+	DescriptionComplete *bool `json:"description_complete,omitempty"`
+	knowledge.NoteRead  `tstype:",extends"`
+	NoteVerdict         `tstype:",extends"`
+	Popularity          *knowledge.NotePopularity `json:"popularity,omitempty"`
 }
 
 // Backlink is something that mentions a note.

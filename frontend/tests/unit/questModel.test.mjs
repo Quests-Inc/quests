@@ -30,18 +30,22 @@ test('questTimer: нет срока, закрытый или просрочен�
   const now = Date.parse('2026-03-01T10:00:00Z')
   expect(questTimer({}, now)).toBeNull()
   expect(questTimer({ deadline_at: '2026-03-01T11:00:00Z', status: 'completed' }, now)).toBeNull()
-  expect(questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active' }, now)).toBeNull()
+  expect(
+    questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active', expire_on_deadline: true }, now).tone
+  ).toBe('overdue')
+  expect(
+    questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active', expire_on_deadline: false }, now)
+  ).toMatchObject({ tone: null, label: 'срок наступил' })
   const t = questTimer({ deadline_at: '2026-03-01T10:30:00Z', status: 'active', duration_seconds: 3600 }, now)
   expect(t).toMatchObject({ rem: 1800, label: '30:00', tone: 'orange', detailLabel: '30:00 / 1:00:00' })
-  // Without a window the remaining time is coloured against a week.
-  expect(questTimer({ deadline_at: '2026-03-01T10:30:00Z', status: 'active' }, now).tone).toBe('red')
+  // Without a real window there is no urgency colour, regardless of source.
+  expect(questTimer({ deadline_at: '2026-03-01T10:30:00Z', status: 'active' }, now).tone).toBeNull()
   expect(questTimer({ deadline_at: '2026-03-10T10:00:00Z', status: 'active', duration_seconds: 0 }, now).tone).toBe(
-    'green'
+    null
   )
 })
 
 import { KINDS, detailOf } from '../../src/entities/history/model/historyKinds.ts'
-import { findEntities } from '../../src/entities/quest/model/entityFlags.ts'
 import { questSpec } from '../../src/entities/quest/model/questFlags.ts'
 import { groupQuestsByCategory, partitionByQuestline } from '../../src/entities/quest/model/questGroups.ts'
 import { parseQuery, passes } from '../../src/shared/lib/searchFlags.ts'
@@ -106,23 +110,6 @@ test('questSpec: фильтры поиска по статусу, флагам, 
   expect(ok('line:моя_линия')).toBe(true)
 })
 
-test('findEntities: пустой запрос ничего не ищет; поиск по названию и по kind=id; фильтр типа и лимит', () => {
-  const data = {
-    quests: [
-      { id: 1, title: 'Купить хлеб' },
-      { id: 2, title: 'Хлебные крошки' },
-    ],
-    notes: [{ id: 1, title: 'Хлеб', outdated: true }],
-    questlines: [{ id: 3, title: 'Быт' }],
-  }
-  expect(findEntities('', data).items).toEqual([])
-  expect(findEntities('хлеб', data).items.map((i) => `${i.type}=${i.id}`)).toEqual(['quest=1', 'quest=2', 'note=1'])
-  expect(findEntities('quest=2', data).items.map((i) => i.id)).toEqual([2])
-  expect(findEntities('type:note хлеб', data).items.map((i) => i.type)).toEqual(['note'])
-  expect(findEntities('flag:outdated', data).items.map((i) => i.type)).toEqual(['note'])
-  expect(findEntities('хлеб', { ...data, limit: 1 }).items).toHaveLength(1)
-})
-
 test('historyKinds: подписи видов и значимая подробность', () => {
   expect(KINDS.quest_completed).toEqual(['квест выполнен', 'checkmark', 'ok'])
   expect(detailOf({ detail: '  изменено ', title: 'x' })).toBe('')
@@ -138,4 +125,11 @@ test('questSpec: cat:none — квесты без раздела', () => {
   expect(passes(parseQuery('cat:none', spec), spec, free)).toBe(true)
   expect(passes(parseQuery('cat:none', spec), spec, work)).toBe(false)
   expect(spec.cat.values.some((v) => v.id === 'none')).toBe(true)
+})
+
+import { ENTITY_SPEC } from '../../src/entities/quest/model/entityFlags.ts'
+test('entity flags keep type alternatives and note-only outdated scope', () => {
+  const parsed = parseQuery('type:note type:quest flag:outdated', ENTITY_SPEC)
+  expect(passes(parsed, ENTITY_SPEC, { type: 'note', x: { outdated: true } })).toBe(true)
+  expect(passes(parsed, ENTITY_SPEC, { type: 'quest', x: { outdated: false } })).toBe(false)
 })

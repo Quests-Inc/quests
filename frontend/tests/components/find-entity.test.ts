@@ -1,8 +1,21 @@
-import { expect, test } from 'bun:test'
+import { expect, mock, test } from 'bun:test'
 
 import { flushSync, mount, unmount } from 'svelte'
 
-import { FindEntityModal } from '@/features/find-entity'
+mock.module('@/shared/api/entitySearch.ts', () => ({
+  searchEntities: async (q: { q: string }) => ({
+    hits: [...quests.map((x) => ({ ...x, kind: 'quest' })), ...notes.map((x) => ({ ...x, kind: 'note' }))]
+      .filter((x) => x.title.toLowerCase().includes(q.q))
+      .map((x) => ({ ...x, where: 'title', snippet: '', score: 100 })),
+    more: false,
+    next: 3,
+  }),
+}))
+const { FindEntityModal } = await import('@/features/find-entity')
+const settle = async () => {
+  await new Promise((r) => setTimeout(r, 180))
+  flushSync()
+}
 
 const quests = [
   { id: 1, title: 'Мир квестов', status: 'active' },
@@ -42,6 +55,7 @@ function open() {
 test('стрелки ходят по найденному по кругу, Enter берёт выбранное, а не первое', async () => {
   const t = open()
   t.type('мир')
+  await settle()
   expect(t.rows().length).toBeGreaterThanOrEqual(3)
   const first = t.activeTitle()
   t.key('ArrowDown')
@@ -58,15 +72,17 @@ test('стрелки ходят по найденному по кругу, Enter
   t.stop()
 })
 
-test('подпись вида — плашка в цвете сущности, а новый поиск снова начинается с первой строки', () => {
+test('подпись вида — плашка в цвете сущности, а новый поиск снова начинается с первой строки', async () => {
   const t = open()
   t.type('мир')
+  await settle()
   const kinds = [...document.querySelectorAll<HTMLElement>('.find__type')]
   expect(kinds.every((k) => k.style.getPropertyValue('--c').startsWith('#'))).toBe(true)
   expect(new Set(kinds.map((k) => k.style.getPropertyValue('--c'))).size).toBeGreaterThan(1)
   t.key('ArrowDown')
   expect(document.querySelector('.find__row--on')).not.toBe(t.rows()[0])
   t.type('ми')
+  await settle()
   expect(document.querySelectorAll('.find__row--on')).toHaveLength(1)
   expect(document.querySelector('.find__row--on')).toBe(t.rows()[0])
   t.stop()

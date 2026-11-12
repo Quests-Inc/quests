@@ -10,7 +10,7 @@ import {
   templateStepDraft,
   templateStepsPayload,
 } from '../../src/entities/quest/model/steps.ts'
-import { applyMention, activeMentionToken, matchMentions } from '../../src/shared/lib/mentionSuggest.ts'
+import { applyMention, activeMentionToken } from '../../src/shared/lib/mentionSuggest.ts'
 import { buildSuggestIndex, nearestVote, pickSuggestion, suggestTags } from '../../src/shared/lib/suggest.ts'
 
 test('диапазон прогресса: разбор «5», «5..10», «5-10», перепутанные границы, формат', () => {
@@ -89,24 +89,6 @@ test('mirrorQuestId: первый quest=N в текстах шага', () => {
   expect(mirrorQuestId('ничего', '')).toBeNull()
 })
 
-test('matchMentions: начало названия выше «содержит», шаги несут квест, дубли вложения схлопываются, лимит', () => {
-  const src = {
-    notes: [
-      { id: 1, title: 'Хлеб' },
-      { id: 2, title: 'Про хлеб' },
-    ],
-    quests: [{ id: 5, title: 'Купить', steps: [{ id: 9, title: 'хлебный шаг' }] }],
-    attachments: [{ id: 3, filename: 'хлеб.pdf', comment: 'про хлеб' }],
-    questlines: [],
-    templates: [],
-  }
-  const r = matchMentions('хлеб', src)
-  expect(r.map((x) => `${x.kind}=${x.id}`)).toEqual(['note=1', 'attachment=3', 'step=9', 'note=2'])
-  expect(r.find((x) => x.kind === 'step').hint).toBe('Купить')
-  expect(matchMentions('хлеб', src, 2)).toHaveLength(2)
-  expect(matchMentions('   ', src)).toEqual([])
-})
-
 test('@-упоминание: токен под кареткой и подстановка kind=id', () => {
   expect(activeMentionToken('привет @хле', 11)).toEqual({ query: 'хле', start: 7 })
   expect(activeMentionToken('привет @хле ', 12)).toBeNull()
@@ -162,14 +144,6 @@ test('checkPayload: шаг со скриптом сохраняет распис
   })
 })
 
-test('bare @ lists available entities and only text-embedding scripts', () => {
-  const items = matchMentions('', {
-    notes: [{ id: 1, title: 'Заметка' }],
-    scripts: [
-      { id: 2, title: 'Расчёт', purpose: 'embed' },
-      { id: 3, title: 'Хук', purpose: 'hook' },
-    ],
-  })
-  expect(items.map((x) => x.kind)).toEqual(['script', 'note'])
+test('bare @ opens a mention token', () => {
   expect(activeMentionToken('@', 1)).toEqual({ query: '', start: 0 })
 })

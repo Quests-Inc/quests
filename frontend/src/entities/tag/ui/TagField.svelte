@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import { createTag } from '@/shared/api/client.ts'
   import { buildSuggestIndex, suggestTags } from '@/shared/lib/suggest.ts'
 
@@ -41,25 +43,8 @@
   )
 
   /** Catalog tags matching what's typed so far: slug/label prefix first, then substring. */
-  let matches = $derived.by(() => {
-    const q = normalizeSlug(draft)
-    const raw = draft.trim().toLowerCase().replace(/ё/g, 'е')
-    if (!q && !raw) return []
-    const taken = new Set(selected.map((t) => t.id))
-    const out: { tag: any, rank: number }[] = []
-    for (const c of catalog) {
-      if (taken.has(c.id)) continue
-      const slug = String(c.slug || '').toLowerCase()
-      const label = String(c.label || '').toLowerCase().replace(/ё/g, 'е')
-      let rank = -1
-      if (slug === q || label === raw) rank = 0
-      else if (slug.startsWith(q) || label.startsWith(raw)) rank = 1
-      else if (slug.includes(q) || label.includes(raw)) rank = 2
-      if (rank >= 0) out.push({ tag: c, rank })
-    }
-    out.sort((a, b) => a.rank - b.rank || a.tag.slug.localeCompare(b.tag.slug))
-    return out.slice(0, 8).map((m) => m.tag)
-  })
+  const tagSearch = createEntitySearch(() => enabled && draft.trim() ? {q:draft,types:['tag'],allowed:{tag:catalog.filter(t=>!selected.some(s=>s.id===t.id)).map(t=>t.id)},limit:8} : null)
+  let matches = $derived(draft.trim() ? tagSearch.select(catalog,'tag') : [])
 
   $effect(() => {
     void draft
@@ -203,6 +188,7 @@
       disabled={busy || selected.length >= MAX}
       autocomplete="off"
     />
+  <SearchState pending={tagSearch.pending} error={tagSearch.error} />
   </div>
   {#if err}
     <p class="tag-field__err">{err}</p>

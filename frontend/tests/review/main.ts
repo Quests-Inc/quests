@@ -50,6 +50,19 @@ window.fetch = async (input, init) => {
   const url = String(input)
   const respond = (value: unknown) =>
     new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } })
+  if (/\/api\/calendar\/events(?:[?]|$)/.test(url))
+    return respond([
+      {
+        id: 12,
+        title: 'Конференция — пример',
+        description: 'Стендовое событие',
+        starts_at: '2030-05-10T07:00:00Z',
+        ends_at: '2030-05-10T09:00:00Z',
+        all_day: false,
+        color: '#6a7ab8',
+        icon: 'calendar',
+      },
+    ])
   if (/\/api\/runners(?:[?]|$)/.test(url))
     return respond([
       {

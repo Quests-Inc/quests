@@ -1,11 +1,11 @@
 <script lang="ts">
+  import { searchEntities } from '@/shared/api/entitySearch.ts'
   import { ENTITY_COLORS } from '@/shared/lib/entityColors.ts'
-  import type { Script } from '@/shared/api/execution.gen.ts'
-  import { getScripts, listValues } from '@/shared/api/client.ts'
+  import { listValues } from '@/shared/api/client.ts'
   import { proseValue } from '@/shared/lib/valueText.ts'
   import { completeText, textCompletionToken, type TextToken } from '@/shared/lib/textCompletion.ts'
   import InsertScriptModal from './InsertScriptModal.svelte'
-  import { activeMentionToken, applyMention, matchMentions } from '@/shared/lib/mentionSuggest.ts'
+  import { activeMentionToken, applyMention } from '@/shared/lib/mentionSuggest.ts'
   import { pairBackspace, pairKey, type PairEdit } from '@/shared/lib/autoPair.ts'
   import { highlightMarkdown } from '@/shared/lib/mdHighlight.ts'
   import { caretXY, placePopup } from '@/shared/lib/caretXY.ts'
@@ -62,19 +62,12 @@
   let insertOpen = $state(false)
   let insertRange = { start: 0, end: 0 }
   let insertId = $state(0)
-  let scriptCatalog: Script[] | null = null
-  let scriptLoad: Promise<Script[]> | null = null
-  function loadMentionScripts() {
-    if (scriptCatalog) return Promise.resolve(scriptCatalog)
-    if (!scriptLoad) scriptLoad = getScripts().then((all) => { scriptCatalog = all; return all }).finally(() => { scriptLoad = null })
-    return scriptLoad
-  }
   let completionSeq = 0
   async function refreshCompletion(token: TextToken) {
     const seq = ++completionSeq
     try {
       const items = token.kind === 'script'
-        ? (await getScripts()).filter((s) => s.purpose === 'embed' && `${s.id} ${s.title}`.toLowerCase().includes(token.query.toLowerCase())).map((s) => ({ kind: 'script', id: s.id, title: s.title, label: '', hint: `№${s.id}`, insertion: `script=${s.id}` }))
+        ? (await searchEntities({q:token.query,types:['script'],filters:[{key:'purpose',values:['embed']}],limit:8})).hits.map((s) => ({ kind: 'script', id: s.id, title: s.title, label: '', hint: `№${s.id}`, insertion: `script=${s.id}` }))
         : (await listValues(host?.kind ?? 'workspace', host?.id ?? 0)).effective.filter((v) => v.name.startsWith(token.query)).map((v, i) => ({ kind: 'value', id: i, title: v.name, label: '', hint: v.error ? 'ошибка' : v.value == null ? '' : proseValue(v.type, v.value), insertion: `{{${v.name}}}` }))
       if (seq !== completionSeq) return
       mentionItems = items.slice(0, 8)
@@ -93,26 +86,18 @@
       return
     }
     mentionToken = token
-    const candidates = (scripts: Script[] = []) => matchMentions(token.query, {
-      quests,
-      questlines,
-      notes,
-      attachments,
-      templates: templateStore.list,
-      scripts,
-    }, Number.MAX_SAFE_INTEGER).filter((item) => !allowedKinds.length || allowedKinds.includes(item.kind)).slice(0, 8)
-    mentionItems = candidates(scriptCatalog ?? [])
-    mentionIndex = 0
-    mentionOpen = mentionItems.length > 0
-    if (!allowedKinds.length && !disabled && !scriptCatalog) {
-      const seq = completionSeq
-      void loadMentionScripts().then((scripts) => {
-        if (seq !== completionSeq || mentionToken?.start !== token.start || mentionToken?.query !== token.query) return
-        mentionItems = candidates(scripts)
-        mentionIndex = 0
-        mentionOpen = mentionItems.length > 0
-      }).catch(() => { /* Entity references still work if the script catalog cannot be loaded. */ })
-    }
+    mentionItems = []
+    mentionOpen = false
+    const seq = completionSeq
+    const types = allowedKinds.length ? allowedKinds : ['quest','step','questline','note','attachment','template','script','event']
+    // The script scope is embed-only; other kinds are limited only by normal access checks.
+    void searchEntities({q:token.query,types,limit:8,filters:[{kind:'script',key:'purpose',values:['embed']}]}).then(page => {
+      if (seq !== completionSeq || mentionToken?.start !== token.start || mentionToken?.query !== token.query) return
+      const labels: Record<string,string> = {quest:'квест',step:'шаг',questline:'квестлайн',note:'заметка',attachment:'файл',template:'шаблон',script:'скрипт',event:'событие'}
+      mentionItems = page.hits.map(h=>({kind:h.kind,id:h.id,title:h.title,label:labels[h.kind] ?? h.kind,hint:`${h.kind}=${h.id}`}))
+      mentionIndex = 0
+      mentionOpen = mentionItems.length > 0
+    }).catch(() => { if (seq === completionSeq) mentionOpen = false })
   }
 
   function onFieldInput(event: Event) {
@@ -366,6 +351,11 @@
   }
 
   /* The field itself stays, but its glyphs are drawn by the layer under it (the caret and the selection are the field's). */
+  .mention-field--hl {
+    background: var(--color-bg, #121212);
+    border-radius: var(--radius-sm, 2px);
+  }
+
   .mention-field--hl textarea {
     position: relative;
     background: transparent !important;

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -63,6 +64,7 @@ type NoteBriefRead struct {
 }
 
 type NoteFilter struct {
+	Catalog     bool
 	ParentID    *int64
 	ParentUnset bool
 	Pinned      *bool
@@ -71,7 +73,11 @@ type NoteFilter struct {
 const noteCols = `id, title, description, pinned, is_readme, is_private, is_category, sort_order, parent_id, color, icon, custom_icon, created_at, updated_at`
 
 func (s *Store) ListNotes(ctx context.Context, f NoteFilter) ([]Note, error) {
-	q := `SELECT ` + noteCols + ` FROM note WHERE 1=1`
+	cols := noteCols
+	if f.Catalog {
+		cols = strings.Replace(cols, "description,", "left(description, 320) AS description,", 1)
+	}
+	q := `SELECT ` + cols + ` FROM note WHERE 1=1`
 	args := []any{}
 	if f.ParentUnset {
 		q += ` AND parent_id IS NULL`

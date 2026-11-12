@@ -3,7 +3,10 @@
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
-  import { ENTITY_SPEC, findEntities } from '@/entities/quest'
+  import { createEntitySearch, searchFilters, searchTypes } from '@/shared/lib/entitySearch.svelte.ts'
+  import { parseQuery } from '@/shared/lib/searchFlags.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
+  import { ENTITY_SPEC } from '@/entities/quest'
   import { TYPES } from '@/entities/graph'
 
   /** Search box over quests and notes; picks one existing entity. */
@@ -42,9 +45,9 @@
     queueMicrotask(() => input?.focus())
   })
 
-  let found = $derived(findEntities(query, { questlines, quests, notes, types }))
-  let matches = $derived(found.items)
-  let parsed = $derived(found.parsed)
+  let parsed = $derived(parseQuery(query,ENTITY_SPEC))
+  const remoteSearch = createEntitySearch(() => open && query.trim() ? {q:parsed.text,types:searchTypes(parsed,types),filters:searchFilters(parsed,ENTITY_SPEC).filter(f=>f.key!=='type'),allowed:{quest:quests.map(q=>q.id),note:notes.map(n=>n.id),questline:questlines.map(l=>l.id)}} : null)
+  let matches = $derived((remoteSearch.hits ?? []).map(h=>({type:h.kind,id:h.id,title:h.title})))
 
   // A new search starts at its first hit.
   $effect(() => {
@@ -90,6 +93,7 @@
       bind:this={input}
       onkeydown={onKey}
     />
+    <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
     <FlagHints value={query} spec={ENTITY_SPEC} parsed={parsed} onPick={(v) => (query = v)} />
     <ul class="find__list" role="listbox" aria-label="Найденное" bind:this={listEl}>
       {#each matches as m, i (m.type + m.id)}

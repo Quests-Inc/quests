@@ -11,6 +11,7 @@ export function snippetHtml(snippet: any) {
 }
 
 export const WHERE_LABEL: Record<string, string> = {
+  id: 'по ID',
   title: 'в названии',
   body: 'в тексте',
   fuzzy: 'похоже на название',

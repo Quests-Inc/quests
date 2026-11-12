@@ -26,6 +26,11 @@ export const QUEST_KEYS = [
   'questline_id',
   'deadline_at',
   'duration_seconds',
+  'expire_on_deadline',
+  'event_id',
+  'event_edge',
+  'event_dir',
+  'event_offset_seconds',
 ]
 export const STEP_KEYS = [
   'title',

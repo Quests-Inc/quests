@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import PageToolbar from '@/shared/ui/PageToolbar.svelte'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import FlagHints from '@/shared/ui/FlagHints.svelte'
@@ -39,9 +41,19 @@
   let fresh: { label: string, token: string, hours: number } | null = $state(null)
 
   let search = $state('')
-  const filtered = $derived(filterRunners(search, runners, jobs))
+  const filtered = $derived(filterRunners(search, runners, jobs,{text:false}))
   const jobFilter = $derived(runnerView(filtered.parsed))
-  const groups = $derived(runnerGroups(filtered.devices, filtered.jobs, jobFilter))
+  const remoteSearch = createEntitySearch(() => filtered.parsed.text ? {q:filtered.parsed.text,types:['runner','job'],allowed:{runner:filtered.devices.map(d=>d.id),job:filtered.jobs.map(j=>j.id)}} : null,{all:true})
+  const searched = $derived.by(() => {
+    if (remoteSearch.hits == null) return filtered
+    const devices = remoteSearch.select(filtered.devices,'runner')
+    const labels = new Set(devices.map(d=>d.label))
+    const jobIds = new Set(remoteSearch.select(filtered.jobs,'job').map(j=>j.id))
+    const foundJobs = filtered.jobs.filter(j=>jobIds.has(j.id)||labels.has(j.runner_label))
+    for (const j of foundJobs) labels.add(j.runner_label)
+    return {devices:filtered.devices.filter(d=>labels.has(d.label)),jobs:foundJobs}
+  })
+  const groups = $derived(runnerGroups(searched.devices, searched.jobs, jobFilter))
   let showAdd = $state(false)
   let openGroup = $state<string | null>(null)
 
@@ -190,6 +202,7 @@
       </button>
     </form>
     {/if}
+    <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
     <FlagHints value={normalizeRunnerQuery(search)} spec={filtered.spec} parsed={filtered.parsed} onPick={v => search = v} />
   {/snippet}
 <div class="runners">

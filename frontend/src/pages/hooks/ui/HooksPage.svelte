@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import PageLayout from '@/shared/ui/PageLayout.svelte'
   import PageToolbar from '@/shared/ui/PageToolbar.svelte'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
@@ -67,29 +69,18 @@
     return () => window.removeEventListener('quests:route', onRoute)
   })
 
-  let filtered = $derived.by(() => {
-    const q = search.trim().toLowerCase()
+  let eligible = $derived.by(() => {
     return hooks.filter((h) => {
       if (scope === 'quest' && h.scope_kind === 'workspace') return false
       if (scope === 'workspace' && h.scope_kind !== 'workspace') return false
       if (stateFilter === 'on' && !h.enabled) return false
       if (stateFilter === 'off' && h.enabled) return false
-      if (!q) return true
-      const hay = [
-        h.name,
-        String(h.id),
-        h.script_title,
-        String(h.script_id),
-        h.run_on,
-        h.scope_kind === 'workspace' ? 'журнал пространство' : `${h.scope_kind} ${h.scope_id}`,
-        ...displayEvents(h),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return hay.includes(q)
+      return true
     })
   })
+  const remoteSearch = createEntitySearch(() => search.trim() ? {q:search,types:['hook'],allowed:{hook:eligible.map(x=>x.id)}} : null,{all:true})
+  let filtered = $derived(remoteSearch.select(eligible,'hook'))
+
 
   async function setEnabled(h: Hook, on: boolean) {
     try {
@@ -131,6 +122,7 @@
   <PageLayout>
     {#snippet toolbar()}
     <PageToolbar>
+      <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
       <input
         class="search hookpage__search"
         type="search"

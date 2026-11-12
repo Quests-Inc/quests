@@ -13,6 +13,17 @@ mock.module('@/shared/api/client.ts', () => ({
   ],
   listValues: async () => ({ own: [], inherited: [], effective: [{ name: 'hp', type: 'int', value: 12 }] }),
 }))
+mock.module('@/shared/api/entitySearch.ts', () => ({
+  searchEntities: async (q: { q: string; types: string[] }) => ({
+    hits: [
+      { id: 8, title: 'Кости', kind: 'script' },
+      { id: 10, title: 'Другой расчёт', kind: 'script' },
+      { id: 1, title: 'Заметка', kind: 'note' },
+    ].filter((x) => q.types.includes(x.kind) && x.title.toLowerCase().includes(q.q.toLowerCase())),
+    more: false,
+    next: 3,
+  }),
+}))
 const { MentionTextarea } = await import('@/entities/template')
 let app: ReturnType<typeof mount>, target: HTMLDivElement
 const tick = () => new Promise((r) => setTimeout(r, 0))

@@ -65,15 +65,7 @@ func SplitQuests(items []api.Quest, categorySlug string, now time.Time) (favorit
 		if len(steps) == 0 {
 			continue
 		}
-		flag := q.Urgent
-		if !flag {
-			flag = IsUrgent(q.DeadlineAt, q.DurationSeconds, now)
-		}
-		if q.Status == "expired" {
-			flag = true
-		} else if rem, ok := RemainingSeconds(q.DeadlineAt, now); ok && rem <= 0 {
-			flag = true
-		}
+		flag := deadlineState(q, now).Urgent || q.Status == "expired"
 		if !flag {
 			continue
 		}
@@ -178,21 +170,20 @@ func withTimer(q api.Quest, steps []StepView, now time.Time) QuestView {
 	if view.Title == "" {
 		view.Title = "?"
 	}
-	overdue := q.Status == "expired"
-	if rem, ok := RemainingSeconds(q.DeadlineAt, now); ok {
-		if rem <= 0 {
-			overdue = true
-		} else {
-			view.TimerTone = TimerTone(q.DeadlineAt, q.DurationSeconds, now)
-			view.TimerLabel = FormatRemaining(rem)
-			view.Overdue = false
-			return view
-		}
+	state := deadlineState(q, now)
+	if state.Tone != nil {
+		view.TimerTone = *state.Tone
 	}
-	if overdue {
+	if state.Remaining != nil {
+		view.TimerLabel = FormatRemaining(*state.Remaining)
+		return view
+	}
+	if state.Overdue || q.Status == "expired" {
 		view.Overdue = true
 		view.TimerTone = "overdue"
 		view.TimerLabel = "просрочено"
+	} else if state.Reached {
+		view.TimerLabel = "срок наступил"
 	}
 	return view
 }

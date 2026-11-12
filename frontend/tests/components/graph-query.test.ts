@@ -16,6 +16,10 @@ function make(
   let expand = ['quest:5>note']
   const pending: { resolve: (g: unknown) => void; reject: (e: unknown) => void }[] = []
   const q = createGraphQuery({
+    searchResults: () => ({
+      parsed: { text: 'аль', terms: [], unknown: [], active: false },
+      items: [{ type: 'quest', id: 5, title: 'Альфа' }],
+    }),
     getActive: () => active,
     getRootType: () => rootType,
     getRootId: () => rootId,

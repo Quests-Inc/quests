@@ -46,7 +46,12 @@ export function runnerSearchSpec(devices: RunnerView[], jobs: RunnerJob[] = []):
   }
 }
 
-export function filterRunners(query: string, devices: RunnerView[], jobs: RunnerJob[]) {
+export function filterRunners(
+  query: string,
+  devices: RunnerView[],
+  jobs: RunnerJob[],
+  options: { text?: boolean } = {}
+) {
   const spec = runnerSearchSpec(devices, jobs)
   const parsed = parseQuery(normalizeRunnerQuery(query), spec)
   const words = parsed.text.toLocaleLowerCase('ru').split(/\s+/).filter(Boolean)
@@ -63,7 +68,7 @@ export function filterRunners(query: string, devices: RunnerView[], jobs: Runner
     ]
       .join(' ')
       .toLocaleLowerCase('ru')
-    return passes(parsed, spec, row) && words.every((word) => text.includes(word))
+    return passes(parsed, spec, row) && (options.text === false || words.every((word) => text.includes(word)))
   }
   return {
     spec,

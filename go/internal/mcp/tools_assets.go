@@ -156,15 +156,27 @@ func assetTools(c *Client) []Tool {
 		})
 
 	type iconArgs struct {
+		Event     *int64  `json:"event,omitempty"`
 		Action    string  `json:"action" enum:"set,clear,color"`
 		Questline *int64  `json:"questline,omitempty"`
 		Note      *int64  `json:"note,omitempty"`
 		FilePath  string  `json:"file_path,omitempty" desc:"set: local image"`
 		Color     *string `json:"color,omitempty" desc:"color: hex like #c47a20"`
 	}
-	icon := Typed("icon", "A questline's or note's icon: action=set (file_path), clear, or color (hex).",
+	icon := Typed("icon", "A calendar event's, questline's or note's icon: action=set (file_path), clear, or color (hex).",
 		func(ctx context.Context, a iconArgs) (any, error) {
-			_, seg, oid, err := owner{Questline: a.Questline, Note: a.Note}.resolve(false)
+			var seg string
+			var oid int64
+			var err error
+			if a.Event != nil {
+				if *a.Event <= 0 || a.Questline != nil || a.Note != nil {
+					return nil, &Err{422, "pass exactly one positive event, questline or note id"}
+				}
+				seg = "calendar/events"
+				oid = *a.Event
+			} else {
+				_, seg, oid, err = owner{Questline: a.Questline, Note: a.Note}.resolve(false)
+			}
 			if err != nil {
 				return nil, err
 			}

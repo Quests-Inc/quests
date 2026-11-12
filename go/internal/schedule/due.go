@@ -75,8 +75,8 @@ func fixedDeadline(tmpl templateRow, localNow time.Time, loc *time.Location) (*t
 	var duration int
 	if tmpl.DurationSeconds.Valid {
 		duration = int(tmpl.DurationSeconds.Int64)
-		if duration < 1 {
-			duration = 1
+		if duration < 0 {
+			duration = 0
 		}
 	} else {
 		startLocal := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)

@@ -1,8 +1,17 @@
-import { expect, test } from 'bun:test'
+import { expect, mock, test } from 'bun:test'
 
 import { flushSync, mount, unmount } from 'svelte'
 
-import ScopePicker from '@/shared/ui/ScopePicker.svelte'
+mock.module('@/shared/api/entitySearch.ts', () => ({
+  searchEntities: async (q: { q: string; allowed: Record<string, number[]> }) => ({
+    hits: many
+      .filter((l) => q.allowed.questline.includes(l.id) && l.title === q.q)
+      .map((l) => ({ ...l, kind: 'questline' })),
+    more: false,
+    next: 1,
+  }),
+}))
+const { default: ScopePicker } = await import('@/shared/ui/ScopePicker.svelte')
 
 const categories = [
   { id: 1, label: 'Работа', color: '#5a8a9a' },
@@ -85,7 +94,7 @@ test('«Все разделы» и раздел без квестлайнов н
   t.done()
 })
 
-test('«Без раздела» — тоже раздел: длинный список получает поиск и фильтр', () => {
+test('«Без раздела» — тоже раздел: длинный список получает поиск и фильтр', async () => {
   const t = setup()
   t.btn().click()
   flushSync()
@@ -94,6 +103,8 @@ test('«Без раздела» — тоже раздел: длинный спи
   expect(search).not.toBeNull()
   search.value = 'Линия 11'
   search.dispatchEvent(new Event('input', { bubbles: true }))
+  flushSync()
+  await new Promise((r) => setTimeout(r, 180))
   flushSync()
   expect([...t.sub()!.querySelectorAll('.scope__list .scope__row')].map((e) => e.textContent?.trim())).toEqual([
     'Линия 11',

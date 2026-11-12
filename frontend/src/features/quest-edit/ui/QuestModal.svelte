@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DeadlineOptions from '@/shared/ui/DeadlineOptions.svelte'
   import {
     QUEST_SIGNIFICANCES,
     QUEST_STATUSES,
@@ -88,6 +89,7 @@
   let deadlineMinute = $state('00')
   let durationHours = $state('')
   let durationMinutes = $state('')
+  let expireOnDeadline = $state(true)
   /** Off = no deadline. */
   let deadlineOn = $state(false)
   /** time = «за окно до срока»; event = «за/через время до/после края события». */
@@ -205,6 +207,7 @@
     questline_id: any
     deadline_at: any
     duration_seconds: number
+    expire_on_deadline?: boolean
     event_id?: number | null
     event_edge?: string
     event_dir?: string
@@ -238,6 +241,7 @@
       deadlineDate = ''
     }
     ;({ hours: durationHours, minutes: durationMinutes } = secondsToParts(q?.duration_seconds))
+    expireOnDeadline = q ? (q.expire_on_deadline ?? Number(q.duration_seconds)>0) : true
     deadlineMode = q?.event_id ? 'event' : 'time'
     eventId = q?.event_id ? String(q.event_id) : ''
     eventEdge = q?.event_edge === 'end' ? 'end' : 'start'
@@ -334,6 +338,7 @@
         tag_ids: selectedTags.map((t) => t.id),
         deadline_at,
         event_id: null,
+        expire_on_deadline:expireOnDeadline,
       }
       if (!deadlineOn) {
         payload.duration_seconds = null
@@ -347,9 +352,9 @@
         payload.event_edge = eventEdge
         payload.event_dir = eventDir
         payload.event_offset_seconds = partsToSeconds(offsetHours, offsetMinutes) ?? 0
-        payload.duration_seconds = 0
+        payload.duration_seconds = partsToSeconds(durationHours, durationMinutes) ?? 0
       } else {
-        // Empty or zero hours and minutes: no urgency window, no auto-expire.
+        // Empty/zero means no urgency window; expiry is an independent policy.
         payload.duration_seconds = partsToSeconds(durationHours, durationMinutes) ?? 0
       }
       let saved
@@ -466,7 +471,7 @@
       <div class="field">
         <span class="label">Квестлайн</span>
         <Picker
-          options={lineOptions}
+          kind="questline" options={lineOptions}
           bind:value={questlineId}
           label="Квестлайн"
           onChange={(id) => {
@@ -493,7 +498,7 @@
       {#if questlineId === ''}
         <div class="field">
           <span class="label">Раздел</span>
-          <Picker options={categoryOptions} bind:value={categoryId} label="Раздел" onChange={() => (catTouched = true)} />
+          <Picker kind="category" options={categoryOptions} bind:value={categoryId} label="Раздел" onChange={() => (catTouched = true)} />
           <SuggestChip
             index={suggestIndex}
             {title}
@@ -552,15 +557,10 @@
         />
         {#if deadlineMode === 'time'}
           <div class="inline-line deadline-phrase deadline-phrase--time">
-            <span>За</span>
-            <DurationInput bind:hours={durationHours} bind:minutes={durationMinutes} label="Окно" />
-            <span>до</span>
+            <span>До</span>
             <DateInput bind:value={deadlineDate} label="Дата срока" />
             <TimeSelect bind:hour={deadlineHour} bind:minute={deadlineMinute} label="Время срока" />
-            <HelpTip label="Что такое окно срочности">
-              <p>Окно — сколько времени до срока квест считается срочным: таймер, напоминание в HUD и Telegram. По истечении срока квест просрочен.</p>
-              <p>Пустые или нулевые часы и минуты — без окна: срок просто ориентир, без таймера и без автопросрочки.</p>
-            </HelpTip>
+
           </div>
         {:else}
           <div class="inline-line deadline-phrase deadline-phrase--event">
@@ -594,6 +594,7 @@
             <p class="hint">События задаются на календаре.</p>
           {/if}
         {/if}
+        <DeadlineOptions bind:hours={durationHours} bind:minutes={durationMinutes} bind:expire={expireOnDeadline} />
       {/if}
     </FormSection>
 
@@ -692,12 +693,11 @@
   }
 
   .deadline-phrase--time :global(.date-input) {
-    flex: 1 1 auto;
-    min-width: 8rem;
+    flex: 0 0 auto;
   }
 
   .deadline-phrase--time :global(.date-input__btn) {
-    width: 100%;
+    width: auto;
   }
 
   .deadline-phrase--event {

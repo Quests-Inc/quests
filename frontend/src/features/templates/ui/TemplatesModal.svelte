@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DeadlineOptions from '@/shared/ui/DeadlineOptions.svelte'
   import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import {
     WEEKDAY_LABELS,
@@ -64,6 +65,7 @@
   let editing = $state((null as any | null))
   let title = $state('')
   let description = $state('')
+  let expireOnDeadline = $state(true)
   let tagCatalog: { id: number, slug: string, label: string, color?: string }[] = $state([])
   let selectedTags: { id: number, slug: string, label: string, color?: string }[] = $state([])
   /** HUD presence of created quests: 'default' | 'always' | 'never'. */
@@ -230,6 +232,7 @@
       deadlineHour = d.hour
       deadlineMinute = d.minute
     }
+    expireOnDeadline = t ? (t.expire_on_deadline ?? Number(t.duration_seconds)>0) : true
     ;({ hours: durationHours, minutes: durationMinutes } = secondsToParts(t?.duration_seconds))
     steps = t?.steps?.length ? t.steps.map((s: any) => templateStepDraft(s)) : [templateStepDraft()]
     selectedTags = Array.isArray(t?.tags) ? t.tags.map((x: any) => ({ ...x })) : []
@@ -354,6 +357,7 @@
         emit_window_end: `${windowEndHour}:${windowEndMinute}`,
         deadline_time: null as string | null,
         duration_seconds,
+        expire_on_deadline:expireOnDeadline,
       }
     }
     const deadline_time = hasDeadline ? `${deadlineHour}:${deadlineMinute}` : null
@@ -364,7 +368,8 @@
       emit_window_start: null,
       emit_window_end: null,
       deadline_time,
-      duration_seconds: deadline_time ? duration_seconds : null,
+      duration_seconds: deadline_time ? (duration_seconds ?? 0) : null,
+      expire_on_deadline:expireOnDeadline,
     }
   }
 
@@ -549,7 +554,7 @@
         <div class="field">
           <span class="label">Квестлайн</span>
           <Picker
-            options={lineOptions}
+            kind="questline" options={lineOptions}
             bind:value={questlineId}
             label="Квестлайн"
             onChange={(id) => {
@@ -576,7 +581,7 @@
         {#if questlineId === ''}
           <div class="field">
             <span class="label">Раздел</span>
-            <Picker options={categoryOptions} bind:value={categoryId} label="Раздел" onChange={() => (catTouched = true)} />
+            <Picker kind="category" options={categoryOptions} bind:value={categoryId} label="Раздел" onChange={() => (catTouched = true)} />
             <SuggestChip
               index={suggestIndex}
               {title}
@@ -626,17 +631,11 @@
           <div class="inline-line">
             срок
             <TimeSelect bind:hour={deadlineHour} bind:minute={deadlineMinute} allowNone label="Срок" />
-            {#if hasDeadline}
-              окно
-              <DurationInput bind:hours={durationHours} bind:minutes={durationMinutes} label="Окно срочности" />
-            {/if}
-            <HelpTip label="Срок и окно">
-              <p>Срок — время дня; «—» означает квест без срока.</p>
-              <p>Окно — сколько до срока квест срочный. Пустое окно — от полуночи до срока.</p>
-            </HelpTip>
+
           </div>
         {/if}
 
+        <DeadlineOptions showWindow={emitMode === 'fixed' && hasDeadline} bind:hours={durationHours} bind:minutes={durationMinutes} bind:expire={expireOnDeadline} label="Помечать созданные квесты просроченными после срока" />
         <div class="inline-line tz-line">
           <span class="hint">часовой пояс</span>
           {#if tzEditing}

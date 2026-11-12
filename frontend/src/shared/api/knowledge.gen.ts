@@ -185,6 +185,7 @@ export interface NoteBriefRead {
   icon_url?: string;
 }
 export interface NoteFilter {
+  Catalog: boolean;
   ParentID?: number /* int64 */;
   ParentUnset: boolean;
   Pinned?: boolean;
@@ -256,6 +257,7 @@ export interface SearchHit {
  * SearchOpts narrows a search.
  */
 export interface SearchOpts {
+  Filters: any /* search.Filter */[];
   Limit: number /* int */;
   /**
    * ExcludePrivate leaves PRIVATE notes out (what an agent must never be shown).

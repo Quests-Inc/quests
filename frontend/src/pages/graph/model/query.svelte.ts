@@ -1,8 +1,9 @@
 // Центр карты и загрузка графа вокруг него: поиск корня, дополнительные центры, очистка.
 import { CENTERABLE } from '@/entities/graph'
-import { findEntities } from '@/entities/quest'
+import { ENTITY_SPEC } from '@/entities/quest'
 import { getGraph, putGraphDraftRoots } from '@/shared/api/graph.ts'
 import type { Graph } from '@/shared/api/store.gen'
+import { parseQuery } from '@/shared/lib/searchFlags.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 type Center = { type: string | null; id: number | null }
@@ -18,6 +19,12 @@ function messageOf(e: unknown) {
 }
 
 export function createGraphQuery(deps: {
+  searchResults?: () => {
+    parsed: ReturnType<typeof parseQuery>
+    items: { type: string; id: number; title: string }[]
+    pending?: boolean
+    error?: string
+  }
   getTreeSettings?: (key: string) => { depth: number; layout: string } | undefined
   initTree?: (key: string, depth: number) => void
   getActive: () => boolean
@@ -58,6 +65,7 @@ export function createGraphQuery(deps: {
   let error = $state('')
   let rootQuery = $state('')
   let pickOpen = $state(false)
+
   let seq = 0
   let lastRootKey = ''
   let lastDataJson = ''
@@ -232,12 +240,7 @@ export function createGraphQuery(deps: {
       pickOpen = v
     },
     get found() {
-      return findEntities(rootQuery, {
-        questlines: deps.getQuestlines(),
-        quests: deps.getQuests(),
-        notes: deps.getNotes(),
-        limit: 12,
-      })
+      return deps.searchResults?.() ?? { parsed: parseQuery(rootQuery, ENTITY_SPEC), items: [] }
     },
     get canClear() {
       return Boolean(center.id) || deps.getDraftRoots().length > 0 || deps.getHiddenSize() > 0

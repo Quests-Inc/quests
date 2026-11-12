@@ -112,11 +112,11 @@
         </div>
         {#if scopeKind === 'quest'}
           <div class="field">
-            <Picker options={questOptions} bind:value={scopeId} noneLabel="Выберите квест" label="Квест области" disabled={saving} />
+            <Picker kind="quest" options={questOptions} bind:value={scopeId} noneLabel="Выберите квест" label="Квест области" disabled={saving} />
           </div>
         {:else if scopeKind === 'note' || scopeKind === 'note_tree'}
           <div class="field">
-            <Picker options={noteOptions} bind:value={scopeId} noneLabel="Выберите заметку" label="Заметка области" disabled={saving} />
+            <Picker kind="note" options={noteOptions} bind:value={scopeId} noneLabel="Выберите заметку" label="Заметка области" disabled={saving} />
           </div>
         {:else if scopeKind === 'step'}
           <label class="field">
