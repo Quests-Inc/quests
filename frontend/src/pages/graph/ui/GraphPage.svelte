@@ -1,4 +1,6 @@
 <script lang="ts">
+ import {attachmentImage,showImages} from '@/shared/lib/imageViewer.svelte.ts'
+ import {isRaster} from '@/entities/attachment'
   import { uploadUnboundAttachment } from '@/shared/api/attachments.ts'
   import { onDestroy } from 'svelte'
   import { createEntitySearch, searchFilters, searchTypes } from '@/shared/lib/entitySearch.svelte.ts'
@@ -94,7 +96,13 @@
     getPicked: () => stage.picked,
     setPicked: (s) => stage.setPicked(s),
     getSaved: () => saved,
-    select: (n) => stage.select(n),
+    select: (n) => {
+      stage.select(n)
+      if(n.type==='attachment'&&isRaster({content_type_detected:n.mime})){
+        const images=stage.nodes.filter(node=>node.type==='attachment'&&isRaster({content_type_detected:node.mime})).map(node=>attachmentImage({id:node.id,filename:node.title}))
+        showImages(images,attachmentImage({id:n.id,filename:n.title}).src)
+      }
+    },
   })
   lk = createLinkMode({
     getNodeMap: () => stage.nodeMap,

@@ -4,6 +4,7 @@
 const TABS = [
   'notes',
   'attachments',
+  'repositories',
   'calendar',
   'history',
   'graph',
@@ -67,6 +68,7 @@ export type ViewName =
   | 'journal'
   | 'notes'
   | 'attachments'
+  | 'repositories'
   | 'calendar'
   | 'history'
   | 'graph'

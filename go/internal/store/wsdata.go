@@ -65,7 +65,7 @@ func (s *Store) ReadTable(ctx context.Context, spec TableSpec, fn func(row map[s
 			if c == "workspace_id" || c == "search_tsv" { // search_tsv is generated: rebuilt on import
 				continue
 			}
-			if spec.Name == "secret" && c == "value" {
+			if (spec.Name == "secret" || spec.Name == "repository_token") && c == "value" {
 				// Archives carry the value itself (sealed values would only open on this server).
 				if str, ok := vals[i].(string); ok {
 					plain, okOpen := s.Execution.OpenSecret(str)
@@ -337,7 +337,7 @@ func (s *Store) ImportWorkspace(ctx context.Context, tables TableRows, opt Impor
 				vals["custom_icon"] = nil // icon files are re-attached by the caller
 			}
 
-			if spec.Name == "secret" {
+			if spec.Name == "secret" || spec.Name == "repository_token" {
 				if str, ok := vals["value"].(string); ok {
 					sealed, err := s.Execution.SealSecret(str)
 					if err != nil {

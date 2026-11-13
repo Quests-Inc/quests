@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { attachmentImage, showImages } from '@/shared/lib/imageViewer.svelte.ts'
   import { onMount } from 'svelte'
   import type { AttachmentView } from '@/shared/api/knowledge_http.gen.ts'
   import { getAttachmentPreview } from '@/shared/api/attachments.ts'
@@ -7,7 +8,7 @@
   import { fileCodeLanguage, highlightCode } from '@/shared/lib/codeHighlight.ts'
   import { extOf, isRaster, isTextPreview, thumbSrc } from '../model/list.ts'
 
-  let { a }: { a: AttachmentView } = $props()
+  let { a, gallery = [] }: { a: AttachmentView; gallery?: AttachmentView[] } = $props()
   let host = $state<HTMLDivElement | null>(null)
   let visible = $state(false)
   let excerpt = $state('')
@@ -65,7 +66,7 @@
 
 <div class="file-preview" style:--file-color={fileKind(a).color} bind:this={host}>
   {#if isRaster(a) && !imageFailed}
-    <img src={thumbSrc(a)} alt={a.filename} loading="lazy" onerror={() => (imageFailed = true)} />
+    <button type="button" class="file-preview__image" aria-label={`Открыть изображение ${a.filename}`} onclick={event=>{event.stopPropagation();showImages((gallery.some(item=>item.id===a.id)?gallery:[a,...gallery]).filter(isRaster).map(attachmentImage),attachmentImage(a).src)}}><img src={thumbSrc(a)} alt={a.filename} loading="lazy" onerror={() => (imageFailed = true)} /></button>
   {:else if excerpt}
     <div class="file-preview__text" title={LABELS[kind] || 'Превью'}>
       <pre class="file-code">{#if language}{@html highlighted}{:else}{excerpt}{/if}</pre>
@@ -88,6 +89,7 @@
 
 <style>
   .file-preview { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: var(--attachment-preview-bg, color-mix(in srgb, var(--file-color) 8%, var(--color-bg-raised, #1a1a1a))); }
+  .file-preview__image {display:block;width:100%;height:100%;padding:0;border:0;background:transparent;cursor:zoom-in}
   .file-preview img { width: 100%; height: 100%; object-fit: contain; }
   .file-preview__icon { display: grid; place-content: center; justify-items: center; gap: 0.4rem; height: 100%; }
   .file-preview__icon span { font: var(--text-xs, 0.75rem) var(--font-mono, monospace); color: var(--color-fg-muted, #9a9a9a); }

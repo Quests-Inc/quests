@@ -2,7 +2,11 @@ package schedule
 
 import (
 	"context"
+	"github.com/quests-inc/quests/go/internal/repository"
 	"log"
+	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/platform/webdav"
@@ -13,11 +17,11 @@ import (
 // RunWorkspacePurgeLoop removes workspaces whose deletion grace period is over:
 // their attachment files on WebDAV first, then the database rows (every table's
 // workspace_id cascades). Hourly.
-func RunWorkspacePurgeLoop(ctx context.Context, st *store.Store, wd *webdav.Client) {
+func RunWorkspacePurgeLoop(ctx context.Context, st *store.Store, wd *webdav.Client, dataDir string) {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
 	for {
-		PurgeDueWorkspaces(ctx, st, wd)
+		PurgeDueWorkspaces(ctx, st, wd, dataDir)
 		select {
 		case <-ctx.Done():
 			return
@@ -27,7 +31,7 @@ func RunWorkspacePurgeLoop(ctx context.Context, st *store.Store, wd *webdav.Clie
 }
 
 // PurgeDueWorkspaces purges every workspace past its grace period.
-func PurgeDueWorkspaces(ctx context.Context, st *store.Store, wd *webdav.Client) {
+func PurgeDueWorkspaces(ctx context.Context, st *store.Store, wd *webdav.Client, dataDir string) {
 	ids, err := st.Identity.DueForPurge(ctx)
 	if err != nil {
 		log.Printf("purge: list: %v", err)
@@ -50,6 +54,16 @@ func PurgeDueWorkspaces(ctx context.Context, st *store.Store, wd *webdav.Client)
 			}
 			if failed {
 				continue // retry next hour rather than orphan files
+			}
+		}
+		if dataDir != "" {
+			lock := repository.WorkspaceLock(dataDir, id)
+			lock.Lock()
+			err := os.RemoveAll(filepath.Join(dataDir, "repositories", strconv.FormatInt(id, 10)))
+			lock.Unlock()
+			if err != nil {
+				log.Printf("purge: workspace %d repositories: %v", id, err)
+				continue
 			}
 		}
 		if err := st.Identity.PurgeWorkspace(ctx, id); err != nil {

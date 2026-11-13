@@ -1,0 +1,65 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"net/http/httptest"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+func TestRepositoryGitTokenAndOwner(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	s.DataDir = t.TempDir()
+	s.Auth = s.Store.Identity
+	s.AuthRequired = true
+	user, err := s.Auth.CreateUser("gitowner", "correcthorse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws, err := s.Auth.CreateWorkspace(context.Background(), user.ID, "Sources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := s.Auth.CreateAPIToken(user.ID, "git", ws.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := s.Handler()
+	r := httptest.NewRequest("POST", "/api/repositories", strings.NewReader(`{"title":"Owned"}`))
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 201 {
+		t.Fatal(w.Body.String())
+	}
+	var made struct {
+		ID int64 `json:"id"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &made)
+	path := "/api/repositories/" + strconv.FormatInt(made.ID, 10) + "/git/info/refs?service=git-upload-pack"
+	r = httptest.NewRequest("GET", path, nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 401 || w.Header().Get("WWW-Authenticate") == "" {
+		t.Fatal("missing git auth challenge")
+	}
+	r = httptest.NewRequest("GET", path, nil)
+	r.SetBasicAuth("git", token)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Fatalf("basic token =%d %s", w.Code, w.Body.String())
+	}
+	if _, err = s.Auth.DB.Exec(`UPDATE workspace_member SET role='member' WHERE user_id=? AND workspace_id=?`, user.ID, ws.ID); err != nil {
+		t.Fatal(err)
+	}
+	r = httptest.NewRequest("GET", strings.Replace(path, "git-upload-pack", "git-receive-pack", 1), nil)
+	r.SetBasicAuth("git", token)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 403 {
+		t.Fatalf("member push advertisement =%d", w.Code)
+	}
+}

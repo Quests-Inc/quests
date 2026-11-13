@@ -361,6 +361,7 @@
       {@const a = selected}
       <AttachmentPanel
         {a}
+        gallery={filtered}
         busy={ops.busyId === a.id}
         revs={ops.revs}
         revsBusy={ops.revsBusy}
@@ -398,7 +399,7 @@
   >
     <div class="attpage__thumb">
       {#if view === 'cards' || isRaster(a)}
-        <AttachmentPreview {a} />
+        <AttachmentPreview {a} gallery={filtered} />
       {:else}
         <span class="attpage__kind">
           <FileKindIcon att={a} size={20} />

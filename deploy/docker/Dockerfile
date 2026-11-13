@@ -82,7 +82,7 @@ RUN apt-get update \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends postgresql-common \
     && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
-    && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && apt-get install -y --no-install-recommends postgresql-client-17 git \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=go-build /out/quests-server /usr/local/bin/quests-server
 COPY --from=go-build /out/quests /usr/local/bin/quests

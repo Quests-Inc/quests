@@ -141,8 +141,8 @@ test('группа раскрывается по наведению, пункт 
   group.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }))
   flushSync()
   const items = [...h.target.querySelectorAll<HTMLElement>('.view-drop [role=menuitem]')]
-  expect(items.map((i) => i.textContent?.trim())).toEqual(['Вложения', 'История', 'Корзина'])
-  items[1].click()
+  expect(items.map((i) => i.textContent?.trim())).toEqual(['Вложения', 'Репозитории', 'История', 'Корзина'])
+  items[2].click()
   flushSync()
   expect(h.calls).toEqual(['view:history'])
   expect(h.target.querySelector('.view-drop')).toBeNull()
@@ -160,6 +160,6 @@ test('касание и клавиатура: тап по группе откр�
   trigger.click()
   flushSync()
   expect(trigger.getAttribute('aria-expanded')).toBe('true')
-  expect(h.target.querySelectorAll('.view-drop [role=menuitem]')).toHaveLength(3)
+  expect(h.target.querySelectorAll('.view-drop [role=menuitem]')).toHaveLength(4)
   h.stop()
 })

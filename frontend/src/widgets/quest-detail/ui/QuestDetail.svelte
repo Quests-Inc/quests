@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {RepositoriesBlock} from '@/entities/repository'
   import { untrack } from 'svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import { QuestlineIcon } from '@/entities/questline'
@@ -21,7 +22,6 @@
   import { animateText } from '@/shared/lib/typewriter.ts'
   import { getRunStats } from '@/shared/api/client.ts'
   import type { SourceRunStats } from '@/shared/api/execution.gen.ts'
-
   let {
     selected,
     quests = [],
@@ -85,7 +85,6 @@
     onRef?: (kind: string, id: number) => void,
     onOpenGraph?: (type: string, id: number) => void,
   } = $props()
-
   /** The latest run of each step with a check or a script (quest=490): the dot on the step's chip. */
   let stepRuns = $state<Record<string, SourceRunStats>>({})
   $effect(() => {
@@ -98,7 +97,6 @@
         .catch(() => {})
     })
   })
-
   const tzLabel = localTimeZone()
   const pdf = createQuestPdf({
     simple: (q) => downloadQuestPdfSimple(q),
@@ -106,7 +104,6 @@
     progress: toastProgress,
     done: toastDone,
   })
-
   let lineQuests = $derived.by(() => {
     if (!selected?.questline_id) return []
     const lid = Number(selected.questline_id)
@@ -123,7 +120,6 @@
         return (a.id || 0) - (b.id || 0)
       })
   })
-
   let inQuestline = $derived(Boolean(selected?.questline_id))
 
   let lineRow = $derived(
@@ -537,6 +533,7 @@
               <span class="step__btn-slot" aria-hidden="true"></span>
             {/if}
           </div>
+          <RepositoriesBlock compact owner={{kind:'step',id:step.id,path:''}} />
           <StepValues stepId={step.id} source={stepDesc} show={Boolean(step.description || stepDesc)} class="step__desc" {labels} {onRef} typing={typingSteps.has(step.id)} />
         </li>
       {/each}
@@ -560,6 +557,7 @@
   </div>
 
   <div class="block">
+    <RepositoriesBlock owner={{kind:'quest',id:q.id,path:''}} />
     <AttachmentsBlock ownerType="quest" ownerId={q.id} onOpenOwner={onRef} />
   </div>
 
@@ -685,6 +683,7 @@
         </div>
       {/if}
 
+      <RepositoriesBlock owner={{kind:'questline',id:Number(selected.questline_id),path:''}} />
       <div class="detail__line-attach">
         <AttachmentsBlock
           ownerType="questline"

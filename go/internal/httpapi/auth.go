@@ -51,6 +51,9 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		}
 		p, ok := s.principal(r)
 		if !ok {
+			if strings.HasPrefix(r.URL.Path, "/api/repositories/") && strings.Contains(r.URL.Path, "/git/") {
+				w.Header().Set("WWW-Authenticate", `Basic realm="Quests Git"`)
+			}
 			writeErr(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
@@ -66,7 +69,14 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 }
 
 func (s *Server) principal(r *http.Request) (identity.Principal, bool) {
-	if secret := bearerToken(r); secret != "" {
+	secret := bearerToken(r)
+	if secret == "" && strings.HasPrefix(r.URL.Path, "/api/repositories/") && strings.Contains(r.URL.Path, "/git/") {
+		_, password, ok := r.BasicAuth()
+		if ok {
+			secret = password
+		}
+	}
+	if secret != "" {
 		// The in-process token the LLM assistant uses to call our own API over
 		// loopback. Never persisted, never handed out.
 		if s.InternalToken != "" && subtleEqual(secret, s.InternalToken) {
