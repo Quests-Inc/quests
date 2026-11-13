@@ -27,3 +27,33 @@ Metadata and associations travel in the workspace archive with remapped IDs. Loc
 Migration **0046** removes earlier draft step links/path fields and permits notes; no source bytes are removed. Migration **0045** adds repository, repository_link and repository_token with workspace RLS. The application role never accesses another workspace's source directory until the repository row passed its workspace lookup.
 
 API tokens belong to an account (`apitoken.user_id`) and are scoped to a workspace; they are not shared workspace identities. Basic username matching catches mismatched credentials, while the token remains the actual secret. Accepted Git HTTP requests use the verified username as REMOTE_USER and successful pushes log the account/workspace/repository. Client-supplied commit author/committer metadata is separate from the authenticated pusher and is not proof of identity.
+
+## Stable Git addresses
+
+Migration **0047** adds `workspace.slug` (unique on the server, including deleted
+workspaces until purge) and `repository.slug` (unique within a workspace). Both
+accept 1–63 lowercase ASCII letters/digits separated by single hyphens. Existing
+and newly created objects default to `workspace-ID` / `repo-ID`, so duplicate or
+non-Latin display titles need no automatic transliteration. Slugs are independent
+of display titles.
+
+Owners edit the workspace slug in Settings → Workspace, and the repository slug
+in its creation/settings dialog. Changing a slug changes the named clone URL;
+the form warns to update local `origin`. Old slug names are not redirects. The
+original ID-based `/api/repositories/ID/git` URL remains supported.
+
+The canonical local clone URL is `/git/WORKSPACE_SLUG/REPOSITORY_SLUG.git`.
+Authentication is the same verified account login + workspace-scoped API token.
+The named URL selects the workspace, but never expands the token's workspace
+scope or membership/owner permissions. Git paths are authenticated API routes,
+not public SPA assets. Vite proxies `/git` to the API as well as `/api`.
+
+The repository view provides a collapsible shortcut recipe, for example:
+
+```sh
+git config --global url."https://quests.example/git/my-space/".insteadOf "q:"
+git clone q:my-project.git
+```
+
+This is optional client configuration; Quests never edits the user's global Git
+settings. Use distinct prefixes for different spaces if configuring several.

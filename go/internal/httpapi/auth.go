@@ -33,7 +33,7 @@ func isPublicAPI(path string) bool {
 // screen. Serving it unauthenticated leaks no data — the SPA fetches everything
 // through /api/, which stays gated.
 func isSPAAsset(path string) bool {
-	return !strings.HasPrefix(path, "/api/") && path != "/ws"
+	return !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/git/") && path != "/ws"
 }
 
 // requireAuth gates every request. Credentials come either from the session
@@ -51,7 +51,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		}
 		p, ok := s.principal(r)
 		if !ok {
-			if strings.HasPrefix(r.URL.Path, "/api/repositories/") && strings.Contains(r.URL.Path, "/git/") {
+			if isGitTransport(r.URL.Path) {
 				w.Header().Set("WWW-Authenticate", `Basic realm="Quests Git"`)
 			}
 			writeErr(w, http.StatusUnauthorized, "authentication required")
@@ -71,7 +71,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 func (s *Server) principal(r *http.Request) (identity.Principal, bool) {
 	secret := bearerToken(r)
 	gitLogin := ""
-	if secret == "" && strings.HasPrefix(r.URL.Path, "/api/repositories/") && strings.Contains(r.URL.Path, "/git/") {
+	if secret == "" && isGitTransport(r.URL.Path) {
 		login, password, ok := r.BasicAuth()
 		if ok {
 			if login == "" {
@@ -134,4 +134,8 @@ func (s *Server) originAllowed(r *http.Request) bool {
 func (s *Server) limiter() *ratelimit.Limiter {
 	s.loginLimiterOnce.Do(func() { s.loginLimiter = ratelimit.New() })
 	return s.loginLimiter
+}
+
+func isGitTransport(path string) bool {
+	return strings.HasPrefix(path, "/git/") || strings.HasPrefix(path, "/api/repositories/") && strings.Contains(path, "/git/")
 }

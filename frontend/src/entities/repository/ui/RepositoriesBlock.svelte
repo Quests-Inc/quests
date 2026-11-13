@@ -12,18 +12,19 @@
  import ModalFoot from '@/shared/ui/ModalFoot.svelte'
  let {owner}:{owner?:RepositoryLink}=$props()
  let repos=$state<Repository[]>([]),error=$state(''),busy=$state(false),loaded=$state(false),expanded=$state(false),creating=$state(false),selected=$state<number|null>(untrack(()=>Number(new URL(location.href).searchParams.get('repo'))||null))
- let search=$state(''),attaching=$state(false)
+ let search=$state(''),attaching=$state(false),editingId=$state<number|null>(null),slug=$state(''),originalSlug=$state('')
  let title=$state(''),kind=$state('local'),url=$state(''),branch=$state('main'),token=$state(''),attachId=$state(''),quota=$state(0),tokenFor=$state<number|null>(null)
  let refreshNo=$state(0)
- const shown=$derived(owner?repos.filter(repo=>repo.links.some(l=>l.kind===owner.kind&&l.id===owner.id)):repos.filter(repo=>{const q=search.trim().toLowerCase().replace(/^repository=/,'');return !q||String(repo.id)===q||repo.title.toLowerCase().includes(q)||repo.url.toLowerCase().includes(q)}))
+ const shown=$derived(owner?repos.filter(repo=>repo.links.some(l=>l.kind===owner.kind&&l.id===owner.id)):repos.filter(repo=>{const q=search.trim().toLowerCase().replace(/^repository=/,'');return !q||String(repo.id)===q||repo.slug?.includes(q)||repo.title.toLowerCase().includes(q)||repo.url.toLowerCase().includes(q)}))
  const available=$derived(repos.filter(repo=>!shown.some(x=>x.id===repo.id)))
  $effect(()=>{void owner?.id;void owner?.kind;void refreshNo;const abort={active:true};loaded=false
  void listRepositories().then(result=>{if(abort.active){repos=result.items??[];quota=result.quota_bytes??0;loaded=true}}).catch(e=>{if(abort.active)error=e.message||String(e)});return()=>{abort.active=false}})
- async function create(event:SubmitEvent){event.preventDefault();busy=true;error='';try{await createRepository({title,kind,url,branch,token,owner});creating=false;title='';token='';expanded=true;refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
+ async function create(event:SubmitEvent){event.preventDefault();busy=true;error='';try{if(editingId!==null){await updateRepository(editingId,{title,slug,branch})}else{await createRepository({title,slug,kind,url,branch,token,owner})};creating=false;title='';token='';expanded=true;refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
  async function attach(){if(!owner||!attachId)return;busy=true;error='';try{await linkRepository(Number(attachId),owner);refreshNo++;attachId='';attaching=false;expanded=true}catch(e){error=e.message||String(e)}finally{busy=false}}
  async function detach(repo:Repository){if(!owner)return;busy=true;try{await unlinkRepository(repo.id,owner);refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
  async function saveToken(){if(tokenFor===null)return;busy=true;error='';try{await updateRepository(tokenFor,{token});tokenFor=null;token='';refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
- function openCreate(){creating=true;token='';error=''}
+ function openCreate(){editingId=null;title='';slug='';kind='local';url='';branch='main';creating=true;token='';error=''}
+ function openEdit(repo:Repository){editingId=repo.id;title=repo.title;slug=repo.slug??'';originalSlug=slug;kind=repo.kind;url=repo.url;branch=repo.branch;token='';error='';creating=true}
  function selectRepo(id:number){selected=id;if(window.matchMedia(SIDEBAR_ONE_PANE).matches)sidebars.setCollapsed('repositories',true);const next=new URL(location.href);next.searchParams.set('repo',String(id));history.replaceState(history.state,'',next)}
  const activeRepo=$derived(repos.find(repo=>repo.id===selected)??null)
 </script>
@@ -49,17 +50,20 @@
    </div>
   </aside>{/snippet}
   <section class="repo-detail" aria-label="Репозиторий">
-   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1>{#if activeRepo.kind!=='local'}<button type="button" class="btn btn--ghost" onclick={()=>{tokenFor=activeRepo.id;token=''}}>Секрет {activeRepo.has_token?'задан':'не задан'}</button>{/if}</header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
+   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1><button type="button" class="btn btn--ghost" onclick={()=>openEdit(activeRepo)}>Настройки</button>{#if activeRepo.kind!=='local'}<button type="button" class="btn btn--ghost" onclick={()=>{tokenFor=activeRepo.id;token=''}}>Секрет {activeRepo.has_token?'задан':'не задан'}</button>{/if}</header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
   </section>
  </SidebarLayout>
 {/if}
-<ModalShell open={creating} onClose={()=>{if(!busy)creating=false}} closeDisabled={busy} labelledby="repo-create-title" maxWidth="38rem"><ModalHead id="repo-create-title" title="Новый репозиторий" onClose={()=>creating=false} closeDisabled={busy}/><form class="modal__form" onsubmit={create}>
+<ModalShell open={creating} onClose={()=>{if(!busy)creating=false}} closeDisabled={busy} labelledby="repo-create-title" maxWidth="38rem"><ModalHead id="repo-create-title" title={editingId===null?"Новый репозиторий":"Настройки репозитория"} onClose={()=>creating=false} closeDisabled={busy}/><form class="modal__form" onsubmit={create}>
  <label class="field"><span class="label">Название</span><input required bind:value={title} maxlength="200"/></label>
- <label class="field"><span class="label">Хранение</span><select bind:value={kind}><option value="local">Свой Git в Quests</option><option value="github">GitHub</option><option value="gitlab">GitLab</option></select></label>
- {#if kind!=='local'}<label class="field"><span class="label">Адрес репозитория</span><input type="url" required placeholder={`https://${kind}.com/owner/project`} bind:value={url}/></label><label class="field"><span class="label">Токен только для чтения · необязательно</span><input type="password" autocomplete="off" bind:value={token}/></label><p class="hint">Push идёт напрямую на внешний хост. Quests читает журнал и дерево через API. Исходящий доступ на сервере должен быть разрешён.</p>{/if}
+ <label class="field"><span class="label">Slug репозитория</span><input aria-label="Slug репозитория" required={editingId!==null} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="63" placeholder="Автоматически: repo-ID" bind:value={slug}/></label>
+ <p class="hint">Уникален внутри пространства. Строчные латинские буквы, цифры и дефисы. Изменение названия не меняет slug.</p>
+ {#if editingId!==null && slug!==originalSlug}<p class="hint">Git-адрес изменится. Обновите origin в локальном клоне.</p>{/if}
+ <label class="field"><span class="label">Хранение</span><select bind:value={kind} disabled={editingId!==null}><option value="local">Свой Git в Quests</option><option value="github">GitHub</option><option value="gitlab">GitLab</option></select></label>
+ {#if kind!=='local' && editingId===null}<label class="field"><span class="label">Адрес репозитория</span><input type="url" required placeholder={`https://${kind}.com/owner/project`} bind:value={url}/></label><label class="field"><span class="label">Токен только для чтения · необязательно</span><input type="password" autocomplete="off" bind:value={token}/></label><p class="hint">Push идёт напрямую на внешний хост. Quests читает журнал и дерево через API. Исходящий доступ на сервере должен быть разрешён.</p>{/if}
  <label class="field"><span class="label">Ветка</span><input required bind:value={branch}/></label>
  {#if error}<p role="alert" class="repo-error">{error}</p>{/if}
- <ModalFoot onCancel={()=>creating=false} submitLabel="Создать" {busy}/>
+ <ModalFoot onCancel={()=>creating=false} submitLabel={editingId===null?"Создать":"Сохранить"} {busy}/>
 </form></ModalShell>
 <ModalShell open={tokenFor!==null} onClose={()=>tokenFor=null} closeDisabled={busy} labelledby="repo-token-title"><ModalHead id="repo-token-title" title="Секрет доступа к репозиторию" onClose={()=>tokenFor=null} closeDisabled={busy}/><div class="modal__body"><label class="field"><span class="label">Новый токен · пусто — удалить</span><input type="password" autocomplete="off" bind:value={token}/></label><p class="hint">Сохранённое значение не показывается и не передаётся раннерам.</p>{#if error}<p role="alert" class="repo-error">{error}</p>{/if}<ModalFoot onCancel={()=>tokenFor=null} onSubmit={saveToken} submitLabel="Сохранить" {busy}/></div></ModalShell>
 <style>

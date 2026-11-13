@@ -2,6 +2,7 @@ import { request } from './http.ts'
 export type RepositoryLink = { kind: 'quest' | 'questline' | 'note'; id: number }
 export type Repository = {
   id: number
+  slug?: string
   title: string
   kind: 'local' | 'github' | 'gitlab'
   url: string
@@ -29,14 +30,17 @@ export type RepositoryView = {
 export const listRepositories = () => request<{ items: Repository[]; quota_bytes: number }>('/api/repositories')
 export const createRepository = (body: {
   title: string
+  slug?: string
   kind: string
   url: string
   branch: string
   token: string
   owner?: RepositoryLink
 }) => request<{ id: number }>('/api/repositories', { method: 'POST', body: JSON.stringify(body) })
-export const updateRepository = (id: number, body: { title?: string; branch?: string; token?: string }) =>
-  request(`/api/repositories/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+export const updateRepository = (
+  id: number,
+  body: { slug?: string; title?: string; branch?: string; token?: string }
+) => request(`/api/repositories/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 export const linkRepository = (id: number, owner: RepositoryLink) =>
   request(`/api/repositories/${id}/links`, { method: 'POST', body: JSON.stringify(owner) })
 export const unlinkRepository = (id: number, owner: RepositoryLink) =>

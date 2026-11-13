@@ -288,7 +288,7 @@ func (h *Handler) createWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Color != nil || body.Icon != nil {
-		if err := h.Auth.UpdateWorkspace(r.Context(), ws.ID, nil, body.Color, body.Icon); err != nil {
+		if err := h.Auth.UpdateWorkspace(r.Context(), ws.ID, nil, body.Color, body.Icon, nil); err != nil {
 			_ = h.Auth.AbortWorkspace(r.Context(), ws.ID)
 			httpx.WriteErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -343,6 +343,7 @@ func (h *Handler) renameWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Name  *string `json:"name"`
+		Slug  *string `json:"slug"`
 		Color *string `json:"color"`
 		Icon  *string `json:"icon"`
 	}
@@ -350,12 +351,14 @@ func (h *Handler) renameWorkspace(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteErr(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if body.Name == nil && body.Color == nil && body.Icon == nil {
+	if body.Name == nil && body.Color == nil && body.Icon == nil && body.Slug == nil {
 		httpx.WriteErr(w, http.StatusUnprocessableEntity, "нужны название, цвет или иконка")
 		return
 	}
-	switch err := h.Auth.UpdateWorkspace(r.Context(), id, body.Name, body.Color, body.Icon); {
-	case errors.Is(err, identity.ErrWorkspaceName), errors.Is(err, identity.ErrWorkspaceAppearance):
+	switch err := h.Auth.UpdateWorkspace(r.Context(), id, body.Name, body.Color, body.Icon, body.Slug); {
+	case errors.Is(err, identity.ErrWorkspaceSlugTaken):
+		httpx.WriteErr(w, http.StatusConflict, err.Error())
+	case errors.Is(err, identity.ErrWorkspaceSlug), errors.Is(err, identity.ErrWorkspaceName), errors.Is(err, identity.ErrWorkspaceAppearance):
 		httpx.WriteErr(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, identity.ErrNotFound):
 		httpx.WriteErr(w, http.StatusNotFound, "workspace not found")

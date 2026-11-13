@@ -36,11 +36,20 @@ func TestWorkspaceAppearanceOwnerOnly(t *testing.T) {
 	if code := patch(`{"name":"changed","color":"invalid"}`); code != 422 {
 		t.Fatal(code)
 	}
+	if code := patch(`{"slug":"my-space"}`); code != 200 {
+		t.Fatal(code)
+	}
+	if code := patch(`{"slug":"Invalid slug"}`); code != 422 {
+		t.Fatal(code)
+	}
 	if code := patch(`{}`); code != 422 {
 		t.Fatal(code)
 	}
 	if err := st.AddWorkspaceMember(t.Context(), 1, user.ID, "member"); err != nil {
 		t.Fatal(err)
+	}
+	if code := patch(`{"slug":"forbidden"}`); code != 403 {
+		t.Fatal(code)
 	}
 	if code := patch(`{"color":"#7a9e3a"}`); code != 403 {
 		t.Fatal(code)

@@ -39,6 +39,34 @@ func TestRepositoryGitTokenAndOwner(t *testing.T) {
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &made)
 	path := "/api/repositories/" + strconv.FormatInt(made.ID, 10) + "/git/info/refs?service=git-upload-pack"
+	named := "/git/" + ws.Slug + "/repo-" + strconv.FormatInt(made.ID, 10) + ".git/info/refs?service=git-upload-pack"
+	for _, login := range []string{"", user.Username, "different-user"} {
+		request := httptest.NewRequest("GET", named, nil)
+		if login != "" {
+			request.SetBasicAuth(login, token)
+		}
+		response := httptest.NewRecorder()
+		h.ServeHTTP(response, request)
+		want := 401
+		if login == user.Username {
+			want = 200
+		}
+		if response.Code != want {
+			t.Fatalf("named Git login=%q status=%d %s", login, response.Code, response.Body.String())
+		}
+	}
+	other, err := s.Auth.CreateWorkspace(context.Background(), user.ID, "Other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest("GET", strings.Replace(named, ws.Slug, other.Slug, 1), nil)
+	request.SetBasicAuth(user.Username, token)
+	response := httptest.NewRecorder()
+	h.ServeHTTP(response, request)
+	if response.Code != 403 {
+		t.Fatalf("token escaped its workspace: %d", response.Code)
+	}
+
 	r = httptest.NewRequest("GET", path, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -62,7 +90,7 @@ func TestRepositoryGitTokenAndOwner(t *testing.T) {
 	if _, err = s.Auth.DB.Exec(`UPDATE workspace_member SET role='member' WHERE user_id=? AND workspace_id=?`, user.ID, ws.ID); err != nil {
 		t.Fatal(err)
 	}
-	r = httptest.NewRequest("GET", strings.Replace(path, "git-upload-pack", "git-receive-pack", 1), nil)
+	r = httptest.NewRequest("GET", strings.Replace(named, "git-upload-pack", "git-receive-pack", 1), nil)
 	r.SetBasicAuth(user.Username, token)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)

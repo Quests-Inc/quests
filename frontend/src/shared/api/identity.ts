@@ -165,3 +165,7 @@ export function setWorkspaceAppearance(id: number, color: string, icon: string) 
 export function setWorkspaceDetails(id: number, name: string, color: string, icon: string) {
   return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name, color, icon }) })
 }
+
+export function setWorkspaceSlug(id: number, slug: string) {
+  return request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ slug }) })
+}

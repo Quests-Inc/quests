@@ -10,10 +10,12 @@
  $effect(()=>{const id=repo.id,b=branch,p=path,c=commit;void revision;if(!b)return;const abort=new AbortController();loading=true;error=''
  void browseRepository(id,b,p,abort.signal,c).then(result=>{if(!abort.signal.aborted)data=result}).catch(e=>{if(!abort.signal.aborted)error=e.message||String(e)}).finally(()=>{if(!abort.signal.aborted)loading=false});return()=>abort.abort()})
  const entries=$derived([...(data?.tree??[])].sort((a,b)=>Number(b.kind==='directory')-Number(a.kind==='directory')||a.name.localeCompare(b.name)))
+ const prefixCommand=$derived(clone?`git config --global url."${clone.slice(0,clone.lastIndexOf('/')+1)}".insteadOf "q:"`:'')
  const clone=$derived(data?.clone_url?.startsWith('/')?`${location.origin}${data.clone_url}`:data?.clone_url||repo.url)
 </script>
 <div class="repo-browser">
  {#if clone}<div class="repo-clone"><code>{clone}</code><button type="button" class="btn btn--ghost" onclick={()=>copyText(clone)}>Копировать</button></div>{/if}
+ {#if repo.kind==='local' && clone.includes('/git/')}<details class="repo-prefix"><summary>Короткие адреса q:</summary><p class="hint">Один раз выполните на своём компьютере для этого пространства:</p><div class="repo-clone"><code>{prefixCommand}</code><button type="button" class="btn btn--ghost" onclick={()=>copyText(prefixCommand)}>Копировать настройку</button></div><code>git clone q:{repo.slug}.git</code></details>{/if}
  {#if repo.kind==='local'}<p class="hint">Логин аккаунта Quests и его API-токен для этого пространства. Для push нужны права владельца.</p>{/if}
  <div class="repo-tools">
   <label>Ветка<select aria-label="Ветка репозитория" disabled={loading} value={branch} onchange={e=>{branch=e.currentTarget.value;commit='';path=''}}>{#if !data?.branches.includes(branch)}<option value={branch}>{branch}</option>{/if}{#each data?.branches||[] as name}<option value={name}>{name}</option>{/each}</select></label>

@@ -55,7 +55,7 @@ func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, fmt.Errorf("некорректная ветка или путь"))
 		return
 	}
-	view := View{CloneURL: h.cloneURL(repo), Branch: branch, Branches: []string{}, Commits: []Commit{}, Tree: []Entry{}}
+	view := View{CloneURL: h.cloneURL(r.Context(), repo), Branch: branch, Branches: []string{}, Commits: []Commit{}, Tree: []Entry{}}
 	if repo.Kind != "local" {
 		err = h.remoteView(r, repo, branch, path, &view)
 		if err == nil && !view.Empty {

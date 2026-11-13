@@ -196,9 +196,13 @@ func RestoreBundle(ctx context.Context, dir, bundle string) error {
 	_, err := Git(ctx, dir, "-c", "protocol.file.allow=always", "fetch", "--no-tags", bundle, "+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*")
 	return err
 }
-func (h *Handler) cloneURL(repo Record) string {
+func (h *Handler) cloneURL(ctx context.Context, repo Record) string {
 	if repo.Kind != "local" {
 		return repo.URL
+	}
+	var slug string
+	if err := h.DB.QueryRowContext(ctx, `SELECT slug FROM workspace WHERE id=? AND deleted_at IS NULL`, wsctx.From(ctx)).Scan(&slug); err == nil && slug != "" && repo.Slug != "" {
+		return "/git/" + slug + "/" + repo.Slug + ".git"
 	}
 	return "/api/repositories/" + strconv.FormatInt(repo.ID, 10) + "/git"
 }

@@ -12,9 +12,11 @@ import (
 	"strings"
 	"sync"
 
+	platformdb "github.com/quests-inc/quests/go/internal/platform/db"
 	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/httpx"
 	"github.com/quests-inc/quests/go/internal/platform/secretbox"
+	"github.com/quests-inc/quests/go/internal/platform/slugs"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
@@ -32,6 +34,7 @@ type Handler struct {
 	Quota         int64
 }
 type Record struct {
+	Slug     string `json:"slug"`
 	ID       int64  `json:"id"`
 	Title    string `json:"title"`
 	Kind     string `json:"kind"`
@@ -72,6 +75,8 @@ func jsonBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 func (h *Handler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /git/{workspace}/{repository}/{path...}", h.transport)
+	mux.HandleFunc("POST /git/{workspace}/{repository}/{path...}", h.transport)
 	mux.HandleFunc("GET /api/repositories", h.list)
 	mux.HandleFunc("POST /api/repositories", h.create)
 	mux.HandleFunc("PATCH /api/repositories/{id}", h.update)
@@ -83,15 +88,27 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 func (h *Handler) get(r *http.Request) (Record, error) {
 	var repo Record
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		return repo, err
+	query := `SELECT id,title,kind,url,branch,EXISTS(SELECT 1 FROM repository_token rt WHERE rt.repository_id=repository.id),slug FROM repository WHERE `
+	var key any
+	if named := r.PathValue("repository"); named != "" {
+		if !strings.HasSuffix(named, ".git") {
+			return repo, fmt.Errorf("missing .git suffix")
+		}
+		key = strings.TrimSuffix(named, ".git")
+		query += "slug=?"
+	} else {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			return repo, err
+		}
+		key = id
+		query += "id=?"
 	}
-	err = h.DB.QueryRowContext(r.Context(), `SELECT id,title,kind,url,branch,EXISTS(SELECT 1 FROM repository_token rt WHERE rt.repository_id=repository.id) FROM repository WHERE id=?`, id).Scan(&repo.ID, &repo.Title, &repo.Kind, &repo.URL, &repo.Branch, &repo.HasToken)
+	err := h.DB.QueryRowContext(r.Context(), query, key).Scan(&repo.ID, &repo.Title, &repo.Kind, &repo.URL, &repo.Branch, &repo.HasToken, &repo.Slug)
 	return repo, err
 }
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,title,kind,url,branch,EXISTS(SELECT 1 FROM repository_token rt WHERE rt.repository_id=repository.id) FROM repository ORDER BY id`)
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT id,title,kind,url,branch,EXISTS(SELECT 1 FROM repository_token rt WHERE rt.repository_id=repository.id)  ,slug FROM repository ORDER BY id`)
 	if err != nil {
 		fail(w, 500, err)
 		return
@@ -99,7 +116,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	repos := []Record{}
 	for rows.Next() {
 		var a Record
-		if err = rows.Scan(&a.ID, &a.Title, &a.Kind, &a.URL, &a.Branch, &a.HasToken); err != nil {
+		if err = rows.Scan(&a.ID, &a.Title, &a.Kind, &a.URL, &a.Branch, &a.HasToken, &a.Slug); err != nil {
 			break
 		}
 		a.Links = []Link{}
@@ -146,6 +163,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 type createBody struct {
+	Slug   string `json:"slug"`
 	Title  string `json:"title"`
 	Kind   string `json:"kind"`
 	URL    string `json:"url"`
@@ -163,6 +181,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
+	if in.Slug != "" && !slugs.Valid(in.Slug) {
+		fail(w, 400, fmt.Errorf("некорректный slug"))
+		return
+	}
 	if in.Kind == "" {
 		in.Kind = "local"
 	}
@@ -210,9 +232,13 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	var id int64
-	err = tx.QueryRowContext(r.Context(), `INSERT INTO repository(title,kind,url,branch) VALUES(?,?,?,?) RETURNING id`, in.Title, in.Kind, in.URL, in.Branch).Scan(&id)
+	err = tx.QueryRowContext(r.Context(), `INSERT INTO repository(title,kind,url,branch,slug) VALUES(?,?,?,?,?) RETURNING id`, in.Title, in.Kind, in.URL, in.Branch, in.Slug).Scan(&id)
 	if err != nil {
-		fail(w, 500, err)
+		if platformdb.IsUniqueViolation(err) {
+			fail(w, 409, fmt.Errorf("slug репозитория уже занят"))
+		} else {
+			fail(w, 500, err)
+		}
 		return
 	}
 	if in.Kind == "local" {
@@ -274,12 +300,20 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
+		Slug   *string `json:"slug"`
 		Title  *string `json:"title"`
 		Branch *string `json:"branch"`
 		Token  *string `json:"token"`
 	}
 	if !jsonBody(w, r, &in) {
 		return
+	}
+	if in.Slug != nil {
+		if !slugs.Valid(*in.Slug) {
+			fail(w, 400, fmt.Errorf("некорректный slug"))
+			return
+		}
+		repo.Slug = *in.Slug
 	}
 	if in.Title != nil {
 		repo.Title = strings.TrimSpace(*in.Title)
@@ -315,13 +349,17 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err == nil {
-		_, err = tx.ExecContext(r.Context(), `UPDATE repository SET title=?,branch=? WHERE id=?`, repo.Title, repo.Branch, repo.ID)
+		_, err = tx.ExecContext(r.Context(), `UPDATE repository SET title=?,branch=?,slug=? WHERE id=?`, repo.Title, repo.Branch, repo.Slug, repo.ID)
 	}
 	if err == nil {
 		err = tx.Commit()
 	}
 	if err != nil {
-		fail(w, 500, err)
+		if platformdb.IsUniqueViolation(err) {
+			fail(w, 409, fmt.Errorf("slug репозитория уже занят"))
+		} else {
+			fail(w, 500, err)
+		}
 		return
 	}
 	httpx.WriteJSON(w, 200, map[string]any{"ok": true})

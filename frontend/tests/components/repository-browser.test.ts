@@ -128,3 +128,42 @@ test('поиск в боковой панели сохраняет открыт�
   expect(target.querySelector('.repo-detail h1')?.textContent).toBe('Other')
   expect(target.querySelector('[aria-label="Ширина боковой панели"]')).not.toBeNull()
 })
+
+test('настройки репозитория предупреждают о смене адреса и сохраняют slug', async () => {
+  const requests: { url: string; body: string }[] = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    if (init?.method === 'PATCH') requests.push({ url, body: String(init.body) })
+    return new Response(
+      JSON.stringify(
+        url.includes('/browse')
+          ? { branches: ['main'], commits: [], tree: [], empty: true }
+          : { items: [{ ...repo, slug: 'mini' }], quota_bytes: 268435456 }
+      )
+    )
+  }) as typeof fetch
+  const target = document.createElement('div')
+  document.body.append(target)
+  const app = mount(RepositoriesBlock, { target })
+  cleanup.push(() => {
+    unmount(app)
+    target.remove()
+  })
+  await settle()
+  flushSync(() => target.querySelector<HTMLButtonElement>('.repo-row')!.click())
+  await settle()
+  flushSync(() => [...target.querySelectorAll('button')].find((b) => b.textContent === 'Настройки')!.click())
+  await settle()
+  const dialog = document.querySelector('[role="dialog"]')!
+  const input = dialog.querySelector<HTMLInputElement>('[aria-label="Slug репозитория"]')!
+  expect(input.value).toBe('mini')
+  flushSync(() => {
+    input.value = 'new-name'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(dialog.textContent).toContain('Git-адрес изменится')
+  flushSync(() => dialog.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })))
+  await settle()
+  expect(requests).toHaveLength(1)
+  expect(JSON.parse(requests[0].body)).toEqual({ title: 'Mini', slug: 'new-name', branch: 'main' })
+})

@@ -36,9 +36,16 @@ func TestRepositoriesGitHTTPAndWorkspace(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &out)
 		return out
 	}
-	made := call("POST", "/api/repositories", map[string]any{"title": "Tiny", "kind": "local"}, 201)
+	made := call("POST", "/api/repositories", map[string]any{"title": "Tiny", "kind": "local", "slug": "tiny"}, 201)
 	id := int(made["id"].(float64))
 	base := "/api/repositories/" + strconv.Itoa(id)
+	call("POST", "/api/repositories", map[string]any{"title": "Duplicate", "slug": "tiny"}, 409)
+	call("PATCH", base, map[string]any{"slug": "Bad slug"}, 400)
+	call("PATCH", base, map[string]any{"title": "Renamed"}, 200)
+	if got := call("GET", base+"/browse", nil, 200)["clone_url"]; got != "/git/workspace-1/tiny.git" {
+		t.Fatal(got)
+	}
+
 	if !call("GET", base+"/browse", nil, 200)["empty"].(bool) {
 		t.Fatal("new repo not empty")
 	}
@@ -52,7 +59,7 @@ func TestRepositoriesGitHTTPAndWorkspace(t *testing.T) {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}
 	}
-	git("clone", server.URL+base+"/git", local)
+	git("clone", server.URL+"/git/workspace-1/tiny.git", local)
 	if err := os.WriteFile(filepath.Join(local, "hello.txt"), []byte("hello source\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
