@@ -13,6 +13,7 @@ import (
 // user-written command (docs/automation.md): user code goes to a runner. A new entry here is a decision to review —
 // say in the comment which of the rules still holds.
 var execAllowed = map[string]string{
+	"internal/repository/git.go":               "fixed git plumbing only; argument-separated validated refs/paths, no shell, hooks and maintenance disabled; uploaded commits are never executed",
 	"internal/platform/filepreview/preview.go": "fixed pdftotext executable and flags, bounded attachment bytes on stdin; no user command, shell, or filename; request deadline limits execution",
 	"cmd/quests-runner/exec.go":                "the runner: the one place user commands run, on the owner's device",
 	"cmd/quests-runner/exec_other.go":          "the runner (non-unix process-group handling)",

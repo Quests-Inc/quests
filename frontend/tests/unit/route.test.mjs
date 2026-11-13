@@ -99,3 +99,17 @@ test('healthFrom и healthOffline: чипы шапки', () => {
     db: 'unknown',
   })
 })
+
+test('репозиторий определяет вкладку без tab, старые ссылки также принимаются', () => {
+  const sel = { quest: null, note: null, attachment: null, graph: { type: null, id: null } }
+  at('?repo=3')
+  expect(initialRoute()).toEqual({ view: 'repositories' })
+  expect(searchForView('repositories', sel)).toEqual({ repo: 3 })
+  at('?tab=repositories&repo=3')
+  expect(initialRoute()).toEqual({ view: 'repositories' })
+  expect(searchForView('repositories', sel)).toEqual({ repo: 3 })
+  at('?tab=repositories')
+  expect(searchForView('repositories', sel)).toEqual({ tab: 'repositories' })
+  at('?repo=-1')
+  expect(initialRoute()).toEqual({})
+})

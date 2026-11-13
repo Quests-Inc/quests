@@ -9,6 +9,7 @@
     pickWorkspace,
     addWorkspace,
     saveName,
+    saveWorkspaceSlug,
     saveWorkspaceAppearance,
     removeCurrent,
     newInvite,
@@ -19,6 +20,9 @@
 
   const mb = (n: number) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} ГБ` : `${(n / (1 << 20)).toFixed(n < 10 << 20 ? 1 : 0)} МБ`)
 
+  let slug = $state('')
+  const currentSlug = $derived(wsx.list.find(w=>w.id===wsx.current)?.slug ?? '')
+  $effect(()=>{slug=currentSlug})
   let color = $state('#9a9a9a')
   let icon = $state('layers')
   $effect(() => {
@@ -114,6 +118,15 @@
         <button type="submit" class="btn" disabled={wsx.busy || !renameTo.trim() || renameTo.trim() === currentWorkspaceName()}>
           Переименовать
         </button>
+      </form>
+    {/if}
+
+    {#if canManage}
+      <form onsubmit={e=>{e.preventDefault();saveWorkspaceSlug(slug)}}>
+        <label class="field"><span class="label">Slug пространства</span><input aria-label="Slug пространства" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="63" bind:value={slug} disabled={wsx.busy}/></label>
+        <p class="note">Уникален на сервере. Строчные латинские буквы, цифры и дефисы. Переименование пространства его не меняет.</p>
+        {#if slug!==currentSlug}<p class="note">Изменение slug изменит Git-адреса всех репозиториев пространства. Обновите origin в локальных клонах.</p>{/if}
+        <button type="submit" class="btn" disabled={wsx.busy||!slug||slug===currentSlug}>Сохранить slug</button>
       </form>
     {/if}
 

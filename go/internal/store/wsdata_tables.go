@@ -34,6 +34,7 @@ var kindTable = map[string]string{
 }
 
 var ExportTables = []TableSpec{
+
 	{Name: "script", HasID: true, Text: []string{"title", "description"}},
 	{Name: "script_version", Where: `script_id IN (SELECT id FROM script)`, FK: map[string]string{"script_id": "script"}},
 	{Name: "custom_node", HasID: true, Text: []string{"title", "description"}},
@@ -43,6 +44,9 @@ var ExportTables = []TableSpec{
 	{Name: "questtemplatestep", HasID: true, Where: `template_id IN (SELECT id FROM questtemplate)`, FK: map[string]string{"template_id": "questtemplate", "script_id": "script"}, Text: []string{"title", "description", "check_command"}},
 	{Name: "quest", HasID: true, FK: map[string]string{"category_id": "questcategory", "questline_id": "questline", "template_id": "questtemplate"}, Text: []string{"title", "description", "source"}},
 	{Name: "queststep", HasID: true, Where: `quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest"}, Text: []string{"title", "description", "check_command"}},
+	{Name: "repository", HasID: true},
+	{Name: "repository_token", FK: map[string]string{"repository_id": "repository"}, Secret: true},
+	{Name: "repository_link", FK: map[string]string{"repository_id": "repository"}, Poly: []PolyFK{{"owner_type", "owner_id"}}},
 	{Name: "tag", HasID: true},
 	{Name: "quest_tag", Where: `quest_id IN ` + liveQuest, FK: map[string]string{"quest_id": "quest", "tag_id": "tag"}},
 	{Name: "template_tag", Where: `template_id IN (SELECT id FROM questtemplate)`, FK: map[string]string{"template_id": "questtemplate", "tag_id": "tag"}},

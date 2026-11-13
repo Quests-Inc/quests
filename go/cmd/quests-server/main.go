@@ -171,7 +171,7 @@ func main() {
 	hub.OnPublish(func(p events.Payload) { checks.DispatchHooks(p) })
 	go schedule.RunMaintenanceLoop(ctx, st, hub, windows, checks)
 	go srv.RunProbes(ctx)
-	go schedule.RunWorkspacePurgeLoop(ctx, st, srv.WebDAV)
+	go schedule.RunWorkspacePurgeLoop(ctx, st, srv.WebDAV, srv.DataDir)
 	go srv.RunTrashPurgeLoop(ctx)
 	go schedule.RunBackupLoop(ctx, st, srv.WebDAV, cfg.DataDir, cfg.BackupInterval, cfg.BackupKeep, schedule.BackupRemote{
 		Host: cfg.BackupRemoteHost,

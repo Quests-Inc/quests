@@ -47,6 +47,8 @@ type Entry struct {
 
 // Request is what a node wants sent. URL must be absolute; the host in it is judged by the policy, whoever wrote it.
 type Request struct {
+	SameHostOnly bool // credentials may not follow a redirect to another origin
+
 	Workspace int64
 	ScriptID  int64
 	Method    string
@@ -56,6 +58,8 @@ type Request struct {
 }
 
 // Result is a received answer. The headers do not leave this package except what a caller needs.
+type redirectOriginKey struct{}
+
 type Result struct {
 	Status      int
 	Body        []byte
@@ -122,6 +126,9 @@ func New(p Policy, log func(Entry)) *Client {
 		Timeout:   p.Timeout,
 		Jar:       nil,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if origin, ok := req.Context().Value(redirectOriginKey{}).(string); ok && req.URL.Scheme+"://"+req.URL.Host != origin {
+				return &Denied{Reason: "редирект на другой хост"}
+			}
 			if len(via) >= 3 {
 				return &Denied{Reason: "слишком много редиректов"}
 			}
@@ -241,6 +248,9 @@ func (c *Client) Do(ctx context.Context, in Request) (*Result, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.policy.Timeout)
 	defer cancel()
+	if in.SameHostOnly {
+		ctx = context.WithValue(ctx, redirectOriginKey{}, u.Scheme+"://"+u.Host)
+	}
 	req, err := http.NewRequestWithContext(ctx, e.Method, u.String(), bytes.NewReader(in.Body))
 	if err != nil {
 		return finish(nil, err)

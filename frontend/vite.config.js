@@ -14,6 +14,11 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       // http target + ws:true — иначе после рестарта API сокет через Vite залипает.
+      '/git': {
+        target: process.env.QUESTS_DEV_API || 'http://127.0.0.1:8765',
+        changeOrigin: true,
+        secure: true,
+      },
       '/api': {
         target: process.env.QUESTS_DEV_API || 'http://127.0.0.1:8765',
         changeOrigin: true,

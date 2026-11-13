@@ -1,0 +1,5 @@
+# Full-screen attachment images
+
+Click an image preview in the attachment list/panel, an image filename in an entity's attachment block, or an attachment image in Markdown to open the original. Previous/next follows images in that current list. The map opens the same viewer from a short image-card click or its explicit expand button; dragging a card remains a map operation. Its gallery contains the image cards on that map.
+
+The overlay fits the original on open. Wheel / + / − zoom; double-click toggles fit/2×; dragging pans the enlarged image. Touch supports pinch, one-finger pan and horizontal swipe between images while fitted. Left/right navigate, 0/Home fits, Escape or the close button closes. Clicking the empty image-area background closes, while clicking the image itself keeps it open. Keyboard focus is trapped in the overlay and returns to the opener. Loading, image failure and retry are explicit. The full original is loaded when opening; map thumbnails keep their existing projected-size quality policy.

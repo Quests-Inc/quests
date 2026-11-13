@@ -6,6 +6,7 @@ export type View =
   | 'journal'
   | 'notes'
   | 'attachments'
+  | 'repositories'
   | 'calendar'
   | 'history'
   | 'graph'
@@ -24,6 +25,7 @@ export const VIEW_TABS: Record<View, ViewTab> = {
   notes: { view: 'notes', label: 'Заметки', icon: 'document' },
   graph: { view: 'graph', label: 'Карта', icon: 'map' },
   calendar: { view: 'calendar', label: 'Календарь', icon: 'calendar' },
+  repositories: { view: 'repositories', label: 'Репозитории', icon: 'folder' },
   attachments: { view: 'attachments', label: 'Вложения', icon: 'attachment' },
   history: { view: 'history', label: 'История', icon: 'scroll' },
   runners: { view: 'runners', label: 'Раннеры', icon: 'layers' },
@@ -41,7 +43,7 @@ export const MAIN_TABS: ViewTab[] = [T.journal, T.notes, T.graph, T.calendar]
 
 /** Выпадающие группы шапки, слева направо. */
 export const VIEW_GROUPS: ViewGroup[] = [
-  { id: 'more', label: 'Данные', icon: 'folder', tabs: [T.attachments, T.history, T.trash] },
+  { id: 'more', label: 'Данные', icon: 'folder', tabs: [T.attachments, T.repositories, T.history, T.trash] },
   { id: 'auto', label: 'Автоматика', icon: 'repeat', tabs: [T.templates, T.scripts, T.hooks, T.runs, T.runners] },
 ]
 

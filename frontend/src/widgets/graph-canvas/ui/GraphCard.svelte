@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {attachmentImage,showImages,type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
  import GraphImage from './GraphImage.svelte'
  import NoteSilhouette from './NoteSilhouette.svelte'
   import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
@@ -28,6 +29,7 @@
     ready = false,
     raster = false,
     imagePixels = 128,
+    imageGallery = [],
     tier,
     more = [],
     changed = false,
@@ -61,6 +63,7 @@
     editingHere?: boolean
     picked?: boolean
     ready?: boolean
+    imageGallery?: GalleryImage[]
     imagePixels?: number
     raster?: boolean
     tier?: string
@@ -156,6 +159,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
           <div class="gcard__sq">
             {#if raster}
               <GraphImage id={n.id} pixels={imagePixels} />
+              <button type="button" class="gcard__image-open" aria-label={`Открыть изображение ${n.title}`} title="Открыть изображение" onpointerdown={e=>e.stopPropagation()} onclick={e=>{e.stopPropagation();const image=attachmentImage({id:n.id,filename:n.title});showImages(imageGallery.length?imageGallery:[image],image.src)}}>⤢</button>
             {:else if n.type === 'cluster'}
               <span class="gcard__count">{n.title.split(' ')[0]}</span>
             {:else}
@@ -288,6 +292,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 {/snippet}
 
 <style>
+ .gcard__image-open{position:absolute;right:3px;top:3px;padding:2px 5px;background:var(--color-bg-raised);border:0;border-radius:4px;color:var(--color-fg);cursor:zoom-in}
+
  .gcard__ghost{height:100%;display:flex;flex-direction:column;padding:12px;gap:8px;overflow:hidden}.gcard__ghost span{opacity:.55;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 

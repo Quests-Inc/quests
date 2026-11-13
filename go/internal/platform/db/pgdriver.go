@@ -31,6 +31,8 @@ import (
 
 // noIDTables are insert targets without a serial `id` column.
 var noIDTables = map[string]bool{
+	"repository_link":     true,
+	"repository_token":    true,
 	"quest_tag":           true,
 	"template_tag":        true,
 	"alembic_version":     true,

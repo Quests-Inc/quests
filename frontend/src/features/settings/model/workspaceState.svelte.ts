@@ -2,6 +2,7 @@ import {
   fetchWorkspaces,
   setWorkspaceAppearance,
   setWorkspaceDetails,
+  setWorkspaceSlug,
   createWorkspace,
   switchWorkspace,
   fetchMembers,
@@ -154,4 +155,11 @@ export async function saveWorkspaceDetails(id: number, name: string, color: stri
     await setWorkspaceDetails(id, name.trim(), color, icon)
     wsx.list = wsx.list.map((w: { id: number }) => (w.id === id ? { ...w, name: name.trim(), color, icon } : w))
   }, 'не удалось сохранить пространство')
+}
+
+export async function saveWorkspaceSlug(slug: string) {
+  await act(async () => {
+    await setWorkspaceSlug(wsx.current, slug)
+    await loadWorkspaceList()
+  }, 'не удалось сохранить slug')
 }

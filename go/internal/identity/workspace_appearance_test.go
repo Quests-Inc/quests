@@ -9,7 +9,7 @@ func TestWorkspaceAppearance(t *testing.T) {
 	s := newTestStore(t)
 	ctx := t.Context()
 	color, icon := "#6a7ab8", "map"
-	if err := s.UpdateWorkspace(ctx, 1, nil, &color, &icon); err != nil {
+	if err := s.UpdateWorkspace(ctx, 1, nil, &color, &icon, nil); err != nil {
 		t.Fatal(err)
 	}
 	rows, err := s.AllWorkspaces(ctx)
@@ -20,7 +20,7 @@ func TestWorkspaceAppearance(t *testing.T) {
 		t.Fatal(rows[0])
 	}
 	name := strings.Repeat("я", 81)
-	if err := s.UpdateWorkspace(ctx, 1, &name, nil, nil); err != nil {
+	if err := s.UpdateWorkspace(ctx, 1, &name, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.WorkspaceName(ctx, 1)
@@ -28,12 +28,12 @@ func TestWorkspaceAppearance(t *testing.T) {
 		t.Fatal(got)
 	}
 	badColor := "red;display:none"
-	if err := s.UpdateWorkspace(ctx, 1, nil, &badColor, nil); err != ErrWorkspaceAppearance {
+	if err := s.UpdateWorkspace(ctx, 1, nil, &badColor, nil, nil); err != ErrWorkspaceAppearance {
 		t.Fatal(err)
 	}
 	badIcon := "missing"
 	other := "changed"
-	if err := s.UpdateWorkspace(ctx, 1, &other, nil, &badIcon); err != ErrWorkspaceAppearance {
+	if err := s.UpdateWorkspace(ctx, 1, &other, nil, &badIcon, nil); err != ErrWorkspaceAppearance {
 		t.Fatal(err)
 	}
 	after, _ := s.WorkspaceName(ctx, 1)
@@ -50,5 +50,37 @@ func TestWorkspaceAppearance(t *testing.T) {
 	list, err := s.UserWorkspaces(ctx, u.ID)
 	if err != nil || len(list) != 1 || list[0].Color != color || list[0].Icon != icon {
 		t.Fatalf("%+v %v", list, err)
+	}
+}
+
+func TestWorkspaceStableSlugs(t *testing.T) {
+	s := newTestStore(t)
+	ctx := t.Context()
+	slug := "my-space"
+	if err := s.UpdateWorkspace(ctx, 1, nil, nil, nil, &slug); err != nil {
+		t.Fatal(err)
+	}
+	name := "Different title"
+	if err := s.UpdateWorkspace(ctx, 1, &name, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.AllWorkspaces(ctx)
+	if err != nil || rows[0].Slug != slug {
+		t.Fatalf("%v %v", rows, err)
+	}
+	invalid := "NOT valid"
+	if err := s.UpdateWorkspace(ctx, 1, nil, nil, nil, &invalid); err != ErrWorkspaceSlug {
+		t.Fatal(err)
+	}
+	user, err := s.CreateUser("slugs", "longenoughpassword")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.CreateWorkspace(ctx, user.ID, "Other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateWorkspace(ctx, other.ID, nil, nil, nil, &slug); err != ErrWorkspaceSlugTaken {
+		t.Fatal(err)
 	}
 }

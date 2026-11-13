@@ -1,4 +1,6 @@
 <script lang="ts">
+ import {RepositoriesBlock} from '@/entities/repository'
+ import ImageViewer from '@/shared/ui/ImageViewer.svelte'
   // Quests web UI — orchestrator (state, load, overlays)
   import { CalendarPage } from '@/pages/calendar'
   import { HistoryPage } from '@/pages/history'
@@ -53,7 +55,6 @@
   import { NotesPage } from '@/pages/notes'
   import { AttachmentsPage } from '@/pages/attachments'
   import { LoginScreen, InviteScreen, NoWorkspaceScreen } from '@/pages/auth'
-
   /** Auth gate: null = still checking, true/false = decided. */
   let authed = $state(null)
   /** Invitation link (?invite=…): shown instead of the journal until accepted. */
@@ -64,7 +65,6 @@
   let username = $state('')
   /** Cleanup for the live subscription + timers, so logout can tear them down. */
   let stopApp: () => void = null
-
   let quests = $derived(questCatalog.list)
   let notes = $derived(noteCatalog.list)
   let attachmentIndex = $derived(attachmentCatalog.index)
@@ -103,12 +103,10 @@
       return false
     }
   }
-
   /** On a full-screen sidebar, picking an item should reveal it, not leave the list covering it. */
   function revealDetailOnNarrow(key: string) {
     if (isNarrowViewport()) sidebars.setCollapsed(key, true)
   }
-
   /** …and going back to the list should bring it back, not leave an empty detail pane. */
   function revealListOnNarrow(key: string) {
     if (isNarrowViewport()) sidebars.setCollapsed(key, false)
@@ -120,7 +118,6 @@
   let categories = $state([])
   let questlines: { id: number, title: string, category_id?: number | null, color?: string, icon?: string }[] = $state([])
   let calendarEvents: { id: number, title?: string, description?: string, color?: string, icon?: string, icon_url?: string | null, all_day?: boolean, starts_at?: string }[] = $state([])
-
   let secretsOpen = $state(false)
   /** entity the secrets modal opens on (context menu → «Секреты»), or null */
   let secretsOwner = $state((null as { kind: string, id: number } | null))
@@ -683,6 +680,8 @@
         onOpen={onJournalRef}
       />
     </div>
+  {:else if nav.view === 'repositories'}
+    <RepositoriesBlock />
   {:else if nav.view === 'attachments'}
     <div class="journal__attachments">
       <AttachmentsPage
@@ -785,6 +784,8 @@
   onApplied={() => load({ silent: true })}
 />
 {/if}
+
+<ImageViewer />
 
 <style>
   .journal__review-page { height: 100%; overflow: auto; padding: 1rem; }

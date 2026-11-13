@@ -4,11 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/platform/apperr"
+	platformdb "github.com/quests-inc/quests/go/internal/platform/db"
+	"github.com/quests-inc/quests/go/internal/platform/slugs"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
@@ -18,7 +21,11 @@ var ErrNotFound = apperr.ErrNotFound
 
 var ErrWorkspaceName = errors.New("workspace name must not be empty")
 
+var ErrWorkspaceSlug = errors.New("slug: до 63 символов, строчные латинские буквы, цифры и одиночные дефисы между ними")
+var ErrWorkspaceSlugTaken = errors.New("slug пространства уже занят")
+
 type Workspace struct {
+	Slug      string    `json:"slug"`
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
 	Color     string    `json:"color"`
@@ -63,7 +70,7 @@ func (s *Store) ForEachWorkspace(ctx context.Context, fn func(ctx context.Contex
 // UserWorkspaces lists the workspaces a user belongs to.
 func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT w.id, w.name, w.created_at, m.role, w.color, w.icon
+		SELECT w.id, w.name, w.created_at, m.role, w.color, w.icon, w.slug
 		FROM workspace w JOIN workspace_member m ON m.workspace_id = w.id
 		WHERE m.user_id = ? AND w.deleted_at IS NULL ORDER BY w.id`, userID)
 	if err != nil {
@@ -74,7 +81,7 @@ func (s *Store) UserWorkspaces(ctx context.Context, userID int64) ([]Workspace, 
 	for rows.Next() {
 		var w Workspace
 		var created string
-		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Role, &w.Color, &w.Icon); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Role, &w.Color, &w.Icon, &w.Slug); err != nil {
 			return nil, err
 		}
 		w.CreatedAt, _ = timeutil.ParseFlexible(created)
@@ -128,7 +135,7 @@ func (s *Store) CreateWorkspace(ctx context.Context, userID int64, name string) 
 	if err := s.AddWorkspaceMember(ctx, id, userID, "owner"); err != nil {
 		return Workspace{}, err
 	}
-	return Workspace{ID: id, Name: name, CreatedAt: now, Role: "owner", Color: "#9a9a9a", Icon: "layers"}, nil
+	return Workspace{ID: id, Slug: "workspace-" + fmt.Sprint(id), Name: name, CreatedAt: now, Role: "owner", Color: "#9a9a9a", Icon: "layers"}, nil
 }
 
 // EnsureUserWorkspace gives a user without any workspace one: the seeded
@@ -159,7 +166,7 @@ func (s *Store) EnsureUserWorkspace(ctx context.Context, userID int64, username 
 
 // AllWorkspaces lists every workspace (for callers with no account).
 func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, color, icon FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, name, created_at, color, icon, slug FROM workspace WHERE deleted_at IS NULL ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +175,7 @@ func (s *Store) AllWorkspaces(ctx context.Context) ([]Workspace, error) {
 	for rows.Next() {
 		var w Workspace
 		var created string
-		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Color, &w.Icon); err != nil {
+		if err := rows.Scan(&w.ID, &w.Name, &created, &w.Color, &w.Icon, &w.Slug); err != nil {
 			return nil, err
 		}
 		w.CreatedAt, _ = timeutil.ParseFlexible(created)
@@ -303,7 +310,7 @@ var ErrWorkspaceAppearance = errors.New("цвет: #RRGGBB; иконка: docume
 var workspaceColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 // UpdateWorkspace changes only supplied fields; validation precedes the single write.
-func (s *Store) UpdateWorkspace(ctx context.Context, id int64, name, color, icon *string) error {
+func (s *Store) UpdateWorkspace(ctx context.Context, id int64, name, color, icon, slug *string) error {
 	if name != nil {
 		n := strings.TrimSpace(*name)
 		if n == "" {
@@ -317,7 +324,13 @@ func (s *Store) UpdateWorkspace(ctx context.Context, id int64, name, color, icon
 	if err := CheckWorkspaceAppearance(color, icon); err != nil {
 		return err
 	}
-	result, err := s.DB.ExecContext(ctx, `UPDATE workspace SET name=COALESCE(?,name), color=COALESCE(?,color), icon=COALESCE(?,icon) WHERE id=? AND deleted_at IS NULL`, name, color, icon, id)
+	if slug != nil && !slugs.Valid(*slug) {
+		return ErrWorkspaceSlug
+	}
+	result, err := s.DB.ExecContext(ctx, `UPDATE workspace SET slug=COALESCE(?,slug), name=COALESCE(?,name), color=COALESCE(?,color), icon=COALESCE(?,icon) WHERE id=? AND deleted_at IS NULL`, slug, name, color, icon, id)
+	if platformdb.IsUniqueViolation(err) {
+		return ErrWorkspaceSlugTaken
+	}
 	if err != nil {
 		return err
 	}

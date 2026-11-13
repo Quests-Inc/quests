@@ -21,6 +21,7 @@ export interface Member {
 // source: workspaces.go
 
 export interface Workspace {
+  slug: string;
   id: number /* int64 */;
   name: string;
   color: string;

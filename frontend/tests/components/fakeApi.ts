@@ -185,6 +185,7 @@ export function installFakeApi(data = fixtureData(), opts: { authRequired?: bool
     if (p === '/api/notes') return json(data.notes)
     if (/^\/api\/notes\/\d+$/.test(p))
       return json({ ...data.notes.find((n) => `/api/notes/${n.id}` === p), refs: [], backlinks: [] })
+    if (p === '/api/repositories') return json({ items: [], quota_bytes: 268435456 })
     if (p === '/api/attachments') return json(data.attachments)
     if (p === '/api/templates' || p.startsWith('/api/trash/')) return json([])
     if (p === '/api/calendar/events') return json([])

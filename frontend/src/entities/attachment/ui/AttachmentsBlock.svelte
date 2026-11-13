@@ -1,4 +1,6 @@
 <script lang="ts">
+  import {attachmentImage,showImages} from '@/shared/lib/imageViewer.svelte.ts'
+  import {isRaster} from '../model/list.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
@@ -411,7 +413,7 @@
           <span class="attach__file">
             <span class="attach__name">
               <FileKindIcon att={a} size={16} />
-              {a.filename}
+              {#if isRaster(a) && !unavailable && a.scan_status==='clean'}<button type="button" class="attach__image-open" onclick={()=>showImages(visible.filter(isRaster).map(attachmentImage),attachmentImage(a).src)}>{a.filename}</button>{:else}{a.filename}{/if}
               {#if revCount > 1}
                 <button
                   type="button"
@@ -608,6 +610,7 @@
 />
 
 <style>
+ .attach__image-open{padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:zoom-in;text-decoration:underline;text-underline-offset:3px}
   .attach__toggle {
     display: flex;
     width: fit-content;

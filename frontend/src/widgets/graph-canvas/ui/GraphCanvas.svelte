@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {attachmentImage} from '@/shared/lib/imageViewer.svelte.ts'
   import {imagePixels} from '../model/imageQuality.ts'
   import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
   import type { Snippet } from 'svelte'
@@ -96,6 +97,7 @@
   const isOrphan = (n: { type: string; links: number }) => (n.type === 'note' || n.type === 'attachment') && n.links === 0
   const rasterOf = (n: { type: string; mime?: string }) =>
     n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
+  const galleryImages=$derived(stage.nodes.filter(rasterOf).map(node=>attachmentImage({id:node.id,filename:node.title})))
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -139,6 +141,7 @@
     <GraphGroups groups={renderedGroups} collapseKey={stage.collapseKey} onGroupDown={gest.onGroupDown} {onGroupCtx} onCollapse={folds.collapse} />
     {#each renderedNodes as n (n.key)}
       <GraphCard
+        imageGallery={galleryImages}
         {n}
         selected={n.key === stage.selectedKey}
         lit={n.key === stage.lit?.from || n.key === stage.lit?.to}

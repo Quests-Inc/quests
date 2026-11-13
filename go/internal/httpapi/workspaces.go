@@ -71,6 +71,34 @@ func (s *Server) withWorkspace(next http.Handler) http.Handler {
 			// No user (auth off, or the in-process token) = trusted, any workspace.
 			ws = id
 		}
+		if strings.HasPrefix(path, "/git/") {
+			parts := strings.Split(strings.TrimPrefix(path, "/git/"), "/")
+			if len(parts) < 3 {
+				http.NotFound(w, r)
+				return
+			}
+			var target int64
+			if err := s.Store.DB.QueryRowContext(r.Context(), `SELECT id FROM workspace WHERE slug=? AND deleted_at IS NULL`, parts[0]).Scan(&target); err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			if hasUser {
+				if p.Via == "token" && p.User.WorkspaceID != target {
+					writeErr(w, 403, "token belongs to another workspace")
+					return
+				}
+				member, e := s.Auth.IsMember(p.User.ID, target)
+				if e != nil || !member {
+					writeErr(w, 403, "not a member of that workspace")
+					return
+				}
+			} else if p.TokenName == "internal" && ws != target {
+				writeErr(w, 403, "internal workspace mismatch")
+				return
+			}
+			ws = target
+		}
+
 		if ws <= 0 {
 			// An account without any workspace may only manage workspaces / sessions.
 			if strings.HasPrefix(path, "/api/workspaces") || strings.HasPrefix(path, "/api/auth/") {

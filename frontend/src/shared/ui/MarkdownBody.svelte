@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { showImages } from '@/shared/lib/imageViewer.svelte.ts'
   import { untrack } from 'svelte'
   import { listValues, type ValueRow } from '@/shared/api/client.ts'
   import { foreignValueRefs, renderMarkdown } from '@/shared/lib/markdown.ts'
@@ -203,7 +204,19 @@
     return { destroy: () => node.removeEventListener('error', onImgError, true) }
   }
 
+  function imageAccess(node:HTMLElement,_html:string) {
+    const apply=()=>{for(const img of node.querySelectorAll<HTMLImageElement>('img.md-attachment-img')){img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',`Открыть изображение ${img.alt}`);img.style.cursor='zoom-in'}}
+    const key=(event:KeyboardEvent)=>{if((event.key==='Enter'||event.key===' ')&&event.target instanceof HTMLImageElement){event.preventDefault();event.target.click()}}
+    node.addEventListener('keydown',key);queueMicrotask(apply)
+    return {update(){queueMicrotask(apply)},destroy(){node.removeEventListener('keydown',key)}}
+  }
   function onClick(event: MouseEvent) {
+    const image=event.target
+    if(image instanceof HTMLImageElement && image.classList.contains('md-attachment-img')) {
+      event.preventDefault();event.stopPropagation()
+      const images=[...root?.querySelectorAll<HTMLImageElement>('img.md-attachment-img')||[]].map(img=>({src:img.getAttribute('src')||'',title:img.alt||'Изображение'}))
+      showImages(images,image.getAttribute('src')||'');return
+    }
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
     const href = a.getAttribute('href') || ''
@@ -221,6 +234,7 @@
     data-value-sig={valueSig}
     bind:this={root}
     onclick={onClick}
+    use:imageAccess={html}
     use:captureImgErrors
     use:refIcons
     use:scriptEmbed={merged}

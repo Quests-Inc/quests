@@ -8,6 +8,7 @@
   /** Панель выбранного вложения: превью, действия, сведения, комментарий, версии и история. */
   let {
     a,
+    gallery = [],
     busy = false,
     revs,
     revsBusy,
@@ -26,6 +27,7 @@
     onCopyRef,
   }: {
     a: AttachmentView
+    gallery?: AttachmentView[]
     busy?: boolean
     revs: RevisionRead[]
     revsBusy: boolean
@@ -54,7 +56,7 @@
       </div>
 
       <div class="attpage__preview" class:attpage__preview--hidden={a.hidden}>
-        <AttachmentPreview {a} />
+        <AttachmentPreview {a} {gallery} />
         {#if a.hidden}
           <span class="attpage__hiddenbadge"><Icon name="eye-off" size={14} /> скрыто</span>
         {/if}

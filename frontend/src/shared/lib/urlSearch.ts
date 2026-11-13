@@ -21,6 +21,12 @@ export function replaceSearch(params: Record<string, unknown>) {
 /** Workspace-local entity ids and filters must never cross a workspace boundary. */
 export function searchAfterWorkspaceSwitch(search: string): Record<string, string> {
   const params = new URLSearchParams(search)
-  const tab = params.has('attachment') ? 'attachments' : params.has('note') ? 'notes' : params.get('tab')
+  const tab = params.has('attachment')
+    ? 'attachments'
+    : params.has('note')
+      ? 'notes'
+      : params.has('repo')
+        ? 'repositories'
+        : params.get('tab')
   return tab && tab !== 'journal' && Object.hasOwn(VIEW_TABS, tab) ? { tab } : {}
 }

@@ -194,6 +194,10 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if err := h.exportRepositories(ctx, zw); err != nil {
+		fail(err)
+		return
+	}
 	if err := zw.Close(); err != nil {
 		fail(err)
 	}
@@ -284,6 +288,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	var uploaded []string
 	var importedBytes int64
 	abort := func(status int, msg string) {
+		_ = os.RemoveAll(filepath.Join(h.DataDir, "repositories", strconv.FormatInt(ws.ID, 10)))
 		for _, path := range uploaded {
 			_ = h.WebDAV.Delete(context.WithoutCancel(ctx), path)
 		}
@@ -386,6 +391,10 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 			status = 499
 		}
 		abort(status, "импорт не удался: "+err.Error())
+		return
+	}
+	if err := h.importRepositories(ctx, entries, rep.IDs); err != nil {
+		abort(http.StatusUnprocessableEntity, "импорт репозиториев: "+err.Error())
 		return
 	}
 	h.importIcons(ctx, entries, rep.IDs)
