@@ -1,5 +1,5 @@
 import { request } from './http.ts'
-export type RepositoryLink = { kind: 'quest' | 'questline' | 'step'; id: number; path: string }
+export type RepositoryLink = { kind: 'quest' | 'questline' | 'note'; id: number }
 export type Repository = {
   id: number
   title: string
@@ -17,8 +17,7 @@ export type RepositoryView = {
   branches: string[]
   commits: { id: string; title: string; author: string; date: string }[]
   tree: { name: string; path: string; kind: string; id: string }[]
-  file?: string
-  binary: boolean
+  selected_commit: string
   empty: boolean
 }
 export const listRepositories = () => request<{ items: Repository[]; quota_bytes: number }>('/api/repositories')
@@ -36,8 +35,8 @@ export const linkRepository = (id: number, owner: RepositoryLink) =>
   request(`/api/repositories/${id}/links`, { method: 'POST', body: JSON.stringify(owner) })
 export const unlinkRepository = (id: number, owner: RepositoryLink) =>
   request(`/api/repositories/${id}/links?kind=${owner.kind}&owner=${owner.id}`, { method: 'DELETE' })
-export const browseRepository = (id: number, branch: string, path: string, signal?: AbortSignal) =>
+export const browseRepository = (id: number, branch: string, path: string, signal?: AbortSignal, commit = '') =>
   request<RepositoryView>(
-    `/api/repositories/${id}/browse?branch=${encodeURIComponent(branch)}&path=${encodeURIComponent(path)}`,
+    `/api/repositories/${id}/browse?branch=${encodeURIComponent(branch)}&path=${encodeURIComponent(path)}&commit=${encodeURIComponent(commit)}`,
     { signal }
   )

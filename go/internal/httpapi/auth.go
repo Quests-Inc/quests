@@ -70,10 +70,15 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 
 func (s *Server) principal(r *http.Request) (identity.Principal, bool) {
 	secret := bearerToken(r)
+	gitLogin := ""
 	if secret == "" && strings.HasPrefix(r.URL.Path, "/api/repositories/") && strings.Contains(r.URL.Path, "/git/") {
-		_, password, ok := r.BasicAuth()
+		login, password, ok := r.BasicAuth()
 		if ok {
+			if login == "" {
+				return identity.Principal{}, false
+			}
 			secret = password
+			gitLogin = login
 		}
 	}
 	if secret != "" {
@@ -86,6 +91,9 @@ func (s *Server) principal(r *http.Request) (identity.Principal, bool) {
 			}, true
 		}
 		if u, name, err := s.Auth.LookupAPIToken(secret); err == nil {
+			if gitLogin != "" && gitLogin != u.Username {
+				return identity.Principal{}, false
+			}
 			return identity.Principal{User: u, Via: "token", TokenName: name}, true
 		}
 		return identity.Principal{}, false

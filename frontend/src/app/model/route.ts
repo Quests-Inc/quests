@@ -59,6 +59,7 @@ export function searchForView(
   if (nextView === 'graph') {
     return sel.graph.id != null ? { tab: 'graph', gt: sel.graph.type, gid: sel.graph.id } : { tab: 'graph' }
   }
+  if (nextView === 'repositories') return { tab: 'repositories', repo: param('repo') || undefined }
   if (nextView === 'attachments')
     return sel.attachment != null ? { attachment: sel.attachment } : { tab: 'attachments' }
   return { tab: nextView }

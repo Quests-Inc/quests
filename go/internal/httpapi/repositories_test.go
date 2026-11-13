@@ -78,6 +78,20 @@ func TestRepositoriesGitHTTPAndWorkspace(t *testing.T) {
 	if raw, err := repository.Git(context.Background(), restored, "show", "refs/heads/main:hello.txt"); err != nil || string(raw) != "hello source\n" {
 		t.Fatalf("bundle roundtrip %s %v", raw, err)
 	}
+	old := call("GET", base+"/browse", nil, 200)["selected_commit"].(string)
+	if err := os.WriteFile(filepath.Join(local, "second.txt"), []byte("second version"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("-C", local, "add", "second.txt")
+	git("-C", local, "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-m", "Second source")
+	git("-C", local, "push", "origin", "HEAD:main")
+	historical := call("GET", base+"/browse?commit="+old, nil, 200)
+	if len(historical["tree"].([]any)) != 1 {
+		t.Fatal("selected commit did not select old tree")
+	}
+	call("POST", base+"/links", map[string]any{"kind": "step", "id": 1}, 400)
+	note := call("POST", "/api/notes", map[string]any{"title": "Repo note"}, 201)
+	call("POST", base+"/links", map[string]any{"kind": "note", "id": note["id"]}, 200)
 	large := make([]byte, 300000)
 	if _, err := rand.Read(large); err != nil {
 		t.Fatal(err)
@@ -92,13 +106,10 @@ func TestRepositoriesGitHTTPAndWorkspace(t *testing.T) {
 		t.Fatalf("overquota push succeeded %s", output)
 	}
 	view := call("GET", base+"/browse", nil, 200)
-	if len(view["commits"].([]any)) != 1 {
+	if len(view["commits"].([]any)) != 2 {
 		t.Fatal(view)
 	}
-	file := call("GET", base+"/browse?path=hello.txt", nil, 200)
-	if file["file"] != "hello source\n" {
-		t.Fatal(file)
-	}
+	call("GET", base+"/browse?path=hello.txt", nil, 400)
 	call("GET", base+"/browse?path=../config", nil, 400)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", base+"/browse", nil)

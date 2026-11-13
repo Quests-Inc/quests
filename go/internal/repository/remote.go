@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -84,6 +83,11 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 	if err := validateRemote(repo.Kind, repo.URL); err != nil {
 		return err
 	}
+	ref := branch
+	if selected := r.URL.Query().Get("commit"); selected != "" {
+		ref = selected
+		v.SelectedCommit = selected
+	}
 	u, _ := url.Parse(repo.URL)
 	project := strings.Trim(strings.TrimSuffix(u.Path, ".git"), "/")
 	if repo.Kind == "github" {
@@ -121,7 +125,10 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 			title, _, _ := strings.Cut(c.Commit.Message, "\n")
 			v.Commits = append(v.Commits, Commit{c.SHA, title, c.Commit.Author.Name, c.Commit.Author.Date})
 		}
-		endpoint := base + "/contents/" + strings.Join(escapeParts(path), "/") + "?ref=" + url.QueryEscape(branch)
+		if v.SelectedCommit == "" && len(v.Commits) > 0 {
+			v.SelectedCommit = v.Commits[0].ID
+		}
+		endpoint := base + "/contents/" + strings.Join(escapeParts(path), "/") + "?ref=" + url.QueryEscape(ref)
 		var raw json.RawMessage
 		if err := h.remoteJSON(r, repo, endpoint, &raw); err != nil {
 			return err
@@ -150,20 +157,9 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 				v.Tree = append(v.Tree, Entry{e.Name, e.Path, kind, e.SHA})
 			}
 		} else {
-			var item content
-			if err := json.Unmarshal(raw, &item); err != nil {
-				return err
-			}
-			if item.Encoding != "base64" {
-				return fmt.Errorf("файл слишком большой для просмотра")
-			}
-			data, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(item.Content, "\n", ""))
-			if err != nil {
-				return err
-			}
-			text := string(data)
-			v.File = &text
+			return fmt.Errorf("выберите каталог; просмотр файлов пока не включён")
 		}
+
 		return nil
 	}
 	base := "https://gitlab.com/api/v4/projects/" + url.PathEscape(project) + "/repository"
@@ -195,21 +191,9 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 	for _, c := range commits {
 		v.Commits = append(v.Commits, Commit{c.ID, c.Title, c.Author, c.Date})
 	}
-	if path != "" {
-		var file struct {
-			Content  string `json:"content"`
-			Encoding string `json:"encoding"`
-		}
-		err := h.remoteJSON(r, repo, base+"/files/"+url.PathEscape(path)+"?ref="+url.QueryEscape(branch), &file)
-		if err == nil {
-			data, e := base64.StdEncoding.DecodeString(file.Content)
-			if e != nil {
-				return e
-			}
-			text := string(data)
-			v.File = &text
-			return nil
-		}
+
+	if v.SelectedCommit == "" && len(v.Commits) > 0 {
+		v.SelectedCommit = v.Commits[0].ID
 	}
 	var items []struct {
 		ID   string `json:"id"`
@@ -217,7 +201,7 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 		Path string `json:"path"`
 		Type string `json:"type"`
 	}
-	if err := h.remoteJSON(r, repo, base+"/tree?per_page=100&ref="+url.QueryEscape(branch)+"&path="+url.QueryEscape(path), &items); err != nil {
+	if err := h.remoteJSON(r, repo, base+"/tree?per_page=100&ref="+url.QueryEscape(ref)+"&path="+url.QueryEscape(path), &items); err != nil {
 		return err
 	}
 	if len(items) >= 100 {

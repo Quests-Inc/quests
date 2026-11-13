@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {RepositoriesBlock} from '@/entities/repository'
   import { AttachmentsBlock } from '@/entities/attachment'
   import { ValueTable } from '@/entities/value'
   import { EntityHistory } from '@/entities/history'
@@ -234,6 +235,7 @@
       <NoteCheck noteId={selectedId} {onChanged} onOpenSecrets={() => onOpenSecrets?.(selectedId)} />
     </div>
     <div class="block notes__attach">
+      <RepositoriesBlock owner={{kind:'note',id:selectedId}} />
       <AttachmentsBlock ownerType="note" ownerId={selectedId} onOpenOwner={onRef} />
     </div>
     <div class="block notes__attach">

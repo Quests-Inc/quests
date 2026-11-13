@@ -27,7 +27,7 @@ func TestRepositoryArchiveRoundTrip(t *testing.T) {
 	if err = f.st.DB.QueryRowContext(ctx, `INSERT INTO repository(title,kind,branch) VALUES('Mini','local','main') RETURNING id`).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.st.DB.ExecContext(ctx, `INSERT INTO repository_link(repository_id,owner_type,owner_id,path) VALUES(?,'quest',?,'hello.txt')`, id, q.ID); err != nil {
+	if _, err = f.st.DB.ExecContext(ctx, `INSERT INTO repository_link(repository_id,owner_type,owner_id) VALUES(?,'quest',?)`, id, q.ID); err != nil {
 		t.Fatal(err)
 	}
 	dir := repository.Directory(f.h.DataDir, f.ws.ID, id)
@@ -77,11 +77,10 @@ func TestRepositoryArchiveRoundTrip(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &result)
 	imported := wsctx.With(ctx, result.WorkspaceID)
 	var repoID, questID int64
-	var path string
-	if err = f.st.DB.QueryRowContext(imported, `SELECT r.id,l.owner_id,l.path FROM repository r JOIN repository_link l ON l.repository_id=r.id`).Scan(&repoID, &questID, &path); err != nil {
+	if err = f.st.DB.QueryRowContext(imported, `SELECT r.id,l.owner_id FROM repository r JOIN repository_link l ON l.repository_id=r.id`).Scan(&repoID, &questID); err != nil {
 		t.Fatal(err)
 	}
-	if repoID == id || questID == q.ID || path != "hello.txt" {
+	if repoID == id || questID == q.ID {
 		t.Fatal("ids/links not remapped")
 	}
 	raw, err := repository.Git(ctx, repository.Directory(f.h.DataDir, result.WorkspaceID, repoID), "show", "refs/heads/main:hello.txt")

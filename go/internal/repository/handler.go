@@ -44,7 +44,6 @@ type Record struct {
 type Link struct {
 	Kind string `json:"kind"`
 	ID   int64  `json:"id"`
-	Path string `json:"path"`
 }
 
 var locks sync.Map
@@ -119,14 +118,14 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range repos {
 		a := &repos[i]
-		links, e := h.DB.QueryContext(r.Context(), `SELECT owner_type,owner_id,path FROM repository_link WHERE repository_id=? ORDER BY owner_type,owner_id`, a.ID)
+		links, e := h.DB.QueryContext(r.Context(), `SELECT owner_type,owner_id FROM repository_link WHERE repository_id=? ORDER BY owner_type,owner_id`, a.ID)
 		if e != nil {
 			fail(w, 500, e)
 			return
 		}
 		for links.Next() {
 			var l Link
-			if e = links.Scan(&l.Kind, &l.ID, &l.Path); e != nil {
+			if e = links.Scan(&l.Kind, &l.ID); e != nil {
 				break
 			}
 			a.Links = append(a.Links, l)
@@ -241,7 +240,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		_, err = tx.ExecContext(r.Context(), `INSERT INTO repository_token(repository_id,value) VALUES(?,?)`, id, sealed)
 	}
 	if err == nil && in.Owner != nil {
-		_, err = tx.ExecContext(r.Context(), `INSERT INTO repository_link(repository_id,owner_type,owner_id,path) VALUES(?,?,?,?)`, id, in.Owner.Kind, in.Owner.ID, in.Owner.Path)
+		_, err = tx.ExecContext(r.Context(), `INSERT INTO repository_link(repository_id,owner_type,owner_id) VALUES(?,?,?)`, id, in.Owner.Kind, in.Owner.ID)
 	}
 	if err == nil {
 		err = tx.Commit()
@@ -334,13 +333,10 @@ func (h *Handler) owner(r *http.Request, l Link) error {
 		table = "quest"
 	case "questline":
 		table = "questline"
-	case "step":
-		table = "queststep"
+	case "note":
+		table = "note"
 	default:
 		return fmt.Errorf("неизвестный владелец")
-	}
-	if !safePath(l.Path) {
-		return fmt.Errorf("некорректный путь")
 	}
 	var exists bool
 	err := h.DB.QueryRowContext(r.Context(), "SELECT EXISTS(SELECT 1 FROM "+table+" WHERE id=?)", l.ID).Scan(&exists)
@@ -369,7 +365,7 @@ func (h *Handler) link(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
-	_, err = h.DB.ExecContext(r.Context(), `INSERT INTO repository_link(repository_id,owner_type,owner_id,path) VALUES(?,?,?,?) ON CONFLICT(repository_id,owner_type,owner_id) DO UPDATE SET path=excluded.path`, repo.ID, l.Kind, l.ID, l.Path)
+	_, err = h.DB.ExecContext(r.Context(), `INSERT INTO repository_link(repository_id,owner_type,owner_id) VALUES(?,?,?) ON CONFLICT(repository_id,owner_type,owner_id) DO NOTHING`, repo.ID, l.Kind, l.ID)
 	if err != nil {
 		fail(w, 500, err)
 		return

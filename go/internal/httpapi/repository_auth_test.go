@@ -46,17 +46,24 @@ func TestRepositoryGitTokenAndOwner(t *testing.T) {
 		t.Fatal("missing git auth challenge")
 	}
 	r = httptest.NewRequest("GET", path, nil)
-	r.SetBasicAuth("git", token)
+	r.SetBasicAuth(user.Username, token)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != 200 {
 		t.Fatalf("basic token =%d %s", w.Code, w.Body.String())
 	}
+	r = httptest.NewRequest("GET", path, nil)
+	r.SetBasicAuth("different-user", token)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 401 {
+		t.Fatal("token accepted under another login")
+	}
 	if _, err = s.Auth.DB.Exec(`UPDATE workspace_member SET role='member' WHERE user_id=? AND workspace_id=?`, user.ID, ws.ID); err != nil {
 		t.Fatal(err)
 	}
 	r = httptest.NewRequest("GET", strings.Replace(path, "git-upload-pack", "git-receive-pack", 1), nil)
-	r.SetBasicAuth("git", token)
+	r.SetBasicAuth(user.Username, token)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != 403 {

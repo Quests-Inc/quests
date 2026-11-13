@@ -1,10 +1,10 @@
 package repository
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/quests-inc/quests/go/internal/platform/httpx"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
@@ -23,15 +23,14 @@ type Entry struct {
 	ID   string `json:"id"`
 }
 type View struct {
-	Limited  bool     `json:"limited"`
-	CloneURL string   `json:"clone_url"`
-	Branch   string   `json:"branch"`
-	Branches []string `json:"branches"`
-	Commits  []Commit `json:"commits"`
-	Tree     []Entry  `json:"tree"`
-	File     *string  `json:"file,omitempty"`
-	Binary   bool     `json:"binary"`
-	Empty    bool     `json:"empty"`
+	SelectedCommit string   `json:"selected_commit"`
+	Limited        bool     `json:"limited"`
+	CloneURL       string   `json:"clone_url"`
+	Branch         string   `json:"branch"`
+	Branches       []string `json:"branches"`
+	Commits        []Commit `json:"commits"`
+	Tree           []Entry  `json:"tree"`
+	Empty          bool     `json:"empty"`
 }
 
 func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +44,11 @@ func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
 		branch = repo.Branch
 	}
 	path := r.URL.Query().Get("path")
+	selected := r.URL.Query().Get("commit")
+	if selected != "" && !validCommit(selected) {
+		fail(w, 400, fmt.Errorf("некорректный коммит"))
+		return
+	}
 	if !safeRef(branch) || !safePath(path) {
 		fail(w, 400, fmt.Errorf("некорректная ветка или путь"))
 		return
@@ -87,25 +91,28 @@ func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
-			object := commit
+			if selected != "" {
+				resolved, e := Git(r.Context(), dir, "rev-parse", "--verify", selected+"^{commit}")
+				if e != nil {
+					fail(w, 404, fmt.Errorf("коммит не найден"))
+					return
+				}
+				commit = strings.TrimSpace(string(resolved))
+			}
+			view.SelectedCommit = commit
+			object := commit + "^{tree}"
 			if path != "" {
-				object += ":" + path
+				object = commit + ":" + path
 			}
 			var kind []byte
 			if err == nil {
 				kind, err = Git(r.Context(), dir, "cat-file", "-t", object)
 			}
-			if err == nil && strings.TrimSpace(string(kind)) == "blob" {
-				raw, err = Git(r.Context(), dir, "cat-file", "blob", object)
-				if err == nil {
-					if utf8.Valid(raw) && !strings.ContainsRune(string(raw), 0) {
-						text := string(raw)
-						view.File = &text
-					} else {
-						view.Binary = true
-					}
-				}
-			} else if err == nil {
+			if err == nil && strings.TrimSpace(string(kind)) != "tree" {
+				fail(w, 400, fmt.Errorf("выберите каталог; просмотр файлов пока не включён"))
+				return
+			}
+			if err == nil {
 				raw, err = Git(r.Context(), dir, "ls-tree", "-z", object)
 				if err == nil {
 					for _, row := range strings.Split(string(raw), "\x00") {
@@ -139,4 +146,12 @@ func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, 200, view)
+}
+
+func validCommit(raw string) bool {
+	if len(raw) != 40 && len(raw) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(raw)
+	return err == nil
 }

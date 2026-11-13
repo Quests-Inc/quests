@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/identity"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -153,6 +155,8 @@ func (h *Handler) transport(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		actor, _ := identity.PrincipalFrom(r.Context())
+		log.Printf("repository push workspace=%d repository=%d actor=%d username=%q status=%d", wsctx.From(r.Context()), repo.ID, wsctx.UserFrom(r.Context()), actor.User.Username, buffer.status)
 		for key, values := range buffer.header {
 			w.Header()[key] = values
 		}
@@ -167,7 +171,11 @@ func (h *Handler) cgi(w http.ResponseWriter, r *http.Request, root, name, path s
 	clone.Body = http.MaxBytesReader(w, r.Body, h.quota()+(1<<20))
 	// Content is never interpreted as executable code. Only smart HTTP endpoints
 	// are exposed; hooks, replace refs, alternates from requests and maintenance are disabled.
-	env := append(gitEnv(), "GIT_PROJECT_ROOT="+root, "GIT_HTTP_EXPORT_ALL=1", "PATH_INFO=/"+name+"/"+path, "REMOTE_USER=quests", "GIT_CONFIG_KEY_6=http.receivepack", "GIT_CONFIG_VALUE_6=true", "GIT_CONFIG_KEY_7=http.getanyfile", "GIT_CONFIG_VALUE_7=false")
+	username := "bootstrap"
+	if principal, ok := identity.PrincipalFrom(r.Context()); ok {
+		username = principal.User.Username
+	}
+	env := append(gitEnv(), "GIT_PROJECT_ROOT="+root, "GIT_HTTP_EXPORT_ALL=1", "PATH_INFO=/"+name+"/"+path, "REMOTE_USER="+username, "GIT_CONFIG_KEY_6=http.receivepack", "GIT_CONFIG_VALUE_6=true", "GIT_CONFIG_KEY_7=http.getanyfile", "GIT_CONFIG_VALUE_7=false")
 	for i, v := range env {
 		if strings.HasPrefix(v, "GIT_CONFIG_COUNT=") {
 			env[i] = "GIT_CONFIG_COUNT=8"

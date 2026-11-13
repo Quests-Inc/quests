@@ -533,7 +533,6 @@
               <span class="step__btn-slot" aria-hidden="true"></span>
             {/if}
           </div>
-          <RepositoriesBlock compact owner={{kind:'step',id:step.id,path:''}} />
           <StepValues stepId={step.id} source={stepDesc} show={Boolean(step.description || stepDesc)} class="step__desc" {labels} {onRef} typing={typingSteps.has(step.id)} />
         </li>
       {/each}
@@ -557,7 +556,7 @@
   </div>
 
   <div class="block">
-    <RepositoriesBlock owner={{kind:'quest',id:q.id,path:''}} />
+    <RepositoriesBlock owner={{kind:'quest',id:q.id}} />
     <AttachmentsBlock ownerType="quest" ownerId={q.id} onOpenOwner={onRef} />
   </div>
 
@@ -683,7 +682,7 @@
         </div>
       {/if}
 
-      <RepositoriesBlock owner={{kind:'questline',id:Number(selected.questline_id),path:''}} />
+      <RepositoriesBlock owner={{kind:'questline',id:Number(selected.questline_id)}} />
       <div class="detail__line-attach">
         <AttachmentsBlock
           ownerType="questline"

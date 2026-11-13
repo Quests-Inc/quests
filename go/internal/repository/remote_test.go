@@ -52,13 +52,7 @@ func TestReadProviderViews(t *testing.T) {
 			if len(v.Branches) != 1 || len(v.Commits) != 1 || len(v.Tree) != 1 {
 				t.Fatalf("bad view %+v", v)
 			}
-			v = View{}
-			if err := h.remoteView(r, repo, "main", "hello.txt", &v); err != nil {
-				t.Fatal(err)
-			}
-			if v.File == nil || *v.File != "hello\n" {
-				t.Fatal("file not decoded")
-			}
+
 			for _, call := range client.calls {
 				if !strings.HasPrefix(call, "https://api.github.com/repos/") && !strings.HasPrefix(call, "https://gitlab.com/api/v4/projects/") {
 					t.Fatal(call)
