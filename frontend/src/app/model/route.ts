@@ -59,7 +59,10 @@ export function searchForView(
   if (nextView === 'graph') {
     return sel.graph.id != null ? { tab: 'graph', gt: sel.graph.type, gid: sel.graph.id } : { tab: 'graph' }
   }
-  if (nextView === 'repositories') return { tab: 'repositories', repo: param('repo') || undefined }
+  if (nextView === 'repositories') {
+    const repo = idParam('repo')
+    return repo != null ? { repo } : { tab: 'repositories' }
+  }
   if (nextView === 'attachments')
     return sel.attachment != null ? { attachment: sel.attachment } : { tab: 'attachments' }
   return { tab: nextView }
@@ -94,6 +97,7 @@ export function initialRoute(): {
   const fromTab = tabFromUrl()
   if (fromAtt != null) return { view: 'attachments', attachmentId: fromAtt }
   if (fromNote != null) return { view: 'notes', noteId: fromNote }
+  if (idParam('repo') != null) return { view: 'repositories' }
   if (fromTab) {
     if (fromTab !== 'graph') return { view: fromTab }
     const gid = Number(param('gid'))

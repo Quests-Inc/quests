@@ -4,6 +4,7 @@
  import SidebarTools from '@/shared/ui/SidebarTools.svelte'
  import Icon from '@/shared/ui/Icon.svelte'
  import {sidebars,SIDEBAR_ONE_PANE} from '@/shared/lib/sidebar.svelte.ts'
+ import {replaceSearch} from '@/shared/lib/urlSearch.ts'
  import {plural} from '@/shared/lib/duration.ts'
  import {untrack} from 'svelte'
  import RepositoryTokenHelp from './RepositoryTokenHelp.svelte'
@@ -12,11 +13,12 @@
  import ModalHead from '@/shared/ui/ModalHead.svelte'
  import ModalFoot from '@/shared/ui/ModalFoot.svelte'
  let {owner}:{owner?:RepositoryLink}=$props()
- let repos=$state<Repository[]>([]),error=$state(''),busy=$state(false),loaded=$state(false),expanded=$state(false),creating=$state(false),selected=$state<number|null>(untrack(()=>Number(new URL(location.href).searchParams.get('repo'))||null))
+ let repos=$state<Repository[]>([]),error=$state(''),busy=$state(false),loaded=$state(false),expanded=$state(false),creating=$state(false),selected=$state<number|null>(untrack(()=>{const id=Number(new URL(location.href).searchParams.get('repo'));return Number.isFinite(id)&&id>0?id:null}))
  let search=$state(''),attaching=$state(false),editingId=$state<number|null>(null),slug=$state(''),originalSlug=$state('')
  let title=$state(''),kind=$state('local'),url=$state(''),branch=$state('main'),token=$state(''),attachId=$state(''),quota=$state(0),tokenSaved=$state(false),removeToken=$state(false)
  let refreshNo=$state(0)
  const shown=$derived(owner?repos.filter(repo=>repo.links.some(l=>l.kind===owner.kind&&l.id===owner.id)):repos.filter(repo=>{const q=search.trim().toLowerCase().replace(/^repository=/,'');return !q||String(repo.id)===q||repo.slug?.includes(q)||repo.title.toLowerCase().includes(q)||repo.url.toLowerCase().includes(q)}))
+ $effect(()=>{if(!owner){const id=selected;untrack(()=>replaceSearch(id?{repo:id}:{tab:'repositories'}))}})
  const available=$derived(repos.filter(repo=>!shown.some(x=>x.id===repo.id)))
  $effect(()=>{void owner?.id;void owner?.kind;void refreshNo;const abort={active:true};loaded=false
  void listRepositories().then(result=>{if(abort.active){repos=result.items??[];quota=result.quota_bytes??0;loaded=true}}).catch(e=>{if(abort.active)error=e.message||String(e)});return()=>{abort.active=false}})
@@ -26,7 +28,7 @@
 
  function openCreate(){tokenSaved=false;removeToken=false;editingId=null;title='';slug='';kind='local';url='';branch='main';creating=true;token='';error=''}
  function openEdit(repo:Repository){tokenSaved=repo.has_token;removeToken=false;editingId=repo.id;title=repo.title;slug=repo.slug??'';originalSlug=slug;kind=repo.kind;url=repo.url;branch=repo.branch;token='';error='';creating=true}
- function selectRepo(id:number){selected=id;if(window.matchMedia(SIDEBAR_ONE_PANE).matches)sidebars.setCollapsed('repositories',true);const next=new URL(location.href);next.searchParams.set('repo',String(id));history.replaceState(history.state,'',next)}
+ function selectRepo(id:number){selected=id;if(window.matchMedia(SIDEBAR_ONE_PANE).matches)sidebars.setCollapsed('repositories',true);replaceSearch({repo:id})}
  const activeRepo=$derived(repos.find(repo=>repo.id===selected)??null)
 </script>
 {#if owner}
@@ -34,7 +36,7 @@
   {#if shown.length}<button type="button" class="block__label repo-heading" aria-expanded={expanded} onclick={()=>expanded=!expanded}>Репозитории ({shown.length}) <Icon name={expanded?'chevron-down':'chevron-right'} size={12}/></button>{:else}<span class="block__label repo-heading">Репозитории</span>{/if}
   {#if error}<p role="alert" class="repo-error">{error}</p>{/if}
   {#if expanded && shown.length}<ul class="repo-links">{#each shown as repo (repo.id)}<li class="repo-link">
-   <a href={`?tab=repositories&repo=${repo.id}`}><Icon name="folder" size={16}/><span>{repo.title}</span></a><small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.branch}</small>
+   <a href={`?repo=${repo.id}`}><Icon name="folder" size={16}/><span>{repo.title}</span></a><small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.branch}</small>
    <button type="button" class="repo-unlink" disabled={busy} onclick={()=>detach(repo)} title="Отвязать репозиторий" aria-label={`Отвязать ${repo.title}`}><Icon name="close" size={14}/></button>
   </li>{/each}</ul>{/if}
   <div class="repo-attach-line"><button type="button" class="repo-text-action" aria-expanded={attaching} onclick={()=>attaching=!attaching}>Привязать репозиторий</button><span> или </span><button type="button" class="repo-text-action" onclick={openCreate}>создать новый</button></div>

@@ -91,7 +91,7 @@ test('карточка владельца содержит ссылки, без 
   })
   await settle()
   flushSync(() => target.querySelector<HTMLButtonElement>('.repo-heading')!.click())
-  expect(target.querySelector('a')?.getAttribute('href')).toBe('?tab=repositories&repo=1')
+  expect(target.querySelector('a')?.getAttribute('href')).toBe('?repo=1')
   expect(target.querySelector('.repo-browser')).toBeNull()
   expect(target.querySelector('[aria-label="Коммит репозитория"]')).toBeNull()
 })
