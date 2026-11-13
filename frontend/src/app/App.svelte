@@ -1,6 +1,5 @@
 <script lang="ts">
  import {RepositoriesBlock} from '@/entities/repository'
- import PageLayout from '@/shared/ui/PageLayout.svelte'
  import ImageViewer from '@/shared/ui/ImageViewer.svelte'
   // Quests web UI — orchestrator (state, load, overlays)
   import { CalendarPage } from '@/pages/calendar'
@@ -682,7 +681,7 @@
       />
     </div>
   {:else if nav.view === 'repositories'}
-    <PageLayout title="Репозитории" description="Исходники пространства и внешние проекты"><div class="journal__review-page"><RepositoriesBlock /></div></PageLayout>
+    <RepositoriesBlock />
   {:else if nav.view === 'attachments'}
     <div class="journal__attachments">
       <AttachmentsPage

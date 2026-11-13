@@ -85,3 +85,36 @@ test('карточка владельца содержит ссылки, без 
   expect(target.querySelector('.repo-browser')).toBeNull()
   expect(target.querySelector('[aria-label="Коммит репозитория"]')).toBeNull()
 })
+
+test('поиск в боковой панели сохраняет открытый репозиторий и позволяет выбрать другой', async () => {
+  globalThis.fetch = (async (input) =>
+    new Response(
+      JSON.stringify(
+        String(input).includes('/browse')
+          ? { branches: ['main'], commits: [], tree: [], empty: true }
+          : { items: [repo, { ...repo, id: 2, title: 'Other' }], quota_bytes: 268435456 }
+      )
+    )) as typeof fetch
+  const target = document.createElement('div')
+  document.body.append(target)
+  const app = mount(RepositoriesBlock, { target })
+  cleanup.push(() => {
+    unmount(app)
+    target.remove()
+  })
+  await settle()
+  flushSync(() => target.querySelector<HTMLButtonElement>('.repo-row')!.click())
+  await settle()
+  const search = target.querySelector<HTMLInputElement>('[aria-label="Поиск репозиториев"]')!
+  flushSync(() => {
+    search.value = '2'
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await settle()
+  expect(target.querySelectorAll('.repo-row').length).toBe(1)
+  expect(target.querySelector('.repo-detail h1')?.textContent).toBe('Mini')
+  flushSync(() => target.querySelector<HTMLButtonElement>('.repo-row')!.click())
+  await settle()
+  expect(target.querySelector('.repo-detail h1')?.textContent).toBe('Other')
+  expect(target.querySelector('[aria-label="Ширина боковой панели"]')).not.toBeNull()
+})

@@ -1,6 +1,9 @@
 <script lang="ts">
  import {listRepositories,createRepository,linkRepository,unlinkRepository,updateRepository,type Repository,type RepositoryLink} from '@/shared/api/repositories.ts'
- import PageToolbar from '@/shared/ui/PageToolbar.svelte'
+ import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
+ import SidebarTools from '@/shared/ui/SidebarTools.svelte'
+ import Icon from '@/shared/ui/Icon.svelte'
+ import {sidebars,SIDEBAR_ONE_PANE} from '@/shared/lib/sidebar.svelte.ts'
  import {plural} from '@/shared/lib/duration.ts'
  import {untrack} from 'svelte'
  import RepositoryBrowser from './RepositoryBrowser.svelte'
@@ -9,43 +12,47 @@
  import ModalFoot from '@/shared/ui/ModalFoot.svelte'
  let {owner}:{owner?:RepositoryLink}=$props()
  let repos=$state<Repository[]>([]),error=$state(''),busy=$state(false),loaded=$state(false),expanded=$state(false),creating=$state(false),selected=$state<number|null>(untrack(()=>Number(new URL(location.href).searchParams.get('repo'))||null))
- let search=$state('')
+ let search=$state(''),attaching=$state(false)
  let title=$state(''),kind=$state('local'),url=$state(''),branch=$state('main'),token=$state(''),attachId=$state(''),quota=$state(0),tokenFor=$state<number|null>(null)
  let refreshNo=$state(0)
  const shown=$derived(owner?repos.filter(repo=>repo.links.some(l=>l.kind===owner.kind&&l.id===owner.id)):repos.filter(repo=>{const q=search.trim().toLowerCase().replace(/^repository=/,'');return !q||String(repo.id)===q||repo.title.toLowerCase().includes(q)||repo.url.toLowerCase().includes(q)}))
  const available=$derived(repos.filter(repo=>!shown.some(x=>x.id===repo.id)))
  $effect(()=>{void owner?.id;void owner?.kind;void refreshNo;const abort={active:true};loaded=false
  void listRepositories().then(result=>{if(abort.active){repos=result.items??[];quota=result.quota_bytes??0;loaded=true}}).catch(e=>{if(abort.active)error=e.message||String(e)});return()=>{abort.active=false}})
- async function create(event:SubmitEvent){event.preventDefault();busy=true;error='';try{await createRepository({title,kind,url,branch,token,owner});creating=false;title='';token='';refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
- async function attach(){if(!owner||!attachId)return;busy=true;error='';try{await linkRepository(Number(attachId),owner);refreshNo++;attachId=''}catch(e){error=e.message||String(e)}finally{busy=false}}
+ async function create(event:SubmitEvent){event.preventDefault();busy=true;error='';try{await createRepository({title,kind,url,branch,token,owner});creating=false;title='';token='';expanded=true;refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
+ async function attach(){if(!owner||!attachId)return;busy=true;error='';try{await linkRepository(Number(attachId),owner);refreshNo++;attachId='';attaching=false;expanded=true}catch(e){error=e.message||String(e)}finally{busy=false}}
  async function detach(repo:Repository){if(!owner)return;busy=true;try{await unlinkRepository(repo.id,owner);refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
  async function saveToken(){if(tokenFor===null)return;busy=true;error='';try{await updateRepository(tokenFor,{token});tokenFor=null;token='';refreshNo++}catch(e){error=e.message||String(e)}finally{busy=false}}
- function selectRepo(id:number){selected=id;const next=new URL(location.href);next.searchParams.set('repo',String(id));history.replaceState(history.state,'',next)}
+ function openCreate(){creating=true;token='';error=''}
+ function selectRepo(id:number){selected=id;if(window.matchMedia(SIDEBAR_ONE_PANE).matches)sidebars.setCollapsed('repositories',true);const next=new URL(location.href);next.searchParams.set('repo',String(id));history.replaceState(history.state,'',next)}
  const activeRepo=$derived(repos.find(repo=>repo.id===selected)??null)
 </script>
-<section class="repositories" class:repositories--linked={Boolean(owner)}>
- {#if owner}<button type="button" class="repo-heading" aria-expanded={!owner||expanded} onclick={()=>expanded=!expanded}>Репозитории {#if loaded}· {shown.length}{/if}</button>{/if}
- {#if !owner||expanded}
+{#if owner}
+ <section class="repositories repositories--linked" aria-label="Привязанные репозитории">
+  {#if shown.length}<button type="button" class="block__label repo-heading" aria-expanded={expanded} onclick={()=>expanded=!expanded}>Репозитории ({shown.length}) <Icon name={expanded?'chevron-down':'chevron-right'} size={12}/></button>{:else}<span class="block__label repo-heading">Репозитории</span>{/if}
   {#if error}<p role="alert" class="repo-error">{error}</p>{/if}
-  {#if !owner}<PageToolbar><input class="search" type="search" aria-label="Поиск репозиториев" placeholder="Название, адрес или ID" bind:value={search}/><button type="button" class="btn btn--ghost" onclick={()=>{creating=true;token='';error=''}}>+ Репозиторий</button></PageToolbar><span class="hint">{shown.length} из {repos.length} · свой Git: {Math.round(repos.reduce((sum,r)=>sum+r.bytes,0)/1048576)} / {Math.round(quota/1048576)} МБ</span>
-  {:else}<div class="repo-actions"><button type="button" class="btn btn--ghost" onclick={()=>{creating=true;token='';error=''}}>+ Репозиторий</button></div>{/if}
-  {#if owner && available.length}<div class="repo-attach"><select aria-label="Привязать существующий репозиторий" bind:value={attachId}><option value="">Существующий репозиторий…</option>{#each available as repo}<option value={repo.id}>{repo.title}</option>{/each}</select><button type="button" class="btn btn--ghost" disabled={busy||!attachId} onclick={attach}>Привязать</button></div>{/if}
-  {#if loaded && !shown.length}<p class="hint">{owner?'Нет привязанных репозиториев.':'Репозитории не найдены.'}</p>{/if}
-  <div class="repo-workspace" class:repo-workspace--linked={Boolean(owner)}>
-   <div class="repo-list" aria-label="Репозитории пространства">
-    {#each shown as repo (repo.id)}
-     <div class="repo-row" class:repo-row--on={selected===repo.id&&!owner}>
-      {#if owner}<a class="repo-name" href={`?tab=repositories&repo=${repo.id}`}>{repo.title}</a>{:else}<button type="button" class="repo-name" onclick={()=>selectRepo(repo.id)}>{repo.title}<small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.links.length} {plural(repo.links.length,['связь','связи','связей'])}</small></button>{/if}
-      {#if owner}<button type="button" class="repo-unlink" disabled={busy} onclick={()=>detach(repo)} title="Отвязать репозиторий" aria-label={`Отвязать ${repo.title}`}>×</button>{/if}
-     </div>
-    {/each}
+  {#if expanded && shown.length}<ul class="repo-links">{#each shown as repo (repo.id)}<li class="repo-link">
+   <a href={`?tab=repositories&repo=${repo.id}`}><Icon name="folder" size={16}/><span>{repo.title}</span></a><small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.branch}</small>
+   <button type="button" class="repo-unlink" disabled={busy} onclick={()=>detach(repo)} title="Отвязать репозиторий" aria-label={`Отвязать ${repo.title}`}><Icon name="close" size={14}/></button>
+  </li>{/each}</ul>{/if}
+  <div class="repo-attach-line"><button type="button" class="repo-text-action" aria-expanded={attaching} onclick={()=>attaching=!attaching}>Привязать репозиторий</button><span> или </span><button type="button" class="repo-text-action" onclick={openCreate}>создать новый</button></div>
+  {#if attaching}<div class="repo-attach"><select aria-label="Привязать существующий репозиторий" bind:value={attachId}><option value="">Существующий репозиторий…</option>{#each available as repo}<option value={repo.id}>{repo.title}</option>{/each}</select><button type="button" class="btn btn--ghost" disabled={busy||!attachId} onclick={attach}>Привязать</button>{#if !available.length}<span class="hint">Нет непривязанных репозиториев.</span>{/if}</div>{/if}
+ </section>
+{:else}
+ <SidebarLayout key="repositories" hasSelection={Boolean(activeRepo)}>
+  {#snippet sidebar()}<aside class="repo-sidebar" aria-label="Репозитории пространства">
+   <SidebarTools bind:value={search} label="Поиск репозиториев" placeholder="Название, адрес или ID" createLabel="Новый репозиторий" onCreate={openCreate}>
+    <div class="repo-summary"><span>{shown.length} из {repos.length}</span><span>Git: {Math.round(repos.reduce((sum,r)=>sum+r.bytes,0)/1048576)} / {Math.round(quota/1048576)} МБ</span></div>
+   </SidebarTools>
+   <div class="repo-list">{#if error}<p role="alert" class="repo-empty repo-error">{error}</p>{:else if !loaded}<p class="repo-empty hint" role="status">Загрузка репозиториев…</p>{:else if !shown.length}<p class="repo-empty hint">Репозитории не найдены.</p>{/if}
+    {#each shown as repo (repo.id)}<button type="button" class="repo-row" class:repo-row--on={selected===repo.id} aria-current={selected===repo.id?'true':undefined} onclick={()=>selectRepo(repo.id)}><span>{repo.title}</span><small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.links.length} {plural(repo.links.length,['связь','связи','связей'])}</small></button>{/each}
    </div>
-   {#if !owner}<section class="repo-detail" aria-label="Репозиторий">
-    {#if activeRepo}<header class="repo-detail__head"><h2>{activeRepo.title}</h2>{#if activeRepo.kind!=='local'}<button type="button" class="btn btn--ghost" onclick={()=>{tokenFor=activeRepo.id;token=''}}>Секрет {activeRepo.has_token?'задан':'не задан'}</button>{/if}</header><RepositoryBrowser repo={activeRepo}/>{:else}<p class="hint">Выберите репозиторий для просмотра дерева.</p>{/if}
-   </section>{/if}
-  </div>
- {/if}
-</section>
+  </aside>{/snippet}
+  <section class="repo-detail" aria-label="Репозиторий">
+   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1>{#if activeRepo.kind!=='local'}<button type="button" class="btn btn--ghost" onclick={()=>{tokenFor=activeRepo.id;token=''}}>Секрет {activeRepo.has_token?'задан':'не задан'}</button>{/if}</header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
+  </section>
+ </SidebarLayout>
+{/if}
 <ModalShell open={creating} onClose={()=>{if(!busy)creating=false}} closeDisabled={busy} labelledby="repo-create-title" maxWidth="38rem"><ModalHead id="repo-create-title" title="Новый репозиторий" onClose={()=>creating=false} closeDisabled={busy}/><form class="modal__form" onsubmit={create}>
  <label class="field"><span class="label">Название</span><input required bind:value={title} maxlength="200"/></label>
  <label class="field"><span class="label">Хранение</span><select bind:value={kind}><option value="local">Свой Git в Quests</option><option value="github">GitHub</option><option value="gitlab">GitLab</option></select></label>
@@ -56,5 +63,21 @@
 </form></ModalShell>
 <ModalShell open={tokenFor!==null} onClose={()=>tokenFor=null} closeDisabled={busy} labelledby="repo-token-title"><ModalHead id="repo-token-title" title="Секрет доступа к репозиторию" onClose={()=>tokenFor=null} closeDisabled={busy}/><div class="modal__body"><label class="field"><span class="label">Новый токен · пусто — удалить</span><input type="password" autocomplete="off" bind:value={token}/></label><p class="hint">Сохранённое значение не показывается и не передаётся раннерам.</p>{#if error}<p role="alert" class="repo-error">{error}</p>{/if}<ModalFoot onCancel={()=>tokenFor=null} onSubmit={saveToken} submitLabel="Сохранить" {busy}/></div></ModalShell>
 <style>
- .repositories{font-family:var(--font-ui);display:grid;gap:.7rem;padding:.5rem 0;min-width:0}.repo-heading{font-weight:600;text-align:left;color:var(--color-fg-muted);border:0;background:transparent;padding:.2rem 0;cursor:pointer;font-size:.85rem}.repo-actions,.repo-attach{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.repo-workspace{display:grid;grid-template-columns:minmax(12rem,17rem) minmax(0,1fr);border-top:1px solid var(--color-border);min-height:20rem}.repo-workspace--linked{display:block;min-height:0;border:0}.repo-list{min-width:0}.repo-row{display:flex;align-items:center;border-bottom:1px solid var(--color-border);padding:.6rem .4rem;gap:.4rem}.repo-row--on{background:color-mix(in srgb,var(--color-accent) 10%,transparent)}.repo-name{display:block;flex:1;min-width:0;text-align:left;overflow-wrap:anywhere;border:0;background:transparent;color:var(--color-accent);font:inherit;cursor:pointer;text-decoration:none;padding:0}.repo-name small{display:block;margin-top:.3rem;color:var(--color-fg-muted);font-size:.75rem}.repo-detail{min-width:0;padding:1rem;border-left:1px solid var(--color-border)}.repo-detail__head{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:1rem}.repo-detail h2{font-size:1.1rem;margin:0}.repo-unlink{background:transparent;border:0;color:var(--color-fg-muted);cursor:pointer;font-size:1.1rem}.repo-error{color:var(--color-danger)}.repositories--linked{gap:.3rem}.repositories--linked .repo-actions .btn{background:transparent;border-color:transparent;padding:.25rem}.repositories--linked .repo-row{padding:.3rem 0}@media(max-width:45rem){.repo-workspace{grid-template-columns:minmax(0,1fr)}.repo-detail{border-left:0;border-top:1px solid var(--color-border)}}
+ .repositories--linked{display:grid;gap:.75rem;min-width:0;margin-bottom:1.5rem}
+ .repo-heading{display:flex;align-items:center;gap:.3rem;width:fit-content;margin:0;padding:0;border:0;background:transparent;line-height:1}
+ button.repo-heading{cursor:pointer}button.repo-heading:hover{color:var(--color-fg-muted)}
+ .repo-links{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}
+ .repo-link{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-radius:var(--pill-radius,12px);background:var(--pill-bg,#0f0f0f);box-shadow:var(--pill-shadow,none);min-width:0;flex-wrap:wrap}
+ .repo-link a{display:flex;align-items:center;gap:.35rem;min-width:0;flex:1;font-weight:600}.repo-link a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .repo-link small{color:var(--color-fg-muted);font-family:var(--font-ui);font-size:.75rem}
+ .repo-unlink{display:flex;padding:.25rem;background:transparent;border:0;color:var(--color-fg-muted);cursor:pointer}
+ .repo-text-action{padding:0;background:transparent;border:0;color:var(--color-accent);font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+ .repo-attach-line{display:flex;align-items:baseline;gap:.25rem;flex-wrap:wrap;color:var(--color-fg-muted)}.repo-attach{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.repo-attach select{min-width:0;max-width:100%;flex:1}
+ .repo-sidebar{display:flex;flex-direction:column;min-height:0;overflow:hidden;font-family:var(--font-ui)}
+ .repo-summary{display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;font-size:.75rem;color:var(--color-fg-muted)}
+ .repo-list{overflow:auto;min-height:0;flex:1}.repo-row{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--color-border);background:transparent;color:var(--color-fg);padding:.7rem .75rem;cursor:pointer;font:inherit;overflow-wrap:anywhere}
+ .repo-row:hover{background:color-mix(in srgb,var(--color-accent) 5%,transparent)}.repo-row--on{background:color-mix(in srgb,var(--color-accent) 10%,transparent);color:var(--color-accent)}
+ .repo-row small{display:block;margin-top:.3rem;color:var(--color-fg-muted);font-size:.75rem}
+ .repo-detail{min-width:0;min-height:0;overflow:auto}.repo-detail__head{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:1.5rem 2rem 1rem;border-bottom:1px solid var(--color-border)}.repo-detail h1{margin:0;font-size:1.5rem;overflow-wrap:anywhere}.repo-detail__body{padding:1.5rem 2rem}.repo-empty{padding:1rem;margin:0}.repo-error{color:var(--color-danger)}
+ @media(max-width:45rem){.repo-detail__head,.repo-detail__body{padding:1rem}}
 </style>
