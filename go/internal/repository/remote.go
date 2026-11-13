@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	pathpkg "path"
 	"strings"
 	"sync"
 	"time"
@@ -70,20 +72,24 @@ func (h *Handler) remoteJSON(r *http.Request, repo Record, endpoint string, out 
 			headers["PRIVATE-TOKEN"] = token
 		}
 	}
-	result, err := h.Egress.Do(r.Context(), egress.Request{Workspace: wsctx.From(r.Context()), SameHostOnly: true, Method: "GET", URL: endpoint, Header: headers})
-	if err != nil {
-		return err
-	}
-	if result.Status != 200 {
-		if result.Status == 429 || result.Status == 403 && strings.Contains(strings.ToLower(string(result.Body)), "rate limit") {
-			return fmt.Errorf("исчерпан лимит API %s: повторите позже или добавьте токен только для чтения", repo.Kind)
+	key := remoteKey{Root: h.DataDir, Workspace: wsctx.From(r.Context()), Repository: repo.ID, URL: repo.URL, Credential: credentialID(headers["Authorization"] + headers["PRIVATE-TOKEN"]), Endpoint: endpoint}
+	// Only branch heads/history lists are mutable. Refreshing a SHA must not
+	// spend another request on its unchanged tree or per-path history.
+	endpointURL, _ := url.Parse(endpoint)
+	mutable := strings.HasSuffix(endpointURL.Path, "/branches") || strings.HasSuffix(endpointURL.Path, "/commits") && endpointURL.Query().Get("per_page") == "30"
+	return cachedRemote(r.Context(), key, mutable && r.URL.Query().Get("refresh") == "1", func(etag string) (*egress.Result, error) {
+		if etag != "" {
+			headers["If-None-Match"] = etag
 		}
-		return fmt.Errorf("хост репозитория вернул HTTP %d", result.Status)
-	}
-	if err = json.Unmarshal(result.Body, out); err != nil {
-		return fmt.Errorf("не удалось прочитать ответ хоста")
-	}
-	return nil
+		result, err := h.Egress.Do(r.Context(), egress.Request{Workspace: wsctx.From(r.Context()), SameHostOnly: true, Method: "GET", URL: endpoint, Header: headers})
+		if errors.Is(err, egress.ErrTooLarge) && strings.Contains(endpoint, "/git/trees/") {
+			return &egress.Result{Status: 200, Body: []byte(`{"truncated":true}`)}, nil
+		}
+		return result, err
+	}, out)
+}
+func containsRateLimit(body []byte) bool {
+	return strings.Contains(strings.ToLower(string(body)), "rate limit")
 }
 func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, v *View) error {
 	if err := validateRemote(repo.Kind, repo.URL); err != nil {
@@ -136,6 +142,46 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 		}
 		if v.SelectedCommit != "" {
 			ref = v.SelectedCommit
+		}
+		// A recursive immutable tree costs one request for all directories. A
+		// truncated/oversized answer falls back to the normal directory endpoint.
+		var recursive struct {
+			Truncated bool `json:"truncated"`
+			Tree      []struct {
+				Path string `json:"path"`
+				Type string `json:"type"`
+				SHA  string `json:"sha"`
+				Mode string `json:"mode"`
+			} `json:"tree"`
+		}
+		if err := h.remoteJSON(r, repo, base+"/git/trees/"+url.PathEscape(ref)+"?recursive=1", &recursive); err == nil && !recursive.Truncated {
+			directory := path
+			foundDirectory := path == ""
+			for _, entry := range recursive.Tree {
+				if entry.Path == directory && entry.Type == "tree" {
+					foundDirectory = true
+				}
+				parent := pathpkg.Dir(entry.Path)
+				if parent == "." {
+					parent = ""
+				}
+				if parent != directory {
+					continue
+				}
+				kind := "file"
+				if entry.Type == "tree" {
+					kind = "directory"
+				} else if entry.Mode == "120000" {
+					kind = "symlink"
+				} else if entry.Type == "commit" {
+					kind = "submodule"
+				}
+				v.Tree = append(v.Tree, Entry{Name: pathpkg.Base(entry.Path), Path: entry.Path, Kind: kind, ID: entry.SHA})
+			}
+			if !foundDirectory {
+				return fmt.Errorf("выберите каталог; просмотр файлов пока не включён")
+			}
+			return nil
 		}
 		endpoint := base + "/contents/" + strings.Join(escapeParts(path), "/") + "?ref=" + url.QueryEscape(ref)
 		var raw json.RawMessage
@@ -251,11 +297,6 @@ func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
 	slots := make(chan struct{}, 2)
 
 	for i := range view.Tree {
-		key := historyKey{Root: h.DataDir, Workspace: wsctx.From(r.Context()), Repository: repo.ID, URL: repo.URL, Ref: view.SelectedCommit, Path: view.Tree[i].Path}
-		if cached := cachedHistory(key); cached != nil {
-			view.Tree[i].LastCommit = cached
-			continue
-		}
 		select {
 		case slots <- struct{}{}:
 		case <-ctx.Done():
@@ -264,11 +305,10 @@ func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
 			return
 		}
 		wg.Add(1)
-		go func(index int, cacheKey historyKey) {
+		go func(index int) {
 			defer wg.Done()
 			defer func() { <-slots }()
 			entry := &view.Tree[index]
-			defer func() { rememberHistory(cacheKey, entry.LastCommit) }()
 			if repo.Kind == "github" {
 				var commits []struct {
 					SHA    string `json:"sha"`
@@ -301,7 +341,7 @@ func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
 					entry.LastCommit = &Commit{c.ID, c.Title, c.Author, c.Date}
 				}
 			}
-		}(i, key)
+		}(i)
 	}
 	wg.Wait()
 	for _, entry := range view.Tree {

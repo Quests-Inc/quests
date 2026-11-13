@@ -34,6 +34,7 @@ type Handler struct {
 	Quota         int64
 }
 type Record struct {
+	CloneURL string `json:"clone_url"`
 	Slug     string `json:"slug"`
 	ID       int64  `json:"id"`
 	Title    string `json:"title"`
@@ -135,6 +136,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range repos {
 		a := &repos[i]
+		a.CloneURL = h.cloneURL(r.Context(), *a)
 		links, e := h.DB.QueryContext(r.Context(), `SELECT owner_type,owner_id FROM repository_link WHERE repository_id=? ORDER BY owner_type,owner_id`, a.ID)
 		if e != nil {
 			fail(w, 500, e)

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import {repositoryRefs} from '@/shared/lib/repositoryRefs.svelte.ts'
   import { showImages } from '@/shared/lib/imageViewer.svelte.ts'
   import { untrack } from 'svelte'
   import { listValues, type ValueRow } from '@/shared/api/client.ts'
@@ -128,7 +129,7 @@
   })
 
   let merged = $derived({ ...foreign, ...own, ...values })
-  let html = $derived(renderMarkdown(source, { labels, values: merged, valuesLoading }))
+  let html = $derived(renderMarkdown(source, { labels:{...repositoryRefs.labels,...labels}, values: merged, valuesLoading }))
   let valueSig = $derived(
     Object.keys(merged)
       .sort()

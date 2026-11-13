@@ -28,3 +28,10 @@ func TestParseKnowsTemplates(t *testing.T) {
 		t.Fatalf("got %+v, want template=5 and quest=7 only", got)
 	}
 }
+
+func TestRepositoryReference(t *testing.T) {
+	got := Parse("repo=8 repo=8 myrepo=9 repo=10x")
+	if len(got) != 1 || got[0] != (Ref{Kind: "repo", ID: 8}) {
+		t.Fatal(got)
+	}
+}

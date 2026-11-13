@@ -1,12 +1,14 @@
 <script lang="ts">
  import {listRepositories,createRepository,linkRepository,unlinkRepository,updateRepository,type Repository,type RepositoryLink} from '@/shared/api/repositories.ts'
+ import ContextMenu from '@/shared/ui/ContextMenu.svelte'
+ import {copyText} from '@/shared/lib/clipboard.ts'
  import SidebarLayout from '@/shared/ui/SidebarLayout.svelte'
  import SidebarTools from '@/shared/ui/SidebarTools.svelte'
  import Icon from '@/shared/ui/Icon.svelte'
  import {sidebars,SIDEBAR_ONE_PANE} from '@/shared/lib/sidebar.svelte.ts'
  import {replaceSearch} from '@/shared/lib/urlSearch.ts'
  import {plural} from '@/shared/lib/duration.ts'
- import {untrack} from 'svelte'
+ import {untrack,onMount} from 'svelte'
  import RepositoryTokenHelp from './RepositoryTokenHelp.svelte'
  import RepositoryBrowser from './RepositoryBrowser.svelte'
  import ModalShell from '@/shared/ui/ModalShell.svelte'
@@ -17,7 +19,7 @@
  let search=$state(''),attaching=$state(false),editingId=$state<number|null>(null),slug=$state(''),originalSlug=$state('')
  let title=$state(''),kind=$state('local'),url=$state(''),branch=$state('main'),token=$state(''),attachId=$state(''),quota=$state(0),tokenSaved=$state(false),removeToken=$state(false)
  let refreshNo=$state(0)
- const shown=$derived(owner?repos.filter(repo=>repo.links.some(l=>l.kind===owner.kind&&l.id===owner.id)):repos.filter(repo=>{const q=search.trim().toLowerCase().replace(/^repository=/,'');return !q||String(repo.id)===q||repo.slug?.includes(q)||repo.title.toLowerCase().includes(q)||repo.url.toLowerCase().includes(q)}))
+ const shown=$derived(owner?repos.filter(repo=>repo.links.some(l=>l.kind===owner.kind&&l.id===owner.id)):repos.filter(repo=>{const q=search.trim().toLowerCase().replace(/^(?:repository|repo)=/,'');return !q||String(repo.id)===q||repo.slug?.includes(q)||repo.title.toLowerCase().includes(q)||repo.url.toLowerCase().includes(q)}))
  $effect(()=>{if(!owner){const id=selected;untrack(()=>replaceSearch(id?{repo:id}:{tab:'repositories'}))}})
  const available=$derived(repos.filter(repo=>!shown.some(x=>x.id===repo.id)))
  $effect(()=>{void owner?.id;void owner?.kind;void refreshNo;const abort={active:true};loaded=false
@@ -29,6 +31,10 @@
  function openCreate(){tokenSaved=false;removeToken=false;editingId=null;title='';slug='';kind='local';url='';branch='main';creating=true;token='';error=''}
  function openEdit(repo:Repository){tokenSaved=repo.has_token;removeToken=false;editingId=repo.id;title=repo.title;slug=repo.slug??'';originalSlug=slug;kind=repo.kind;url=repo.url;branch=repo.branch;token='';error='';creating=true}
  function selectRepo(id:number){selected=id;if(window.matchMedia(SIDEBAR_ONE_PANE).matches)sidebars.setCollapsed('repositories',true);replaceSearch({repo:id})}
+ let menu=$state<{repo:Repository;x:number;y:number}|null>(null)
+ function context(event:MouseEvent,repo:Repository){event.preventDefault();menu={repo,x:event.clientX,y:event.clientY}}
+ async function menuAction(action:string){const repo=menu?.repo;if(!repo)return;try{if(action==='edit')openEdit(repo);else if(action==='ref')await copyText(`repo=${repo.id}`);else if(action==='link')await copyText(new URL(`?repo=${repo.id}`,location.href).href);else if(action==='source'){const source=repo.clone_url||repo.url;if(!source)throw new Error('Адрес репозитория недоступен');await copyText(new URL(source,location.origin).href)}}catch(e){error=e.message||String(e)}}
+ onMount(()=>{const open=(e:Event)=>{if(!owner)selectRepo((e as CustomEvent<number>).detail)};window.addEventListener('quests:repository',open);return()=>window.removeEventListener('quests:repository',open)})
  const activeRepo=$derived(repos.find(repo=>repo.id===selected)??null)
 </script>
 {#if owner}
@@ -49,14 +55,15 @@
     <div class="repo-summary"><span>{shown.length} из {repos.length}</span><span>Git: {Math.round(repos.reduce((sum,r)=>sum+r.bytes,0)/1048576)} / {Math.round(quota/1048576)} МБ</span></div>
    </SidebarTools>
    <div class="repo-list">{#if error}<p role="alert" class="repo-empty repo-error">{error}</p>{:else if !loaded}<p class="repo-empty hint" role="status">Загрузка репозиториев…</p>{:else if !shown.length}<p class="repo-empty hint">Репозитории не найдены.</p>{/if}
-    {#each shown as repo (repo.id)}<button type="button" class="repo-row" class:repo-row--on={selected===repo.id} aria-current={selected===repo.id?'true':undefined} onclick={()=>selectRepo(repo.id)}><span>{repo.title}</span><small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.links.length} {plural(repo.links.length,['связь','связи','связей'])}</small></button>{/each}
+    {#each shown as repo (repo.id)}<button type="button" class="repo-row" class:repo-row--on={selected===repo.id} aria-current={selected===repo.id?'true':undefined} onclick={()=>selectRepo(repo.id)} oncontextmenu={e=>context(e,repo)}><span>{repo.title}</span><small>{repo.kind==='local'?'Свой Git':repo.kind} · {repo.links.length} {plural(repo.links.length,['связь','связи','связей'])}</small></button>{/each}
    </div>
   </aside>{/snippet}
   <section class="repo-detail" aria-label="Репозиторий">
-   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1><button type="button" class="repo-settings" title="Редактировать репозиторий" aria-label="Редактировать репозиторий" onclick={()=>openEdit(activeRepo)}><Icon name="edit" size={18}/></button></header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
+   {#if activeRepo}<header class="repo-detail__head"><h1 oncontextmenu={e=>context(e,activeRepo)}>{activeRepo.title}</h1><button type="button" class="repo-settings" title="Редактировать репозиторий" aria-label="Редактировать репозиторий" onclick={()=>openEdit(activeRepo)}><Icon name="edit" size={18}/></button></header><div class="repo-detail__body">{#key activeRepo}<RepositoryBrowser repo={activeRepo}/>{/key}</div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
   </section>
  </SidebarLayout>
 {/if}
+<ContextMenu open={Boolean(menu)} x={menu?.x??0} y={menu?.y??0} items={[{id:'ref',label:`Копировать repo=${menu?.repo.id??''}`},{id:'edit',label:'Изменить'},{id:'source',label:'Копировать источник'},{id:'link',label:'Копировать ссылку'}]} onSelect={menuAction} onClose={()=>menu=null}/>
 <ModalShell open={creating} onClose={()=>{if(!busy)creating=false}} closeDisabled={busy} labelledby="repo-create-title" maxWidth="38rem"><ModalHead id="repo-create-title" title={editingId===null?"Новый репозиторий":"Настройки репозитория"} onClose={()=>creating=false} closeDisabled={busy}/><form class="modal__form" onsubmit={create}>
  <label class="field"><span class="label">Название</span><input required bind:value={title} maxlength="200"/></label>
  <label class="field"><span class="label">Slug репозитория</span><input aria-label="Slug репозитория" required={editingId!==null} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="63" placeholder="Автоматически: repo-ID" bind:value={slug}/></label>

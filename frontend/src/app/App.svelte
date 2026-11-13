@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {listRepositories,resetRepositorySession} from '@/shared/api/repositories.ts'
  import {RepositoriesBlock} from '@/entities/repository'
  import ImageViewer from '@/shared/ui/ImageViewer.svelte'
   // Quests web UI — orchestrator (state, load, overlays)
@@ -134,7 +135,6 @@
   let allAttachments = $derived(flattenAttachmentIndex(attachmentIndex))
   let refLabels = $derived(buildRefLabels({ notes, quests, questlines, templates: templateStore.list, attachments: allAttachments, events: calendarEvents }))
   bindRefRegistries(() => ({ notes, quests, questlines, events: calendarEvents, labels: refLabels }))
-
   async function load({ silent = false } = {}) {
     if (!silent) loading = true
     if (!silent) error = ''
@@ -146,6 +146,7 @@
         listNotes({catalog:true}).catch((): any[] => []),
         listAllAttachments().catch((): any => null),
         listEvents().catch((): any[] => []),
+        listRepositories().catch(()=>null),
       ])
       setQuests(next)
       setNotes(Array.isArray(nextNotes) ? nextNotes : [])
@@ -186,13 +187,13 @@
         clearQuests()
         clearNotes()
         clearAttachmentIndex()
+        resetRepositorySession()
         nav.selectedId = null
       }
     } finally {
       if (!silent) loading = false
     }
   }
-
   function openTemplates() {
     nav.setView('templates')
   }
@@ -207,7 +208,6 @@
     settingsSection = opts && !(opts instanceof Event) ? (opts.section ?? null) : null
     settingsOpen = true
   }
-
   const desk = createJournalDesk({
     getQuests: () => quests,
     getQuestlines: () => questlines,
@@ -342,6 +342,7 @@
     clearQuests()
     clearNotes()
     clearAttachmentIndex()
+    resetRepositorySession()
     nav.selectedId = null
     nav.selectedNoteId = null
     nav.selectedAttachmentId = null
@@ -363,6 +364,7 @@
     applyTheme(loadSavedTheme())
     // A 401 from any later call means the session lapsed — fall back to login.
     setUnauthorizedHandler(() => {
+      resetRepositorySession()
       if (authed === false) return
       if (stopApp) stopApp()
       stopApp = null

@@ -6,7 +6,7 @@ import (
 )
 
 // Kind IDs agents already paste: quest=23, note=12, …
-var TokenRe = regexp.MustCompile(`\b(note|quest|questline|step|attachment|template|event)=(\d+)\b`)
+var TokenRe = regexp.MustCompile(`\b(note|quest|questline|step|attachment|template|event|repo)=(\d+)\b`)
 
 type Ref struct {
 	Kind string `json:"kind"`

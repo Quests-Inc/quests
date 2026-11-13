@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
+	"github.com/quests-inc/quests/go/internal/refs"
 	"github.com/quests-inc/quests/go/internal/repository"
 	"net/http"
 	"net/http/httptest"
@@ -42,6 +44,18 @@ func TestRepositoriesGitHTTPAndWorkspace(t *testing.T) {
 	call("POST", "/api/repositories", map[string]any{"title": "Duplicate", "slug": "tiny"}, 409)
 	call("PATCH", base, map[string]any{"slug": "Bad slug"}, 400)
 	call("PATCH", base, map[string]any{"title": "Renamed"}, 200)
+	listed := call("GET", "/api/repositories", nil, 200)["items"].([]any)
+	if got := listed[0].(map[string]any)["clone_url"]; got != "/git/workspace-1/tiny.git" {
+		t.Fatal(got)
+	}
+	for _, workspace := range []int64{1, 2} {
+		req := httptest.NewRequest("GET", "/", nil).WithContext(wsctx.With(t.Context(), workspace))
+		resolved := s.resolveRefs(req, []refs.Ref{{Kind: "repo", ID: int64(id)}})
+		if workspace == 1 && (resolved[0].Title == nil || *resolved[0].Title != "Renamed") || workspace == 2 && resolved[0].Title != nil {
+			t.Fatalf("workspace %d: %+v", workspace, resolved)
+		}
+	}
+
 	if got := call("GET", base+"/browse", nil, 200)["clone_url"]; got != "/git/workspace-1/tiny.git" {
 		t.Fatal(got)
 	}

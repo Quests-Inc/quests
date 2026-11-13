@@ -130,3 +130,20 @@ test('openRef: разбор ссылок по видам', () => {
   expect(url()).toBe('/?event=9')
   nav.openRef('unknown', 1)
 })
+
+test('repository reference opens the canonical entity URL and selects it in an already mounted sidebar', () => {
+  const { nav } = make()
+  const opened: number[] = []
+  const handler = (event: Event) => opened.push((event as CustomEvent<number>).detail)
+  window.addEventListener('quests:repository', handler)
+  try {
+    nav.openRef('repo', 8)
+    expect(nav.view).toBe('repositories')
+    expect(url()).toBe('/?repo=8')
+    nav.openRef('repo', 9)
+    expect(url()).toBe('/?repo=9')
+    expect(opened).toEqual([8, 9])
+  } finally {
+    window.removeEventListener('quests:repository', handler)
+  }
+})

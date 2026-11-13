@@ -29,7 +29,7 @@ const (
 
 // Kind names in kind=ID tokens and entity_type / owner_type columns → table.
 var kindTable = map[string]string{
-	"note_tree": "note", "quest": "quest", "questline": "questline", "note": "note", "step": "queststep",
+	"repo": "repository", "note_tree": "note", "quest": "quest", "questline": "questline", "note": "note", "step": "queststep",
 	"script": "script", "hook": "hook", "attachment": "attachment", "template": "questtemplate", "tag": "tag", "category": "questcategory",
 }
 

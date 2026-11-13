@@ -156,6 +156,13 @@ export function createNavigation(deps: {
 
   /** Открыть сущность по ссылке вида kind=id. */
   function openRef(kind: string, id: number) {
+    if (kind === 'repo') {
+      slideTo('repositories')
+      replaceSearch({ repo: id })
+      view = 'repositories'
+      window.dispatchEvent(new CustomEvent('quests:repository', { detail: id }))
+      return
+    }
     if (kind === 'note') return selectNote(id)
     if (kind === 'attachment') return selectAttachment(id)
     if (kind === 'quest') return selectQuest(id)

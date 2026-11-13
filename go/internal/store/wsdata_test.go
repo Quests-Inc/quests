@@ -51,3 +51,18 @@ func TestCheckProgressRewrite(t *testing.T) {
 }
 
 func toInt(s string) int64 { n, _ := strconv.ParseInt(s, 10, 64); return n }
+
+func TestRepositoryRefsFollowImportedIDs(t *testing.T) {
+	if table := kindTable["repo"]; table != "repository" {
+		t.Fatal(table)
+	}
+	got := refs.Rewrite("repo=8", func(kind string, id int64) (string, bool) {
+		if kind == "repo" && id == 8 {
+			return "repo=108", true
+		}
+		return "", false
+	})
+	if got != "repo=108" {
+		t.Fatal(got)
+	}
+}

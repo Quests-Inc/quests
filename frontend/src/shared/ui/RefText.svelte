@@ -1,4 +1,5 @@
 <script lang="ts">
+  import {repositoryRefs} from '@/shared/lib/repositoryRefs.svelte.ts'
   import DOMPurify from 'dompurify'
   import { tailFade } from '@/shared/lib/typewriter.ts'
   import { refPreview } from '@/shared/lib/refPreview.ts'
@@ -25,7 +26,7 @@
   }
 
   let html = $derived.by(() => {
-    const raw = renderRefTextHtml(source, { labels })
+    const raw = renderRefTextHtml(source, { labels:{...repositoryRefs.labels,...labels} })
     if (!raw) return ''
     if (typeof window === 'undefined') return raw
     return DOMPurify.sanitize(raw, PURIFY)

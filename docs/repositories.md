@@ -58,14 +58,47 @@ git clone q:my-project.git
 This is optional client configuration; Quests never edits the user's global Git
 settings. Use distinct prefixes for different spaces if configuring several.
 
-Per-path remote commit metadata is cached for five minutes by workspace,
-repository URL, immutable commit SHA and path (bounded to 2048 entries per
-process). Every directory request still reads the provider using the current
-credentials before using cached metadata. Only two metadata requests run at
-once, leaving capacity for other operations under the shared egress limit.
-Provider limits still apply; missing history is marked as partial rather than
-replaced with the branch-tip date. Remote URL and default branch can be edited
-in repository settings, with the same provider URL validation as creation.
+## Navigation and provider request budget
+
+Right-click a catalog row or its title to copy `repo=ID`, edit the repository,
+copy its clone/source URL, or copy the full card URL. Repository mentions render
+as named links in Markdown and short text, navigate to `?repo=ID`, and have their
+IDs rewritten during workspace archive import.
+
+The browser coalesces and caches up to 128 visited directory/branch/commit views
+in memory until reload/logout; successful edits invalidate the affected views.
+The inexpensive workspace catalog is shared for 30 seconds and supplies link
+labels. No provider credentials or private tree payloads are persisted in browser
+storage. A consumer leaving the page does not cancel another consumer's request.
+
+The server also coalesces provider reads and caches successful JSON responses for
+10 minutes (up to 512 responses / 16 MiB per process). ETags are retained for up
+to 30 minutes for conditional validation. Permission/egress checks and credential
+reads precede every lookup; cache keys include workspace, repository URL, and a
+credential fingerprint. Changing/removing a token cannot reuse another token's
+cache. The refresh button revalidates branch lists and recent commits; unchanged
+SHA trees/path history stay cached. Provider errors are not successful cache hits.
+
+GitHub's recursive Git-tree endpoint loads all directories at the selected SHA
+with one provider request. Truncated responses or the existing egress body-size
+limit trigger directory-by-directory fallback; the oversized-tree outcome is
+remembered, avoiding repeated expensive probes. GitLab uses cached directory
+pages. Neither implementation downloads file contents or the entire Git history.
+The selector retains the last 30 commits. Per-path last-commit metadata is fetched
+only for the opened directory, with two concurrent calls and a ten-second total
+budget. Missing history stays marked partial instead of using a fabricated date.
+
+GitHub normally permits 60 unauthenticated reads/hour per IP or 5000 with a PAT
+(shared across the account's clients). Secondary limits also apply. A rate-limit
+response stops further uncached calls for that credential/provider until
+`Retry-After` / `X-RateLimit-Reset` permits retry (at least one minute without
+headers). There is no automatic retry loop. Authenticated conditional `304`
+responses do not consume GitHub's primary quota, but still use Quests' independent
+workspace egress budget; caching never expands that administrator policy.
+
+References: [GitHub rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api),
+[API best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api),
+[recursive trees and truncation](https://docs.github.com/en/rest/git/trees).
 
 External tokens are edited in the main repository settings dialog. A blank field
 preserves the current encrypted token, a new value replaces it, and a separate
@@ -75,5 +108,4 @@ fine-grained PAT with selected repository + Contents read-only; GitLab read_api
 for the branches/commits/tree API endpoints. Private repositories work when the
 token has access (including required organization approval). Repository tree and
 history are shared with the workspace's members; this token is not a per-member
-provider authorization. Live private-repository verification requires a user's
-authorized token and has not been performed.
+provider authorization.

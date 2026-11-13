@@ -14,6 +14,11 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 	for _, ref := range list {
 		row := refs.Resolved{Kind: ref.Kind, ID: ref.ID}
 		switch ref.Kind {
+		case "repo":
+			var title string
+			if err := s.Store.DB.QueryRowContext(r.Context(), `SELECT title FROM repository WHERE id=?`, ref.ID).Scan(&title); err == nil {
+				row.Title = &title
+			}
 		case "note":
 			n, err := s.Store.Knowledge.GetNote(r.Context(), ref.ID)
 			if err == nil {

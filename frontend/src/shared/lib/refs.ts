@@ -1,8 +1,8 @@
 /** Tokens agents already paste: note=12, quest=23, … */
 
-export const REF_RE = /\b(note|quest|questline|step|attachment|template|event)=(\d+)\b/g
+export const REF_RE = /\b(note|quest|questline|step|attachment|template|event|repo)=(\d+)\b/g
 
-export const REF_KINDS = ['note', 'quest', 'questline', 'step', 'attachment', 'template', 'event']
+export const REF_KINDS = ['note', 'quest', 'questline', 'step', 'attachment', 'template', 'event', 'repo']
 
 export function parseRefs(text: string): { kind: string; id: number }[] {
   const seen = new Set()

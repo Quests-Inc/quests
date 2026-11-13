@@ -39,7 +39,9 @@ export function refIcons(node: HTMLElement) {
     const map = refIconStore.map
     for (const a of node.querySelectorAll<HTMLAnchorElement>('a[href]')) {
       const ref = parseRefHref(a.getAttribute('href') || '')
-      const entry = ref ? map[`${ref.kind}:${ref.id}`] : undefined
+      const entry = ref
+        ? (map[`${ref.kind}:${ref.id}`] ?? (ref.kind === 'repo' ? { icon: 'folder' } : undefined))
+        : undefined
       const url = maskUrl(entry)
       const old = a.querySelector(':scope > .md-ref__ico')
       if (!url) {

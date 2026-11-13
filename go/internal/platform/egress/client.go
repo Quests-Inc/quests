@@ -61,9 +61,13 @@ type Request struct {
 type redirectOriginKey struct{}
 
 type Result struct {
-	Status      int
-	Body        []byte
-	ContentType string
+	Status        int
+	Body          []byte
+	ContentType   string
+	ETag          string
+	RetryAfter    string
+	RateRemaining string
+	RateReset     string
 }
 
 // TextLike says whether the answer is something a script may read as text or JSON.
@@ -275,7 +279,7 @@ func (c *Client) Do(ctx context.Context, in Request) (*Result, error) {
 	if int64(len(body)) > c.policy.MaxBody {
 		return finish(nil, ErrTooLarge)
 	}
-	return finish(&Result{Status: resp.StatusCode, Body: body, ContentType: resp.Header.Get("Content-Type")}, nil)
+	return finish(&Result{Status: resp.StatusCode, Body: body, ContentType: resp.Header.Get("Content-Type"), ETag: resp.Header.Get("ETag"), RetryAfter: resp.Header.Get("Retry-After"), RateRemaining: resp.Header.Get("X-RateLimit-Remaining"), RateReset: resp.Header.Get("X-RateLimit-Reset")}, nil)
 }
 
 func unwrapURLError(err error) error {

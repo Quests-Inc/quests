@@ -1,14 +1,15 @@
 <script lang="ts">
  import {browseRepository,type Repository,type RepositoryView} from '@/shared/api/repositories.ts'
+ import {untrack} from 'svelte'
  import {ago} from '@/shared/lib/time.ts'
  import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
  import Icon from '@/shared/ui/Icon.svelte'
  import {copyText} from '@/shared/lib/clipboard.ts'
  let {repo}:{repo:Repository}=$props()
- let branch=$state(''),commit=$state(''),path=$state(''),data=$state<RepositoryView|null>(null),error=$state(''),loading=$state(false),revision=$state(0),key=$state('')
+ let branch=$state(''),commit=$state(''),path=$state(''),data=$state<RepositoryView|null>(null),error=$state(''),loading=$state(false),revision=$state(0),force=$state(false),key=$state('')
  $effect(()=>{const next=`${repo.id}:${repo.url}:${repo.branch}`;if(key!==next){key=next;branch=repo.branch;commit='';path='';data=null}})
- $effect(()=>{const id=repo.id,b=branch,p=path,c=commit;void revision;if(!b)return;const abort=new AbortController();loading=true;error=''
- void browseRepository(id,b,p,abort.signal,c).then(result=>{if(!abort.signal.aborted)data=result}).catch(e=>{if(!abort.signal.aborted)error=e.message||String(e)}).finally(()=>{if(!abort.signal.aborted)loading=false});return()=>abort.abort()})
+ $effect(()=>{const id=repo.id,b=branch,p=path,c=commit;void revision;const refresh=untrack(()=>force);untrack(()=>{force=false});if(!b)return;const abort=new AbortController();loading=true;error=''
+ void browseRepository(id,b,p,abort.signal,c,refresh).then(result=>{if(!abort.signal.aborted)data=result}).catch(e=>{if(!abort.signal.aborted)error=e.message||String(e)}).finally(()=>{if(!abort.signal.aborted)loading=false});return()=>abort.abort()})
  const entries=$derived([...(data?.tree??[])].sort((a,b)=>Number(b.kind==='directory')-Number(a.kind==='directory')||a.name.localeCompare(b.name)))
  const clone=$derived(data?.clone_url?.startsWith('/')?`${location.origin}${data.clone_url}`:data?.clone_url||repo.url)
  const prefixCommand=$derived(clone?`git config --global url."${clone.slice(0,clone.lastIndexOf('/')+1)}".insteadOf "q:"`:'')
@@ -20,7 +21,7 @@
  <div class="repo-tools">
   <label>Ветка<select aria-label="Ветка репозитория" disabled={loading} value={branch} onchange={e=>{branch=e.currentTarget.value;commit='';path=''}}>{#if !data?.branches.includes(branch)}<option value={branch}>{branch}</option>{/if}{#each data?.branches||[] as name}<option value={name}>{name}</option>{/each}</select></label>
   <label>Коммит<select aria-label="Коммит репозитория" disabled={loading} value={commit} onchange={e=>{commit=e.currentTarget.value;path=''}}><option value="">Последний в ветке</option>{#each data?.commits||[] as item}<option value={item.id}>{item.id.slice(0,8)} · {item.title}</option>{/each}</select></label>
-  <button type="button" class="repo-action" title="Обновить" aria-label="Обновить" onclick={()=>revision++} disabled={loading}><Icon name="renew" size={17}/></button>
+  <button type="button" class="repo-action" title="Обновить" aria-label="Обновить" onclick={()=>{force=true;revision++}} disabled={loading}><Icon name="renew" size={17}/></button>
  </div>
  {#if loading}<p role="status" class="hint">Загрузка дерева…</p>{:else if error}<p class="repo-error" role="alert">{error}</p>{:else if data}
   {#if data.limited}<p class="hint">Часть списка или истории недоступна.</p>{/if}

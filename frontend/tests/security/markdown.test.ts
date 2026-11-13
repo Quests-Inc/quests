@@ -90,3 +90,10 @@ test('markdown: опасные ссылки и атрибуты не прохо�
   expect(html).not.toContain('<style')
   expect(html).not.toContain('data:image')
 })
+
+test('repository references render and resolve names, while code remains literal', () => {
+  const html = renderMarkdown('repo=8 and `repo=8`', { labels: { 'repo:8': 'Quests' } })
+  expect(html).toContain('href="?repo=8"')
+  expect(html).toContain('Quests')
+  expect(html).toContain('<code>repo=8</code>')
+})

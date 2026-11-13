@@ -4,9 +4,11 @@ import { flushSync, mount, unmount } from 'svelte'
 
 import RepositoriesBlock from '@/entities/repository/ui/RepositoriesBlock.svelte'
 import RepositoryBrowser from '@/entities/repository/ui/RepositoryBrowser.svelte'
+import { resetRepositorySession } from '@/shared/api/repositories.ts'
 const previous = globalThis.fetch
 let cleanup: (() => void)[] = []
 afterEach(() => {
+  resetRepositorySession()
   globalThis.fetch = previous
   cleanup.forEach((f) => f())
   cleanup = []
@@ -222,4 +224,66 @@ test('токен в настройках: пустое поле сохраняе
     await unmount(app)
     target.remove()
   }
+})
+
+test('context menus work on an unselected sidebar row and title, without changing selection', async () => {
+  window.history.replaceState({}, '', '/?repo=1')
+  const copied: string[] = []
+  const originalWrite = navigator.clipboard.writeText
+  navigator.clipboard.writeText = async (text) => {
+    copied.push(text)
+  }
+  cleanup.push(() => {
+    navigator.clipboard.writeText = originalWrite
+  })
+  globalThis.fetch = (async (input) =>
+    new Response(
+      JSON.stringify(
+        String(input) === '/api/repositories'
+          ? {
+              items: [
+                { ...repo, clone_url: '/git/main/mini.git' },
+                { ...repo, id: 2, title: 'Second', clone_url: '/git/main/second.git' },
+              ],
+              quota_bytes: 1,
+            }
+          : { branches: ['main'], commits: [], tree: [], empty: true }
+      )
+    )) as typeof fetch
+  const target = document.createElement('div')
+  document.body.append(target)
+  const app = mount(RepositoriesBlock, { target })
+  cleanup.push(() => {
+    unmount(app)
+    target.remove()
+  })
+  await settle()
+  const row = target.querySelectorAll('.repo-row')[1]!
+  const open = async (element: Element) => {
+    flushSync(() => element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })))
+    await settle()
+  }
+  const pick = async (label: string) => {
+    flushSync(() =>
+      [...target.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+        .find((b) => b.textContent?.trim() === label)!
+        .click()
+    )
+    await settle()
+  }
+  await open(row)
+  await pick('Копировать repo=2')
+  expect(copied.at(-1)).toBe('repo=2')
+  expect(target.querySelector('h1')?.textContent).toBe('Mini')
+  await open(row)
+  await pick('Копировать источник')
+  expect(copied.at(-1)).toEndWith('/git/main/second.git')
+  await open(row)
+  await pick('Изменить')
+  expect(target.querySelector<HTMLInputElement>('input[maxlength="200"]')?.value).toBe('Second')
+  flushSync(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  await settle()
+  await open(target.querySelector('h1')!)
+  await pick('Копировать repo=1')
+  expect(copied.at(-1)).toBe('repo=1')
 })
