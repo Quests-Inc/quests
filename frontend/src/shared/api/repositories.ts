@@ -39,7 +39,7 @@ export const createRepository = (body: {
 }) => request<{ id: number }>('/api/repositories', { method: 'POST', body: JSON.stringify(body) })
 export const updateRepository = (
   id: number,
-  body: { slug?: string; title?: string; branch?: string; token?: string }
+  body: { url?: string; slug?: string; title?: string; branch?: string; token?: string }
 ) => request(`/api/repositories/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 export const linkRepository = (id: number, owner: RepositoryLink) =>
   request(`/api/repositories/${id}/links`, { method: 'POST', body: JSON.stringify(owner) })

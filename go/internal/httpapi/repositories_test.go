@@ -96,6 +96,12 @@ func TestRepositoriesGitHTTPAndWorkspace(t *testing.T) {
 	if len(historical["tree"].([]any)) != 1 {
 		t.Fatal("selected commit did not select old tree")
 	}
+
+	external := call("POST", "/api/repositories", map[string]any{"title": "External", "kind": "github", "url": "https://github.com/team/old"}, 201)
+	externalPath := "/api/repositories/" + strconv.Itoa(int(external["id"].(float64)))
+	call("PATCH", externalPath, map[string]any{"url": "https://evil.example/team/repo"}, 400)
+	call("PATCH", externalPath, map[string]any{"url": "https://github.com/team/new", "branch": "feature"}, 200)
+	call("PATCH", base, map[string]any{"url": "https://github.com/team/repo"}, 400)
 	call("POST", base+"/links", map[string]any{"kind": "step", "id": 1}, 400)
 	note := call("POST", "/api/notes", map[string]any{"title": "Repo note"}, 201)
 	call("POST", base+"/links", map[string]any{"kind": "note", "id": note["id"]}, 200)

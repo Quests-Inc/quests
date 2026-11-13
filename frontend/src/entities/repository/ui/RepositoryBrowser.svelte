@@ -5,13 +5,13 @@
  import Icon from '@/shared/ui/Icon.svelte'
  import {copyText} from '@/shared/lib/clipboard.ts'
  let {repo}:{repo:Repository}=$props()
- let branch=$state(''),commit=$state(''),path=$state(''),data=$state<RepositoryView|null>(null),error=$state(''),loading=$state(false),revision=$state(0),key=$state(0)
- $effect(()=>{if(key!==repo.id){key=repo.id;branch=repo.branch;commit='';path='';data=null}})
+ let branch=$state(''),commit=$state(''),path=$state(''),data=$state<RepositoryView|null>(null),error=$state(''),loading=$state(false),revision=$state(0),key=$state('')
+ $effect(()=>{const next=`${repo.id}:${repo.url}:${repo.branch}`;if(key!==next){key=next;branch=repo.branch;commit='';path='';data=null}})
  $effect(()=>{const id=repo.id,b=branch,p=path,c=commit;void revision;if(!b)return;const abort=new AbortController();loading=true;error=''
  void browseRepository(id,b,p,abort.signal,c).then(result=>{if(!abort.signal.aborted)data=result}).catch(e=>{if(!abort.signal.aborted)error=e.message||String(e)}).finally(()=>{if(!abort.signal.aborted)loading=false});return()=>abort.abort()})
  const entries=$derived([...(data?.tree??[])].sort((a,b)=>Number(b.kind==='directory')-Number(a.kind==='directory')||a.name.localeCompare(b.name)))
- const prefixCommand=$derived(clone?`git config --global url."${clone.slice(0,clone.lastIndexOf('/')+1)}".insteadOf "q:"`:'')
  const clone=$derived(data?.clone_url?.startsWith('/')?`${location.origin}${data.clone_url}`:data?.clone_url||repo.url)
+ const prefixCommand=$derived(clone?`git config --global url."${clone.slice(0,clone.lastIndexOf('/')+1)}".insteadOf "q:"`:'')
 </script>
 <div class="repo-browser">
  {#if clone}<div class="repo-clone"><code>{clone}</code><button type="button" class="btn btn--ghost" onclick={()=>copyText(clone)}>Копировать</button></div>{/if}

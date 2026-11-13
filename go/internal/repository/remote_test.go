@@ -42,7 +42,7 @@ func TestReadProviderViews(t *testing.T) {
 	for _, kind := range []string{"github", "gitlab"} {
 		t.Run(kind, func(t *testing.T) {
 			client := &fakeRemote{}
-			h := Handler{Egress: client, RemoteEnabled: func(context.Context) bool { return true }}
+			h := Handler{DataDir: t.TempDir(), Egress: client, RemoteEnabled: func(context.Context) bool { return true }}
 			r := httptest.NewRequest("GET", "/", nil)
 			repo := Record{Kind: kind, URL: "https://" + kind + ".com/team/project"}
 			v := View{}
@@ -59,6 +59,13 @@ func TestReadProviderViews(t *testing.T) {
 			}
 			if last := client.calls[len(client.calls)-1]; !strings.Contains(last, "path=hello.txt") || !strings.Contains(last, "abcd") {
 				t.Fatal(last)
+			}
+
+			count := len(client.calls)
+			v.Tree[0].LastCommit = nil
+			h.remoteEntryCommits(r, repo, &v)
+			if len(client.calls) != count || v.Tree[0].LastCommit == nil {
+				t.Fatal("unchanged commit metadata was fetched again")
 			}
 
 			for _, call := range client.calls {

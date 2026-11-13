@@ -75,6 +75,9 @@ func (h *Handler) remoteJSON(r *http.Request, repo Record, endpoint string, out 
 		return err
 	}
 	if result.Status != 200 {
+		if result.Status == 429 || result.Status == 403 && strings.Contains(strings.ToLower(string(result.Body)), "rate limit") {
+			return fmt.Errorf("исчерпан лимит API %s: повторите позже или добавьте токен только для чтения", repo.Kind)
+		}
 		return fmt.Errorf("хост репозитория вернул HTTP %d", result.Status)
 	}
 	if err = json.Unmarshal(result.Body, out); err != nil {
@@ -130,6 +133,9 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 		}
 		if v.SelectedCommit == "" && len(v.Commits) > 0 {
 			v.SelectedCommit = v.Commits[0].ID
+		}
+		if v.SelectedCommit != "" {
+			ref = v.SelectedCommit
 		}
 		endpoint := base + "/contents/" + strings.Join(escapeParts(path), "/") + "?ref=" + url.QueryEscape(ref)
 		var raw json.RawMessage
@@ -198,6 +204,9 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 	if v.SelectedCommit == "" && len(v.Commits) > 0 {
 		v.SelectedCommit = v.Commits[0].ID
 	}
+	if v.SelectedCommit != "" {
+		ref = v.SelectedCommit
+	}
 	var items []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
@@ -239,8 +248,14 @@ func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
 	u, _ := url.Parse(repo.URL)
 	project := strings.Trim(strings.TrimSuffix(u.Path, ".git"), "/")
 	var wg sync.WaitGroup
-	slots := make(chan struct{}, 4)
+	slots := make(chan struct{}, 2)
+
 	for i := range view.Tree {
+		key := historyKey{Root: h.DataDir, Workspace: wsctx.From(r.Context()), Repository: repo.ID, URL: repo.URL, Ref: view.SelectedCommit, Path: view.Tree[i].Path}
+		if cached := cachedHistory(key); cached != nil {
+			view.Tree[i].LastCommit = cached
+			continue
+		}
 		select {
 		case slots <- struct{}{}:
 		case <-ctx.Done():
@@ -249,10 +264,11 @@ func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
 			return
 		}
 		wg.Add(1)
-		go func(index int) {
+		go func(index int, cacheKey historyKey) {
 			defer wg.Done()
 			defer func() { <-slots }()
 			entry := &view.Tree[index]
+			defer func() { rememberHistory(cacheKey, entry.LastCommit) }()
 			if repo.Kind == "github" {
 				var commits []struct {
 					SHA    string `json:"sha"`
@@ -285,7 +301,7 @@ func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
 					entry.LastCommit = &Commit{c.ID, c.Title, c.Author, c.Date}
 				}
 			}
-		}(i)
+		}(i, key)
 	}
 	wg.Wait()
 	for _, entry := range view.Tree {

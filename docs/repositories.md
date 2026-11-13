@@ -57,3 +57,12 @@ git clone q:my-project.git
 
 This is optional client configuration; Quests never edits the user's global Git
 settings. Use distinct prefixes for different spaces if configuring several.
+
+Per-path remote commit metadata is cached for five minutes by workspace,
+repository URL, immutable commit SHA and path (bounded to 2048 entries per
+process). Every directory request still reads the provider using the current
+credentials before using cached metadata. Only two metadata requests run at
+once, leaving capacity for other operations under the shared egress limit.
+Provider limits still apply; missing history is marked as partial rather than
+replaced with the branch-tip date. Remote URL and default branch can be edited
+in repository settings, with the same provider URL validation as creation.

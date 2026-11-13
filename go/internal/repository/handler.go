@@ -300,6 +300,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
+		URL    *string `json:"url"`
 		Slug   *string `json:"slug"`
 		Title  *string `json:"title"`
 		Branch *string `json:"branch"`
@@ -314,6 +315,17 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		repo.Slug = *in.Slug
+	}
+	if in.URL != nil {
+		if repo.Kind == "local" {
+			fail(w, 400, fmt.Errorf("локальный Git не имеет внешнего адреса"))
+			return
+		}
+		if err := validateRemote(repo.Kind, *in.URL); err != nil {
+			fail(w, 400, err)
+			return
+		}
+		repo.URL = *in.URL
 	}
 	if in.Title != nil {
 		repo.Title = strings.TrimSpace(*in.Title)
@@ -349,7 +361,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err == nil {
-		_, err = tx.ExecContext(r.Context(), `UPDATE repository SET title=?,branch=?,slug=? WHERE id=?`, repo.Title, repo.Branch, repo.Slug, repo.ID)
+		_, err = tx.ExecContext(r.Context(), `UPDATE repository SET title=?,branch=?,slug=?,url=? WHERE id=?`, repo.Title, repo.Branch, repo.Slug, repo.URL, repo.ID)
 	}
 	if err == nil {
 		err = tx.Commit()
