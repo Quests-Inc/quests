@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/quests-inc/quests/go/internal/execution"
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	"github.com/quests-inc/quests/go/internal/kernel"
 	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/events"
@@ -16,6 +17,8 @@ import (
 // Handler serves the execution endpoints.
 type Handler struct {
 	Store *execution.Store
+	// ReadNote reads non-private Markdown under the request workspace. It never executes inserts.
+	ReadNote graph.NoteReader
 
 	// RequireOwner answers 403 and false unless the caller owns the workspace (identity decides who is the owner).
 	RequireOwner func(w http.ResponseWriter, r *http.Request, what string) bool

@@ -41,7 +41,17 @@ func (s *Server) automationHTTP() *automationhttp.Handler {
 func (s *Server) executionHTTP() *executionhttp.Handler {
 	s.executionOnce.Do(func() {
 		s.eh = &executionhttp.Handler{
-			Store:        s.Store.Execution,
+			Store: s.Store.Execution,
+			ReadNote: func(ctx context.Context, id int64) (string, string, error) {
+				n, err := s.Store.Knowledge.GetNote(ctx, id)
+				if err != nil {
+					return "", "", err
+				}
+				if n.IsPrivate {
+					return "", "", errors.New("приватные заметки недоступны источнику вставки")
+				}
+				return n.Title, n.Description, nil
+			},
 			RequireOwner: s.identityHTTP().RequireOwner,
 			SubjectExists: func(ctx context.Context, kind string, id int64) (bool, error) {
 				switch kind {

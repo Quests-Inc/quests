@@ -5,6 +5,7 @@ import App from '@/app/App.svelte'
 
 import { installFakeApi } from '../components/fakeApi.ts'
 import Review from './Review.svelte'
+const searchDelay = Math.min(Number(new URLSearchParams(location.search).get('searchDelay')) || 0, 30000)
 const appMode = location.pathname.endsWith('/app.html')
 const baseApi = appMode ? installFakeApi() : null
 const fallbackFetch = window.fetch.bind(window)
@@ -48,6 +49,9 @@ const reviewStartedAt = new Date().toISOString()
 // Isolated review fixture: no request reaches the user's workspace.
 window.fetch = async (input, init) => {
   const url = String(input)
+  if (/\/api\/search(?:[?]|$)/.test(url)) {
+    if (searchDelay > 0) await new Promise((resolve) => setTimeout(resolve, searchDelay))
+  }
   const respond = (value: unknown) =>
     new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } })
   if (/\/api\/calendar\/events(?:[?]|$)/.test(url))

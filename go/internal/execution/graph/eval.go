@@ -417,6 +417,10 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 			out, err = runRegex(rs, ins["in"][0])
 		case "http.get":
 			out, err = r.runHTTP(ctx, rs, ins)
+		case "json.build", "text.build":
+			out, err = runBuild(rs, ins)
+		case "markdown.table":
+			out, err = runMarkdownTable(rs, ins["text"][0], ins["column"]...)
 		case "json.get":
 			out, err = runJSONGet(rs, ins["in"][0])
 		}

@@ -53,6 +53,12 @@ export function defaultParams(type: string): unknown {
       return { host: 'api.example.org' }
     case 'http.runner':
       return { host: 'api.example.org' }
+    case 'json.build':
+      return { inputs: [{ name: 'value', type: 'str' }], template: { value: { $input: 'value' } } }
+    case 'text.build':
+      return { inputs: [{ name: 'value', type: 'str' }], template: '{{value}}' }
+    case 'markdown.table':
+      return { table: 'example', column: 0 }
     case 'json.get':
       return { path: 'value', type: 'str' }
   }

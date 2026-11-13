@@ -309,7 +309,7 @@ function linkifyRefs(
       return chunk.replace(scriptEmbedRe(), (_, id, arg, query) => {
         const text = String(arg).trim()
         const flags = scriptFlags(query)
-        const label = flags.hide ? scriptLabel(text, flags) : escapeMdInline(text)
+        const label = escapeMdInline(scriptLabel(text, flags))
         return `[${label}](${scriptHref(id, text, flags)})`
       })
     })

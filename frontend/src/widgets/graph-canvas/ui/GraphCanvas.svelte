@@ -1,4 +1,5 @@
 <script lang="ts">
+  import {imagePixels} from '../model/imageQuality.ts'
   import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
   import type { Snippet } from 'svelte'
   import { createClusterFolds } from '../model/folds.svelte.ts'
@@ -153,6 +154,7 @@
         picked={stage.picked.has(n.key)}
         ready={stage.ready}
         raster={rasterOf(n)}
+        imagePixels={imagePixels(n,gest.cam,stage.stageSize,typeof window!=='undefined'?window.devicePixelRatio||1:1)}
         tier={tier.get(n.key)}
         more={stage.moreMap.get(n.key) ?? []}
         changed={stage.touched.has(n.key) && !n.draft}

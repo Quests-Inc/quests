@@ -110,7 +110,7 @@ func graphHasArgs(g graph.Graph) bool {
 
 // tryEmbedded tests a script made for texts: the arguments go in, Result comes out, a Code node goes to the runner.
 func (r *CheckRunner) tryEmbedded(ctx context.Context, g graph.Graph, reg graph.Registry, in execution.TryStart, ref string, b runBinding) (int64, error) {
-	run, reqs, out, advErr := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope, r.fetcher(&in.ScriptID))
+	run, reqs, out, advErr := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope, r.fetcher(&in.ScriptID), r.embeddedNoteReader(in.SubjectType, in.SubjectID))
 	if run == nil {
 		return 0, advErr
 	}

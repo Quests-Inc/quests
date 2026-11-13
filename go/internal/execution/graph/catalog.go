@@ -49,7 +49,7 @@ func Builtin() Registry {
 		add(NodeType{Name: "source." + entity, Title: "Источник: " + sourceTitles[entity], Kind: KindSource, Trusted: true, Ports: sourcePorts(out)})
 	}
 	source("step", TRefStep, req("title", TStr), req("description", TStr), req("progress", TInt), req("total", TInt), req("done", TBool))
-	source("note", TRefNote, req("title", TStr))
+	source("note", TRefNote, req("title", TStr), req("description", TStr))
 	source("template", TRefTemplate, req("title", TStr), req("period", TStr))
 	source("quest", TRefQuest, req("title", TStr), req("status", TStr), req("description", TStr), req("progress", TInt), req("total", TInt))
 	source("workspace", TRefWorkspace, req("name", TStr))
@@ -64,6 +64,9 @@ func Builtin() Registry {
 	add(NodeType{Name: "all_of", Title: "Каждый из", Kind: KindControl, Trusted: true, Ports: allOfPorts})
 
 	registerEmbed(add)
+	add(NodeType{Name: "json.build", Title: "JSON: собрать", Kind: KindLogic, Trusted: true, Ports: func(p json.RawMessage) ([]Port, []Port, error) { return buildPorts(p, false) }})
+	add(NodeType{Name: "text.build", Title: "Текст: собрать", Kind: KindLogic, Trusted: true, Ports: func(p json.RawMessage) ([]Port, []Port, error) { return buildPorts(p, true) }})
+	add(NodeType{Name: "markdown.table", Title: "Markdown: таблица", Kind: KindLogic, Trusted: true, Ports: tablePorts})
 	add(NodeType{Name: "http.get", Title: "HTTP: запрос", Kind: KindLogic, Trusted: true, Network: true, Ports: httpPorts})
 	add(NodeType{Name: "json.get", Title: "JSON: достать", Kind: KindLogic, Trusted: true, Ports: jsonGetPorts})
 

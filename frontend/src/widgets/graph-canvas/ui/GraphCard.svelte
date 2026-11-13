@@ -1,4 +1,6 @@
 <script lang="ts">
+ import GraphImage from './GraphImage.svelte'
+ import NoteSilhouette from './NoteSilhouette.svelte'
   import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
   import { QuestlineIcon } from '@/entities/questline'
   import { statusWord } from '@/shared/lib/questStatus.ts'
@@ -25,6 +27,7 @@
     picked = false,
     ready = false,
     raster = false,
+    imagePixels = 128,
     tier,
     more = [],
     changed = false,
@@ -58,6 +61,7 @@
     editingHere?: boolean
     picked?: boolean
     ready?: boolean
+    imagePixels?: number
     raster?: boolean
     tier?: string
     more?: { type: string; count: number }[]
@@ -136,7 +140,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         class:gcard--sized={n.sw != null}
         class:gcard--resizing={resizing}
         style:width={n.sw != null ? `${n.sw}px` : big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
-        style:height={n.sh != null ? `${editingHere ? Math.max(n.sh, 340) : n.sh}px` : ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
+        style:height={n.sh != null ? `${editingHere ? Math.max(n.sh, 340) : n.sh}px` : square ? `${SQUARE}px` : ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
         data-gkey={n.key}
         title="{t.label}: {n.title}{orphan ? ' — на неё нет ссылок' : ''}"
         onpointerdown={(e) => {
@@ -151,7 +155,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         {#if square}
           <div class="gcard__sq">
             {#if raster}
-              <img class="gcard__thumb" src="/api/attachments/{n.id}/image?preview=1" alt="" loading="lazy" draggable="false" />
+              <GraphImage id={n.id} pixels={imagePixels} />
             {:else if n.type === 'cluster'}
               <span class="gcard__count">{n.title.split(' ')[0]}</span>
             {:else}
@@ -204,7 +208,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
             <span class="gcard__edithint">Ctrl+Enter — готово · Esc — отмена</span>
           </div>
         {:else if tier === 'lite'}
-          <!-- frame only: off-screen or too small to read -->
+          {#if n.type==='note'}<div class="gcard__ghost"><span>{n.title}</span><NoteSilhouette text={n.desc||''}/></div>{/if}
         {:else if big || withText}
           <div class="gcard__head">
             {@render glyph(n, t)}
@@ -215,6 +219,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
               <span class="gcard__prog">{n.progress}</span>
             {/if}
           </div>
+          {#if n.type==='note'&&tier==='title'}<NoteSilhouette text={n.desc||''}/>{/if}
           {#if n.desc && tier !== 'title'}
             <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
               <MarkdownBody source={n.desc} {labels} host={hostOf} ownValues={!!hostOf} onRef={(k, id) => onOpen?.(k, id)} />
@@ -227,7 +232,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
             <span class="gcard__prog">{n.progress}</span>
           {/if}
         {/if}
-        {#if !square && tier !== 'lite'}
+        {#if (!square || raster) && tier !== 'lite'}
                       {#if more.length}
             <div class="gcard__more">
               {#each more as m (m.type)}
@@ -245,7 +250,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
             </div>
           {/if}
         {/if}
-        {#if !square && tier !== 'lite' && !editingHere && onResizeStart}
+        {#if (!square || raster) && tier !== 'lite' && !editingHere && onResizeStart}
           <button
             type="button"
             class="gcard__grip"
@@ -283,6 +288,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 {/snippet}
 
 <style>
+ .gcard__ghost{height:100%;display:flex;flex-direction:column;padding:12px;gap:8px;overflow:hidden}.gcard__ghost span{opacity:.55;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 
 
   .gcard {
@@ -620,20 +627,14 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   }
 
   .gcard__sq {
+    min-height:0;
+    height:100%;
     display: grid;
     justify-items: center;
-    align-content: center;
+    grid-template-rows: minmax(0,1fr) auto;
     gap: 0.3rem;
     height: 100%;
     min-width: 0;
-  }
-
-  .gcard__thumb {
-    width: 100%;
-    height: 56px;
-    object-fit: cover;
-    border-radius: 10px;
-    pointer-events: none;
   }
 
   .gcard__count {

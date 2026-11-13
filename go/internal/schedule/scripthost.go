@@ -74,7 +74,11 @@ func (h scriptHost) Source(ctx context.Context, n graph.Node) (map[string]any, e
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"ref": ref, "secrets": secrets, "title": note.Title, "event": event}, nil
+		out := map[string]any{"ref": ref, "secrets": secrets, "title": note.Title, "event": event}
+		if !note.IsPrivate {
+			out["description"] = note.Description
+		}
+		return out, nil
 	case "template":
 		t, err := h.r.Store.Automation.TemplateRowByID(ctx, id)
 		if err != nil {
@@ -131,7 +135,10 @@ func (h scriptHost) Sink(ctx context.Context, n graph.Node, in map[string]graph.
 		if h.subj.RunID == 0 {
 			return nil
 		}
-		text, _ := in["value"].Value.(string)
+		text, err := graph.ResultText(in["value"])
+		if err != nil {
+			return err
+		}
 		return h.r.Store.Execution.SetRunResult(ctx, h.subj.RunID, text)
 	case "sink.http":
 		return h.r.sinkHTTP(ctx, n, in)

@@ -28,7 +28,7 @@ var embedName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,23}$`)
 func registerEmbed(add func(NodeType)) {
 	add(NodeType{Name: "args", Title: "Аргументы", Kind: KindSource, Trusted: true, Ports: argsPorts})
 	add(NodeType{Name: "sink.result", Title: "Результат", Kind: KindSink, Trusted: true,
-		Ports: func(json.RawMessage) ([]Port, []Port, error) { return []Port{req("value", TStr)}, nil, nil }})
+		Ports: func(json.RawMessage) ([]Port, []Port, error) { return []Port{req("value", TValue)}, nil, nil }})
 	add(NodeType{Name: "expr", Title: "Выражение", Kind: KindLogic, Trusted: true, Ports: exprPorts})
 	add(NodeType{Name: "random", Title: "Случайное", Kind: KindLogic, Trusted: true, Ports: randomPorts})
 	add(NodeType{Name: "regex", Title: "Регулярка", Kind: KindLogic, Trusted: true, Ports: regexPorts})
@@ -430,60 +430,6 @@ type budget struct {
 	rolls, evals int
 }
 
-type embedHost struct {
-	args   map[string]string
-	result *string
-}
-
-func (h *embedHost) Source(_ context.Context, n Node) (map[string]any, error) {
-	if n.Type != "args" {
-		return nil, fmt.Errorf("источник %s здесь не работает", n.Type)
-	}
-	var p struct {
-		Params []ArgParam `json:"params"`
-	}
-	_ = json.Unmarshal(n.Params, &p)
-	out := map[string]any{}
-	for _, a := range p.Params {
-		raw, ok := h.args[a.Name]
-		if !ok {
-			continue
-		}
-		switch a.Type {
-		case TStr:
-			out[a.Name] = raw
-		case TInt:
-			v, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("аргумент %q: не целое число", a.Name)
-			}
-			out[a.Name] = v
-		case TFloat:
-			v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-			if err != nil {
-				return nil, fmt.Errorf("аргумент %q: не число", a.Name)
-			}
-			out[a.Name] = v
-		case TBool:
-			v, err := strconv.ParseBool(strings.TrimSpace(raw))
-			if err != nil {
-				return nil, fmt.Errorf("аргумент %q: не да/нет", a.Name)
-			}
-			out[a.Name] = v
-		}
-	}
-	return out, nil
-}
-
-func (h *embedHost) Sink(_ context.Context, n Node, in map[string]Token) error {
-	if n.Type != "sink.result" {
-		return fmt.Errorf("приёмник %s здесь не работает", n.Type)
-	}
-	s, _ := in["value"].Value.(string)
-	*h.result = s
-	return nil
-}
-
 // Evaluate runs a graph that holds only trusted nodes (Args … Result) on the server and returns what Result received.
 // The graph must be expanded (no custom nodes). Arguments are given as text and read as the types Args declares.
 func Evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string) (string, error) {
@@ -492,7 +438,7 @@ func Evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string
 
 // BeginEmbedded advances an embedded graph as far as the server goes: the arguments, the expressions, up to the Code nodes. The
 // caller stores the run and hands the requests to a runner; what Result already received comes back too.
-func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope, fetch Fetcher) (*Run, []CodeRequest, string, error) {
+func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope, fetch Fetcher, readers ...NoteReader) (*Run, []CodeRequest, string, error) {
 	run, err := NewRun(g, reg)
 	if err != nil {
 		return nil, nil, "", err
@@ -501,7 +447,7 @@ func BeginEmbedded(ctx context.Context, g Graph, reg Registry, args map[string]s
 	run.budget = &budget{}
 	run.Scope = scope
 	run.Fetch = fetch
-	reqs, err := run.Advance(ctx, &embedHost{args: withFirstArg(g, args), result: &out})
+	reqs, err := run.Advance(ctx, &embedHost{args: withFirstArg(g, args), result: &out, notes: firstReader(readers)})
 	return run, reqs, out, err
 }
 
@@ -511,11 +457,11 @@ func EvaluateScoped(ctx context.Context, g Graph, reg Registry, args map[string]
 }
 
 // EvaluateFetch is EvaluateScoped for a graph that may hold `http.get` nodes: fetch sends their requests.
-func EvaluateFetch(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope, fetch Fetcher) (string, error) {
-	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope, fetch)
+func EvaluateFetch(ctx context.Context, g Graph, reg Registry, args map[string]string, scope *ExprScope, fetch Fetcher, readers ...NoteReader) (string, error) {
+	return evaluate(ctx, g, reg, withFirstArg(g, args), &budget{}, scope, fetch, readers...)
 }
 
-func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string, b *budget, scope *ExprScope, fetch Fetcher) (string, error) {
+func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string, b *budget, scope *ExprScope, fetch Fetcher, readers ...NoteReader) (string, error) {
 	if g.RunsOnRunner() {
 		return "", errors.New("в графе есть нода кода: встроить можно только скрипт без неё")
 	}
@@ -525,7 +471,7 @@ func evaluate(ctx context.Context, g Graph, reg Registry, args map[string]string
 	}
 	var out string
 	got := false
-	h := &embedHost{args: args, result: &out}
+	h := &embedHost{args: args, result: &out, notes: firstReader(readers)}
 	run.budget = b
 	run.Scope = scope
 	run.Fetch = fetch

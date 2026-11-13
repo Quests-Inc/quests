@@ -1,6 +1,5 @@
 <script lang="ts">
   import { createEntitySearch, searchFilters } from '@/shared/lib/entitySearch.svelte.ts'
-  import SearchState from '@/shared/ui/SearchState.svelte'
   import { createNoteScroll, revealOpenRow } from '../model/noteScroll.ts'
   import { createTitleEdit } from '../model/noteTitleEdit.svelte.ts'
   import { tick } from 'svelte'
@@ -581,8 +580,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
 <SidebarLayout key="notes" hasSelection={selectedId != null} class="notes">
   {#snippet sidebar()}
-  <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
   <NotesTree
+    searchPending={remoteSearch.pending}
+    searchError={remoteSearch.error}
     bind:search
     {parsedSearch}
     {searchActive}

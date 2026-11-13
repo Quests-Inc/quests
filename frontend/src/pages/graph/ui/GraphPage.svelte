@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { uploadUnboundAttachment } from '@/shared/api/attachments.ts'
+  import { onDestroy } from 'svelte'
   import { createEntitySearch, searchFilters, searchTypes } from '@/shared/lib/entitySearch.svelte.ts'
   import { parseQuery } from '@/shared/lib/searchFlags.ts'
 
@@ -34,15 +36,17 @@
     rootType = null,
     rootId = null,
     nonce = 0,
+    rootNonce = 0,
     questlines = [],
     labels = {},
     onCenter,
     onOpen,
   }: {
     active?: boolean
-    rootType?: 'quest' | 'note' | 'questline' | 'event' | null
+    rootType?: 'quest' | 'note' | 'questline' | 'event' | 'attachment' | null
     rootId?: number | null
     nonce?: number
+    rootNonce?: number
     questlines?: { id: number; title?: string }[]
     labels?: Record<string, string>
     onCenter?: (type: string | null, id: number | null) => void
@@ -52,7 +56,7 @@
   let quests = $derived(questCatalog.list)
   let notes = $derived(noteCatalog.list)
 
-  const prefs = createGraphPrefs(typeof localStorage === 'undefined' ? null : localStorage)
+  const prefs = createGraphPrefs(null)
   let zoneDrawing = $state(false)
   const saved = new Map<string, { x: number; y: number }>()
   // Поле, черновик и жесты читают друг друга только после сборки. Методы до этого не зовутся.
@@ -108,6 +112,7 @@
     getRootType: () => rootType ?? null,
     getRootId: () => rootId ?? null,
     getNonce: () => nonce,
+    getRootNonce: () => rootNonce,
     getExpandKeys: () => prefs.expandKeys,
     getReloadTick: () => gd.reloadTick,
     getDraftRoots: () => gd.draft.roots,
@@ -116,12 +121,10 @@
     getNotes: () => notes,
     getQuestlines: () => questlines,
     onCenter: (type, id) => onCenter?.(type, id),
-    onRetarget: () => {
+    onRetarget: async () => {
+      await layouts.newTemporary()
       stage.selectedKey = null
       stage.clearLit?.()
-      folds.reset()
-      prefs.setExpand([])
-      folds.forgetPositions()
     },
     prepareFresh: () => {
       stage.selectedKey = null
@@ -232,6 +235,8 @@
     putRoots: putGraphDraftRoots,
     onOpen,
     recenter: (n) => query.recenter(n),
+    board: () => layouts.current,
+    place: (id,key,at) => layouts.placePosition(id,key,at),
     saved,
   })
 
@@ -262,9 +267,13 @@
     saved,
     cam: { get: () => gest.cam, set: (c) => (gest.cam = c) },
     stageSize: () => stage.stageSize,
-    settled: () => !query.loading && stage.ready,
+    settled: () => !query.loading && stage.ready && stage.stageSize.w > 0 && stage.stageSize.h > 0,
     applyLayout: () => stage.applyLayout(),
-  })
+    addRoot: (type,id) => query.addToMap(type,id),
+  }, { rememberActive: true })
+
+  $effect(() => { layouts.track() })
+  onDestroy(() => layouts.dispose())
 
   function toggleSelectMode() {
     stage.toggleSelectMode()
@@ -367,6 +376,20 @@
     prefs.layoutMode = stage.layoutMode
   }
 
+  async function onPaste(e: ClipboardEvent) {
+    if (!active || layouts.busy || e.target instanceof Element && e.target.closest('input,textarea,[contenteditable="true"]')) return
+    const origin = layouts.current
+    const files = [...(e.clipboardData?.files ?? [])]
+    if (!files.length) return
+    e.preventDefault()
+    const cam = gest.cam, size = stage.stageSize
+    const at = { x: (size.w / 2 - cam.x) / cam.k, y: (size.h / 2 - cam.y) / cam.k }
+    for (const [i, file] of files.entries()) try {
+      const attachment = await uploadUnboundAttachment(file)
+      await layouts.placeEntity(origin, { type: 'attachment', id: attachment.id, title: attachment.filename }, { x: at.x + i * 110, y: at.y })
+    } catch (err) { toast(err instanceof Error ? err.message : String(err), { kind: 'error' }) }
+  }
+
   function onKey(e: KeyboardEvent) {
     handleGraphKey(e, {
       active,
@@ -398,7 +421,7 @@
   }
 
   $effect(() => {
-    query.syncRoot()
+    void query.syncRoot()
   })
   $effect(() => {
     if (active) void gd.load()
@@ -423,6 +446,7 @@
 </script>
 
 <svelte:window
+  onpaste={onPaste}
   onkeydown={onKey}
 />
 <svelte:document onfullscreenchange={onFullscreenChange} />

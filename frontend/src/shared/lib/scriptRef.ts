@@ -7,7 +7,7 @@
 const LABEL = String.raw`[a-z0-9][a-z0-9_-]{0,31}`
 const LABELS = String.raw`${LABEL}(?:,${LABEL}){0,7}`
 const FLAG = String.raw`auto(?:=1)?|hide(?:=1)?|set=[a-z][a-z0-9_]{0,23}|on=${LABELS}`
-const SCRIPT_EMBED_SOURCE = String.raw`\bscript=(\d+)\{([^{}\[\]\n]{1,200})\}(\?(?:${FLAG})(?:&(?:${FLAG})){0,2}\b)?`
+const SCRIPT_EMBED_SOURCE = String.raw`\bscript=(\d+)\{([^{}\[\]\n]{0,200})\}(\?(?:${FLAG})(?:&(?:${FLAG})){0,2}\b)?`
 
 /** A fresh global regex. Callers must not share one instance across overlapping scans. */
 export function scriptEmbedRe() {
@@ -58,7 +58,7 @@ export function parseScriptHref(
 
 /** What a reader sees before a roll: the formula, or `?` when it is hidden. */
 export function scriptLabel(arg: string, flags: { hide?: boolean }) {
-  return flags.hide ? '?' : arg
+  return flags.hide ? '?' : arg || 'Запустить'
 }
 
 /** `*` and `_` in a formula must stay characters, not markdown emphasis. */

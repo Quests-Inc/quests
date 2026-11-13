@@ -32,7 +32,7 @@ func (s *Server) getGraph(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var rootType string
 	var rootID int64
-	for _, t := range []string{"quest", "note", "questline"} {
+	for _, t := range []string{"quest", "note", "questline", "attachment"} {
 		if v := q.Get(t); v != "" {
 			n, err := strconv.ParseInt(v, 10, 64)
 			if err != nil || n <= 0 {
@@ -58,7 +58,7 @@ func (s *Server) getGraph(w http.ResponseWriter, r *http.Request) {
 	for _, part := range strings.Split(q.Get("extra"), ",") {
 		t, idStr, ok := strings.Cut(strings.TrimSpace(part), ":")
 		n, err := strconv.ParseInt(idStr, 10, 64)
-		if ok && err == nil && n > 0 && (t == "quest" || t == "note" || t == "questline") {
+		if ok && err == nil && n > 0 && (t == "quest" || t == "note" || t == "questline" || t == "attachment") {
 			roots = append(roots, store.GraphRoot{Type: t, ID: n})
 		}
 	}

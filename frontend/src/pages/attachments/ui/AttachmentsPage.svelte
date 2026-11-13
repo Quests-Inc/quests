@@ -48,7 +48,7 @@
     selectedId?: number | null,
     onSelect?: (id: number | null) => void,
     onOpenOwner?: (kind: string, id: number) => void,
-    onOpenGraph?: (type: 'quest' | 'questline' | 'note', id: number) => void,
+    onOpenGraph?: (type: 'quest' | 'questline' | 'note' | 'attachment', id: number) => void,
     onChanged?: () => void,
   } = $props()
 
@@ -61,8 +61,9 @@
     { id: 'quest', label: 'Квесты' },
     { id: 'questline', label: 'Квестлайны' },
     { id: 'note', label: 'Заметки' },
+    { id: 'workspace', label: 'Без привязки' },
   ]
-  const KIND_ONE: Record<string, string> = { quest: 'Квест', questline: 'Квестлайн', note: 'Заметка' }
+  const KIND_ONE: Record<string, string> = { quest: 'Квест', questline: 'Квестлайн', note: 'Заметка', workspace: 'Без привязки' }
   const SORTS = [
     { id: 'new', label: 'Сначала новые' },
     { id: 'old', label: 'Сначала старые' },
@@ -115,6 +116,7 @@
 
   function ownerLabel(a: any) {
     const kind = ownerKind(a)
+    if(kind==='workspace')return 'Файл пространства'
     return titles[`${kind}:${a.owner_id}`] || `${kind}=${a.owner_id}`
   }
 
@@ -227,7 +229,7 @@
       { id: 'download', label: 'Скачать' },
       { id: 'new-version', label: 'Новая версия…' },
       { id: 'hide', label: a.hidden ? 'Вернуть' : 'Скрыть' },
-      { id: 'open', label: 'Открыть владельца' },
+      ...(ownerKind(a)==='workspace'?[]:[{ id: 'open', label: 'Открыть владельца' }]),
       { id: 'sep-danger', sep: true },
       { id: 'delete', label: 'Удалить…', danger: true },
     ]
@@ -250,7 +252,7 @@
     const a = ctxAtt
     if (!a) return
     if (ctxGroup.length > 1) return void grp.run(action, ctxGroup)
-    if (action === 'graph') onOpenGraph?.(ownerKind(a) as 'quest' | 'questline' | 'note', Number(a.owner_id))
+    if (action === 'graph') onOpenGraph?.(ownerKind(a)==='workspace'?'attachment':ownerKind(a) as 'quest' | 'questline' | 'note', Number(ownerKind(a)==='workspace'?a.id:a.owner_id))
     else if (action === 'download') downloadAtt(a)
     else if (action === 'new-version') pickVersion(a)
     else if (action === 'hide') ops.toggleHidden(a)
@@ -370,7 +372,7 @@
         onToggleHidden={() => ops.toggleHidden(a)}
         onPickVersion={() => pickVersion(a)}
         onDelete={() => (ops.pending = { att: a, revision: null })}
-        onOpenOwner={() => onOpenOwner?.(ownerKind(a), Number(a.owner_id))}
+        onOpenOwner={ownerKind(a)==='workspace'?undefined:() => onOpenOwner?.(ownerKind(a), Number(a.owner_id))}
         onSaveComment={() => ops.saveComment(a)}
         onMakeCurrent={(revision) => ops.makeCurrent(a, revision)}
         onDeleteRevision={(revision) => (ops.pending = { att: a, revision })}
@@ -424,7 +426,7 @@
       </div>
       {#if a.comment}<p class="attpage__cmt" title={a.comment}>{a.comment}</p>{/if}
       <div class="attpage__meta">
-        {#if showOwner}
+        {#if showOwner && ownerKind(a)==='workspace'}<span>Без привязки</span>{:else if showOwner}
           <a
             class="attpage__owner"
             href={`?${ownerKind(a)}=${a.owner_id}`}

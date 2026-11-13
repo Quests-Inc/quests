@@ -1,6 +1,6 @@
 // Правый клик на карте: меню поля, карточки, шара вложений и ребра — и что по нему делается.
 import { edgeMenuItems, graphMenuItems, type GraphNodeView } from '@/entities/graph'
-import { uploadGraphDraftFile } from '@/shared/api/graph.ts'
+import { getGraphDraftScope, uploadGraphDraftFile } from '@/shared/api/graph.ts'
 
 type At = { x: number; y: number }
 type Root = { type: string; id: number }
@@ -72,7 +72,9 @@ export function createGraphMenu(deps: {
   onOpen?: (kind: string, id: number) => void
   recenter: (n: GraphNodeView) => void
   saved: Map<string, At>
-  upload?: (file: File, owner: string) => Promise<{ id: number }>
+  board?: () => number | string
+  place?: (id: number | string, key: string, at: At) => Promise<void>
+  upload?: (file: File, owner: string, scope?: string) => Promise<{ id: number }>
 }) {
   let ctx = $state<Ctx>(closed())
   let questModal = $state({ open: false, desc: '', at: { x: 0, y: 0 }, questlineId: null as number | null })
@@ -249,10 +251,17 @@ export function createGraphMenu(deps: {
     if (!(input instanceof HTMLInputElement)) return
     const files = [...(input.files ?? [])]
     input.value = ''
+    const scope = getGraphDraftScope(),
+      board = deps.board?.(),
+      owner = fileOwner,
+      at = { ...fileAt }
     for (const [i, file] of files.entries()) {
       try {
-        const op = await upload(file, fileOwner)
-        deps.saved.set(`attachment:t${op.id}`, { x: fileAt.x + i * 110, y: fileAt.y })
+        const op = await upload(file, owner, scope)
+        const key = `attachment:t${op.id}`,
+          position = { x: at.x + i * 110, y: at.y }
+        if (board !== undefined && deps.place) await deps.place(board, key, position)
+        else deps.saved.set(key, position)
       } catch {
         /* toast already shown */
       }

@@ -57,6 +57,8 @@ var draftKinds = map[string]bool{
 
 // draftRef is "type:id" where id is a number (real entity) or "t<op>" (made
 // by an op of this draft).
+var graphScopeRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 var draftRefRe = regexp.MustCompile(`^(quest|note|step|attachment|questline):(\d+|t\d+)$`)
 
 type draftRef struct {
@@ -123,14 +125,24 @@ type attachPayload struct {
 // Register mounts the map draft routes.
 func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerLayouts(mux)
-	mux.HandleFunc("GET /api/graph-draft", h.getGraphDraft)
-	mux.HandleFunc("POST /api/graph-draft/ops", h.postGraphDraftOp)
-	mux.HandleFunc("PUT /api/graph-draft/ops/{id}", h.putGraphDraftOp)
-	mux.HandleFunc("DELETE /api/graph-draft/ops/{id}", h.deleteGraphDraftOp)
-	mux.HandleFunc("PUT /api/graph-draft/roots", h.putGraphDraftRoots)
-	mux.HandleFunc("POST /api/graph-draft/files", h.postGraphDraftFile)
-	mux.HandleFunc("DELETE /api/graph-draft", h.cancelGraphDraft)
-	mux.HandleFunc("POST /api/graph-draft/commit", h.commitGraphDraft)
+	handle := func(pattern string, fn http.HandlerFunc) {
+		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+			key := r.URL.Query().Get("layout")
+			if len(key) > 80 || (key != "" && !graphScopeRe.MatchString(key)) {
+				writeErr(w, 422, "invalid layout key")
+				return
+			}
+			fn(w, r.WithContext(store.WithGraphScope(r.Context(), key)))
+		})
+	}
+	handle("GET /api/graph-draft", h.getGraphDraft)
+	handle("POST /api/graph-draft/ops", h.postGraphDraftOp)
+	handle("PUT /api/graph-draft/ops/{id}", h.putGraphDraftOp)
+	handle("DELETE /api/graph-draft/ops/{id}", h.deleteGraphDraftOp)
+	handle("PUT /api/graph-draft/roots", h.putGraphDraftRoots)
+	handle("POST /api/graph-draft/files", h.postGraphDraftFile)
+	handle("DELETE /api/graph-draft", h.cancelGraphDraft)
+	handle("POST /api/graph-draft/commit", h.commitGraphDraft)
 }
 
 func (h *Handler) getGraphDraft(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +229,7 @@ func (h *Handler) putGraphDraftRoots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, x := range in.Roots {
-		if x.Type != "quest" && x.Type != "note" && x.Type != "questline" || x.ID <= 0 {
+		if x.Type != "quest" && x.Type != "note" && x.Type != "questline" && x.Type != "attachment" || x.ID <= 0 {
 			writeErr(w, 422, "bad root")
 			return
 		}

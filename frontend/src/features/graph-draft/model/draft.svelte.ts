@@ -7,6 +7,7 @@ import {
   commitGraphDraft,
   deleteGraphDraftOp,
   getGraphDraft,
+  getGraphDraftScope,
   putGraphDraftRoots,
 } from '@/shared/api/graph.ts'
 import type { DraftOp } from '@/shared/api/store.gen'
@@ -37,7 +38,9 @@ export function createGraphDraft(deps: {
 
   async function load() {
     try {
+      const scope = getGraphDraftScope()
       const d = await getGraphDraft()
+      if (scope !== getGraphDraftScope()) return
       const next = { ops: d.ops ?? [], roots: Array.isArray(d.roots) ? d.roots : [] }
       // Unchanged: keep the object, so nothing is rebuilt.
       if (JSON.stringify(next) !== JSON.stringify(draft)) draft = next

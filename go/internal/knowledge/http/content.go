@@ -135,6 +135,15 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	// The address of an image in a text never names a revision, so a cached copy could not tell that a newer one was
 	// uploaded. The tag does: it is the card, the revision and its upload time, and a browser asks again each time.
 	etag := fmt.Sprintf(`"att-%d-r%d-%d-%d"`, a.ID, revision, size, uploaded.Unix())
+	thumbnail := 0
+	if raw := r.URL.Query().Get("thumb"); raw != "" {
+		thumbnail, _ = strconv.Atoi(raw)
+		if thumbnail != 128 && thumbnail != 256 && thumbnail != 512 && thumbnail != 1024 && thumbnail != 2048 {
+			writeErr(w, 422, "thumb must be 128, 256, 512, 1024 or 2048")
+			return
+		}
+		etag = strings.TrimSuffix(etag, `"`) + fmt.Sprintf(`-thumb%d"`, thumbnail)
+	}
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "private, no-cache")
 	if match := r.Header.Get("If-None-Match"); match != "" && strings.Contains(match, etag) {
@@ -146,6 +155,10 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	ctype = strings.ToLower(strings.TrimSpace(ctype))
 	if !InlineImageTypes[ctype] {
 		writeErr(w, 415, "attachment is not a raster image")
+		return
+	}
+	if thumbnail > 0 {
+		h.serveThumbnail(w, r, pathToGet, etag, thumbnail)
 		return
 	}
 	body, err := h.WebDAV.Get(r.Context(), pathToGet)

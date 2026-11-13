@@ -5,7 +5,7 @@ import { searchOfTarget, type OpenTarget } from '@/shared/lib/openTarget.ts'
 import { TAB_ORDER, type View } from '@/shared/lib/viewTabs.ts'
 
 export { TAB_ORDER, type View }
-export type GraphRoot = { type: 'quest' | 'note' | 'questline' | 'event' | null; id: number | null }
+export type GraphRoot = { type: 'quest' | 'note' | 'questline' | 'event' | 'attachment' | null; id: number | null }
 
 const validId = (id: unknown) => {
   const n = Number(id)
@@ -23,6 +23,7 @@ export function createNavigation(deps: {
   let selectedId = $state<number | null>(null)
   let selectedNoteId = $state<number | null>(null)
   let selectedAttachmentId = $state<number | null>(null)
+  let graphVisit = $state(0)
   let graphRoot = $state<GraphRoot>({ type: null, id: null })
   /** Квест, который надо выбрать, когда список дозагрузится. */
   let pendingSelectId = $state<number | null>(null)
@@ -73,6 +74,7 @@ export function createNavigation(deps: {
 
   /** Карта связей с центром на одной сущности. */
   function openGraph(type: GraphRoot['type'], id: number | string) {
+    graphVisit++
     slideTo('graph')
     graphRoot = { type, id: Number(id) }
     replaceSearch(searchFor('graph'))
@@ -205,6 +207,9 @@ export function createNavigation(deps: {
     },
     set selectedAttachmentId(v: number | null) {
       selectedAttachmentId = v
+    },
+    get graphVisit() {
+      return graphVisit
     },
     get graphRoot() {
       return graphRoot

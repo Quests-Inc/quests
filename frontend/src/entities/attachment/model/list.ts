@@ -31,6 +31,7 @@ export const ATT_SPEC = {
       { id: 'quest', label: 'квест' },
       { id: 'questline', label: 'квестлайн' },
       { id: 'note', label: 'заметка' },
+      { id: 'workspace', label: 'без привязки' },
     ],
     test: (a: any, v: any) => ownerKind(a) === v,
   },

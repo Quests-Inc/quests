@@ -4,6 +4,7 @@
   import { NOTE_SPEC } from '@/entities/note'
   import { QuestlineIcon } from '@/entities/questline'
   import { helpLine } from '@/shared/lib/searchFlags.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import { isListSelectAll } from '@/shared/lib/listKeys.ts'
   import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
@@ -16,6 +17,8 @@
 
   /** Боковое дерево заметок: поиск, результаты поиска, вложенные строки с переименованием и перетаскиванием. */
   let {
+    searchPending = false,
+    searchError = '',
     search = $bindable(''),
     parsedSearch,
     searchActive,
@@ -54,6 +57,8 @@
     onRowDragLeave,
     onRowDrop,
   }: {
+    searchPending?: boolean,
+    searchError?: string,
     search?: string
     parsedSearch: ComponentProps<typeof FlagHints>['parsed']
     searchActive: boolean
@@ -131,8 +136,9 @@
     ondragleave={onListDragLeave}
     ondrop={onListDrop}
   >
+    <SearchState pending={searchPending} error={searchError} />
     {#if searchActive && searchHits}
-      {#if searchHits.length === 0}
+      {#if searchHits.length === 0 && !searchPending && !searchError}
         <p class="empty">Ничего не найдено</p>
       {:else}
         <ul class="hits">

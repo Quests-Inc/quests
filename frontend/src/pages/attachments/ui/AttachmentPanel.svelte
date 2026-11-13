@@ -37,7 +37,7 @@
     onToggleHidden: () => void
     onPickVersion: () => void
     onDelete: () => void
-    onOpenOwner: () => void
+    onOpenOwner?: () => void
     onSaveComment: () => void
     onMakeCurrent: (revision: number) => void
     onDeleteRevision: (revision: number) => void
@@ -81,9 +81,9 @@
       <dl class="attpage__facts">
         <dt>Владелец</dt>
         <dd>
-          <button type="button" class="attpage__link" onclick={onOpenOwner}>
+          {#if onOpenOwner}<button type="button" class="attpage__link" onclick={onOpenOwner}>
             {ownerKindLabel} · {ownerLabel}
-          </button>
+          </button>{:else}<span>{ownerKindLabel}</span>{/if}
         </dd>
         <dt>Размер</dt>
         <dd>{formatSize(a.size_bytes)}</dd>

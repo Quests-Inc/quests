@@ -161,7 +161,7 @@ func (r *CheckRunner) StartEmbedded(ctx context.Context, in execution.EmbedStart
 	if open >= execution.MaxOpenEmbedded {
 		return 0, execution.ErrTooManyEmbedded
 	}
-	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope, r.fetcher(&in.ScriptID))
+	run, reqs, out, err := graph.BeginEmbedded(ctx, g, reg, in.Args, in.Scope, r.fetcher(&in.ScriptID), r.embeddedNoteReader(in.HostKind, in.HostID))
 	if err != nil {
 		return 0, err
 	}

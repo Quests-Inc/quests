@@ -19,10 +19,12 @@ import (
 
 func (h *Handler) RegisterAttachments(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attachments/{id}/owner", h.postAttachmentOwner)
+	mux.HandleFunc("POST /api/attachments", func(w http.ResponseWriter, r *http.Request) { h.PostAttachment(w, r, "workspace") })
 	for _, owner := range []struct{ seg, typ string }{
 		{"quests", ownerQuest},
 		{"questlines", ownerQuestline},
 		{"notes", ownerNote},
+		{"workspaces", "workspace"},
 	} {
 		seg, typ := owner.seg, owner.typ
 		mux.HandleFunc("GET /api/"+seg+"/{id}/attachments", func(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +137,7 @@ func (h *Handler) listAllAttachments(w http.ResponseWriter, r *http.Request) {
 		"quest":     {},
 		"questline": {},
 		"note":      {},
+		"workspace": {},
 	}
 	for _, a := range rows {
 		bucket, ok := out[a.OwnerType]

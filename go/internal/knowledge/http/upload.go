@@ -15,6 +15,7 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 )
 
 // SafeFilename keeps the original name for humans but strips anything that
@@ -51,6 +52,9 @@ func (h *Handler) PostAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 		return
 	}
 	ownerID, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if ownerType == "workspace" && ownerID == 0 {
+		ownerID = wsctx.From(r.Context())
+	}
 	ok, err := h.OwnerExists(r.Context(), ownerType, ownerID)
 	if err != nil {
 		writeErr(w, 500, err.Error())

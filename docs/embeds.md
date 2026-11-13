@@ -54,7 +54,7 @@ links break until it is restored ([`trash.md`](trash.md)). `GET /api/scripts/{id
 
 ## Table result targets
 
-The `Result` node still returns a string. A script may opt into a versioned JSON envelope, serialized as that string:
+The API result is still a string; the `Result` node accepts typed values and serializes documents as JSON. See [script-data.md](script-data.md) for table reading and result builders. A script may opt into a versioned JSON envelope, serialized as that string:
 
 ```json
 {"kind":"markdown-target","version":1,"text":"Restart the service","target":{"table":"diagnostics","row":"restart"}}
@@ -70,8 +70,7 @@ keeps its own latest result until the note closes or that embedding runs again. 
 Markdown is not rewritten, no server state is saved, and the highlights are not exported. The same contract works for
 an encounter table and for a diagnostics/decision table; there is no D&D-specific logic.
 
-The table text remains in the note. Scripts should return stable row keys rather than duplicate descriptions. This first
-prototype does not add a table-data source node: a script that needs cell values can fetch its source note through the
-existing graph sources; a dedicated parsed-table source requires a separate design. Editing a row key requires updating
-its producer, as with an ordinary document anchor. Version 1 targets one row; columns, cells and multi-target envelopes
-are left for a confirmed use case.
+The table text remains in the note. The `source.note → markdown.table → random.pick → json.build → Result` chain can read
+stable row keys without duplicating descriptions; see [script-data.md](script-data.md). Editing a row key requires
+updating any producer that stores it, as with an ordinary document anchor. Version 1 targets one row; columns, cells and
+multi-target envelopes are left for a confirmed use case.

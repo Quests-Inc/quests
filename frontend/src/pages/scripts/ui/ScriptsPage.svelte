@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
   import SearchState from '@/shared/ui/SearchState.svelte'
+  import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
   import { untrack } from 'svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -279,6 +279,7 @@
   <aside class="scripts__list" aria-label="Скрипты">
     <SidebarTools bind:value={search} label="Поиск по скриптам" hint="По названию, описанию и видам сущностей" createLabel="Новый скрипт" createBusy={busy} onCreate={() => void createEmpty()} />
     <div class="scripts__items">
+      <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
       {#each groups as g (g.key)}
         <section class="sgroup" style:--c={g.color}>
           <button type="button" class="sgroup__head" aria-expanded={!folded.has(g.key)} onclick={() => fold(g.key)}>
@@ -329,7 +330,6 @@
       </div>
     {:else}
       <div class="scripts__bar">
-        <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
       <input type="text" class="scripts__title" bind:value={ed.title} aria-label="Название скрипта" />
         <button type="button" class="btn scripts__ver" title="Посмотреть версии, сравнить или откатить" onclick={() => (versionsOpen = true)}>Версия {ed.version}{ed.dirty ? ' · не сохранён' : ''}</button>
         <div class="detail__actions">

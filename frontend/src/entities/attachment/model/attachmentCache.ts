@@ -94,7 +94,7 @@ export function onAttachmentLiveInvalidate(fn: () => void) {
 export function flattenAttachmentIndex(index: any) {
   if (!index || typeof index !== 'object') return []
   const out: any[] = []
-  for (const type of ['quest', 'questline', 'note']) {
+  for (const type of ['quest', 'questline', 'note', 'workspace']) {
     const bucket = index[type]
     if (!bucket || typeof bucket !== 'object') continue
     for (const rows of Object.values<any[]>(bucket)) {

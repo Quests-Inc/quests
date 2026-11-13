@@ -1,6 +1,5 @@
 <script lang="ts">
   import { createEntitySearch } from '@/shared/lib/entitySearch.svelte.ts'
-  import SearchState from '@/shared/ui/SearchState.svelte'
   import { questCatalog, groupQuestsByCategory, inScope, listOpenOrAll, questSpec, scopeQuestlineChoices, type CategoryScope } from '@/entities/quest'
   import { noteCatalog } from '@/entities/note'
   import { QuestDetail } from '@/widgets/quest-detail'
@@ -152,8 +151,9 @@
 
 <SidebarLayout key="journal" hasSelection={selectedId != null} class="journal__body">
   {#snippet sidebar()}
-  <SearchState pending={remoteSearch.pending} error={remoteSearch.error} />
   <QuestSidebar
+    searchPending={remoteSearch.pending}
+    searchError={remoteSearch.error}
     {loading}
     {quests}
     {matchedQuests}

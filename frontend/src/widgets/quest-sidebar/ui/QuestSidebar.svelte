@@ -8,6 +8,7 @@
   import { helpLine } from '@/shared/lib/searchFlags.ts'
   import { statusWord } from '@/shared/lib/questStatus.ts'
   import { isListSelectAll } from '@/shared/lib/listKeys.ts'
+  import SearchState from '@/shared/ui/SearchState.svelte'
   import SidebarTools from '@/shared/ui/SidebarTools.svelte'
   import SidebarPicked from '@/shared/ui/SidebarPicked.svelte'
   import {
@@ -20,6 +21,8 @@
   } from '@/entities/quest'
 
   let {
+    searchPending = false,
+    searchError = '',
     loading,
     quests,
     matchedQuests,
@@ -59,6 +62,8 @@
     labels = {},
     onRef,
   }: {
+    searchPending?: boolean,
+    searchError?: string,
     loading: boolean,
     quests: any[],
     matchedQuests: any[],
@@ -311,7 +316,9 @@
         {/if}
       </div>
     {/if}
-    {#if loading}
+    {#if searchPending || searchError}
+      <SearchState pending={searchPending} error={searchError} />
+    {:else if loading}
       <p class="empty">Загрузка…</p>
     {:else if quests.length === 0}
       <p class="empty">Квестов нет</p>

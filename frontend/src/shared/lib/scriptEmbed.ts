@@ -26,11 +26,12 @@ function cacheKey(node: HTMLElement, parsed: Parsed) {
 }
 
 function rowFor(parsed: Parsed, value: string | null, errTitle = ''): Row {
-  if (errTitle) return { text: parsed.hide ? '?' : `${parsed.arg} — ошибка`, err: true, title: errTitle }
-  if (value == null) return { text: parsed.hide ? '?' : parsed.arg, err: false, title: '' }
+  const label = parsed.arg || 'Запустить'
+  if (errTitle) return { text: parsed.hide ? '?' : `${label} — ошибка`, err: true, title: errTitle }
+  if (value == null) return { text: parsed.hide ? '?' : label, err: false, title: '' }
   const title = parsed.auto || parsed.hide ? 'Пересчитать' : ''
   if (parsed.hide) return { text: value, err: false, title }
-  return { text: `${parsed.arg} = ${value}`, label: parsed.arg, tail: ` = ${value}`, err: false, title }
+  return { text: `${label} = ${value}`, label: label, tail: ` = ${value}`, err: false, title }
 }
 
 /** Svelte action: makes the embedded-script links inside a rendered text live. */
@@ -83,7 +84,7 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
 
   /** The formula with each named value as a chip, like a `{{name}}` in prose; the chip keeps the name for hover and edit. */
   const fillLabel = (a: HTMLAnchorElement, label: string, tail: string) => {
-    const kids: Node[] = labelParts(label, names).map((part) => {
+    const kids: Node[] = labelParts(label || 'Запустить', names).map((part) => {
       if (!part.name) return document.createTextNode(part.text)
       const chip = document.createElement('span')
       chip.className = 'md-value'

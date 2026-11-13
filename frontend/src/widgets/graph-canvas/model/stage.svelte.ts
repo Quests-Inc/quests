@@ -184,7 +184,7 @@ export function createGraphStage(deps: {
     // The sizes are put on the plain nodes before they become state: reading `view` back here would make this effect depend on its own write.
     const fresh = prepareGraph(g, open, deps.folds.loose)
     for (const n of fresh.nodes) {
-      const s = n.type === 'attachment' || n.type === 'cluster' ? undefined : deps.prefs.sizes[n.key]
+      const s = n.type === 'cluster' ? undefined : deps.prefs.sizes[n.key]
       if (s) {
         n.sw = s.w
         n.sh = s.h

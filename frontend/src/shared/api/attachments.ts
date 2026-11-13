@@ -2,7 +2,14 @@ import { onUnauthorized, UnauthorizedError, BASE, request } from './http.ts'
 import type { AttachmentRevisions, AttachmentView } from './knowledge_http.gen'
 
 function ownerAttachmentsPath(ownerType: string, ownerId: number, attachmentId?: number | null) {
-  const seg = ownerType === 'questline' ? 'questlines' : ownerType === 'note' ? 'notes' : 'quests'
+  const seg =
+    ownerType === 'workspace'
+      ? 'workspaces'
+      : ownerType === 'questline'
+        ? 'questlines'
+        : ownerType === 'note'
+          ? 'notes'
+          : 'quests'
   const base = `/api/${seg}/${ownerId}/attachments`
   return attachmentId == null ? base : `${base}/${attachmentId}`
 }
@@ -156,4 +163,14 @@ export async function getAttachmentPreview(
   if (response.status === 401) onUnauthorized?.()
   if (!response.ok) throw new Error(`Preview HTTP ${response.status}`)
   return response.json()
+}
+
+/** A workspace file with no quest/note owner. It outlives the board that displays it. */
+export async function uploadUnboundAttachment(file: File) {
+  const body = new FormData()
+  body.append('file', file)
+  const response = await fetch(`${BASE}/api/attachments`, { method: 'POST', credentials: 'same-origin', body })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`)
+  return data as AttachmentView
 }

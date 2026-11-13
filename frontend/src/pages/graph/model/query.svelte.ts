@@ -31,6 +31,7 @@ export function createGraphQuery(deps: {
   getRootType: () => string | null
   getRootId: () => number | null
   getNonce: () => number
+  getRootNonce?: () => number
   getExpandKeys: () => string[]
   getReloadTick: () => number
   getDraftRoots: () => Root[]
@@ -40,7 +41,7 @@ export function createGraphQuery(deps: {
   getQuestlines: () => Listed[]
   onCenter: (type: string | null, id: number | null) => void
   /** Сменился центр снаружи (другая карточка, nonce): забыть раскрытия и позиции. */
-  onRetarget: () => void
+  onRetarget: () => void | Promise<void>
   /** Новый центр выбран здесь: забыть позиции и точечные раскрытия, группы вложений не трогать. */
   prepareFresh: () => void
   forgetPositions: () => void
@@ -71,16 +72,18 @@ export function createGraphQuery(deps: {
   let lastDataJson = ''
 
   /** Подтянуть центр к тому, что открыто в журнале. Повтор того же ключа ничего не делает. */
-  function syncRoot() {
+  async function syncRoot() {
     const rootType = deps.getRootType()
     const rootId = deps.getRootId()
     if (!deps.getActive() || !rootType || !rootId) return
-    const key = `${rootType}:${rootId}:${deps.getNonce()}`
+    const key = `${rootType}:${rootId}:${deps.getRootNonce?.() ?? deps.getNonce()}`
     if (key === lastRootKey) return
     lastRootKey = key
+    const retarget = deps.onRetarget()
+    if (retarget && typeof retarget.then === 'function') await retarget
+    if (key !== lastRootKey) return
     deps.initTree?.(`${rootType}:${rootId}`, depth)
     center = { type: rootType, id: rootId }
-    deps.onRetarget()
   }
 
   /** Запросить граф. Пока вкладка скрыта — нет. Пустой центр — пустая карта, чтобы черновик всё равно было куда класть. */
@@ -144,6 +147,7 @@ export function createGraphQuery(deps: {
   }
 
   function focus(type: string, id: number) {
+    lastRootKey = `${type}:${id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
     deps.initTree?.(`${type}:${id}`, depth)
     deps.prepareFresh()
     center = { type, id }
@@ -162,6 +166,7 @@ export function createGraphQuery(deps: {
   }
 
   function setCenter(c: { type: string; id: number }) {
+    lastRootKey = `${c.type}:${c.id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
     center = { type: c.type, id: c.id }
     deps.onCenter(c.type, c.id)
   }
@@ -187,6 +192,7 @@ export function createGraphQuery(deps: {
   async function addToMap(type: string, id: number) {
     deps.initTree?.(`${type}:${id}`, depth)
     if (!center.id) {
+      lastRootKey = `${type}:${id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
       deps.forgetPositions()
       center = { type, id }
       deps.onCenter(type, id)

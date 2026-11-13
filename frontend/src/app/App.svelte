@@ -744,6 +744,7 @@
         rootType={nav.graphRoot.type}
         rootId={nav.graphRoot.id}
         nonce={graphNonce}
+        rootNonce={nav.graphVisit}
         {questlines} labels={refLabels}
         onCenter={onGraphCenter}
         onOpen={onGraphOpen}

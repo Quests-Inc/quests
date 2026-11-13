@@ -87,3 +87,9 @@ test('?on takes a chain of runners, the first online goes first', () => {
   expect(parseScriptHref(scriptHref('9', 'x', { on: 'a,b' }))?.on).toBe('a,b')
   expect(scriptFlags('?on=a,').on).toBe('')
 })
+
+test('scripts without arguments render an explicit run action', () => {
+  expect(scriptEmbedRe().exec('script=30{}')?.[2]).toBe('')
+  expect(scriptLabel('', {})).toBe('Запустить')
+  expect(parseScriptHref(scriptHref('30', ''))?.arg).toBe('')
+})

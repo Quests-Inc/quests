@@ -69,3 +69,26 @@ test('пустая панель раскрывается на узком экр�
     window.matchMedia = original
   }
 })
+
+test('ожидание и ошибка поиска остаются внутри списка и не становятся колонками сетки', async () => {
+  for (const state of [{ pending: true }, { error: 'Сеть недоступна' }, {}]) {
+    const target = document.createElement('div')
+    document.body.append(target)
+    const app = mount(SidebarLayoutHarness, { target, props: state })
+    flushSync()
+    const layout = target.querySelector('.sbl')!
+    const panels = [...layout.children].filter(
+      (el) => !el.classList.contains('sbl__resize') && !el.classList.contains('sbl__handle')
+    )
+    expect(panels.map((el) => el.tagName)).toEqual(['ASIDE', 'MAIN'])
+    const status = target.querySelector('[role="status"], [role="alert"]')
+    if ('pending' in state || 'error' in state) {
+      expect(status?.closest('aside')).toBe(panels[0])
+      expect(status?.closest('[aria-label="Результаты"]')).not.toBeNull()
+      expect(target.querySelector('.sbt [role="status"], .sbt [role="alert"]')).toBeNull()
+      expect(panels[1].querySelector('[role="status"], [role="alert"]')).toBeNull()
+    } else expect(status).toBeNull()
+    await unmount(app)
+    target.remove()
+  }
+})

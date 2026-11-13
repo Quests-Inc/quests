@@ -1,4 +1,6 @@
 <script lang="ts">
+  import BuildParams from './params/BuildParams.svelte'
+  import MarkdownTableParams from './params/MarkdownTableParams.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import type { ScriptUse } from '@/shared/api/execution.gen.ts'
   import { openTarget } from '@/shared/lib/openTarget.ts'
@@ -106,6 +108,10 @@
         <HttpGetParams params={node.params as never} onChange={set} />
       {:else if node.type === 'http.runner'}
         <HttpRunnerParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'json.build' || node.type === 'text.build'}
+        <BuildParams params={node.params as never} text={node.type === 'text.build'} onChange={set} />
+      {:else if node.type === 'markdown.table'}
+        <MarkdownTableParams params={node.params as never} onChange={set} />
       {:else if node.type === 'json.get'}
         <JsonGetParams params={node.params as never} onChange={set} />
       {:else if node.type === 'sink.values'}

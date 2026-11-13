@@ -7,6 +7,7 @@ let commitResult: any = { applied: 2, created: { 'note:t1': 11 } }
 let commitError: any = null
 
 mock.module('@/shared/api/graph.ts', () => ({
+  getGraphDraftScope: () => '',
   getGraphDraft: async () => ({ ops: serverOps, roots: serverRoots }),
   addGraphDraftOp: async (kind: string, payload: unknown) => {
     const op = { id: serverOps.length + 1, kind, payload }

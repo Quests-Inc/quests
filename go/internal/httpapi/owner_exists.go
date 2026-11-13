@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/store"
 )
 
@@ -17,6 +18,9 @@ const (
 // ownerExists says whether the quest, questline or note an attachment would hang on exists. It reaches into two
 // contexts, so it lives in the root and the knowledge handler receives it as a function.
 func (s *Server) ownerExists(ctx context.Context, ownerType string, id int64) (bool, error) {
+	if ownerType == "workspace" {
+		return id > 0 && id == wsctx.From(ctx), nil
+	}
 	if ownerType == ownerQuestline {
 		return s.Store.Journal.QuestlineExists(ctx, id)
 	}

@@ -83,7 +83,7 @@ export function initialRoute(): {
   attachmentId?: number
   noteId?: number
   questId?: number
-  graphRoot?: { type: 'quest' | 'note' | 'questline' | 'event'; id: number }
+  graphRoot?: { type: 'quest' | 'note' | 'questline' | 'event' | 'attachment'; id: number }
   eventId?: number
 } {
   const fromNote = noteIdFromUrl()
@@ -95,7 +95,7 @@ export function initialRoute(): {
     if (fromTab !== 'graph') return { view: fromTab }
     const gid = Number(param('gid'))
     const gt = param('gt')
-    if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline' || gt === 'event'))
+    if (gid > 0 && (gt === 'quest' || gt === 'note' || gt === 'questline' || gt === 'event' || gt === 'attachment'))
       return { view: 'graph', graphRoot: { type: gt, id: gid } }
     return { view: 'graph' }
   }

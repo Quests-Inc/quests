@@ -187,3 +187,15 @@ test('у каждого дерева своя глубина; общие кар�
   q.depth = 1
   expect(calls).toHaveLength(count)
 })
+
+test('catalog refresh does not create a new temporary layout; explicit navigation does', async () => {
+  let visit = 1
+  const { q, setRoot, calls } = make({ getRootNonce: () => visit })
+  await q.syncRoot()
+  setRoot('quest', 5, 22)
+  await q.syncRoot()
+  expect(calls.filter((c) => c === 'retarget')).toHaveLength(1)
+  visit++
+  await q.syncRoot()
+  expect(calls.filter((c) => c === 'retarget')).toHaveLength(2)
+})

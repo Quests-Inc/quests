@@ -46,7 +46,7 @@ func itoa(n int64) string {
 
 // ListDraftOps returns the pending operations in the order they were made.
 func (s *Store) ListDraftOps(ctx context.Context) ([]DraftOp, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, kind, payload, created_at FROM graphdraft_op ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, kind, payload, created_at FROM graphdraft_op WHERE layout_key = ? ORDER BY id`, graphScope(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +67,8 @@ func (s *Store) ListDraftOps(ctx context.Context) ([]DraftOp, error) {
 
 func (s *Store) AddDraftOp(ctx context.Context, kind string, payload json.RawMessage) (DraftOp, error) {
 	now := timeutil.NowUTC()
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO graphdraft_op (kind, payload, created_at) VALUES (?, ?, ?)`,
-		kind, string(payload), timeutil.ToDBUTC(now))
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO graphdraft_op (kind, payload, created_at, layout_key) VALUES (?, ?, ?, ?)`,
+		kind, string(payload), timeutil.ToDBUTC(now), graphScope(ctx))
 	if err != nil {
 		return DraftOp{}, err
 	}
@@ -82,25 +82,26 @@ func (s *Store) DeleteDraftOps(ctx context.Context, ids []int64) error {
 		return nil
 	}
 	ph := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	args := make([]any, len(ids))
+	args := make([]any, len(ids)+1)
+	args[len(ids)] = graphScope(ctx)
 	for i, id := range ids {
 		args[i] = id
 	}
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM graphdraft_op WHERE id IN (`+ph+`)`, args...)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM graphdraft_op WHERE id IN (`+ph+`) AND layout_key = ?`, args...)
 	return err
 }
 
 // UpdateDraftOpPayload replaces an op's payload (used to swap placeholder ids
 // for real ones after a partial commit).
 func (s *Store) UpdateDraftOpPayload(ctx context.Context, id int64, payload json.RawMessage) error {
-	_, err := s.DB.ExecContext(ctx, `UPDATE graphdraft_op SET payload = ? WHERE id = ?`, string(payload), id)
+	_, err := s.DB.ExecContext(ctx, `UPDATE graphdraft_op SET payload = ? WHERE id = ? AND layout_key = ?`, string(payload), id, graphScope(ctx))
 	return err
 }
 
 // DraftRoots returns the extra map roots kept with the draft, as raw JSON.
 func (s *Store) DraftRoots(ctx context.Context) (json.RawMessage, error) {
 	var roots string
-	err := s.DB.QueryRowContext(ctx, `SELECT roots FROM graphdraft_state ORDER BY id LIMIT 1`).Scan(&roots)
+	err := s.DB.QueryRowContext(ctx, `SELECT roots FROM graphdraft_state WHERE layout_key = ? ORDER BY id LIMIT 1`, graphScope(ctx)).Scan(&roots)
 	if err != nil {
 		return json.RawMessage("[]"), nil //nolint:nilerr // no row yet = no roots
 	}
@@ -110,14 +111,14 @@ func (s *Store) DraftRoots(ctx context.Context) (json.RawMessage, error) {
 func (s *Store) SetDraftRoots(ctx context.Context, roots json.RawMessage) error {
 	// One row per workspace (row-level security scopes the UPDATE); insert on first use.
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	res, err := s.DB.ExecContext(ctx, `UPDATE graphdraft_state SET roots = ?, updated_at = ?`, string(roots), now)
+	res, err := s.DB.ExecContext(ctx, `UPDATE graphdraft_state SET roots = ?, updated_at = ? WHERE layout_key = ?`, string(roots), now, graphScope(ctx))
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
 		return nil
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO graphdraft_state (roots, updated_at) VALUES (?, ?)`, string(roots), now)
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO graphdraft_state (roots, updated_at, layout_key) VALUES (?, ?, ?)`, string(roots), now, graphScope(ctx))
 	return err
 }
 
@@ -128,7 +129,7 @@ func (s *Store) ClearDraft(ctx context.Context) ([]DraftOp, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.DB.ExecContext(ctx, `DELETE FROM graphdraft_op`); err != nil {
+	if _, err := s.DB.ExecContext(ctx, `DELETE FROM graphdraft_op WHERE layout_key = ?`, graphScope(ctx)); err != nil {
 		return nil, err
 	}
 	return ops, nil

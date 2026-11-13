@@ -14,7 +14,7 @@ const INLINE: { cls: string; re: RegExp; inner?: (m: RegExpExecArray) => string 
   // Ours first: a script link and a named value stay whole even inside emphasis marks.
   {
     cls: 'script',
-    re: new RegExp(String.raw`\bscript=\d+\{[^{}\[\]\n]{1,200}\}(?:\?${FLAG}(?:&${FLAG}){0,2}\b)?`, 'y'),
+    re: new RegExp(String.raw`\bscript=\d+\{[^{}\[\]\n]{0,200}\}(?:\?${FLAG}(?:&${FLAG}){0,2}\b)?`, 'y'),
   },
   { cls: 'value', re: /\{\{[a-z0-9_]*\}\}/y },
   { cls: 'ref', re: new RegExp(`\\b${REF}`, 'y') },

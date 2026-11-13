@@ -69,7 +69,11 @@ func (h *Handler) evalScript(w http.ResponseWriter, r *http.Request) {
 		h.startEmbedded(w, r, sc, g, in.Args, in.Host, in.On, scope)
 		return
 	}
-	out, ok := h.runEmbedded(w, r, sc.ID, g, reg, in.Args, scope)
+	hostNote := int64(0)
+	if in.Host != nil && in.Host.Kind == "note" {
+		hostNote = in.Host.ID
+	}
+	out, ok := h.runEmbedded(w, r, sc.ID, g, reg, in.Args, scope, hostNote)
 	if !ok {
 		return
 	}
@@ -104,7 +108,7 @@ func (h *Handler) loadEmbedded(w http.ResponseWriter, r *http.Request, id int64)
 
 // runEmbedded computes a graph of trusted nodes on the server. ok=false means the response is written. The caller has bounded
 // the arguments and chosen the values the formulas read.
-func (h *Handler) runEmbedded(w http.ResponseWriter, r *http.Request, scriptID int64, g graph.Graph, reg graph.Registry, args map[string]string, scope *graph.ExprScope) (string, bool) {
+func (h *Handler) runEmbedded(w http.ResponseWriter, r *http.Request, scriptID int64, g graph.Graph, reg graph.Registry, args map[string]string, scope *graph.ExprScope, hostNotes ...int64) (string, bool) {
 	select {
 	case evalSlots <- struct{}{}:
 		defer func() { <-evalSlots }()
@@ -118,7 +122,15 @@ func (h *Handler) runEmbedded(w http.ResponseWriter, r *http.Request, scriptID i
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	out, err := graph.EvaluateFetch(ctx, g, reg, args, scope, h.Store.NewFetcher(h.Egress, scriptID))
+	out, err := graph.EvaluateFetch(ctx, g, reg, args, scope, h.Store.NewFetcher(h.Egress, scriptID), func(ctx context.Context, id int64) (string, string, error) {
+		if id == 0 && len(hostNotes) > 0 {
+			id = hostNotes[0]
+		}
+		if id <= 0 || h.ReadNote == nil {
+			return "", "", errors.New("источник заметки: укажите id или запускайте из заметки")
+		}
+		return h.ReadNote(ctx, id)
+	})
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		return "", false

@@ -213,7 +213,11 @@ func (h *Handler) rollValue(segment string) http.HandlerFunc {
 			writeErr(w, http.StatusUnprocessableEntity, "источнику нужен раннер: запишите значение нодой «Переменная: записать» в скрипте")
 			return
 		}
-		out, ok := h.runEmbedded(w, r, script, g, reg, map[string]string{"_": arg}, scopeFrom(r, h, set, skip))
+		hostNote := int64(0)
+		if o.Kind == "note" {
+			hostNote = o.ID
+		}
+		out, ok := h.runEmbedded(w, r, script, g, reg, map[string]string{"_": arg}, scopeFrom(r, h, set, skip), hostNote)
 		if !ok {
 			return
 		}
