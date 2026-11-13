@@ -12,6 +12,9 @@ import (
 type fakeRemote struct{ calls []string }
 
 func (f *fakeRemote) Do(_ context.Context, in egress.Request) (*egress.Result, error) {
+	if in.Budget != egress.BudgetRepositories {
+		return nil, fmt.Errorf("repository used script budget")
+	}
 	f.calls = append(f.calls, in.URL)
 	var body string
 	switch {

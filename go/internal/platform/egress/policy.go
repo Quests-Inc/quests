@@ -37,27 +37,29 @@ type Policy struct {
 	// Proxy is the one proxy every request goes through (a machine that reaches the outside only through one). It is the
 	// administrator's address and is allowed to be internal. The proxy resolves the names, where we cannot look, so a proxy needs
 	// ModeAllowlist: only hosts the administrator named.
-	Proxy       *url.URL
-	Ports       map[int]bool
-	MaxBody     int64
-	Timeout     time.Duration
-	RatePerHour int
-	Concurrency int
+	Proxy                 *url.URL
+	Ports                 map[int]bool
+	MaxBody               int64
+	Timeout               time.Duration
+	RatePerHour           int
+	RepositoryRatePerHour int
+	Concurrency           int
 }
 
 // Defaults are the limits when the environment says nothing.
 const (
-	DefaultMaxBody     = 1 << 20
-	DefaultTimeout     = 10 * time.Second
-	DefaultRatePerHour = 120
-	DefaultConcurrency = 4
+	DefaultMaxBody               = 1 << 20
+	DefaultTimeout               = 10 * time.Second
+	DefaultRatePerHour           = 120
+	DefaultRepositoryRatePerHour = 500
+	DefaultConcurrency           = 4
 )
 
 // PolicyFromEnv reads QUESTS_EGRESS_* through get (os.Getenv in the server).
 func PolicyFromEnv(get func(string) string) (Policy, error) {
 	p := Policy{
 		Mode: ModeOff, Ports: map[int]bool{80: true, 443: true},
-		MaxBody: DefaultMaxBody, Timeout: DefaultTimeout, RatePerHour: DefaultRatePerHour, Concurrency: DefaultConcurrency,
+		MaxBody: DefaultMaxBody, Timeout: DefaultTimeout, RatePerHour: DefaultRatePerHour, RepositoryRatePerHour: DefaultRepositoryRatePerHour, Concurrency: DefaultConcurrency,
 	}
 	switch m := Mode(strings.ToLower(strings.TrimSpace(get("QUESTS_EGRESS_MODE")))); m {
 	case "":
@@ -111,6 +113,11 @@ func PolicyFromEnv(get func(string) string) (Policy, error) {
 		return Policy{}, err
 	}
 	p.RatePerHour = int(rate)
+	repositoryRate, err := positive(get("QUESTS_EGRESS_REPOSITORY_RATE"), int64(p.RepositoryRatePerHour), "QUESTS_EGRESS_REPOSITORY_RATE")
+	if err != nil {
+		return Policy{}, err
+	}
+	p.RepositoryRatePerHour = int(repositoryRate)
 	conc, err := positive(get("QUESTS_EGRESS_CONCURRENCY"), int64(p.Concurrency), "QUESTS_EGRESS_CONCURRENCY")
 	if err != nil {
 		return Policy{}, err

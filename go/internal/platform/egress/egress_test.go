@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -34,6 +35,8 @@ func TestPolicyFromEnv(t *testing.T) {
 		{"QUESTS_EGRESS_ALLOW_NETS": "not-an-ip"},
 		{"QUESTS_EGRESS_PORTS": "0"},
 		{"QUESTS_EGRESS_RATE": "-1"},
+		{"QUESTS_EGRESS_REPOSITORY_RATE": "0"},
+		{"QUESTS_EGRESS_REPOSITORY_RATE": "oops"},
 	} {
 		if _, err := PolicyFromEnv(env(bad)); err == nil {
 			t.Errorf("%v must be refused", bad)
@@ -259,5 +262,89 @@ func TestProxyIsTheAdministratorsAndNeedsAnAllowlist(t *testing.T) {
 	var d *Denied
 	if _, err := c.Do(context.Background(), Request{Workspace: 1, URL: "http://evil.example.com/"}); !errors.As(err, &d) {
 		t.Fatalf("a host not in the list: %v", err)
+	}
+}
+
+func TestIndependentWorkspaceBudgets(t *testing.T) {
+	p, err := PolicyFromEnv(env(map[string]string{"QUESTS_EGRESS_RATE": "2", "QUESTS_EGRESS_REPOSITORY_RATE": "3"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := New(p, nil)
+	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	c.now = func() time.Time { return now }
+	for i := 0; i < 2; i++ {
+		if err := c.reserve(1, BudgetScripts); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := c.reserve(1, BudgetScripts); !errors.Is(err, ErrRate) {
+		t.Fatal("script budget not exhausted", err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := c.reserve(1, BudgetRepositories); err != nil {
+			t.Fatal("script limit blocked repositories", err)
+		}
+	}
+	if err := c.reserve(1, BudgetRepositories); !errors.Is(err, ErrRate) {
+		t.Fatal("repository budget not exhausted", err)
+	}
+	if err := c.reserve(2, BudgetRepositories); err != nil {
+		t.Fatal("workspace budgets mixed", err)
+	}
+	now = now.Add(time.Hour)
+	if err := c.reserve(1, BudgetScripts); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.reserve(1, BudgetRepositories); err != nil {
+		t.Fatal(err)
+	}
+	// Also exhaust repositories first in another workspace.
+	for i := 0; i < 3; i++ {
+		_ = c.reserve(3, BudgetRepositories)
+	}
+	if err := c.reserve(3, BudgetScripts); err != nil {
+		t.Fatal("repository limit blocked scripts", err)
+	}
+	defaults, _ := PolicyFromEnv(env(nil))
+	if defaults.RepositoryRatePerHour != 500 || defaults.RatePerHour != 120 {
+		t.Fatalf("defaults %+v", defaults)
+	}
+}
+
+func TestConcurrencyPoolsDoNotBlockEachOther(t *testing.T) {
+	for _, busy := range []Budget{BudgetScripts, BudgetRepositories} {
+		t.Run(fmt.Sprint(busy), func(t *testing.T) {
+			entered, release := make(chan struct{}), make(chan struct{})
+			srv := listen(t, "127.0.0.1", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/hold" {
+					close(entered)
+					<-release
+				}
+				_, _ = w.Write([]byte("ok"))
+			}))
+			p := policyFor(portOf(srv))
+			p.AllowNets = []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}
+			p.Concurrency = 1
+			c := New(p, nil)
+			done := make(chan error, 1)
+			go func() {
+				_, err := c.Do(context.Background(), Request{Workspace: 1, Budget: busy, URL: srv.URL + "/hold"})
+				done <- err
+			}()
+			<-entered
+			other := BudgetRepositories
+			if busy == BudgetRepositories {
+				other = BudgetScripts
+			}
+			_, err := c.Do(context.Background(), Request{Workspace: 1, Budget: other, URL: srv.URL})
+			close(release)
+			if err != nil {
+				t.Errorf("one pool blocked the other: %v", err)
+			}
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

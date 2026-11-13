@@ -30,7 +30,9 @@ policy**: environment variables of the server (`QUESTS_EGRESS_*`), never the dat
 | `QUESTS_EGRESS_ALLOW_NETS` | explicit exceptions to the ban on internal addresses (CIDR or address) | empty |
 | `QUESTS_EGRESS_PORTS` | allowed ports | `80,443` |
 | `QUESTS_EGRESS_MAX_BODY` / `_TIMEOUT` | answer size after unpacking (bytes) / seconds | 1 MiB / 10 |
-| `QUESTS_EGRESS_RATE` / `_CONCURRENCY` | requests per hour per workspace / at once | 120 / 4 |
+| `QUESTS_EGRESS_RATE` | script/hook requests per hour per workspace | 120 |
+| `QUESTS_EGRESS_REPOSITORY_RATE` | repository requests per hour per workspace, independent budget | 500 |
+| `QUESTS_EGRESS_CONCURRENCY` | requests at once in each budget | 4 |
 | `QUESTS_EGRESS_PROXY` | the administrator's one proxy (a machine that reaches the outside only through one); needs `allowlist`, because a proxy resolves names where the server cannot look | none |
 
 On top of the mode, a workspace needs a **grant** (`egress_grant`, written only by the admin CLI as the database owner; the API

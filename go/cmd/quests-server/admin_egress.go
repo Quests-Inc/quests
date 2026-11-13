@@ -44,7 +44,8 @@ func runEgressCmd(st *store.Store, args []string) {
 		if p.Proxy != nil {
 			fmt.Printf("proxy: %s\n", p.Proxy.Redacted())
 		}
-		fmt.Printf("limits: %d B per answer, %s, %d per hour per workspace, %d at once\n", p.MaxBody, p.Timeout, p.RatePerHour, p.Concurrency)
+		fmt.Printf("limits: %d B per answer, %s, %d at once per budget\n", p.MaxBody, p.Timeout, p.Concurrency)
+		fmt.Printf("per hour per workspace: scripts=%d, repositories=%d\n", p.RatePerHour, p.RepositoryRatePerHour)
 		grants, err := st.Execution.EgressGrants(ctx)
 		if err != nil {
 			fatal("%v", err)

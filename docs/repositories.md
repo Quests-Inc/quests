@@ -94,7 +94,13 @@ response stops further uncached calls for that credential/provider until
 `Retry-After` / `X-RateLimit-Reset` permits retry (at least one minute without
 headers). There is no automatic retry loop. Authenticated conditional `304`
 responses do not consume GitHub's primary quota, but still use Quests' independent
-workspace egress budget; caching never expands that administrator policy.
+repository egress budget; caching never expands that administrator policy.
+Repository reads use a separate per-workspace hourly budget (default 500,
+`QUESTS_EGRESS_REPOSITORY_RATE`), independent from scripts/hooks (default 120,
+`QUESTS_EGRESS_RATE`). Each budget has its own concurrency slots, with the limit
+set by `QUESTS_EGRESS_CONCURRENCY`. Host allowlists, grants, proxy, body-size and
+timeout policy remain common. Environment configuration is read at server startup;
+changing a limit requires restarting the API, without a code patch.
 
 References: [GitHub rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api),
 [API best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api),

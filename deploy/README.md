@@ -57,7 +57,9 @@ just release 1.4.0        # проверит, что CI на main зелёный
 | `QUESTS_EGRESS_ALLOW_NETS` | явные исключения для внутренних адресов (CIDR или адрес) | пусто |
 | `QUESTS_EGRESS_PORTS` | разрешённые порты | `80,443` |
 | `QUESTS_EGRESS_MAX_BODY`, `_TIMEOUT` | размер ответа в байтах, таймаут в секундах | 1048576, 10 |
-| `QUESTS_EGRESS_RATE`, `_CONCURRENCY` | запросов в час на пространство, одновременных | 120, 4 |
+| `QUESTS_EGRESS_RATE` | запросов скриптов/хуков в час на пространство | 120 |
+| `QUESTS_EGRESS_REPOSITORY_RATE` | запросов GitHub/GitLab в час на пространство; отдельный бюджет | 500 |
+| `QUESTS_EGRESS_CONCURRENCY` | одновременных запросов в каждом из двух бюджетов | 4 |
 | `QUESTS_EGRESS_PROXY` | один прокси администратора (`http://127.0.0.1:2080`); только вместе с `allowlist` | нет |
 
 Пространству нужно ещё разрешение: `quests-server egress enable <id>` (`status`, `log`, `disable <id>`). Без него граф с такой

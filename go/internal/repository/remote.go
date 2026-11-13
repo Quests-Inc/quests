@@ -81,7 +81,7 @@ func (h *Handler) remoteJSON(r *http.Request, repo Record, endpoint string, out 
 		if etag != "" {
 			headers["If-None-Match"] = etag
 		}
-		result, err := h.Egress.Do(r.Context(), egress.Request{Workspace: wsctx.From(r.Context()), SameHostOnly: true, Method: "GET", URL: endpoint, Header: headers})
+		result, err := h.Egress.Do(r.Context(), egress.Request{Budget: egress.BudgetRepositories, Workspace: wsctx.From(r.Context()), SameHostOnly: true, Method: "GET", URL: endpoint, Header: headers})
 		if errors.Is(err, egress.ErrTooLarge) && strings.Contains(endpoint, "/git/trees/") {
 			return &egress.Result{Status: 200, Body: []byte(`{"truncated":true}`)}, nil
 		}

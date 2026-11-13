@@ -45,8 +45,22 @@ type Entry struct {
 	Result    string
 }
 
+// Budget is chosen by trusted server code, never by a script parameter.
+type Budget uint8
+
+const (
+	BudgetScripts Budget = iota
+	BudgetRepositories
+)
+
+type budgetKey struct {
+	Workspace int64
+	Budget    Budget
+}
+
 // Request is what a node wants sent. URL must be absolute; the host in it is judged by the policy, whoever wrote it.
 type Request struct {
+	Budget       Budget
 	SameHostOnly bool // credentials may not follow a redirect to another origin
 
 	Workspace int64
@@ -83,20 +97,25 @@ type Client struct {
 	policy Policy
 	log    func(Entry)
 	http   *http.Client
-	sem    chan struct{}
+	sem    [2]chan struct{}
 
 	mu   sync.Mutex
-	used map[int64][]time.Time
+	used map[budgetKey][]time.Time
 	now  func() time.Time
 }
 
 // New builds a client. log (may be nil) is told about every attempt, refused ones included.
 func New(p Policy, log func(Entry)) *Client {
-	c := &Client{policy: p, log: log, used: map[int64][]time.Time{}, now: time.Now}
+	c := &Client{policy: p, log: log, used: map[budgetKey][]time.Time{}, now: time.Now}
 	if p.Concurrency < 1 {
 		p.Concurrency = DefaultConcurrency
 	}
-	c.sem = make(chan struct{}, p.Concurrency)
+	if p.RepositoryRatePerHour < 1 {
+		c.policy.RepositoryRatePerHour = DefaultRepositoryRatePerHour
+	}
+	for i := range c.sem {
+		c.sem[i] = make(chan struct{}, p.Concurrency)
+	}
 	proxyAddrs := proxyAddresses(p.Proxy)
 	dialer := &net.Dialer{
 		Timeout: 5 * time.Second,
@@ -179,21 +198,26 @@ func (c *Client) check(u *url.URL) (string, error) {
 	return host, nil
 }
 
-func (c *Client) reserve(ws int64) error {
+func (c *Client) reserve(ws int64, budget Budget) error {
+	key := budgetKey{Workspace: ws, Budget: budget}
+	limit := c.policy.RatePerHour
+	if budget == BudgetRepositories {
+		limit = c.policy.RepositoryRatePerHour
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := c.now()
-	keep := c.used[ws][:0]
-	for _, t := range c.used[ws] {
+	keep := c.used[key][:0]
+	for _, t := range c.used[key] {
 		if now.Sub(t) < time.Hour {
 			keep = append(keep, t)
 		}
 	}
-	if len(keep) >= c.policy.RatePerHour {
-		c.used[ws] = keep
+	if len(keep) >= limit {
+		c.used[key] = keep
 		return ErrRate
 	}
-	c.used[ws] = append(keep, now)
+	c.used[key] = append(keep, now)
 	return nil
 }
 
@@ -241,12 +265,15 @@ func (c *Client) Do(ctx context.Context, in Request) (*Result, error) {
 		return finish(nil, err)
 	}
 	e.Host = host
-	if err := c.reserve(in.Workspace); err != nil {
+	if in.Budget > BudgetRepositories {
+		return finish(nil, &Denied{Reason: "неизвестный бюджет запросов"})
+	}
+	if err := c.reserve(in.Workspace, in.Budget); err != nil {
 		return finish(nil, err)
 	}
 	select {
-	case c.sem <- struct{}{}:
-		defer func() { <-c.sem }()
+	case c.sem[in.Budget] <- struct{}{}:
+		defer func() { <-c.sem[in.Budget] }()
 	default:
 		return finish(nil, ErrBusy)
 	}
