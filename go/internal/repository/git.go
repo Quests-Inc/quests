@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const DefaultQuota int64 = 256 << 20
+const DefaultQuota int64 = 1024 << 20
 
 // Git's config is supplied by us, not by incoming commits or an imported .git.
 func gitEnv() []string {
