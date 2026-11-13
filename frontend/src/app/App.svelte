@@ -146,7 +146,7 @@
         listNotes({catalog:true}).catch((): any[] => []),
         listAllAttachments().catch((): any => null),
         listEvents().catch((): any[] => []),
-        listRepositories().catch(()=>null),
+        listRepositories().catch(():null=>null),
       ])
       setQuests(next)
       setNotes(Array.isArray(nextNotes) ? nextNotes : [])
