@@ -1,11 +1,14 @@
 package repository
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/quests-inc/quests/go/internal/platform/egress"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
@@ -154,7 +157,7 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 				if e.Type == "dir" {
 					kind = "directory"
 				}
-				v.Tree = append(v.Tree, Entry{e.Name, e.Path, kind, e.SHA})
+				v.Tree = append(v.Tree, Entry{Name: e.Name, Path: e.Path, Kind: kind, ID: e.SHA})
 			}
 		} else {
 			return fmt.Errorf("выберите каталог; просмотр файлов пока не включён")
@@ -212,7 +215,7 @@ func (h *Handler) remoteView(r *http.Request, repo Record, branch, path string, 
 		if e.Type == "tree" {
 			kind = "directory"
 		}
-		v.Tree = append(v.Tree, Entry{e.Name, e.Path, kind, e.ID})
+		v.Tree = append(v.Tree, Entry{Name: e.Name, Path: e.Path, Kind: kind, ID: e.ID})
 	}
 	return nil
 }
@@ -225,4 +228,69 @@ func escapeParts(path string) []string {
 		parts[i] = url.PathEscape(parts[i])
 	}
 	return parts
+}
+
+// Host APIs expose path history separately. Bound concurrent requests and total
+// latency; missing metadata must not make the directory itself unavailable.
+func (h *Handler) remoteEntryCommits(r *http.Request, repo Record, view *View) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	r = r.WithContext(ctx)
+	u, _ := url.Parse(repo.URL)
+	project := strings.Trim(strings.TrimSuffix(u.Path, ".git"), "/")
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, 4)
+	for i := range view.Tree {
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			view.Limited = true
+			wg.Wait()
+			return
+		}
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			defer func() { <-slots }()
+			entry := &view.Tree[index]
+			if repo.Kind == "github" {
+				var commits []struct {
+					SHA    string `json:"sha"`
+					Commit struct {
+						Message string `json:"message"`
+						Author  struct {
+							Name string `json:"name"`
+						} `json:"author"`
+						Committer struct {
+							Date string `json:"date"`
+						} `json:"committer"`
+					} `json:"commit"`
+				}
+				endpoint := "https://api.github.com/repos/" + project + "/commits?per_page=1&sha=" + url.QueryEscape(view.SelectedCommit) + "&path=" + url.QueryEscape(entry.Path)
+				if h.remoteJSON(r, repo, endpoint, &commits) == nil && len(commits) > 0 {
+					c := commits[0]
+					title, _, _ := strings.Cut(c.Commit.Message, "\n")
+					entry.LastCommit = &Commit{c.SHA, title, c.Commit.Author.Name, c.Commit.Committer.Date}
+				}
+			} else {
+				var commits []struct {
+					ID     string `json:"id"`
+					Title  string `json:"title"`
+					Author string `json:"author_name"`
+					Date   string `json:"committed_date"`
+				}
+				endpoint := "https://gitlab.com/api/v4/projects/" + url.PathEscape(project) + "/repository/commits?per_page=1&ref_name=" + url.QueryEscape(view.SelectedCommit) + "&path=" + url.QueryEscape(entry.Path)
+				if h.remoteJSON(r, repo, endpoint, &commits) == nil && len(commits) > 0 {
+					c := commits[0]
+					entry.LastCommit = &Commit{c.ID, c.Title, c.Author, c.Date}
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+	for _, entry := range view.Tree {
+		if entry.LastCommit == nil {
+			view.Limited = true
+		}
+	}
 }

@@ -16,7 +16,13 @@ export type RepositoryView = {
   branch: string
   branches: string[]
   commits: { id: string; title: string; author: string; date: string }[]
-  tree: { name: string; path: string; kind: string; id: string }[]
+  tree: {
+    name: string
+    path: string
+    kind: string
+    id: string
+    last_commit?: { id: string; title: string; author: string; date: string }
+  }[]
   selected_commit: string
   empty: boolean
 }

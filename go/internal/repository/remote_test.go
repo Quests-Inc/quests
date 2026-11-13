@@ -19,9 +19,9 @@ func (f *fakeRemote) Do(_ context.Context, in egress.Request) (*egress.Result, e
 		body = `[{"name":"main"}]`
 	case strings.Contains(in.URL, "/commits"):
 		if strings.Contains(in.URL, "github") {
-			body = `[{"sha":"abcd","commit":{"message":"Hello","author":{"name":"A","date":"2026-11-13"}}}]`
+			body = `[{"sha":"abcd","commit":{"message":"Hello","author":{"name":"A","date":"2026-11-13"},"committer":{"date":"2026-11-14"}}}]`
 		} else {
-			body = `[{"id":"abcd","title":"Hello","author_name":"A","created_at":"2026-11-13"}]`
+			body = `[{"id":"abcd","title":"Hello","author_name":"A","created_at":"2026-11-13","committed_date":"2026-11-14"}]`
 		}
 	case strings.Contains(in.URL, "/contents/"):
 		if strings.Contains(in.URL, "hello.txt") {
@@ -51,6 +51,14 @@ func TestReadProviderViews(t *testing.T) {
 			}
 			if len(v.Branches) != 1 || len(v.Commits) != 1 || len(v.Tree) != 1 {
 				t.Fatalf("bad view %+v", v)
+			}
+
+			h.remoteEntryCommits(r, repo, &v)
+			if v.Tree[0].LastCommit == nil || v.Tree[0].LastCommit.Title != "Hello" || v.Tree[0].LastCommit.Date != "2026-11-14" {
+				t.Fatalf("missing path commit: %+v", v.Tree)
+			}
+			if last := client.calls[len(client.calls)-1]; !strings.Contains(last, "path=hello.txt") || !strings.Contains(last, "abcd") {
+				t.Fatal(last)
 			}
 
 			for _, call := range client.calls {

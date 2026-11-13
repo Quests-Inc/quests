@@ -41,7 +41,13 @@ test('переключатель коммитов меняет дерево, ф�
         selected_commit: sha,
         commits: [{ id: sha, title: 'First', author: 'A', date: '2026' }],
         tree: [
-          { name: 'main.py', path: 'main.py', kind: 'file', id: 'def' },
+          {
+            name: 'main.py',
+            path: 'main.py',
+            kind: 'file',
+            id: 'def',
+            last_commit: { id: sha, title: 'Edit main', author: 'Tester', date: '2026-11-13T10:00:00Z' },
+          },
           { name: 'src', path: 'src', kind: 'directory', id: 'ghi' },
         ],
         empty: false,
@@ -57,6 +63,10 @@ test('переключатель коммитов меняет дерево, ф�
   })
   await settle()
   expect([...target.querySelectorAll('button')].some((b) => b.textContent?.includes('main.py'))).toBe(false)
+  expect(target.querySelector('.repo-tree li')?.textContent).toContain('src/')
+  expect(target.querySelector('.repo-file .fki')?.getAttribute('aria-label')).toBe('Код / текст')
+  expect(target.querySelector('.repo-message[title="Edit main"]')).not.toBeNull()
+  expect(target.querySelector('time')?.getAttribute('datetime')).toBe('2026-11-13T10:00:00Z')
   const commits = target.querySelector('[aria-label="Коммит репозитория"]') as HTMLSelectElement
   flushSync(() => {
     commits.selectedIndex = 1

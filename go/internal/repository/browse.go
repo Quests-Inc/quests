@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -17,10 +18,11 @@ type Commit struct {
 	Date   string `json:"date"`
 }
 type Entry struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
+	Name       string  `json:"name"`
+	Path       string  `json:"path"`
+	Kind       string  `json:"kind"`
+	ID         string  `json:"id"`
+	LastCommit *Commit `json:"last_commit,omitempty"`
 }
 type View struct {
 	SelectedCommit string   `json:"selected_commit"`
@@ -56,6 +58,9 @@ func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
 	view := View{CloneURL: h.cloneURL(repo), Branch: branch, Branches: []string{}, Commits: []Commit{}, Tree: []Entry{}}
 	if repo.Kind != "local" {
 		err = h.remoteView(r, repo, branch, path, &view)
+		if err == nil && !view.Empty {
+			h.remoteEntryCommits(r, repo, &view)
+		}
 	} else {
 		lock := WorkspaceLock(h.DataDir, wsctx.From(r.Context()))
 		lock.RLock()
@@ -135,11 +140,14 @@ func (h *Handler) browse(w http.ResponseWriter, r *http.Request) {
 						if parts[0] == "160000" {
 							kind = "submodule"
 						}
-						view.Tree = append(view.Tree, Entry{name, p, kind, parts[2]})
+						view.Tree = append(view.Tree, Entry{Name: name, Path: p, Kind: kind, ID: parts[2]})
 					}
 				}
 			}
 		}
+	}
+	if err == nil && repo.Kind == "local" && len(view.Tree) > 0 {
+		view.Limited = !localEntryCommits(r.Context(), h.directory(wsctx.From(r.Context()), repo.ID), view.SelectedCommit, path, view.Tree)
 	}
 	if err != nil {
 		fail(w, 502, err)
@@ -154,4 +162,63 @@ func validCommit(raw string) bool {
 	}
 	_, err := hex.DecodeString(raw)
 	return err == nil
+}
+
+// Scan history once for the whole directory, rather than spawning git per row.
+// The bounded scan never substitutes the branch tip for an unknown file date.
+func localEntryCommits(ctx context.Context, dir, ref, path string, entries []Entry) bool {
+	args := []string{"log", "-1000", "-m", "--format=%x00%H%x00%s%x00%an%x00%cI%x00", "--name-only", "-z", "--no-renames", ref, "--"}
+	if path != "" {
+		args = append(args, ":(literal)"+path)
+	}
+	raw, err := Git(ctx, dir, args...)
+	if err != nil {
+		return false
+	}
+	pending := make(map[string]int, len(entries))
+	for i, e := range entries {
+		pending[e.Path] = i
+	}
+	tokens := strings.Split(string(raw), "\x00")
+	for i := 0; i < len(tokens); {
+		for i < len(tokens) && tokens[i] == "" {
+			i++
+		}
+		if i+4 >= len(tokens) || !validCommit(tokens[i]) {
+			break
+		}
+		c := Commit{tokens[i], tokens[i+1], tokens[i+2], tokens[i+3]}
+		i += 4
+		if tokens[i] == "" {
+			i++
+		}
+		first := true
+		for i < len(tokens) && tokens[i] != "" {
+			name := tokens[i]
+			i++
+			if first {
+				name = strings.TrimPrefix(name, "\n")
+				first = false
+			}
+			if path != "" {
+				if !strings.HasPrefix(name, path+"/") {
+					continue
+				}
+				name = strings.TrimPrefix(name, path+"/")
+			}
+			child, _, _ := strings.Cut(name, "/")
+			if path != "" {
+				child = path + "/" + child
+			}
+			if index, ok := pending[child]; ok {
+				copy := c
+				entries[index].LastCommit = &copy
+				delete(pending, child)
+			}
+		}
+		if len(pending) == 0 {
+			return true
+		}
+	}
+	return len(pending) == 0
 }
