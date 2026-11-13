@@ -167,6 +167,10 @@ export interface GraphLayout {
 }
 
 //////////
+// source: graphscope.go
+
+
+//////////
 // source: starter.go
 
 export interface SeedReport {
