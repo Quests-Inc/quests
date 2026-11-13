@@ -53,7 +53,7 @@
    </div>
   </aside>{/snippet}
   <section class="repo-detail" aria-label="Репозиторий">
-   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1><button type="button" class="repo-settings" title="Настройки репозитория" aria-label="Настройки репозитория" onclick={()=>openEdit(activeRepo)}><Icon name="settings" size={18}/></button></header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
+   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1><button type="button" class="repo-settings" title="Редактировать репозиторий" aria-label="Редактировать репозиторий" onclick={()=>openEdit(activeRepo)}><Icon name="edit" size={18}/></button></header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
   </section>
  </SidebarLayout>
 {/if}

@@ -154,7 +154,7 @@ test('настройки репозитория предупреждают о с
   await settle()
   flushSync(() =>
     [...target.querySelectorAll('button')]
-      .find((b) => b.getAttribute('aria-label') === 'Настройки репозитория')!
+      .find((b) => b.getAttribute('aria-label') === 'Редактировать репозиторий')!
       .click()
   )
   await settle()
@@ -198,7 +198,7 @@ test('токен в настройках: пустое поле сохраняе
     await settle()
     flushSync(() =>
       [...target.querySelectorAll('button')]
-        .find((b) => b.getAttribute('aria-label') === 'Настройки репозитория')!
+        .find((b) => b.getAttribute('aria-label') === 'Редактировать репозиторий')!
         .click()
     )
     await settle()
