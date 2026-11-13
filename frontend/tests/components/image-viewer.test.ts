@@ -100,3 +100,18 @@ test('касания: pinch увеличивает, перетаскивание
   pointer('pointerup', 4, 200, 200)
   expect(imageViewer.open).toBe(true)
 })
+
+test('повторное открытие той же картинки снова вписывает её в окно', () => {
+  const root = render()
+  const a = attachmentImage({ id: 9 })
+  flushSync(() => showImages([a], a.src))
+  flushSync(() =>
+    Array.from(root.querySelectorAll('button'))
+      .find((b) => b.getAttribute('aria-label') === 'Увеличить')!
+      .click()
+  )
+  expect(root.querySelector('img')?.getAttribute('style')).toContain('scale(1.4)')
+  flushSync(() => (imageViewer.open = false))
+  flushSync(() => showImages([a], a.src))
+  expect(root.querySelector('img')?.getAttribute('style')).toContain('scale(1)')
+})

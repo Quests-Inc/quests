@@ -57,7 +57,7 @@
   }
  }
  $effect(()=>{if(!viewer.open)return;window.addEventListener('keydown',key,true);const previous=document.activeElement;const overflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog?.focus();return()=>{window.removeEventListener('keydown',key,true);document.body.style.overflow=overflow;if(previous instanceof HTMLElement&&previous.isConnected)previous.focus()}})
- $effect(()=>{void image?.src;void retry;reset();natural={w:0,h:0};loading=true;failed=false;points.clear()})
+ $effect(()=>{void viewer.open;void image?.src;void retry;reset();natural={w:0,h:0};loading=true;failed=false;points.clear()})
  $effect(()=>{if(!area)return;const observer=new ResizeObserver(entries=>{const rect=entries[0].contentRect;untrack(()=>{size={w:rect.width,h:rect.height};clamp()})});observer.observe(area);return()=>observer.disconnect()})
 </script>
 {#if viewer.open && image}
