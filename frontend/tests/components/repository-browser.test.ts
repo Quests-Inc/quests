@@ -152,7 +152,11 @@ test('настройки репозитория предупреждают о с
   await settle()
   flushSync(() => target.querySelector<HTMLButtonElement>('.repo-row')!.click())
   await settle()
-  flushSync(() => [...target.querySelectorAll('button')].find((b) => b.textContent === 'Настройки')!.click())
+  flushSync(() =>
+    [...target.querySelectorAll('button')]
+      .find((b) => b.getAttribute('aria-label') === 'Настройки репозитория')!
+      .click()
+  )
   await settle()
   const dialog = document.querySelector('[role="dialog"]')!
   const input = dialog.querySelector<HTMLInputElement>('[aria-label="Slug репозитория"]')!
@@ -192,7 +196,11 @@ test('токен в настройках: пустое поле сохраняе
     await settle()
     flushSync(() => target.querySelector<HTMLButtonElement>('.repo-row')!.click())
     await settle()
-    flushSync(() => [...target.querySelectorAll('button')].find((b) => b.textContent === 'Настройки')!.click())
+    flushSync(() =>
+      [...target.querySelectorAll('button')]
+        .find((b) => b.getAttribute('aria-label') === 'Настройки репозитория')!
+        .click()
+    )
     await settle()
     const dialog = document.querySelector('[role="dialog"]')!
     const field = dialog.querySelector<HTMLInputElement>('[aria-label="Токен доступа"]')!

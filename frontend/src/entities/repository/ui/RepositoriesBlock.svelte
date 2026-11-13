@@ -53,7 +53,7 @@
    </div>
   </aside>{/snippet}
   <section class="repo-detail" aria-label="Репозиторий">
-   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1><button type="button" class="btn btn--ghost" onclick={()=>openEdit(activeRepo)}>Настройки</button></header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
+   {#if activeRepo}<header class="repo-detail__head"><h1>{activeRepo.title}</h1><button type="button" class="repo-settings" title="Настройки репозитория" aria-label="Настройки репозитория" onclick={()=>openEdit(activeRepo)}><Icon name="settings" size={18}/></button></header><div class="repo-detail__body"><RepositoryBrowser repo={activeRepo}/></div>{:else}<p class="repo-empty hint">Выберите репозиторий для просмотра дерева.</p>{/if}
   </section>
  </SidebarLayout>
 {/if}
@@ -73,6 +73,8 @@
  <ModalFoot onCancel={()=>creating=false} submitLabel={editingId===null?"Создать":"Сохранить"} {busy}/>
 </form></ModalShell>
 <style>
+ .repo-settings{display:inline-flex;align-items:center;justify-content:center;flex:none;width:2.25rem;height:2.25rem;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--color-fg-muted);cursor:pointer}.repo-settings:hover{color:var(--color-accent)}.repo-settings:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+
  .repositories--linked{display:grid;gap:.75rem;min-width:0;margin-bottom:1.5rem}
  .repo-heading{display:flex;align-items:center;gap:.3rem;width:fit-content;margin:0;padding:0;border:0;background:transparent;line-height:1}
  button.repo-heading{cursor:pointer}button.repo-heading:hover{color:var(--color-fg-muted)}
