@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test'
 
-import { daysLabel, parseClock, parseLimits, parseWeekdays } from '../../src/entities/template/model/schedule.ts'
+import {
+  daysLabel,
+  scheduleLabel,
+  parseSelectedDays,
+  parseClock,
+  parseLimits,
+  parseWeekdays,
+} from '../../src/entities/template/model/schedule.ts'
 
 test('parseClock: часы и минуты в пределах суток, мусор — запасное значение', () => {
   expect(parseClock('7:5', '12', '00')).toEqual({ hour: '07', minute: '05' })
@@ -25,4 +32,12 @@ test('parseLimits: только JSON-объект', () => {
   expect(parseLimits('{"max_steps": 50}')).toEqual({ max_steps: 50 })
   expect(() => parseLimits('[1]')).toThrow('Лимиты')
   expect(() => parseLimits('нет')).toThrow('Лимиты')
+})
+
+test('новые периоды: выбранные числа и подписи цикла', () => {
+  expect([...parseSelectedDays('0,1,15,31,32,no', 31)]).toEqual([1, 15, 31])
+  expect(scheduleLabel({ freq: 'monthly', monthdays: '31,15' })).toBe('15, 31 числа каждого месяца')
+  expect(scheduleLabel({ freq: 'cycle', cycle_length: 4, cycle_days: '1,2', cycle_start: '2026-11-13' })).toBe(
+    'цикл 4 дн. · дни 1, 2 · с 2026-11-13'
+  )
 })

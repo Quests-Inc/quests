@@ -56,6 +56,8 @@ func coerceInt64Slice(raw any) ([]int64, error) {
 }
 
 func scanTemplate(row rowScanner) (TemplateRead, error) {
+	var trMonthdays, trCycleStart, trCycleDays string
+	var trCycleLength int
 	var id int64
 	var title, desc, freq, weekdays, tz, sig, emitMode string
 	var pinned, enabled, sortOrder, automated, expireOnDeadline int
@@ -68,7 +70,7 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 	var lTitle, lColor, lIcon, lCustom, lUpdated sql.NullString
 	var lID sql.NullInt64
 	err := row.Scan(
-		&id, &title, &desc, &pinned, &sortOrder, &dur, &expireOnDeadline, &freq, &weekdays,
+		&id, &title, &desc, &pinned, &sortOrder, &dur, &expireOnDeadline, &freq, &weekdays, &trMonthdays, &trCycleLength, &trCycleStart, &trCycleDays,
 		&enabled, &tz, &deadline, &sig, &emitMode, &emitChance,
 		&ewStart, &ewEnd, &emitPoolCommand, &emitLimits, &emitRunOn,
 		&catID, &lineID,
@@ -81,6 +83,7 @@ func scanTemplate(row rowScanner) (TemplateRead, error) {
 	tr := TemplateRead{
 		ExpireOnDeadline: expireOnDeadline != 0,
 		ID:               id, Title: title, Description: desc, Pinned: pinned > 0, OverlayHidden: pinned < 0, SortOrder: sortOrder,
+		Monthdays: trMonthdays, CycleLength: trCycleLength, CycleStart: trCycleStart, CycleDays: trCycleDays,
 		Freq: freq, Weekdays: weekdays, Enabled: enabled != 0, Timezone: tz,
 		Significance: sig, EmitMode: emitMode, EmitChance: emitChance, Automated: automated != 0,
 	}
@@ -259,4 +262,13 @@ func emitLimitsColumn(v any) (any, error) {
 		return nil, err
 	}
 	return raw, nil
+}
+
+// body is the template in the shape a create/update request has, so that a read can be merged with
+// a patch or copied.
+func (t TemplateRead) body() map[string]any {
+	raw, _ := json.Marshal(t)
+	var m map[string]any
+	_ = json.Unmarshal(raw, &m)
+	return m
 }

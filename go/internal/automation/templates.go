@@ -23,6 +23,10 @@ type TemplateRead struct {
 	SortOrder        int            `json:"sort_order"`
 	Freq             string         `json:"freq"`
 	Weekdays         string         `json:"weekdays"`
+	Monthdays        string         `json:"monthdays"`
+	CycleLength      int            `json:"cycle_length"`
+	CycleStart       string         `json:"cycle_start"`
+	CycleDays        string         `json:"cycle_days"`
 	Enabled          bool           `json:"enabled"`
 	Timezone         string         `json:"timezone"`
 	Significance     string         `json:"significance"`
@@ -74,18 +78,9 @@ type TemplateStepRead struct {
 	ScriptID *int64 `json:"script_id"`
 }
 
-// body is the template in the shape a create/update request has, so that a read can be merged with
-// a patch or copied.
-func (t TemplateRead) body() map[string]any {
-	raw, _ := json.Marshal(t)
-	var m map[string]any
-	_ = json.Unmarshal(raw, &m)
-	return m
-}
-
 func (s *Store) ListTemplates(ctx context.Context, enabled *bool) ([]TemplateRead, error) {
 	q := `
-		SELECT t.id, t.title, t.description, t.pinned, t.sort_order, t.duration_seconds, t.expire_on_deadline, t.freq, t.weekdays,
+		SELECT t.id, t.title, t.description, t.pinned, t.sort_order, t.duration_seconds, t.expire_on_deadline, t.freq, t.weekdays, t.monthdays, t.cycle_length, t.cycle_start, t.cycle_days,
 			t.enabled, t.timezone, t.deadline_time, t.significance, t.emit_mode, t.emit_chance,
 			t.emit_window_start, t.emit_window_end, t.emit_pool_command, t.emit_limits, t.emit_run_on,
 			t.category_id, t.questline_id,
@@ -181,7 +176,7 @@ func (s *Store) latestEmitRollOutcome(ctx context.Context, templateID int64) (st
 
 func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error) {
 	row := s.DB.QueryRowContext(ctx, `
-		SELECT t.id, t.title, t.description, t.pinned, t.sort_order, t.duration_seconds, t.expire_on_deadline, t.freq, t.weekdays,
+		SELECT t.id, t.title, t.description, t.pinned, t.sort_order, t.duration_seconds, t.expire_on_deadline, t.freq, t.weekdays, t.monthdays, t.cycle_length, t.cycle_start, t.cycle_days,
 			t.enabled, t.timezone, t.deadline_time, t.significance, t.emit_mode, t.emit_chance,
 			t.emit_window_start, t.emit_window_end, t.emit_pool_command, t.emit_limits, t.emit_run_on,
 			t.category_id, t.questline_id,
@@ -228,6 +223,9 @@ func (s *Store) GetTemplate(ctx context.Context, id int64) (TemplateRead, error)
 }
 
 func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (TemplateRead, error) {
+	if err := validateTemplateSchedule(body); err != nil {
+		return TemplateRead{}, errBad(err.Error())
+	}
 	now := timeutil.NowUTC()
 	title, _ := body["title"].(string)
 	title = strings.TrimSpace(title)
@@ -270,12 +268,12 @@ func (s *Store) CreateTemplate(ctx context.Context, body map[string]any) (Templa
 	}
 	res, err := s.DB.ExecContext(ctx, `
 		INSERT INTO questtemplate (
-			title, description, pinned, sort_order, duration_seconds, expire_on_deadline, freq, weekdays, enabled, timezone,
+			title, description, pinned, sort_order, duration_seconds, expire_on_deadline, freq, weekdays, monthdays, cycle_length, cycle_start, cycle_days, enabled, timezone,
 			deadline_time, significance, emit_mode, emit_chance, emit_window_start, emit_window_end,
 			emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, created_at, updated_at, automated
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		title, desc, pinned, sortOrder, nullInt(asIntPtr(body["duration_seconds"])), boolInt(asBool(body["expire_on_deadline"], true)), freq, weekdays, boolInt(enabled), tz,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		title, desc, pinned, sortOrder, nullInt(asIntPtr(body["duration_seconds"])), boolInt(asBool(body["expire_on_deadline"], true)), freq, weekdays, asStringDef(body["monthdays"], "1"), asInt(body["cycle_length"], 4), asStringDef(body["cycle_start"], ""), asStringDef(body["cycle_days"], "1,2"), boolInt(enabled), tz,
 		nullStr(asStringPtr(body["deadline_time"])), sig, emitMode, emitChance,
 		nullStr(asStringPtr(body["emit_window_start"])), nullStr(asStringPtr(body["emit_window_end"])),
 		nullStr(asStringPtr(body["emit_pool_command"])), emitLimits, nullStr(emitRunOn),
@@ -309,6 +307,9 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	for k, v := range body {
 		merged[k] = v
 	}
+	if err := validateTemplateSchedule(merged); err != nil {
+		return TemplateRead{}, errBad(err.Error())
+	}
 	// pinned and overlay_hidden share a column: the one just switched on wins.
 	if asBool(body["overlay_hidden"], false) {
 		merged["pinned"] = false
@@ -329,7 +330,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 	}
 	_, err = s.DB.ExecContext(ctx, `
 		UPDATE questtemplate SET
-			title=?, description=?, pinned=?, sort_order=?, duration_seconds=?, expire_on_deadline=?, freq=?, weekdays=?,
+			title=?, description=?, pinned=?, sort_order=?, duration_seconds=?, expire_on_deadline=?, freq=?, weekdays=?, monthdays=?, cycle_length=?, cycle_start=?, cycle_days=?,
 			enabled=?, timezone=?, deadline_time=?, significance=?, emit_mode=?, emit_chance=?,
 			emit_window_start=?, emit_window_end=?, emit_pool_command=?, emit_limits=?, emit_run_on=?,
 			category_id=?, questline_id=?,
@@ -338,7 +339,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, body map[string]an
 		asStringDef(merged["title"], ""), asStringDef(merged["description"], ""),
 		journal.PinState(asBool(merged["pinned"], false), asBool(merged["overlay_hidden"], false)), asInt(merged["sort_order"], 0),
 		nullInt(asIntPtr(merged["duration_seconds"])), boolInt(asBool(merged["expire_on_deadline"], cur.ExpireOnDeadline)), asStringDef(merged["freq"], "daily"),
-		asStringDef(merged["weekdays"], "0,1,2,3,4,5,6"), boolInt(asBool(merged["enabled"], true)),
+		asStringDef(merged["weekdays"], "0,1,2,3,4,5,6"), asStringDef(merged["monthdays"], "1"), asInt(merged["cycle_length"], 4), asStringDef(merged["cycle_start"], ""), asStringDef(merged["cycle_days"], "1,2"), boolInt(asBool(merged["enabled"], true)),
 		asStringDef(merged["timezone"], "Europe/Moscow"), nullStr(asStringPtr(merged["deadline_time"])),
 		asStringDef(merged["significance"], "common"), asStringDef(merged["emit_mode"], "fixed"),
 		asFloat(merged["emit_chance"], 1.0), nullStr(asStringPtr(merged["emit_window_start"])),

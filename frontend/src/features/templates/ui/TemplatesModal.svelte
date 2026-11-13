@@ -2,7 +2,6 @@
   import DeadlineOptions from '@/shared/ui/DeadlineOptions.svelte'
   import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import {
-    WEEKDAY_LABELS,
     QUEST_SIGNIFICANCES,
     copyTemplate,
     emitTemplate, emitTemplateTest,
@@ -28,7 +27,7 @@
   import { questCatalog, templateStepDraft, templateStepsPayload, StepsEditor } from '@/entities/quest'
   import type { TemplateRead } from '@/shared/api/automation.gen'
   import Icon from '@/shared/ui/Icon.svelte'
-  import { MentionTextarea, WORKDAYS, daysLabel, parseClock, parseLimits, parseWeekdays } from '@/entities/template'
+  import { MentionTextarea, PeriodPicker, WORKDAYS, scheduleLabel, parseSelectedDays, parseClock, parseLimits, parseWeekdays } from '@/entities/template'
   import OptionPills from '@/shared/ui/OptionPills.svelte'
   import Picker from '@/shared/ui/Picker.svelte'
   import FormSection from '@/shared/ui/FormSection.svelte'
@@ -45,7 +44,6 @@
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import TemplateList from './TemplateList.svelte'
-  import TemplatePage from './TemplatePage.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { untrack } from 'svelte'
   import { loadRunners, runnersList } from '@/entities/runner'
@@ -79,6 +77,10 @@
   let enabled = $state(true)
   let automated = $state(false)
   let freq = $state('daily')
+  let monthdays = $state(new Set([1]))
+  let cycleLength = $state(4)
+  let cycleStart = $state('')
+  let cycleDays = $state(new Set([1,2]))
   let emitMode = $state('fixed')
   /** Empty string = no category / no questline. */
   let categoryId = $state('')
@@ -122,15 +124,10 @@
   let lineTouched = $state(false)
   let catTouched = $state(false)
   let suggestIndex = $derived(open && suggestOn ? buildSuggestIndex(quests) : null)
-  const FREQ_OPTIONS = [
-    { id: 'daily', label: 'каждый день' },
-    { id: 'weekly', label: 'по дням недели' },
-  ]
   const MODE_OPTIONS = [
     { id: 'fixed', label: 'по расписанию' },
     { id: 'surprise', label: 'случайно' },
   ]
-  const DAY_OPTIONS = WEEKDAY_LABELS.map((d) => ({ id: String(d.id), label: d.label }))
   const SIG_OPTIONS = QUEST_SIGNIFICANCES.map((s) => ({ ...s, kind: ('sig' as const) }))
   let isSurprise = $derived(emitMode === 'surprise')
   let hasDeadline = $derived(!isSurprise && Boolean(deadlineHour))
@@ -140,7 +137,6 @@
       void loadRunners()
     }
   })
-  let weekdayIds = $derived(new Set([...weekdays].map(String)))
   let lineOptions = $derived(
     questlines.map((l) => ({ id: String(l.id), label: l.title, color: l.color || '' })),
   )
@@ -151,7 +147,7 @@
     categoryId === '' ? null : categories.find((c) => String(c.id) === categoryId) ?? null,
   )
   let scheduleSummary = $derived.by(() => {
-    const days = freq === 'weekly' ? daysLabel(weekdays) : 'каждый день'
+    const days = scheduleLabel({freq,weekdays:[...weekdays].join(','),monthdays:[...monthdays].join(','),cycle_length:cycleLength,cycle_start:cycleStart,cycle_days:[...cycleDays].join(',')})
     const dur = durationLabel(durationHours, durationMinutes)
     const parts = [days]
     if (isSurprise) {
@@ -204,6 +200,10 @@
     enabled = t ? t.enabled !== false : true
     automated = Boolean(t?.automated)
     freq = t?.freq ?? 'daily'
+    monthdays = parseSelectedDays(t?.monthdays ?? '1',31)
+    cycleLength = t?.cycle_length ?? 4
+    cycleStart = t?.cycle_start || new Date().toLocaleDateString('sv-SE')
+    cycleDays = parseSelectedDays(t?.cycle_days ?? '1,2',cycleLength)
     emitMode = t?.emit_mode === 'surprise' ? 'surprise' : 'fixed'
     categoryId = t?.category_id != null ? String(t.category_id) : ''
     questlineId = t?.questline_id != null ? String(t.questline_id) : ''
@@ -301,6 +301,7 @@
   }
 
   function handleClose() {
+    if (saving || deleting) return
     if (view !== 'list') backToList()
     else onClose()
   }
@@ -317,15 +318,6 @@
     resetForm(t)
   }
 
-  function toggleDay(idStr: any) {
-    const id = Number(idStr)
-    const next = new Set(weekdays)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    if (next.size === 0) next.add(id)
-    weekdays = next
-  }
-
   function buildPayload() {
     const duration_seconds = partsToSeconds(durationHours, durationMinutes)
     const common = {
@@ -338,6 +330,10 @@
       significance,
       freq,
       weekdays: [...weekdays].sort((a, b) => a - b).join(','),
+      monthdays: [...monthdays].sort((a,b)=>a-b).join(','),
+      cycle_length: cycleLength,
+      cycle_start: cycleStart,
+      cycle_days: [...cycleDays].filter(d=>d<=cycleLength).sort((a,b)=>a-b).join(','),
       timezone: timezone.trim() || LOCAL_TZ,
       // A script takes the command's place; the command that was typed before scripts stays only while no script is chosen.
       emit_pool_command: emitScript ? null : emitPoolCommand.trim() || null,
@@ -377,6 +373,11 @@
     event.preventDefault()
     if (!title.trim()) {
       formError = 'Нужен заголовок'
+      return
+    }
+    if ((freq === 'monthly' && !monthdays.size) || (freq === 'cycle' && ![...cycleDays].some(d=>d<=cycleLength))) {
+      formError = 'Выберите хотя бы один день выпуска'
+      secSchedule = true
       return
     }
     let payload
@@ -502,14 +503,13 @@
 </script>
 
 {#snippet content()}
-  {#if !embedded}
   <ModalHead
     id="templates-modal-title"
     title={view === 'list' ? 'Шаблоны' : view === 'create' ? 'Новый шаблон' : 'Редактировать шаблон'}
     icon="repeat"
     onClose={handleClose}
+    closeDisabled={saving || deleting}
   />
-  {/if}
   {#if view === 'list'}
     <TemplateList {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
   {:else}
@@ -599,12 +599,7 @@
       </div>
 
       <FormSection title="Расписание" summary={scheduleSummary} bind:open={secSchedule}>
-        <div class="inline-line">
-          <OptionPills options={FREQ_OPTIONS} bind:value={freq} label="Частота" compact />
-          {#if freq === 'weekly'}
-            <OptionPills options={DAY_OPTIONS} selected={weekdayIds} onToggle={toggleDay} label="Дни недели" compact />
-          {/if}
-        </div>
+        <PeriodPicker bind:freq bind:weekdays bind:monthdays bind:cycleLength bind:cycleStart bind:cycleDays />
         <div class="inline-line">
           <OptionPills options={MODE_OPTIONS} bind:value={emitMode} label="Как появляется" compact />
           <HelpTip label="По расписанию или случайно">
@@ -758,12 +753,11 @@
     </form>
   {/if}
 {/snippet}
-{#if embedded && view === 'list'}
+{#if embedded}
   <TemplateList standalone {error} {loading} {templates} rowMeta={metaOf} onCreate={openCreate} onOpen={openEdit} onMenu={openTemplateMenu} {onEmit} {onCopy} {onToggleEnabled} />
-{:else if embedded}
-  <TemplatePage title={view === 'list' ? 'Шаблоны' : view === 'create' ? 'Новый шаблон' : editing?.title || 'Редактировать шаблон'} onBack={view !== 'list' ? backToList : undefined} busy={saving || deleting}>{@render content()}</TemplatePage>
-{:else}
-  <ModalShell {open} onClose={handleClose} labelledby="templates-modal-title" zIndex={40} maxWidth="36rem">{@render content()}</ModalShell>
+{/if}
+{#if !embedded || view !== 'list'}
+  <ModalShell {open} onClose={handleClose} closeDisabled={saving || deleting} labelledby="templates-modal-title" zIndex={40} maxWidth="52rem">{@render content()}</ModalShell>
 {/if}
 
 <ContextMenu

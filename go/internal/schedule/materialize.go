@@ -72,7 +72,7 @@ func materializeDue(ctx context.Context, st *store.Store, hub *events.Hub, now t
 			}
 		}
 		localNow := now.In(loc)
-		if !templateDueToday(tmpl.Freq, tmpl.Weekdays, localNow) {
+		if !automation.TemplateDueOn(tmpl, localNow) {
 			continue
 		}
 		key := localNow.Format("2006-01-02")

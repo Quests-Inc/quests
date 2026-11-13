@@ -44,3 +44,28 @@ export function parseWeekdays(raw: any) {
   }
   return set.size ? set : new Set(WORKDAYS)
 }
+
+export function parseSelectedDays(raw: string, max: number): Set<number> {
+  return new Set(
+    String(raw)
+      .split(',')
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= max)
+  )
+}
+
+export function scheduleLabel(t: {
+  freq?: string
+  weekdays?: string
+  monthdays?: string
+  cycle_length?: number
+  cycle_start?: string
+  cycle_days?: string
+}) {
+  if (t.freq === 'weekly') return daysLabel(parseWeekdays(t.weekdays))
+  if (t.freq === 'monthly')
+    return `${[...parseSelectedDays(t.monthdays ?? '', 31)].sort((a, b) => a - b).join(', ')} числа каждого месяца`
+  if (t.freq === 'cycle')
+    return `цикл ${t.cycle_length} дн. · дни ${[...parseSelectedDays(t.cycle_days ?? '', t.cycle_length ?? 0)].sort((a, b) => a - b).join(', ')} · с ${t.cycle_start}`
+  return 'каждый день'
+}

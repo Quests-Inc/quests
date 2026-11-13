@@ -70,8 +70,8 @@
     </PageToolbar>
     <PageToolbar>
       <OptionPills options={statusOptions} bind:value={statusFilter} label="Состояние шаблонов" compact wrap />
-      <Picker options={[{id:"daily",label:"Каждый день"},{id:"weekly",label:"По дням недели"}]} value={frequency === "all" ? "" : frequency} onChange={v => frequency = v || "all"} noneLabel="Любое расписание" label="Периодичность" />
-      <span class="hint" role="status">{shown.length} из {templates.length}</span>
+      <Picker options={[{id:"daily",label:"День"},{id:"weekly",label:"Неделя"},{id:"monthly",label:"Месяц"},{id:"cycle",label:"Свой промежуток"}]} value={frequency === "all" ? "" : frequency} onChange={v => frequency = v || "all"} noneLabel="Любое расписание" label="Периодичность" />
+      <span class="hint tpl-count" role="status">{shown.length} из {templates.length}</span>
     </PageToolbar>
 {/snippet}
 {#snippet rows()}
@@ -79,7 +79,7 @@
     {#if loading}
       <p class="hint">Загрузка…</p>
     {:else if templates.length === 0}
-      <p class="hint">Пока нет шаблонов — создай дейлик или еженедельный.</p>
+      <p class="hint">Пока нет шаблонов — создайте первый.</p>
     {:else if shown.length === 0}
       <p class="hint">Шаблоны не найдены. Измените поиск или фильтры.</p>
       <button type="button" class="btn btn--ghost" onclick={() => { search = ''; statusFilter = 'all'; frequency = 'all' }}>Сбросить фильтры</button>
@@ -158,6 +158,9 @@
 {/if}
 
 <style>
+  .tpl-count { margin-left:auto; text-align:right; white-space:nowrap; }
+  .tpl-row__actions :global(.btn) { background:transparent; border-color:transparent; box-shadow:none; }
+  .tpl-row__actions :global(.btn:hover) { background:var(--color-bg-hover); }
   .tpl-content { padding:0.5rem 0; font-size:var(--text-sm); }
   .tpl-row__title { overflow-wrap: anywhere; }
   @container (max-width: 40rem) {

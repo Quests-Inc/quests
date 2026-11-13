@@ -1,5 +1,5 @@
 // Подписи строки шаблона в списке и пункты его контекстного меню — чистые функции.
-import { daysLabel, parseWeekdays } from '@/entities/template'
+import { scheduleLabel } from '@/entities/template'
 import type { TemplateRead } from '@/shared/api/automation.gen'
 import { QUEST_SIGNIFICANCES } from '@/shared/api/questConsts.ts'
 import { plural } from '@/shared/lib/duration.ts'
@@ -14,7 +14,7 @@ export function streakLabel(st: Streak | undefined): string {
 
 export function rowMeta(t: TemplateRead, streak?: Streak): string {
   const mode = t.emit_mode === 'surprise' ? 'случайно' : 'по расписанию'
-  const days = t.freq === 'weekly' ? daysLabel(parseWeekdays(t.weekdays)) : 'каждый день'
+  const days = scheduleLabel(t)
   return [
     days,
     mode,

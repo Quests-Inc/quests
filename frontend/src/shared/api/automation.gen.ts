@@ -51,6 +51,10 @@ export interface TemplateRead {
   sort_order: number /* int */;
   freq: string;
   weekdays: string;
+  monthdays: string;
+  cycle_length: number /* int */;
+  cycle_start: string;
+  cycle_days: string;
   enabled: boolean;
   timezone: string;
   significance: string;

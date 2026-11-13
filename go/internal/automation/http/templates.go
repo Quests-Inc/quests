@@ -3,6 +3,7 @@ package automationhttp
 import (
 	"encoding/json"
 	"errors"
+	"github.com/quests-inc/quests/go/internal/platform/apperr"
 	"github.com/quests-inc/quests/go/internal/platform/trashrow"
 	"net/http"
 	"strconv"
@@ -67,6 +68,10 @@ func (h *Handler) patchTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row, err := h.Store.UpdateTemplate(r.Context(), id, body)
+	if apperr.IsBad(err) {
+		writeErr(w, 400, err.Error())
+		return
+	}
 	if errors.Is(err, automation.ErrNotFound) {
 		writeErr(w, 404, "Template not found")
 		return

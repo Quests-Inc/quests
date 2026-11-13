@@ -22,6 +22,10 @@ type TemplateRow struct {
 	ExpireOnDeadline bool
 	Freq             string
 	Weekdays         string
+	Monthdays        string
+	CycleLength      int
+	CycleStart       string
+	CycleDays        string
 	Enabled          bool
 	Timezone         string
 	DeadlineTime     sql.NullString
@@ -53,7 +57,7 @@ type TemplateStepRow struct {
 	ScriptID             sql.NullInt64
 }
 
-const templateRowColumns = `id, title, description, pinned, sort_order, duration_seconds, expire_on_deadline, freq, weekdays,
+const templateRowColumns = `id, title, description, pinned, sort_order, duration_seconds, expire_on_deadline, freq, weekdays, monthdays, cycle_length, cycle_start, cycle_days,
 			enabled, timezone, deadline_time, significance, emit_mode, emit_chance,
 			emit_window_start, emit_window_end, emit_pool_command, emit_limits, emit_run_on,
 			category_id, questline_id, automated`
@@ -64,7 +68,7 @@ func scanTemplateRow(r rowScan) (TemplateRow, error) {
 	var t TemplateRow
 	var pinned, enabled, automated int
 	if err := r.Scan(
-		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.ExpireOnDeadline, &t.Freq, &t.Weekdays,
+		&t.ID, &t.Title, &t.Description, &pinned, &t.SortOrder, &t.DurationSeconds, &t.ExpireOnDeadline, &t.Freq, &t.Weekdays, &t.Monthdays, &t.CycleLength, &t.CycleStart, &t.CycleDays,
 		&enabled, &t.Timezone, &t.DeadlineTime, &t.Significance, &t.EmitMode, &t.EmitChance,
 		&t.EmitWindowStart, &t.EmitWindowEnd, &t.EmitPoolCommand, &t.EmitLimits, &t.EmitRunOn,
 		&t.CategoryID, &t.QuestlineID, &automated,

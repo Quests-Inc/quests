@@ -17,8 +17,12 @@ import (
 type templateFields struct {
 	Title            *string        `json:"title,omitempty"`
 	Description      *string        `json:"description,omitempty" desc:"markdown"`
-	Freq             *string        `json:"freq,omitempty" enum:"daily,weekly"`
+	Freq             *string        `json:"freq,omitempty" enum:"daily,weekly,monthly,cycle"`
 	Weekdays         *string        `json:"weekdays,omitempty" desc:"weekly: comma list, 0=Mon..6=Sun"`
+	Monthdays        *string        `json:"monthdays,omitempty" desc:"monthly: comma list of dates 1..31; nonexistent dates are skipped"`
+	CycleLength      *int           `json:"cycle_length,omitempty" desc:"cycle: length in calendar days, 1..366"`
+	CycleStart       *string        `json:"cycle_start,omitempty" desc:"cycle: day 1 as YYYY-MM-DD in template timezone; no emission before it"`
+	CycleDays        *string        `json:"cycle_days,omitempty" desc:"cycle: comma list of emitting day numbers, 1..cycle_length; 2/2 uses length=4, days=1,2"`
 	Timezone         *string        `json:"timezone,omitempty"`
 	EmitMode         *string        `json:"emit_mode,omitempty" enum:"fixed,surprise"`
 	EmitChance       *float64       `json:"emit_chance,omitempty"`
@@ -89,7 +93,7 @@ func templateTools(c *Client) []Tool {
 					break
 				}
 				items = append(items, map[string]any{
-					"id": t["id"], "title": t["title"], "freq": t["freq"], "weekdays": t["weekdays"], "enabled": t["enabled"],
+					"id": t["id"], "title": t["title"], "freq": t["freq"], "weekdays": t["weekdays"], "monthdays": t["monthdays"], "cycle_length": t["cycle_length"], "cycle_start": t["cycle_start"], "cycle_days": t["cycle_days"], "enabled": t["enabled"],
 					"emit_mode": t["emit_mode"], "emit_run_on": t["emit_run_on"],
 					"has_command":  strings.TrimSpace(str(t["emit_pool_command"])) != "",
 					"questline_id": t["questline_id"], "significance": t["significance"],
@@ -134,7 +138,7 @@ func templateTools(c *Client) []Tool {
 		Questline string   `json:"questline" desc:"REQUIRED: id or name of the project (list_questlines), or \"none\" to deliberately leave it standalone"`
 		Steps     []stepIn `json:"steps,omitempty"`
 	}
-	create := Typed("create_template", "Create a recurring template (daily/weekly), optionally emitting its quest from a command.",
+	create := Typed("create_template", "Create a recurring template (daily/weekly/monthly/anchored cycle), optionally emitting its quest from a command.",
 		func(ctx context.Context, a createArgs) (any, error) {
 			if strings.TrimSpace(a.Questline) == "" {
 				return nil, &Err{422, `questline is required: pass the id or name of the project (see list_questlines) or "none" to leave the template standalone on purpose`}

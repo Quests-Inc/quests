@@ -1,44 +1,15 @@
 package schedule
 
 import (
+	"github.com/quests-inc/quests/go/internal/automation"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func templateDueToday(freq, weekdays string, localNow time.Time) bool {
-	if strings.ToLower(freq) == "daily" || freq == "" {
-		return true
-	}
-	days := parseWeekdays(weekdays)
-	if len(days) == 0 {
-		return true
-	}
-	// Python weekday(): Mon=0 … Sun=6. Go: Sun=0 … Sat=6.
-	py := (int(localNow.Weekday()) + 6) % 7
-	_, ok := days[py]
-	return ok
-}
-
-// TemplateDueTodayForTest exports weekday matching for unit tests.
+// TemplateDueTodayForTest preserves the weekday helper used by existing tests.
 func TemplateDueTodayForTest(freq, weekdays string, localNow time.Time) bool {
-	return templateDueToday(freq, weekdays, localNow)
-}
-
-func parseWeekdays(raw string) map[int]struct{} {
-	out := map[int]struct{}{}
-	for _, part := range strings.Split(raw, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		n, err := strconv.Atoi(part)
-		if err != nil || n < 0 || n > 6 {
-			continue
-		}
-		out[n] = struct{}{}
-	}
-	return out
+	return automation.TemplateDueOn(automation.TemplateRow{Freq: freq, Weekdays: weekdays}, localNow)
 }
 
 func parseClock(raw string) (hour, min, sec int, ok bool) {
