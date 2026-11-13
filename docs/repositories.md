@@ -66,3 +66,14 @@ once, leaving capacity for other operations under the shared egress limit.
 Provider limits still apply; missing history is marked as partial rather than
 replaced with the branch-tip date. Remote URL and default branch can be edited
 in repository settings, with the same provider URL validation as creation.
+
+External tokens are edited in the main repository settings dialog. A blank field
+preserves the current encrypted token, a new value replaces it, and a separate
+checkbox explicitly removes it. The stored value is never returned to the form.
+The dialog includes provider-specific token creation instructions: GitHub
+fine-grained PAT with selected repository + Contents read-only; GitLab read_api
+for the branches/commits/tree API endpoints. Private repositories work when the
+token has access (including required organization approval). Repository tree and
+history are shared with the workspace's members; this token is not a per-member
+provider authorization. Live private-repository verification requires a user's
+authorized token and has not been performed.

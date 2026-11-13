@@ -167,3 +167,51 @@ test('настройки репозитория предупреждают о с
   expect(requests).toHaveLength(1)
   expect(JSON.parse(requests[0].body)).toEqual({ title: 'Mini', slug: 'new-name', branch: 'main' })
 })
+
+test('токен в настройках: пустое поле сохраняет, новое заменяет, галочка удаляет', async () => {
+  for (const action of ['keep', 'replace', 'remove']) {
+    let saved: Record<string, unknown> | null = null
+    globalThis.fetch = (async (input, init) => {
+      if (init?.method === 'PATCH') saved = JSON.parse(String(init.body))
+      return new Response(
+        JSON.stringify(
+          String(input).includes('/browse')
+            ? { branches: ['main'], commits: [], tree: [], empty: true }
+            : {
+                items: [
+                  { ...repo, kind: 'github', url: 'https://github.com/team/project', slug: 'mini', has_token: true },
+                ],
+                quota_bytes: 1,
+              }
+        )
+      )
+    }) as typeof fetch
+    const target = document.createElement('div')
+    document.body.append(target)
+    const app = mount(RepositoriesBlock, { target })
+    await settle()
+    flushSync(() => target.querySelector<HTMLButtonElement>('.repo-row')!.click())
+    await settle()
+    flushSync(() => [...target.querySelectorAll('button')].find((b) => b.textContent === 'Настройки')!.click())
+    await settle()
+    const dialog = document.querySelector('[role="dialog"]')!
+    const field = dialog.querySelector<HTMLInputElement>('[aria-label="Токен доступа"]')!
+    expect(field.value).toBe('')
+    expect(field.type).toBe('password')
+    if (action === 'replace')
+      flushSync(() => {
+        field.value = 'fixture-read-token'
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+    if (action === 'remove') flushSync(() => dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    flushSync(() =>
+      dialog.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    )
+    await settle()
+    expect(saved).not.toBeNull()
+    if (action === 'keep') expect(Object.hasOwn(saved!, 'token')).toBe(false)
+    else expect(saved!['token']).toBe(action === 'replace' ? 'fixture-read-token' : '')
+    await unmount(app)
+    target.remove()
+  }
+})
