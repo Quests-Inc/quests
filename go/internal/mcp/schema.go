@@ -82,6 +82,9 @@ func objectSchema(t reflect.Type) map[string]any {
 }
 
 func typeSchema(t reflect.Type) map[string]any {
+	if t == reflect.TypeOf(json.RawMessage{}) {
+		return map[string]any{}
+	}
 	switch t.Kind() {
 	case reflect.Pointer:
 		return typeSchema(t.Elem())

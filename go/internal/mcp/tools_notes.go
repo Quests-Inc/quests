@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,7 +14,7 @@ func noteTools(c *Client) []Tool {
 	type listArgs struct {
 		ParentID   *int64 `json:"parent_id,omitempty" desc:"children of this note"`
 		CategoryID *int64 `json:"category_id,omitempty" desc:"everything below this CATEGORY note"`
-		Flags      string `json:"flags,omitempty" desc:"comma list; minus = without: outdated, readme, private, category, pinned, check (e.g. -outdated,-private)"`
+		Flags      string `json:"flags,omitempty" desc:"comma list; minus = without: outdated, readme, private, category, sample, pinned, check (e.g. -outdated,-private)"`
 		Sort       string `json:"sort,omitempty" enum:"tree,popular"`
 		Limit      int    `json:"limit,omitempty" desc:"default 20, max 100"`
 		Cursor     string `json:"cursor,omitempty" desc:"next from the previous page"`
@@ -125,6 +126,7 @@ func noteTools(c *Client) []Tool {
 		IsReadme    *bool   `json:"is_readme,omitempty"`
 		IsPrivate   *bool   `json:"is_private,omitempty" desc:"hidden from MCP readers"`
 		IsCategory  *bool   `json:"is_category,omitempty"`
+		IsSample    *bool   `json:"is_sample,omitempty"`
 		SortOrder   *int    `json:"sort_order,omitempty"`
 		NoCategory  bool    `json:"no_category,omitempty" desc:"allow a top-level note although categories exist"`
 	}
@@ -146,6 +148,7 @@ func noteTools(c *Client) []Tool {
 			setIf(body, "is_readme", a.IsReadme)
 			setIf(body, "is_private", a.IsPrivate)
 			setIf(body, "is_category", a.IsCategory)
+			setIf(body, "is_sample", a.IsSample)
 			setIf(body, "sort_order", a.SortOrder)
 			var n struct {
 				ID int64 `json:"id"`
@@ -272,19 +275,19 @@ func noteTools(c *Client) []Tool {
 
 	type flagArgs struct {
 		ID     int64  `json:"id"`
-		Flag   string `json:"flag" enum:"outdated,pinned,readme,private,category"`
+		Flag   string `json:"flag" enum:"outdated,pinned,readme,private,category,sample"`
 		Value  *bool  `json:"value,omitempty" desc:"default true"`
 		Reason string `json:"reason,omitempty" desc:"for outdated: why the note is stale"`
 	}
-	flag := Typed("set_note_flag", "Set or clear a note flag: outdated (stale; give a reason), pinned, readme, private (hidden from MCP), category (folder).",
+	flag := Typed("set_note_flag", "Set or clear a note flag: outdated (stale; give a reason), pinned, readme, private (hidden from MCP), category (folder), sample (reusable note blueprint; copy with duplicate_note).",
 		func(ctx context.Context, a flagArgs) (any, error) {
 			on := a.Value == nil || *a.Value
 			var err error
 			switch a.Flag {
 			case "outdated":
 				err = c.Do(ctx, http.MethodPut, fmt.Sprintf("/api/notes/%d/outdated", a.ID), nil, map[string]any{"outdated": on, "reason": a.Reason}, nil)
-			case "pinned", "readme", "private", "category":
-				field := map[string]string{"pinned": "pinned", "readme": "is_readme", "private": "is_private", "category": "is_category"}[a.Flag]
+			case "pinned", "readme", "private", "category", "sample":
+				field := map[string]string{"pinned": "pinned", "readme": "is_readme", "private": "is_private", "category": "is_category", "sample": "is_sample"}[a.Flag]
 				err = c.Do(ctx, http.MethodPatch, fmt.Sprintf("/api/notes/%d", a.ID), nil, map[string]any{field: on}, nil)
 			default:
 				err = &Err{422, fmt.Sprintf("unknown flag %q", a.Flag)}
@@ -329,7 +332,27 @@ func noteTools(c *Client) []Tool {
 		return ok(ctx, c, a.ID, map[string]any{"check": res}), nil
 	})
 
-	return []Tool{list, get, search, cats, create, update, del, trash, flag, rate, check, runNow}
+	type duplicateArgs struct {
+		SourceID int64           `json:"source_id"`
+		Title    *string         `json:"title,omitempty"`
+		ParentID json.RawMessage `json:"parent_id,omitempty"`
+	}
+	duplicate := Typed("duplicate_note", "Atomically copy note content, appearance and own typed values, formulas and roll provenance without rerolling. Private sources/parents are forbidden. Flags (pin/category/readme), secrets and checks are not copied. Attachment refs keep existing workspace ids; source files must be retained. parent_id: omitted preserves parent, null moves to root. Returns the new note id, workspace and placement.", func(ctx context.Context, a duplicateArgs) (any, error) {
+		var res map[string]any
+		body := map[string]any{}
+		if a.Title != nil {
+			body["title"] = *a.Title
+		}
+		if len(a.ParentID) > 0 {
+			body["parent_id"] = a.ParentID
+		}
+		if err := c.Do(ctx, http.MethodPost, "/api/notes/"+itoa(a.SourceID)+"/duplicate", nil, body, &res); err != nil {
+			return nil, err
+		}
+		res["workspace"] = c.Workspace(ctx)
+		return res, nil
+	})
+	return []Tool{list, get, search, cats, create, update, del, trash, flag, rate, check, runNow, duplicate}
 }
 
 // setIf puts v under key when the pointer is set.

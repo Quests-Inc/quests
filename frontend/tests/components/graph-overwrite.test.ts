@@ -135,3 +135,21 @@ test('an upload completing after a switch is added to its original board', async
   expect(db.get(Number(origin))?.state.positions['attachment:55']).toEqual({ x: 123, y: 456 })
   layouts.dispose()
 })
+
+test('saved layout URLs omit tab, restore on reload, and temporary boards restore tab', async () => {
+  history.replaceState(null, '', '/?tab=graph')
+  const layouts = createGraphLayouts(map().deps, { rememberActive: true })
+  await layouts.newEmpty('URL board')
+  const id = layouts.current
+  expect(location.search).toBe(`?layout=${id}`)
+  history.replaceState(null, '', `/?tab=graph&layout=${id}`)
+  const restored = createGraphLayouts(map().deps, { rememberActive: true })
+  await restored.load()
+  expect(restored.current).toBe(id)
+  expect(location.search).toBe(`?layout=${id}`)
+  await restored.newTemporary()
+  expect(location.search).toBe('?tab=graph')
+  restored.dispose()
+  layouts.dispose()
+  history.replaceState(null, '', '/')
+})

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"io"
 	"os"
 	"path/filepath"
@@ -88,7 +89,7 @@ func (h *Handler) importRepositories(ctx context.Context, entries map[string]*zi
 				return err
 			}
 		} else {
-			if file.UncompressedSize64 > uint64(repository.DefaultQuota) {
+			if file.UncompressedSize64 > uint64(limits.Get("git_bytes")) {
 				return fmt.Errorf("репозиторий превышает квоту")
 			}
 			temp, err := os.MkdirTemp("", "quests-repo-import-")
@@ -106,7 +107,7 @@ func (h *Handler) importRepositories(ctx context.Context, entries map[string]*zi
 				if err != nil {
 					return err
 				}
-				_, err = io.Copy(f, io.LimitReader(reader, repository.DefaultQuota+1))
+				_, err = io.Copy(f, io.LimitReader(reader, limits.Get("git_bytes")+1))
 				cerr := f.Close()
 				if err != nil {
 					return err
@@ -129,7 +130,7 @@ func (h *Handler) importRepositories(ctx context.Context, entries map[string]*zi
 			return err
 		}
 		total += size
-		if total > repository.DefaultQuota {
+		if total > limits.Get("git_bytes") {
 			return fmt.Errorf("репозитории архива превышают квоту")
 		}
 	}

@@ -12,7 +12,7 @@ import {
   deleteWorkspace,
   importWorkspace,
 } from '@/shared/api/client.ts'
-import { replaceSearch, searchAfterWorkspaceSwitch } from '@/shared/lib/urlSearch.ts'
+import { replaceSearch, searchAfterWorkspaceSwitch, navigationScope } from '@/shared/lib/urlSearch.ts'
 
 /** Workspaces of the signed-in account, shared by the settings sections.
  * Switching / creating / deleting reloads the page: every list in the app belongs to one workspace. */
@@ -34,6 +34,7 @@ export const wsx = $state({
 export const env = { reload: () => location.reload(), origin: () => location.origin }
 
 function reloadWorkspace() {
+  navigationScope(true)
   replaceSearch(searchAfterWorkspaceSwitch(location.search))
   env.reload()
 }

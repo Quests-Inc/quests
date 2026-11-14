@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"os"
 	"strconv"
 	"strings"
@@ -55,6 +56,7 @@ const adminUsage = `quests-server admin commands (run on the host with access to
   quests-server egress log [<id> [n]]    the last n outgoing requests (default 50), of one workspace or of all
   quests-server backup-now               run one DB+attachments backup tick now
   quests-server backups                  list the backups (newest first: file, size, where it went, errors)
+  quests-server limits list|set <key> <integer>|reset <key>  persistent operational limits (list includes units/ranges/sources)
   quests-server schema                   print the database's schema revision and the one this binary expects
                                          (the server migrates the schema itself when it starts)
 
@@ -71,7 +73,7 @@ func runAdmin(args []string) bool {
 	case "schema":
 		runSchema()
 		return true
-	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "egress", "backup-now", "backups", "workspace":
+	case "useradd", "passwd", "users", "2fa-reset", "secrets-check", "token", "runner", "egress", "backup-now", "backups", "workspace", "limits":
 	case "help", "-h", "--help":
 		fmt.Print(adminUsage)
 		return true
@@ -81,6 +83,12 @@ func runAdmin(args []string) bool {
 
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
+	limits.Configure(cfg.DataDir)
+	if args[0] == "limits" {
+		limits.Configure(cfg.DataDir)
+		runLimits(args[1:])
+		return true
+	}
 	// Admin commands run as the database owner: they are the ones allowed to change what the API role cannot.
 	db.SkipAppRole = true
 	dbURL, err := cfg.RequireDatabaseURL()

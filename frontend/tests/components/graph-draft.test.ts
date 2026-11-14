@@ -1,5 +1,6 @@
 import { beforeEach, expect, mock, test } from 'bun:test'
 
+let draftRequest: (() => Promise<any>) | null = null
 let serverOps: any[] = []
 let serverRoots: any[] = []
 const calls: string[] = []
@@ -8,7 +9,7 @@ let commitError: any = null
 
 mock.module('@/shared/api/graph.ts', () => ({
   getGraphDraftScope: () => '',
-  getGraphDraft: async () => ({ ops: serverOps, roots: serverRoots }),
+  getGraphDraft: async () => (draftRequest ? draftRequest() : { ops: serverOps, roots: serverRoots }),
   addGraphDraftOp: async (kind: string, payload: unknown) => {
     const op = { id: serverOps.length + 1, kind, payload }
     serverOps = [...serverOps, op]
@@ -53,6 +54,7 @@ function make(center = { type: 'quest', id: 5 }) {
 }
 
 beforeEach(() => {
+  draftRequest = null
   serverOps = []
   serverRoots = []
   calls.length = 0
@@ -123,4 +125,18 @@ test('askDrop: с зависимыми — вопрос, без — сразу; 
   expect(gd.cancelAsk).toBe(false)
   expect(state.resets).toBe(1)
   expect(gd.draft.ops).toEqual([])
+})
+
+test('a stale draft response cannot remove a newly added card', async () => {
+  const { gd } = make()
+  const responses: ((value: unknown) => void)[] = []
+  draftRequest = () => new Promise((resolve) => responses.push(resolve))
+  const old = gd.load()
+  const fresh = gd.load()
+  const op = { id: 1, kind: 'create_note', payload: { fields: { title: 'New' } } }
+  responses[1]({ ops: [op], roots: [] })
+  await fresh
+  responses[0]({ ops: [], roots: [] })
+  await old
+  expect(gd.draft.ops).toEqual([op])
 })

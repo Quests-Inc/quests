@@ -21,6 +21,7 @@ type Row = {
   pinned?: boolean
   is_private?: boolean
   is_category?: boolean
+  is_sample?: boolean
   outdated?: boolean
   sort_order?: number
 }
@@ -161,12 +162,13 @@ export function noteMenuItems({
         { id: 'pin', label: note?.pinned ? 'Снять закреп' : 'Закрепить' },
         { id: 'readme', label: note?.is_readme ? 'Снять «к прочтению»' : 'Пометить «к прочтению»' },
         { id: 'private', label: note?.is_private ? 'Снять приватность' : 'Сделать приватной' },
+        { id: 'sample', label: note?.is_sample ? 'Снять «Образец»' : 'Сделать образцом' },
         { id: 'category', label: note?.is_category ? 'Снять категорию' : 'Сделать категорией' },
         { id: 'outdated', label: note?.outdated ? 'Снять «устарела»' : 'Пометить «устарела»' },
       ],
     },
     { id: 'add-child', label: 'Добавить дочернюю' },
-    { id: 'duplicate', label: 'Дублировать' },
+    { id: 'duplicate', label: note?.is_sample ? 'Создать по образцу' : 'Дублировать' },
     { id: 'move', label: 'Переместить', children: moveTargets, search: moveSearch },
     {
       id: 'export',

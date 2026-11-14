@@ -279,3 +279,37 @@ test('готовность поля не запускает повторную �
     dispose()
   }
 })
+
+test('focus moves the camera to the added card over 500 ms and keeps the zoom', async () => {
+  const originalRaf = globalThis.requestAnimationFrame
+  const originalCancel = globalThis.cancelAnimationFrame
+  let callback: FrameRequestCallback | null = null
+  globalThis.requestAnimationFrame = (cb) => {
+    callback = cb
+    return 1
+  }
+  globalThis.cancelAnimationFrame = () => {
+    callback = null
+  }
+  try {
+    const { stage, setCam, cam } = make()
+    stage.compose()
+    await flush()
+    setCam({ x: -500, y: -200, k: 0.5 })
+    stage.focusNode('quest:1')
+    const t = performance.now()
+    expect(cam()).toEqual({ x: -500, y: -200, k: 0.5 })
+    callback!(t + 250)
+    const halfway = cam()
+    expect(halfway.x).not.toBe(-500)
+    callback!(t + 501)
+    const node = stage.nodeMap.get('quest:1')!
+    expect(cam().x).toBeCloseTo(400 - node.x * 0.5)
+    expect(cam().y).toBeCloseTo(300 - node.y * 0.5)
+    expect(cam().k).toBe(0.5)
+    stage.cancelCamera()
+  } finally {
+    globalThis.requestAnimationFrame = originalRaf
+    globalThis.cancelAnimationFrame = originalCancel
+  }
+})

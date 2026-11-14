@@ -40,5 +40,8 @@ func (s *Store) CopyNoteValues(ctx context.Context, sourceID, targetID int64, hi
 	if err != nil {
 		return err
 	}
+	if err := s.CheckCopiedValueBudget(ctx, tx, SecretOwner{Kind: SecretOwnerNote, ID: targetID}, hidePrivate); err != nil {
+		return err
+	}
 	return tx.Commit()
 }

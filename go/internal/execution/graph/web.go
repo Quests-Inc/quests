@@ -261,7 +261,7 @@ func jsonGetPorts(raw json.RawMessage) ([]Port, []Port, error) {
 	if !p.Type.value() {
 		return nil, nil, fmt.Errorf("параметр %q: int, float, str, bool или doc", "type")
 	}
-	return []Port{req("in", TValue)}, []Port{req("value", p.Type), req("bad", TStr)}, nil
+	return []Port{req("in", TValue), opt("path", TStr), opt("index", TInt)}, []Port{req("value", p.Type), req("bad", TStr)}, nil
 }
 
 func splitJSONPath(path string) ([]string, error) {
@@ -280,10 +280,22 @@ func splitJSONPath(path string) ([]string, error) {
 
 // runJSONGet takes one value out of a JSON document by a dotted path (an object key or an array index) and gives it as the type
 // asked. A path that is not there, or a value of another type, leaves `value` without a token and says why on `bad`.
-func runJSONGet(rs *resolved, in Token) (map[string]Token, error) {
+func runJSONGet(rs *resolved, in Token, paths ...Token) (map[string]Token, error) {
 	var p jsonGetParams
 	if err := strictParams(rs.node.Params, &p); err != nil {
 		return nil, err
+	}
+	for _, t := range paths {
+		if t.Type == TStr {
+			p.Path, _ = t.Value.(string)
+		}
+		if t.Type == TInt {
+			index, ok := t.Value.(int64)
+			if !ok || index < 0 {
+				return nil, fmt.Errorf("index: нужен неотрицательный int")
+			}
+			p.Path += "." + strconv.FormatInt(index, 10)
+		}
 	}
 	segs, err := splitJSONPath(p.Path)
 	if err != nil {

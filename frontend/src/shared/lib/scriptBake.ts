@@ -4,7 +4,7 @@ import { listValues } from '@/shared/api/client.ts'
 import { evalScriptText } from '@/shared/api/scripts.ts'
 
 import { foreignValueRefs } from './markdown.ts'
-import { escapeMdInline, labelParts, MAX_AUTO_SCRIPTS, scriptEmbedRe, scriptFlags } from './scriptRef.ts'
+import { escapeMdInline, labelParts, autoScriptLimit, scriptEmbedRe, scriptFlags } from './scriptRef.ts'
 import { proseValue } from './valueText.ts'
 
 const FENCE = /(```[\s\S]*?```|`[^`]+`)/
@@ -52,7 +52,10 @@ async function bakeChunk(
   for (const m of matches) {
     const flags = scriptFlags(m[3])
     // Click-only: the reader of the file has no click, so it shows what the view shows before one.
-    rendered.set(m.index ?? 0, flags.hide ? '?' : plainLabel(m[2].trim(), values))
+    rendered.set(
+      m.index ?? 0,
+      flags.auto && !picked.includes(m) ? '[лимит автовычислений]' : flags.hide ? '?' : plainLabel(m[2].trim(), values)
+    )
   }
   await mapPool(picked, 4, async (m) => {
     const arg = m[2].trim()
@@ -110,7 +113,7 @@ export async function bakeAutoScripts(source: string, host?: { kind: string; id:
   source = String(source ?? '')
   const values = await exportValues(source, host)
   const parts = source.split(FENCE)
-  let budget = MAX_AUTO_SCRIPTS
+  let budget = autoScriptLimit()
   const out: string[] = []
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i] ?? ''
@@ -122,5 +125,8 @@ export async function bakeAutoScripts(source: string, host?: { kind: string; id:
     budget -= used
     out.push(next)
   }
-  return out.join('')
+  let result = out.join('')
+  if (foreignValueRefs(source, Infinity).length > foreignValueRefs(source).length)
+    result += '\n\n> Достигнут лимит внешних переменных: часть значений не загружена.'
+  return result
 }

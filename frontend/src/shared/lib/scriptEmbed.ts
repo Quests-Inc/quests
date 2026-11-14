@@ -4,7 +4,7 @@ import { rollValue } from '@/shared/api/client.ts'
 import { evalScriptText } from '@/shared/api/scripts.ts'
 
 import { findMarkdownTarget, targetResult, type MarkdownTarget } from './markdownTargets.ts'
-import { labelParts, MAX_AUTO_SCRIPTS, parseScriptHref } from './scriptRef.ts'
+import { labelParts, autoScriptLimit, parseScriptHref } from './scriptRef.ts'
 import { hostKey, touchValues } from './valueLive.svelte.ts'
 
 function valueHost(node: HTMLElement) {
@@ -198,7 +198,10 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
         used++
         continue
       }
-      if (used >= MAX_AUTO_SCRIPTS) continue
+      if (used >= autoScriptLimit()) {
+        a.title = 'Лимит автоматических вычислений достигнут — нажмите для запуска'
+        continue
+      }
       const hit = cache.get(cacheKey(node, parsed))
       if (hit) {
         used++
@@ -218,7 +221,11 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
     for (const a of wait) {
       if (!node.contains(a) || a.dataset.settled) continue
       const parsed = parseScriptHref(a.getAttribute('href') || '')
-      if (!parsed?.auto || used >= MAX_AUTO_SCRIPTS) continue
+      if (!parsed?.auto) continue
+      if (used >= autoScriptLimit()) {
+        a.title = 'Лимит автоматических вычислений достигнут — нажмите для запуска'
+        continue
+      }
       used++
       a.dataset.settled = '1'
       todo.push(a)

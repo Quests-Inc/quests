@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"sort"
 
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -14,8 +15,8 @@ import (
 // Nothing is written when any key, type, formula or total size fails validation.
 func (s *Store) WriteScriptValues(ctx context.Context, o SecretOwner, raw json.RawMessage) ([]StoredValue, error) {
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil || len(fields) == 0 || len(fields) > maxValuesPerOwner {
-		return nil, &ValueError{Msg: "нужен непустой объект, не больше 32 переменных"}
+	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil || len(fields) == 0 || len(fields) > int(limits.Specs["values_own"].Max) {
+		return nil, &ValueError{Msg: "нужен непустой объект в пределах лимита переменных"}
 	}
 	names := make([]string, 0, len(fields))
 	for name := range fields {
@@ -90,6 +91,28 @@ func (s *Store) WriteScriptValues(ctx context.Context, o SecretOwner, raw json.R
 	if err != nil {
 		return nil, err
 	}
+	scoped := *s
+	scoped.valueTx = tx
+	inherited, err := scoped.collectNamedValues(ctx, o, false)
+	if err != nil {
+		return nil, err
+	}
+	effective := map[string]bool{}
+	for _, v := range inherited.Effective {
+		effective[v.Name] = true
+	}
+	oldEffective := len(effective)
+	for _, v := range values {
+		effective[v.Name] = true
+	}
+	if inherited.Truncated || (len(effective) > int(limits.Get("values_effective")) && len(effective) > oldEffective) {
+		return nil, &ValueError{Msg: "превышен лимит эффективных переменных"}
+	}
+	oldCount := len(merged)
+	oldSize := 0
+	for _, n := range merged {
+		oldSize += n
+	}
 	for _, v := range values {
 		if formulas[v.Name] {
 			return nil, &ValueError{Msg: "«" + v.Name + "» — формула: запись её не заменяет"}
@@ -100,8 +123,8 @@ func (s *Store) WriteScriptValues(ctx context.Context, o SecretOwner, raw json.R
 	for _, n := range merged {
 		size += n
 	}
-	if len(merged) > maxValuesPerOwner || size > maxValueBytes {
-		return nil, &ValueError{Msg: "не больше 32 переменных и 8 КБ на сущность"}
+	if (len(merged) > int(limits.Get("values_own")) && len(merged) > oldCount) || (size > int(limits.Get("values_bytes")) && size > oldSize) {
+		return nil, &ValueError{Msg: "превышена квота переменных сущности"}
 	}
 	now := timeutil.ToDBUTC(timeutil.NowUTC())
 	owner, ownerArgs, conflict := "?", []any{o.ID}, fmt.Sprintf("%[1]s, name) WHERE %[1]s IS NOT NULL", col)

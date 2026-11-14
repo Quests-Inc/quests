@@ -59,3 +59,38 @@ change events are emitted only after commit. The single-variable node keeps its 
 «Дублировать» создаёт заметку рядом с исходной и копирует её собственные обычные переменные: типы, текущие значения, формулы и источник повторного броска. Броски заново не выполняются. Унаследованные переменные остаются унаследованными через того же родителя.
 
 Собственные **секреты не копируются**. Секреты родителя и пространства по-прежнему доступны по обычным правилам наследования. Это правило относится к команде дублирования заметки, а не к экспорту/импорту пространства.
+
+## Manual batch upsert
+
+`PUT /api/{notes|quests|steps|questlines|templates}/{id}/values` (or
+`PUT /api/workspace/values`) accepts `{"values":[...]}`. MCP: `set_values(owner, values)`.
+Each row has `name`, explicit `type` (`int`, `float`, `str`, `bool`) and exactly one
+of `value` or a nonempty `formula`. Zero, false and the empty string are literals;
+null is rejected. Duplicate names are errors. Only listed own values change.
+
+The final inherited environment is evaluated once, independent of row order, so
+formulas may refer to a later row. Missing dependencies, cycles, division by zero,
+type/range violations and final quotas roll back the whole transaction. Formula/literal
+replacement is intentional here; automatic `sink.values` retains its stricter policy.
+The owner row is locked, including for single manual writes, rolled values and
+script packages. Untouched values retain their roll provenance; manually written
+values clear it. No rolls or user code execute during this operation.
+
+Response: `{"items":[...]}` in input order, with typed values and computed formula
+results. Validation failures return HTTP 422 with `detail` and, for row failures,
+`error:{index,name,message}` (index -1 identifies an unchanged dependent formula).
+One collection change event is published after commit. Workspace writes still require
+an owner; MCP cannot use this operation on private notes or read private ancestors.
+Body ceiling: 256 KiB; final admission budgets come from [server limits](server-limits.md).
+
+CLI uses the same endpoint, without temporary scripts:
+
+```
+quests --json values set note=123 values.json
+cat values.json | quests values set workspace -
+```
+
+`values.json` is the typed array itself, e.g.
+`[{"name":"hp","type":"int","value":20},{"name":"alive","type":"bool","formula":"hp > 0"}]`.
+Use the normal `--api`/token/workspace configuration. Server validation and the
+single transaction remain authoritative; a failed command does not partially write rows.

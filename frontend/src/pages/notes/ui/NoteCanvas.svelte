@@ -65,7 +65,7 @@
   }: {
     ed: NoteEditor
     selectedId: number | null
-    titleEl?: HTMLInputElement | null
+    titleEl?: HTMLTextAreaElement | null
     editEl?: HTMLTextAreaElement | null
     previewEl?: HTMLDivElement | null
     findOpen?: boolean

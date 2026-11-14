@@ -63,6 +63,8 @@ func Builtin() Registry {
 	add(NodeType{Name: "any_of", Title: "Любой из", Kind: KindControl, Trusted: true, Ports: anyOfPorts})
 	add(NodeType{Name: "all_of", Title: "Каждый из", Kind: KindControl, Trusted: true, Ports: allOfPorts})
 
+	add(NodeType{Name: "constant", Title: "Константа", Kind: KindSource, Trusted: true, Ports: constantPorts})
+	add(NodeType{Name: "convert", Title: "Привести тип", Kind: KindLogic, Trusted: true, Ports: convertPorts})
 	registerEmbed(add)
 	add(NodeType{Name: "json.build", Title: "JSON: собрать", Kind: KindLogic, Trusted: true, Ports: func(p json.RawMessage) ([]Port, []Port, error) { return buildPorts(p, false) }})
 	add(NodeType{Name: "text.build", Title: "Текст: собрать", Kind: KindLogic, Trusted: true, Ports: func(p json.RawMessage) ([]Port, []Port, error) { return buildPorts(p, true) }})

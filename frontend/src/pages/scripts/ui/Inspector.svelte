@@ -1,4 +1,5 @@
 <script lang="ts">
+ import TypedParams from './params/TypedParams.svelte'
   import BuildParams from './params/BuildParams.svelte'
   import MarkdownTableParams from './params/MarkdownTableParams.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -112,6 +113,8 @@
         <BuildParams params={node.params as never} text={node.type === 'text.build'} onChange={set} />
       {:else if node.type === 'markdown.table'}
         <MarkdownTableParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'constant' || node.type === 'convert'}
+        <TypedParams params={node.params as never} constant={node.type === 'constant'} onChange={set} />
       {:else if node.type === 'json.get'}
         <JsonGetParams params={node.params as never} onChange={set} />
       {:else if node.type === 'sink.values'}

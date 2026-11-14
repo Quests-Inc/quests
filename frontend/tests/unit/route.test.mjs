@@ -113,3 +113,14 @@ test('репозиторий определяет вкладку без tab, с�
   at('?repo=-1')
   expect(initialRoute()).toEqual({})
 })
+
+test('layout identifies the graph without tab and stays in its address', () => {
+  at('?layout=1')
+  expect(initialRoute()).toEqual({ view: 'graph' })
+  const sel = { quest: null, note: null, attachment: null, graph: { type: 'note', id: 3 } }
+  expect(searchForView('graph', sel)).toEqual({ layout: 1 })
+  at('?tab=graph&layout=1')
+  expect(searchForView('graph', sel)).toEqual({ layout: 1 })
+  at('?layout=invalid')
+  expect(initialRoute()).toEqual({})
+})

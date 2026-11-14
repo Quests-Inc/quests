@@ -43,7 +43,7 @@
     tools,
   }: {
     title?: string
-    titleEl?: HTMLInputElement | null
+    titleEl?: HTMLTextAreaElement | null
     titleReadonly: boolean
     titleEditing?: boolean
     dirty: boolean
@@ -90,10 +90,10 @@
         <div class="notes__title-cluster" class:notes__title-cluster--editing={titleEditing}>
           <span class="notes__title-grow">
             <span class="notes__title-sizer" aria-hidden="true">{title || '\u00a0'}</span>
-            <input
+            <textarea
+              rows="1"
               class="notes__title"
               class:notes__title--locked={titleReadonly}
-              size="1"
               bind:this={titleEl}
               bind:value={title}
               readonly={titleReadonly}
@@ -101,7 +101,7 @@
               ondblclick={onTitleDblClick}
               onblur={onTitleBlur}
               onkeydown={onTitleKeydown}
-            />
+            ></textarea>
           </span>
           {#if dirty && !titleEditing}<span class="notes__unsaved" title="Несохранено">*</span>{/if}
         </div>
@@ -265,12 +265,18 @@
 
   .notes__title-sizer {
     visibility: hidden;
-    white-space: pre;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     pointer-events: none;
   }
 
   .notes__title {
     width: 100%;
+    height: 100%;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     min-width: 0;
     border: 0;
     background: transparent;

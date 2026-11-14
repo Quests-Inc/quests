@@ -126,3 +126,9 @@ Markdown и DOM не разбираются заново при каждом д�
 `positions` может содержать прежние позиции временно скрытых карточек, поэтому не заменяет `entities`.
 `zones`: уникальные строковые `id`, подпись, цвет `#RRGGBB`, координаты левого верхнего угла и размеры в координатах мира.
 Сервер хранит JSON непрозрачно, с действующими ограничениями размера и изоляцией пользователя/пространства.
+
+Adding a root, draft card or uploaded file focuses the added card after layout:
+the camera pans with its current zoom so the card's centre becomes the viewport
+centre. The pan lasts 500 ms with cubic ease-out. Pointer/wheel interaction cancels
+it immediately. Existing hand positions remain pinned; focusing does not rearrange
+other cards. Restoring a saved board does not automatically focus its draft cards.

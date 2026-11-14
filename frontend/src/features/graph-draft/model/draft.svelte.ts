@@ -36,11 +36,14 @@ export function createGraphDraft(deps: {
   let dropAsk = $state<{ id: number; ids: number[] } | null>(null)
   let reloadTick = $state(0)
 
+  let loadSeq = 0
+
   async function load() {
+    const mine = ++loadSeq
     try {
       const scope = getGraphDraftScope()
       const d = await getGraphDraft()
-      if (scope !== getGraphDraftScope()) return
+      if (mine !== loadSeq || scope !== getGraphDraftScope()) return
       const next = { ops: d.ops ?? [], roots: Array.isArray(d.roots) ? d.roots : [] }
       // Unchanged: keep the object, so nothing is rebuilt.
       if (JSON.stringify(next) !== JSON.stringify(draft)) draft = next

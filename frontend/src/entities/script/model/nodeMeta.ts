@@ -27,6 +27,10 @@ export const KIND_COLORS: Record<string, string> = {
 /** Parameters a node gets when it is added: a valid starting point the owner then edits. */
 export function defaultParams(type: string): unknown {
   switch (type) {
+    case 'constant':
+      return { type: 'str', value: '' }
+    case 'convert':
+      return { from: 'str', to: 'int', mode: 'value', round: 'exact' }
     case 'code':
       return { language: '', text: '# команда: её вывод уйдёт дальше\ntrue' }
     case 'parse':

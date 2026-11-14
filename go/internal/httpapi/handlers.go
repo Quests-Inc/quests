@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"net/http"
 	"strings"
 	"sync"
@@ -138,6 +139,18 @@ func (s *Server) routes() *http.ServeMux {
 	}
 	mux.HandleFunc("POST /api/search", s.searchEntities)
 	mux.HandleFunc("GET /api/health", s.getHealth)
+	mux.HandleFunc("GET /api/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		rows, err := limits.List()
+		if err != nil {
+			writeErr(w, 503, "limits unavailable")
+			return
+		}
+		out := map[string]int64{}
+		for k := range rows {
+			out[k] = limits.Applied(k)
+		}
+		writeJSON(w, 200, map[string]any{"limits": out})
+	})
 	mux.HandleFunc("POST /api/health/heartbeat", s.postHeartbeat)
 	mux.HandleFunc("GET /api/sync", s.getSync)
 	mux.HandleFunc("GET /api/events", s.getEvents)

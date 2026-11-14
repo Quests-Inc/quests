@@ -7,7 +7,7 @@ import (
 
 func (s *Store) SearchEntities(ctx context.Context, r search.Request) ([]search.Hit, error) {
 	sources := []search.Source{
-		{Kind: "note", From: "note n LEFT JOIN note_stat ns ON ns.note_id=n.id", ID: "n.id", Title: "n.title", Body: "n.description", Where: "TRUE", ParentKind: "note", ParentID: "n.parent_id", Tests: map[string]map[string]string{"flag": {"pinned": "n.pinned=1", "readme": "n.is_readme=1", "private": "n.is_private=1", "category": "n.is_category=1", "outdated": "n.outdated=1", "check": "(NULLIF(trim(n.check_command),'') IS NOT NULL OR EXISTS(SELECT 1 FROM script_binding sb WHERE sb.subject_type='note' AND sb.subject_id=n.id))"}}},
+		{Kind: "note", From: "note n LEFT JOIN note_stat ns ON ns.note_id=n.id", ID: "n.id", Title: "n.title", Body: "n.description", Where: "TRUE", ParentKind: "note", ParentID: "n.parent_id", Tests: map[string]map[string]string{"flag": {"pinned": "n.pinned=1", "readme": "n.is_readme=1", "private": "n.is_private=1", "category": "n.is_category=1", "sample": "n.is_sample=1", "outdated": "n.outdated=1", "check": "(NULLIF(trim(n.check_command),'') IS NOT NULL OR EXISTS(SELECT 1 FROM script_binding sb WHERE sb.subject_type='note' AND sb.subject_id=n.id))"}}},
 		{Kind: "attachment", From: "attachment a", ID: "a.id", Title: "a.filename", Body: "a.comment || ' ' || a.content_type_detected", Where: "TRUE", Fields: map[string]string{"owner": "a.owner_type", "owner_id": "a.owner_id", "rev": "a.current_revision"}, Tests: map[string]map[string]string{"flag": {"hidden": "a.hidden=1"}, "show": {"all": "TRUE", "active": "a.hidden=0"}}},
 	}
 	// Preserve reading-history/newness/manual weighting for every client, before LIMIT.

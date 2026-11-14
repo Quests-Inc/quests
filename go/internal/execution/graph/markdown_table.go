@@ -33,7 +33,7 @@ func tablePorts(raw json.RawMessage) ([]Port, []Port, error) {
 	if !tableKey.MatchString(p.Table) || p.Column < 0 || p.Column > 100 || len(p.Omit) > 100 {
 		return nil, nil, fmt.Errorf("нужен table-id; column 0..100; исключений до 100")
 	}
-	return []Port{req("text", TStr), opt("column", TInt)}, []Port{req("value", TDoc), req("rows", TDoc), req("items", TDoc)}, nil
+	return []Port{req("text", TStr), opt("column", TInt), opt("table", TStr)}, []Port{req("value", TDoc), req("rows", TDoc), req("items", TDoc)}, nil
 }
 
 type markdownRow struct {
@@ -203,4 +203,20 @@ func runMarkdownTable(rs *resolved, in Token, columns ...Token) (map[string]Toke
 		}
 	}
 	return out, nil
+}
+
+func runMarkdownTableInputs(rs *resolved, ins map[string][]Token) (map[string]Token, error) {
+	copy := *rs
+	if table := ins["table"]; len(table) > 0 {
+		var p tableParams
+		if err := strictParams(rs.node.Params, &p); err != nil {
+			return nil, err
+		}
+		p.Table, _ = table[0].Value.(string)
+		if !tableKey.MatchString(p.Table) {
+			return nil, fmt.Errorf("неверный table-id")
+		}
+		copy.node.Params, _ = json.Marshal(p)
+	}
+	return runMarkdownTable(&copy, ins["text"][0], ins["column"]...)
 }

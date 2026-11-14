@@ -43,11 +43,13 @@ type valueListJSON struct {
 
 func (h *Handler) registerValueRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/notes/{id}/values/copy", h.copyNoteValues)
+	mux.HandleFunc("PUT /api/workspace/values", h.putValues(workspaceSegment))
 	mux.HandleFunc("GET /api/workspace/values", h.listValues(workspaceSegment))
 	mux.HandleFunc("PUT /api/workspace/values/{name}", h.putValue(workspaceSegment))
 	mux.HandleFunc("DELETE /api/workspace/values/{name}", h.deleteValue(workspaceSegment))
 	mux.HandleFunc("POST /api/workspace/values/{name}/roll", h.rollValue(workspaceSegment))
 	for segment := range secretOwnerKinds {
+		mux.HandleFunc("PUT /api/"+segment+"/{id}/values", h.putValues(segment))
 		mux.HandleFunc("GET /api/"+segment+"/{id}/values", h.listValues(segment))
 		mux.HandleFunc("PUT /api/"+segment+"/{id}/values/{name}", h.putValue(segment))
 		mux.HandleFunc("DELETE /api/"+segment+"/{id}/values/{name}", h.deleteValue(segment))
@@ -61,7 +63,10 @@ func fromMCP(r *http.Request) bool {
 
 func valueWriteErr(w http.ResponseWriter, err error) {
 	var ve *execution.ValueError
+	var be *execution.ValueBatchError
 	switch {
+	case errors.As(err, &be):
+		writeJSON(w, 422, map[string]any{"detail": be.Error(), "error": be})
 	case errors.As(err, &ve):
 		writeErr(w, http.StatusUnprocessableEntity, ve.Msg)
 	case errors.Is(err, execution.ErrNotFound):
@@ -126,7 +131,18 @@ func (h *Handler) putValue(segment string) http.HandlerFunc {
 			stored execution.StoredValue
 			err    error
 		)
-		if formula := strings.TrimSpace(body.Formula); formula != "" {
+		if fromMCP(r) {
+			row := execution.ValueInput{Name: name, Type: body.Type, Value: body.Value}
+			if f := strings.TrimSpace(body.Formula); f != "" {
+				row.Value = nil
+				row.Formula = &f
+			}
+			var rows []execution.StoredValue
+			rows, err = h.Store.SetNamedValues(r.Context(), o, []execution.ValueInput{row}, true)
+			if err == nil {
+				stored = rows[0]
+			}
+		} else if formula := strings.TrimSpace(body.Formula); formula != "" {
 			stored, err = h.Store.SetNamedFormula(r.Context(), o, name, body.Type, formula)
 		} else {
 			var canonical string
@@ -448,4 +464,47 @@ func (h *Handler) copyNoteValues(w http.ResponseWriter, r *http.Request) {
 	}
 	h.valuesChanged(r, target, "", "", nil)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// putValues returns the written rows, with formulas evaluated in the final scope.
+func (h *Handler) putValues(segment string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if segment == workspaceSegment && !h.RequireOwner(w, r, "set values") {
+			return
+		}
+		o, ok := h.secretOwner(w, r, segment)
+		if !ok {
+			return
+		}
+		var body struct {
+			Values []execution.ValueInput `json:"values"`
+		}
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&body); err != nil {
+			writeErr(w, 400, "invalid JSON")
+			return
+		}
+		rows, err := h.Store.SetNamedValues(r.Context(), o, body.Values, fromMCP(r))
+		if err != nil {
+			var be *execution.ValueBatchError
+			if errors.As(err, &be) {
+				writeJSON(w, 422, map[string]any{"detail": be.Error(), "error": be})
+				return
+			}
+			valueWriteErr(w, err)
+			return
+		}
+		out := make([]valueJSON, 0, len(rows))
+		for _, row := range rows {
+			j, err := oneValue(row, execution.SecretOwner{}, "")
+			if err != nil {
+				valueWriteErr(w, err)
+				return
+			}
+			out = append(out, j)
+		}
+		h.valuesChanged(r, o, "", "", nil)
+		writeJSON(w, 200, map[string]any{"items": out})
+	}
 }

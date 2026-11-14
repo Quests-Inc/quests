@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -167,6 +168,7 @@ func secretTools(c *Client) []Tool {
 			}
 			return map[string]any{"ok": true, "owner": a.Owner, "key": a.Key, "deleted": true, "workspace": c.Workspace(ctx)}, nil
 		})
+
 	return []Tool{list, set, del}
 }
 
@@ -229,7 +231,30 @@ func valueTools(c *Client) []Tool {
 			}
 			return map[string]any{"ok": true, "owner": a.Owner, "name": a.Name, "deleted": true, "workspace": c.Workspace(ctx)}, nil
 		})
-	return []Tool{list, set, del}
+	type batchRow struct {
+		Name    string          `json:"name"`
+		Type    string          `json:"type" enum:"int,float,str,bool"`
+		Value   json.RawMessage `json:"value,omitempty"`
+		Formula *string         `json:"formula,omitempty"`
+	}
+	type batchArgs struct {
+		Owner  string     `json:"owner"`
+		Values []batchRow `json:"values"`
+	}
+	batch := Typed("set_values", "Atomically upsert typed variables and formulas of one owner. Exactly one of value/formula per row; forward dependencies work. An invalid row rolls back the entire batch. Returns written items with computed results; leaves other own values and roll sources untouched.", func(ctx context.Context, a batchArgs) (any, error) {
+		p, err := ownerPath(a.Owner, "values")
+		if err != nil {
+			return nil, err
+		}
+		var res map[string]any
+		if err := c.Do(ctx, http.MethodPut, p, nil, map[string]any{"values": a.Values}, &res); err != nil {
+			return nil, err
+		}
+		res["workspace"] = c.Workspace(ctx)
+		res["owner"] = a.Owner
+		return res, nil
+	})
+	return []Tool{list, set, del, batch}
 }
 
 func runnerTools(c *Client) []Tool {

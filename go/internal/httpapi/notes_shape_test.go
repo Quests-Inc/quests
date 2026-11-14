@@ -53,7 +53,7 @@ func TestNoteJSONShape(t *testing.T) {
 	}
 
 	core := []string{"color", "created_at", "custom_icon", "description", "icon", "icon_url", "id", "is_category",
-		"is_private", "is_readme", "parent_id", "pinned", "sort_order", "title", "updated_at"}
+		"is_private", "is_readme", "is_sample", "parent_id", "pinned", "sort_order", "title", "updated_at"}
 	verdict := []string{"has_check", "outdated", "outdated_reason"}
 	want := func(extra ...string) []string {
 		all := slices.Concat(core, verdict, extra)

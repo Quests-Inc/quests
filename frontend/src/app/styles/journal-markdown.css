@@ -408,23 +408,23 @@ a:has(> .md-ref__ico) {
 }
 .mdh-layer .mdh-heading {
   color: var(--color-accent, #c9a227);
-  font-weight: 600;
+  font-weight: inherit;
 }
 .mdh-layer .mdh-heading .mdh-mark {
   color: color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
 }
 .mdh-layer .mdh-quote {
   color: var(--color-fg-muted, #9a9a9a);
-  font-style: italic;
+  font-style: inherit;
 }
 .mdh-layer .mdh-bold,
 .mdh-layer .mdh-bolditalic {
   color: color-mix(in srgb, var(--color-fg, #e8e8e8) 80%, var(--color-accent, #c9a227));
-  font-weight: 600;
+  font-weight: inherit;
 }
 .mdh-layer .mdh-italic,
 .mdh-layer .mdh-bolditalic {
-  font-style: italic;
+  font-style: inherit;
 }
 .mdh-layer .mdh-italic {
   color: color-mix(in srgb, var(--color-fg, #e8e8e8) 80%, var(--color-info, #5a8a7a));

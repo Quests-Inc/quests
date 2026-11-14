@@ -33,6 +33,7 @@ type LaidOut = { nodes: GraphNodeView[]; edges: ViewEdge[]; groups?: GraphGroupV
 type Cam = { x: number; y: number; k: number }
 
 export function createGraphStage(deps: {
+  getAutoFocus?: () => boolean
   getTrees?: () => { key: string; keys: string[]; layout: string }[]
   getActive: () => boolean
   getData: () => Graph | null
@@ -88,6 +89,34 @@ export function createGraphStage(deps: {
   let buildSeq = 0
   let buildLater = false
   let lastFitKey = ''
+  let focusKey: string | null = null
+  let cameraFrame = 0
+  let shownKeys = new Set<string>()
+  let composed = false
+  function cancelCamera() {
+    if (cameraFrame) cancelAnimationFrame(cameraFrame)
+    cameraFrame = 0
+  }
+  function focusNode(key: string) {
+    focusKey = key
+    const n = nodesByKey().get(key),
+      element = el
+    if (!ready || !n || !element) return
+    focusKey = null
+    cancelCamera()
+    selectedKey = key
+    const r = element.getBoundingClientRect(),
+      from = { ...deps.getCam() }
+    const to = { x: r.width / 2 - n.x * from.k, y: r.height / 2 - n.y * from.k }
+    const start = performance.now()
+    function frame(now: number) {
+      const t = Math.min(1, Math.max(0, (now - start) / 500))
+      const progress = 1 - (1 - t) ** 3
+      deps.setCam({ k: from.k, x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress })
+      cameraFrame = t < 1 ? requestAnimationFrame(frame) : 0
+    }
+    cameraFrame = requestAnimationFrame(frame)
+  }
   let flashTimer = 0
   let nativeFull = false
   let mapView: LaidOut | null | undefined
@@ -207,12 +236,20 @@ export function createGraphStage(deps: {
     }
     applyLayout()
     ready = true
+    const addedDraft =
+      composed && deps.getAutoFocus?.() !== false
+        ? view.nodes.findLast((n) => n.draft && !shownKeys.has(n.key))
+        : undefined
+    composed = true
+    shownKeys = new Set(view.nodes.map((n) => n.key))
+    if (!focusKey && addedDraft) focusKey = addedDraft.key
     await tick()
     const fitKey = `${g.root}|${deps.getTrees ? '' : deps.getDepth()}`
     if (fitKey !== lastFitKey) {
       lastFitKey = fitKey
-      fit()
+      if (!focusKey) fit()
     }
+    if (focusKey) focusNode(focusKey)
   }
 
   /**
@@ -542,6 +579,8 @@ export function createGraphStage(deps: {
       const n = selectedKey ? map().get(selectedKey) : null
       return Boolean(n && n.key !== deps.getData()?.root && CENTERABLE.has(n.type) && !n.draft)
     },
+    focusNode,
+    cancelCamera,
     touch,
     /** Разложить заново с тем, что сейчас в `saved` (расклад поставил позиции карточек). */
     applyLayout,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"io"
 	"net/http"
 	"strings"
@@ -48,6 +49,9 @@ func (h *Handler) postGraphDraftFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	maxBytes := h.MaxUploadBytes
+	if limits.Path() != "" {
+		maxBytes = limits.Get("upload_bytes")
+	}
 	if maxBytes <= 0 {
 		maxBytes = 25 << 20
 	}

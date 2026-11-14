@@ -33,6 +33,7 @@
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import { toastTrashed } from '@/shared/lib/trashUndo.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
+  import CreateSampleModal from './CreateSampleModal.svelte'
   import { NoteIconModal } from '@/features/note-icon'
   import NoteCanvas from './NoteCanvas.svelte'
   import './noteStatus.css'
@@ -43,6 +44,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let {
     selectedId = null,
+    historyIds = [],
+    historyIndex = -1,
+    onHistory = () => {},
     labels = {},
     questlines = [],
     onSelect,
@@ -52,6 +56,9 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onOpenGraph,
   }: {
     selectedId: number | null,
+    historyIds?: number[],
+    historyIndex?: number,
+    onHistory?: (index: number) => void,
     labels?: Record<string, string>,
     questlines?: any[],
     onSelect: (id: number | null) => void,
@@ -228,7 +235,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   })
 
   let editEl = $state((null as HTMLTextAreaElement | null))
-  let titleEl = $state((null as HTMLInputElement | null))
+  let titleEl = $state((null as HTMLTextAreaElement | null))
   let findOpen = $state(false)
   let noteIsOutdated = $derived(selectedId != null && !!(ed.detail?.id === selectedId ? ed.detail.outdated : noteById(selectedId)?.outdated))
   function onFindKey(e: { ctrlKey: any; metaKey: any; shiftKey: any; altKey: any; key: string; target?: any; preventDefault: () => void }) {
@@ -514,9 +521,14 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   })
 
   /** A copy next to the original: same text and colour, title marked, opened right away. */
+  let sampleSource = $state<{ id: number; title: string; parent_id?: number | null } | null>(null)
   async function duplicateNote(id: number) {
     const row = noteById(id)
     if (!row) return
+    if (row.is_sample) {
+      sampleSource = row
+      return
+    }
     try {
       const created = await copyNote(id)
       await onChanged()
@@ -540,6 +552,11 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     readme: toggleReadmeNote,
     private: togglePrivateNote,
     category: toggleCategoryNote,
+    sample: async (id: number) => {
+      const row = await updateNote(id, { is_sample: !notes.find(n => n.id === id)?.is_sample })
+      ed.patched(id, row, {})
+      onChanged()
+    },
     outdated: toggleOutdatedNote,
     'add-child': addNote,
     duplicate: duplicateNote,
@@ -624,6 +641,15 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   {/snippet}
 
   <section class="notes__page" bind:this={pageEl} onscroll={scroll.onScroll}>
+    {#if historyIds.length > 1}
+      <nav class="notes__visits" aria-label="История открытых заметок">
+        <button type="button" class="btn" disabled={historyIndex <= 0} onclick={() => onHistory(historyIndex - 1)} aria-label="Предыдущая заметка">←</button>
+        <button type="button" class="btn" disabled={historyIndex >= historyIds.length - 1} onclick={() => onHistory(historyIndex + 1)} aria-label="Следующая заметка">→</button>
+        {#each historyIds as id, i}
+          <button type="button" class="btn" aria-current={i === historyIndex ? 'page' : undefined} onclick={() => onHistory(i)}>{notes.find(n => n.id === id)?.title ?? `Заметка ${id}`}</button>
+        {/each}
+      </nav>
+    {/if}
     <NoteCanvas
       {ed}
       {selectedId}
@@ -752,4 +778,10 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       padding: 1rem 1rem 2rem;
     }
   }
+
+.notes__visits{display:flex;gap:.4rem;align-items:center;overflow-x:auto;flex-shrink:0;padding-bottom:.35rem}.notes__visits button{flex-shrink:0;max-width:18rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.notes__visits [aria-current]{color:var(--color-accent);border-color:currentColor}
 </style>
+
+{#if sampleSource}
+  <CreateSampleModal source={sampleSource} {notes} onClose={() => sampleSource = null} onCreated={async (id) => { await onChanged(); onSelect(id) }} />
+{/if}

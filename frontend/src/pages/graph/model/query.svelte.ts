@@ -25,6 +25,7 @@ export function createGraphQuery(deps: {
     pending?: boolean
     error?: string
   }
+  prepareAddition?: (type: string, id: number) => void
   getTreeSettings?: (key: string) => { depth: number; layout: string } | undefined
   initTree?: (key: string, depth: number) => void
   getActive: () => boolean
@@ -194,6 +195,7 @@ export function createGraphQuery(deps: {
     if (!center.id) {
       lastRootKey = `${type}:${id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
       deps.forgetPositions()
+      deps.prepareAddition?.(type, id)
       center = { type, id }
       deps.onCenter(type, id)
       return
@@ -207,6 +209,7 @@ export function createGraphQuery(deps: {
       toast('Уже на карте', { kind: 'info' })
       return
     }
+    deps.prepareAddition?.(type, id)
     await writeRoots([...roots, { type, id }])
     await deps.loadDraft()
   }

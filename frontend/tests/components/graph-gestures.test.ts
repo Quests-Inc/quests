@@ -179,3 +179,40 @@ test('Shift+рамка по полю добавляет к выбранному 
   plain.g.onUp(plain.ev(130, 90))
   expect(entered).toBe(1)
 })
+
+test('card pointer capture keeps a touch long press on the card', () => {
+  for (const selectMode of [false, true]) {
+    const { g, nodes, state, ev, el } = make()
+    state.selectMode = selectMode
+    const captures: string[] = []
+    ;(el as any).setPointerCapture = () => captures.push('stage')
+    const card = document.createElement('div')
+    ;(card as any).setPointerCapture = () => captures.push('card')
+    g.onCardDown(ev(5, 5, { pointerType: 'touch', currentTarget: card }), nodes[0] as any)
+    expect(captures).toEqual(['card'])
+    g.onMove(ev(25, 15))
+    g.onUp(ev(25, 15))
+    expect(nodes[0]).toMatchObject({ x: 20, y: 10 })
+  }
+})
+
+test('selected cards move together at a zoom without panning; controls keep their own gestures', () => {
+  const { g, nodes, state, ev } = make()
+  state.selectMode = true
+  state.picked = new Set(nodes.map((n) => n.key))
+  g.cam = { x: 50, y: 70, k: 0.5 }
+  g.onCardDown(ev(0, 0, { pointerType: 'touch' }), nodes[0] as any)
+  g.onMove(ev(20, 10))
+  g.onUp(ev(20, 10))
+  expect(nodes[0]).toMatchObject({ x: 40, y: 20 })
+  expect(nodes[1]).toMatchObject({ x: 440, y: 20 })
+  expect(g.cam).toEqual({ x: 50, y: 70, k: 0.5 })
+  expect(state.saved.get(nodes[1].key)).toEqual({ x: 440, y: 20 })
+  for (const tag of ['a', 'button', 'textarea', 'input', 'pre']) {
+    const target = document.createElement(tag)
+    g.onCardDown(ev(0, 0, { target }), nodes[0] as any)
+    g.onMove(ev(100, 100))
+    g.onUp(ev(100, 100))
+    expect(nodes[0]).toMatchObject({ x: 40, y: 20 })
+  }
+})

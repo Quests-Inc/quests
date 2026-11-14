@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"log"
 	"net/http"
 	"os"
@@ -42,6 +43,11 @@ func main() {
 
 	config.LoadDotenv(config.Load().Root)
 	cfg := config.Load()
+	limits.Configure(cfg.DataDir)
+	limits.Freeze()
+	if _, err := limits.List(); err != nil {
+		log.Fatalf("limits: %v", err)
+	}
 
 	dbURL, err := cfg.RequireDatabaseURL()
 	if err != nil {
@@ -156,7 +162,7 @@ func main() {
 
 	windows := schedule.NewWindowNotifier()
 	checks := schedule.NewCheckRunner(st, hub)
-	policy, perr := egress.PolicyFromEnv(os.Getenv)
+	policy, perr := egress.PolicyFromEnv(limits.EgressEnv)
 	if perr != nil {
 		log.Fatalf("egress: %v", perr)
 	}

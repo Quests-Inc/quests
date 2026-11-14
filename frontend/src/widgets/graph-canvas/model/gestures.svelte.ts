@@ -23,6 +23,7 @@ type Drag = {
 }
 
 export function createGraphGestures(deps: {
+  onInteract?: () => void
   getStage: () => HTMLElement | null
   nodes: () => GraphNodeView[]
   nodeMap: () => Map<string, GraphNodeView>
@@ -97,6 +98,7 @@ export function createGraphGestures(deps: {
     preventDefault: () => void
   }) {
     if (e.pointerType !== 'touch') return
+    deps.onInteract?.()
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (touches.size !== 2) return
     e.stopPropagation()
@@ -107,6 +109,7 @@ export function createGraphGestures(deps: {
     deps.getStage()?.setPointerCapture(e.pointerId)
   }
   function onBgDown(e: PointerEvent) {
+    deps.onInteract?.()
     if ((e.target as Element).closest('[data-gkey]')) return
     // Middle button always pans, also in selection mode.
     if (e.button === 1) {
@@ -130,7 +133,14 @@ export function createGraphGestures(deps: {
     drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
     deps.getStage()?.setPointerCapture(e.pointerId)
   }
+  // Keep contextmenu targeted at the card during a native touch long press.
+  // Capturing on the stage retargets that event to the background.
+  function captureCard(e: PointerEvent) {
+    const target = e.currentTarget as HTMLElement | null
+    ;(target ?? deps.getStage())?.setPointerCapture(e.pointerId)
+  }
   function onCardDown(e: PointerEvent, n: GraphNodeView) {
+    deps.onInteract?.()
     if (deps.isLinking()) {
       if (e.button === 0) {
         e.stopPropagation()
@@ -139,7 +149,13 @@ export function createGraphGestures(deps: {
       return
     }
     if (deps.selectMode() || (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey))) {
-      if (e.button !== 0 || (e.target as Element).closest('textarea, input, .gcard__editbar, .gcard__changed')) return
+      if (
+        e.button !== 0 ||
+        (e.target as Element).closest(
+          'textarea, input, a, button, pre, [contenteditable], .gcard__editbar, .gcard__changed'
+        )
+      )
+        return
       e.stopPropagation()
       const group = deps.getPicked().has(n.key)
         ? [...deps.getPicked()].map((k) => deps.nodeMap().get(k)).filter(Boolean)
@@ -152,7 +168,7 @@ export function createGraphGestures(deps: {
         moved: false,
         items: group.map((m) => ({ m, x: m.x, y: m.y })),
       }
-      deps.getStage()?.setPointerCapture(e.pointerId)
+      captureCard(e)
       return
     }
     if (e.button !== 0) return
@@ -167,7 +183,7 @@ export function createGraphGestures(deps: {
     if (body && body.scrollHeight > body.clientHeight + 1 && e.offsetX > body.clientWidth - 14) return
     e.stopPropagation()
     drag = { kind: 'node', n, x: e.clientX, y: e.clientY, nx: n.x, ny: n.y, moved: false }
-    deps.getStage()?.setPointerCapture(e.pointerId)
+    captureCard(e)
   }
   /** Dragging an expanded block by its frame moves all its cards together. */
   function onGroupDown(
@@ -291,6 +307,7 @@ export function createGraphGestures(deps: {
     drag = null
   }
   function onWheel(e: WheelEvent) {
+    deps.onInteract?.()
     // Over a card's scrollable text the wheel scrolls the text, not the map.
     const body = e.target instanceof Element ? (e.target as Element).closest('.gcard__body, textarea') : null
     if (body && body.scrollHeight > body.clientHeight + 1) return

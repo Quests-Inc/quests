@@ -94,6 +94,7 @@
     }
   })
 
+  const foreignTruncated = $derived(foreignValueRefs(source, Infinity).length > foreignValueRefs(source).length)
   let own = $state({} as Record<string, string>)
   $effect(() => {
     void valueRev.n
@@ -247,3 +248,5 @@
 {#if edit}
   <ValueEditDialog open owner={{ kind: edit.kind, id: edit.id }} name={edit.name} onClose={() => (edit = null)} />
 {/if}
+
+{#if foreignTruncated}<p class="hint" role="status">Достигнут лимит внешних переменных: часть значений не загружена.</p>{/if}

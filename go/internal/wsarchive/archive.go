@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"io"
 	"log"
 	"net/http"
@@ -297,6 +298,9 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxFile := h.MaxUploadBytes
+	if limits.Path() != "" {
+		maxFile = limits.Get("upload_bytes")
+	}
 	if maxFile <= 0 {
 		maxFile = 25 << 20
 	}

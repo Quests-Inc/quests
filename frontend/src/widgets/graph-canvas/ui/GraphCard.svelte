@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import { getNote } from '@/shared/api/notes.ts'
+
  import {attachmentImage,showImages,type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
  import GraphImage from './GraphImage.svelte'
  import NoteSilhouette from './NoteSilhouette.svelte'
@@ -27,6 +30,8 @@
     editingHere = false,
     picked = false,
     ready = false,
+    textRevision = 0,
+    loadText = true,
     raster = false,
     imagePixels = 128,
     imageGallery = [],
@@ -63,6 +68,8 @@
     editingHere?: boolean
     picked?: boolean
     ready?: boolean
+    textRevision?: number
+    loadText?: boolean
     imageGallery?: GalleryImage[]
     imagePixels?: number
     raster?: boolean
@@ -106,6 +113,37 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   }
   grab()
 }
+
+  let fullText = $state<{ preview: string; revision: number; text: string } | null>(null)
+  let textError = $state(false)
+  let textLoading = $state(false)
+  let textRetry = $state(0)
+  // The graph carries a 4000-rune preview. Fetch the body only when the
+  // visible card renders markdown; draft edits already contain the full text.
+  $effect(() => {
+    const preview = n.desc ?? ''
+    const revision = textRevision
+    const id = Number(n.id)
+    void textRetry
+    if (n.type !== 'note' || n.draft || changed || !ready || !loadText || tier === 'lite' || tier === 'title' ||
+      !Number.isInteger(id) || id <= 0 || !preview.endsWith('…') || [...preview].length <= 4000) return
+    if (untrack(() => fullText?.preview === preview && fullText.revision === revision)) {
+      textLoading = false
+      return
+    }
+    let cancelled = false
+    textError = false
+    textLoading = true
+    void getNote(id).then(note => {
+      if (!cancelled) fullText = { preview, revision, text: note.description ?? '' }
+    }).catch(() => {
+      if (!cancelled) textError = true
+    }).finally(() => {
+      if (!cancelled) textLoading = false
+    })
+    return () => { cancelled = true }
+  })
+  const bodyText = $derived(!n.draft && !changed && fullText && fullText.preview === n.desc ? fullText.text : n.desc)
 
   const t = $derived(TYPES[n.type] ?? TYPES.step)
   const square = $derived(n.type === 'attachment' || n.type === 'cluster')
@@ -224,9 +262,11 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
             {/if}
           </div>
           {#if n.type==='note'&&tier==='title'}<NoteSilhouette text={n.desc||''}/>{/if}
-          {#if n.desc && tier !== 'title'}
+          {#if bodyText && tier !== 'title'}
             <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
-              <MarkdownBody source={n.desc} {labels} host={hostOf} ownValues={!!hostOf} onRef={(k, id) => onOpen?.(k, id)} />
+              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} onRef={(k, id) => onOpen?.(k, id)} />
+              {#if textLoading}<p role="status">Загрузка полного текста…</p>{/if}
+              {#if textError}<button type="button" onpointerdown={e => e.stopPropagation()} onclick={() => textRetry++}>Повторить загрузку полного текста</button>{/if}
             </div>
           {/if}
         {:else}

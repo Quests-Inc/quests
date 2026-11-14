@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"io"
 	"net/http"
 	"path"
@@ -66,6 +67,9 @@ func (h *Handler) PostAttachment(w http.ResponseWriter, r *http.Request, ownerTy
 	}
 
 	maxBytes := h.MaxUploadBytes
+	if limits.Path() != "" {
+		maxBytes = limits.Get("upload_bytes")
+	}
 	if maxBytes <= 0 {
 		maxBytes = 25 << 20
 	}

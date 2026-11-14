@@ -4,6 +4,7 @@
 package execution
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/quests-inc/quests/go/internal/identity"
@@ -15,7 +16,8 @@ import (
 
 // Store is the context's data access: the PostgreSQL database behind the row-level-security driver.
 type Store struct {
-	DB *sql.DB
+	DB      *sql.DB
+	valueTx *sql.Tx
 	// Box seals secret values at rest (nil = stored as given, e.g. in tests).
 	Box *secretbox.Box
 
@@ -42,3 +44,15 @@ var (
 )
 
 type rowScanner = dbx.Scanner
+
+type valueQuery interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func (s *Store) valueRead() valueQuery {
+	if s.valueTx != nil {
+		return s.valueTx
+	}
+	return s.DB
+}

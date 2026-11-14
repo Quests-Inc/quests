@@ -3,6 +3,7 @@ package graph
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"regexp"
 	"strings"
 )
@@ -21,8 +22,8 @@ func buildPorts(raw json.RawMessage, text bool) ([]Port, []Port, error) {
 	if err := strictParams(raw, &p); err != nil {
 		return nil, nil, err
 	}
-	if len(p.Inputs) > MaxArgsParams || len(p.Template) == 0 || len(p.Template) > MaxTextBytes {
-		return nil, nil, fmt.Errorf("шаблон обязателен, до 64 КБ; входов до %d", MaxArgsParams)
+	if len(p.Inputs) > MaxArgsParams || len(p.Template) == 0 || len(p.Template) > int(limits.Get("build_bytes")) {
+		return nil, nil, fmt.Errorf("шаблон обязателен, до %d байт; входов до %d", limits.Get("build_bytes"), MaxArgsParams)
 	}
 	in := []Port{}
 	names := map[string]bool{}
@@ -159,8 +160,8 @@ func runBuild(rs *resolved, ins map[string][]Token) (map[string]Token, error) {
 			return nil, err
 		}
 	}
-	if len(raw) > MaxTextBytes {
-		return nil, fmt.Errorf("результат больше 64 КБ")
+	if len(raw) > int(limits.Get("build_bytes")) {
+		return nil, fmt.Errorf("результат больше %d байт", limits.Get("build_bytes"))
 	}
 	var value any = json.RawMessage(raw)
 	if typ == TStr {

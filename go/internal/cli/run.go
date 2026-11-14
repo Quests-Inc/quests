@@ -60,6 +60,8 @@ func Run(argv []string) int {
 		code, err = cmdQuestline(c, args)
 	case "note", "notes":
 		code, err = cmdNote(c, args)
+	case "values":
+		code, err = cmdValues(c, args)
 	case "hook":
 		code, err = cmdHook(c, args, asJSON)
 	case "-v", "--version", "version":
@@ -99,6 +101,8 @@ func printHelp() {
 
 Usage:
   quests [--json] [--api URL] COMMAND …
+  quests values set note=N|quest=N|step=N|questline=N|template=N|workspace FILE|-
+    Atomically upsert a typed JSON array (value or formula per row).
 
 Build: just build-cli  →  go/bin/quests
 Run:   just quests …  |  go/bin/quests …

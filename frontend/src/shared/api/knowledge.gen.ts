@@ -141,6 +141,7 @@ export interface Note {
   IsReadme: boolean;
   IsPrivate: boolean;
   IsCategory: boolean;
+  IsSample: boolean;
   SortOrder: number /* int */;
   ParentID?: number /* int64 */;
   Color: string;
@@ -160,6 +161,7 @@ export interface NoteRead {
   is_readme: boolean;
   is_private: boolean;
   is_category: boolean;
+  is_sample: boolean;
   sort_order: number /* int */;
   parent_id?: number /* int64 */;
   color: string;
@@ -180,6 +182,7 @@ export interface NoteBriefRead {
   is_readme: boolean;
   is_private: boolean;
   is_category: boolean;
+  is_sample: boolean;
   color: string;
   icon: string;
   icon_url?: string;

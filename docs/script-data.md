@@ -95,3 +95,27 @@ in the graph. Table ID remains a parameter of the node; a fully dynamic table se
 For row navigation, instead choose from `rows`, extract `id`, feed it into the JSON builder shown above, and connect its
 output to Result. This selects a whole row. Independent column choices do not imply cell highlighting, which v1 does
 not support.
+
+## Typed constants and explicit conversion
+
+`constant` is a source with `{"type":"int","value":42}` and output `value`.
+Supported types: str/int/float/bool/doc, including JSON null only for doc. The JSON
+value must match its type; an int keeps signed 64-bit precision. It executes no code.
+
+`convert` has input `in`, output `value`, params `from`, `to`, optional `mode` and
+`round`. The value mode accepts strict scalar conversions: booleans parse only the
+strings `true`/`false`; integer strings are base-10 signed integers; numeric strings
+must be finite. Integers outside ±2^53 cannot become float silently. Float → int
+requires an integral in-range value unless `round` explicitly selects floor, ceil,
+trunc or nearest (ties away from zero). The default `exact` refuses fractions and
+overflow. Unsupported conversions fail the run.
+
+Document scalars retain numeric spelling/precision. `mode: "parse_json"` is only
+str → doc and validates the JSON string; `mode: "stringify"` is only doc → str and
+serializes compact JSON. These are distinct from interpreting a document's scalar.
+
+`json.get` now accepts optional `path: str`; its wired value takes priority over
+params.path. Numeric segments select array indices, e.g. `items.2.name`. Optional `index: int` appends a nonnegative array index to the selected path (static or wired), e.g. path `items` and index 2 select `items.2`.
+`markdown.table` similarly accepts optional `table: str`, overriding params.table.
+Static parameters remain required fallbacks and preserve old graphs. Column input
+priority remains unchanged. Neither operation evaluates source text.

@@ -82,6 +82,7 @@
     resetPositions: () => folds.forgetPositions(),
   })
   gest = createGraphGestures({
+    onInteract: () => stage.cancelCamera(),
     getStage: () => stage.el,
     nodes: () => stage.nodes,
     nodeMap: () => stage.nodeMap,
@@ -114,6 +115,15 @@
   const rootSearch = createEntitySearch(() => query?.rootQuery.trim() ? {q:parsedRootSearch.text,types:searchTypes(parsedRootSearch,['quest','note','questline']),filters:searchFilters(parsedRootSearch,ENTITY_SPEC).filter(f=>f.key!=='type'),limit:12} : null)
   query = createGraphQuery({
     searchResults: () => ({parsed:parsedRootSearch,items:(rootSearch.hits ?? []).map(h=>({type:h.kind,id:h.id,title:h.title})),pending:rootSearch.pending,error:rootSearch.error}),
+    prepareAddition: (type, id) => {
+      const key = `${type}:${id}`
+      // Preserve the current scene and put a newly requested root where it is visible.
+      for (const n of stage.nodes) saved.set(n.key, { x: n.x, y: n.y })
+      const hidden = new Set(prefs.hidden)
+      hidden.delete(key)
+      prefs.saveHidden(hidden)
+      stage.focusNode(key)
+    },
     getTreeSettings: (key) => prefs.trees[key],
     initTree: (key, depth) => { if (!prefs.trees[key]) prefs.setTree(key, { depth, layout: stage.layoutMode }) },
     getActive: () => active,
@@ -153,6 +163,7 @@
     loadDraft: () => gd.load(),
   })
   stage = createGraphStage({
+    getAutoFocus: () => !layouts.busy,
     getTrees: () => Object.entries(query.memberships).map(([key, keys]) => ({ key, keys, layout: prefs.trees[key]?.layout ?? stage.layoutMode })),
     getActive: () => active,
     getData: () => query.data,
@@ -278,10 +289,11 @@
     settled: () => !query.loading && stage.ready && stage.stageSize.w > 0 && stage.stageSize.h > 0,
     applyLayout: () => stage.applyLayout(),
     addRoot: (type,id) => query.addToMap(type,id),
+    focusNode: (key) => stage.focusNode(key),
   }, { rememberActive: true })
 
   $effect(() => { layouts.track() })
-  onDestroy(() => layouts.dispose())
+  onDestroy(() => { layouts.dispose(); stage.cancelCamera() })
 
   function toggleSelectMode() {
     stage.toggleSelectMode()
@@ -489,6 +501,8 @@
   </GraphToolbar>
 
   <GraphCanvas
+    {active}
+    textRevision={nonce}
     zones={prefs.zones}
     {zoneDrawing}
     onZonesChange={prefs.restoreZones}

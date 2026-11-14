@@ -1,7 +1,8 @@
 // Навигация приложения: открытая вкладка, выбранный квест / заметка / вложение, центр карты и адресная строка.
 // Всё, что «открывает» сущность из интерфейса (ссылки, карта, календарь), проходит здесь, чтобы адрес и выбор не расходились.
-import { initialRoute, replaceSearch, searchForView as searchForRoute } from '@/app/model/route.ts'
+import { initialRoute, searchForView as searchForRoute } from '@/app/model/route.ts'
 import { searchOfTarget, type OpenTarget } from '@/shared/lib/openTarget.ts'
+import { navigationScope, searchAfterWorkspaceSwitch } from '@/shared/lib/urlSearch.ts'
 import { TAB_ORDER, type View } from '@/shared/lib/viewTabs.ts'
 
 export { TAB_ORDER, type View }
@@ -20,6 +21,96 @@ export function createNavigation(deps: {
 }) {
   let view = $state<View>('journal')
   let navDir = $state(1)
+  let noteHistory = $state<number[]>([])
+  let noteEntries = $state<number[]>([])
+  let noteHistoryIndex = $state(-1)
+  let entry = 0
+  function routeState() {
+    return {
+      ...history.state,
+      questsEntry: entry,
+      questsScope: navigationScope(),
+      questsNotes: { ids: [...noteHistory], entries: [...noteEntries], index: noteHistoryIndex },
+    }
+  }
+  function restoreNoteHistory() {
+    if (history.state?.questsScope && history.state.questsScope !== navigationScope()) {
+      noteHistory = []
+      noteEntries = []
+      noteHistoryIndex = -1
+      entry = 0
+      const qs = new URLSearchParams(searchAfterWorkspaceSwitch(location.search))
+      history.replaceState(routeState(), '', `${location.pathname}${qs.size ? `?${qs}` : ''}`)
+      return
+    }
+    entry = Number.isInteger(history.state?.questsEntry) ? history.state.questsEntry : 0
+    const saved = history.state?.questsNotes
+    if (
+      saved &&
+      Array.isArray(saved.ids) &&
+      Array.isArray(saved.entries) &&
+      saved.ids.length === saved.entries.length &&
+      saved.entries.every((n: unknown) => Number.isInteger(n) && Number(n) >= 0) &&
+      saved.ids.every((id: unknown) => Number.isInteger(id) && Number(id) > 0) &&
+      Number.isInteger(saved.index) &&
+      saved.index >= 0 &&
+      saved.index < saved.ids.length
+    ) {
+      // Older entries hold a prefix. Retain known forward visits and write them
+      // back on pop so reloading while looking backwards preserves the trail.
+      if (!saved.ids.every((id: number, i: number) => noteHistory[i] === id) || saved.ids.length > noteHistory.length) {
+        noteHistory = saved.ids
+        noteEntries = saved.entries
+      }
+      noteHistoryIndex = saved.index
+    }
+  }
+  function replaceSearch(params: Record<string, unknown>) {
+    const qs = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) if (value != null && value !== '') qs.set(key, String(value))
+    const url = `${location.pathname}${qs.size ? `?${qs}` : ''}`
+    if (url !== location.pathname + location.search) {
+      // Preserve the current note before leaving it for another view.
+      history.replaceState(routeState(), '', location.href)
+      entry++
+      history.pushState(routeState(), '', url)
+    }
+  }
+  function rememberNote(id: number, push: boolean) {
+    const same = location.search === `?note=${id}`
+    if (push && !same) {
+      history.replaceState(routeState(), '', location.href)
+      entry++
+    }
+    if (noteHistory[noteHistoryIndex] !== id) {
+      noteHistory = [...noteHistory.slice(0, noteHistoryIndex + 1), id]
+      noteEntries = [...noteEntries.slice(0, noteHistoryIndex + 1), entry]
+      noteHistoryIndex = noteHistory.length - 1
+    } else if (push && !same) {
+      noteEntries = [...noteEntries]
+      noteEntries[noteHistoryIndex] = entry
+    }
+    const state = routeState(),
+      url = `${location.pathname}?note=${id}`
+    if (push && !same) history.pushState(state, '', url)
+    else history.replaceState(state, '', url)
+  }
+  function onPopState() {
+    restoreNoteHistory()
+    const route = initialRoute()
+    view = (route.view ?? 'journal') as View
+    selectedId = route.questId ?? null
+    pendingSelectId = route.questId ?? null
+    selectedNoteId = route.noteId ?? null
+    selectedAttachmentId = route.attachmentId ?? null
+    graphRoot = route.graphRoot ?? { type: null, id: null }
+    restoreNoteHistory()
+    history.replaceState(routeState(), '', location.href)
+    if (selectedNoteId != null) deps.revealDetail('notes')
+  }
+  function goNoteHistory(index: number) {
+    if (index >= 0 && index < noteHistory.length) history.go(noteEntries[index] - entry)
+  }
   let selectedId = $state<number | null>(null)
   let selectedNoteId = $state<number | null>(null)
   let selectedAttachmentId = $state<number | null>(null)
@@ -44,7 +135,9 @@ export function createNavigation(deps: {
 
   /** Стартовое состояние из адресной строки. */
   function start() {
+    restoreNoteHistory()
     const route = initialRoute()
+    if (route.noteId != null) rememberNote(route.noteId, false)
     if (route.view) view = route.view as View
     if (route.attachmentId != null) selectedAttachmentId = route.attachmentId
     if (route.noteId != null) selectedNoteId = route.noteId
@@ -77,7 +170,7 @@ export function createNavigation(deps: {
     graphVisit++
     slideTo('graph')
     graphRoot = { type, id: Number(id) }
-    replaceSearch(searchFor('graph'))
+    replaceSearch({ tab: 'graph', gt: type, gid: Number(id) })
     view = 'graph'
   }
 
@@ -125,13 +218,13 @@ export function createNavigation(deps: {
     const n = validId(id)
     if (n == null) {
       selectedNoteId = null
-      if (pushUrl) replaceSearch(searchFor(view))
+      if (pushUrl) replaceSearch({ tab: 'notes' })
       deps.revealList('notes')
       return
     }
     selectedNoteId = n
     if (view !== 'notes') view = 'notes'
-    if (pushUrl) replaceSearch({ note: n })
+    if (pushUrl) rememberNote(n, true)
     deps.revealDetail('notes')
   }
 
@@ -227,6 +320,14 @@ export function createNavigation(deps: {
     set pendingSelectId(v: number | null) {
       pendingSelectId = v
     },
+    get noteHistory() {
+      return noteHistory
+    },
+    get noteHistoryIndex() {
+      return noteHistoryIndex
+    },
+    goNoteHistory,
+    onPopState,
     searchFor,
     start,
     setView,

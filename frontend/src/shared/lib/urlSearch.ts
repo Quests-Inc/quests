@@ -27,6 +27,22 @@ export function searchAfterWorkspaceSwitch(search: string): Record<string, strin
       ? 'notes'
       : params.has('repo')
         ? 'repositories'
-        : params.get('tab')
+        : params.has('layout')
+          ? 'graph'
+          : params.get('tab')
   return tab && tab !== 'journal' && Object.hasOwn(VIEW_TABS, tab) ? { tab } : {}
+}
+
+/** History entries must not reopen workspace-local ids after a workspace/account switch. */
+export function navigationScope(reset = false) {
+  try {
+    let scope = sessionStorage.getItem('quests.navigation.scope')
+    if (!scope || reset) {
+      scope = crypto.randomUUID()
+      sessionStorage.setItem('quests.navigation.scope', scope)
+    }
+    return scope
+  } catch {
+    return ''
+  }
 }

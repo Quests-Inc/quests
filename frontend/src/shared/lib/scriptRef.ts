@@ -1,3 +1,4 @@
+import { serverLimits } from './serverLimits.ts'
 // `script=N{arg}` in a text. Parameters are written by the author, nothing is inferred from the formula:
 // `?auto` computes when the text is shown, `?hide` hides the formula (`?` until a click, if it is not auto),
 // `?on=label` (or `a,b`: the first one online) sends the code of a script to that runner instead of the workspace default, and
@@ -16,6 +17,7 @@ export function scriptEmbedRe() {
 
 /** How many `?auto` embeddings one text computes. The rest stay click links. */
 export const MAX_AUTO_SCRIPTS = 16
+export const autoScriptLimit = () => serverLimits.embed_auto
 
 export type ScriptFlags = { auto: boolean; hide: boolean; set: string; on: string }
 

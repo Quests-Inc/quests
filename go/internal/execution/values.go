@@ -6,14 +6,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/quests-inc/quests/go/internal/execution/graph"
-	"github.com/quests-inc/quests/go/internal/platform/timeutil"
 )
 
 // Named values are readable data on an entity. A secret is the opposite: write-only, sealed, for a command's
@@ -87,7 +86,7 @@ func ParseNamedValue(typ string, raw json.RawMessage) (string, error) {
 			return "", &ValueError{Msg: "нужна строка"}
 		}
 		if len(s) > maxValueStr {
-			return "", &ValueError{Msg: "строка длиннее 500 символов"}
+			return "", &ValueError{Msg: "строка длиннее 500 байт UTF-8"}
 		}
 		return s, nil
 	default:
@@ -231,16 +230,25 @@ func (s *Store) SetRolledValue(ctx context.Context, o SecretOwner, name, typ, ca
 // WriteScriptValue is what a script's sink.value does: the literal is written, a source it came from is forgotten, and a
 // value that is a formula stays untouched (the script is told so instead of silently replacing a stat's rule).
 func (s *Store) WriteScriptValue(ctx context.Context, o SecretOwner, name, typ, canonical string) error {
-	rows, err := s.listStored(ctx, o)
+	if err := CheckValueName(name); err != nil {
+		return err
+	}
+	canonical, err := normalizeValue(typ, canonical)
 	if err != nil {
 		return err
 	}
-	for _, row := range rows {
-		if row.Name == name && row.Formula != "" {
-			return &ValueError{Msg: "«" + name + "» — формула: запись её не заменяет"}
-		}
+	raw := json.RawMessage(canonical)
+	if typ == "str" {
+		raw, _ = json.Marshal(canonical)
 	}
-	_, err = s.SetNamedValue(ctx, o, name, typ, canonical)
+	if typ == "float" && !strings.ContainsAny(canonical, ".eE") {
+		raw = json.RawMessage(canonical + ".0")
+	}
+	payload, err := json.Marshal(map[string]json.RawMessage{name: raw})
+	if err != nil {
+		return err
+	}
+	_, err = s.WriteScriptValues(ctx, o, payload)
 	return err
 }
 
@@ -290,52 +298,20 @@ func (s *Store) SetNamedFormula(ctx context.Context, o SecretOwner, name, typ, f
 }
 
 func (s *Store) writeValue(ctx context.Context, o SecretOwner, name, typ, canonical, formula string, script int64, arg string) (StoredValue, error) {
-	rows, err := s.listStored(ctx, o)
+	var raw json.RawMessage
+	var f *string
+	if formula != "" {
+		f = &formula
+	} else if typ == "str" {
+		raw, _ = json.Marshal(canonical)
+	} else {
+		raw = json.RawMessage(canonical)
+	}
+	values, err := s.upsertValues(ctx, o, []ValueInput{{Name: name, Type: typ, Value: raw, Formula: f}}, false, script, arg, false)
 	if err != nil {
 		return StoredValue{}, err
 	}
-	total, old := 0, 0
-	exists := false
-	for _, row := range rows {
-		n := len(row.Name) + len(row.Value) + len(row.Formula) + len(row.RollArg)
-		total += n
-		if row.Name == name {
-			exists = true
-			old = n
-		}
-	}
-	if !exists && len(rows) >= maxValuesPerOwner {
-		return StoredValue{}, &ValueError{Msg: "не больше 32 значений"}
-	}
-	if total-old+len(name)+len(canonical)+len(formula)+len(arg) > maxValueBytes {
-		return StoredValue{}, &ValueError{Msg: "значения больше 8 КБ"}
-	}
-	col, err := o.column()
-	if err != nil {
-		return StoredValue{}, err
-	}
-	now := timeutil.ToDBUTC(timeutil.NowUTC())
-	var rollScript any // NULL, not 0: the column is a foreign key
-	if script > 0 {
-		rollScript = script
-	}
-	owner, args := "?", []any{o.ID}
-	conflict := fmt.Sprintf("%[1]s, name) WHERE %[1]s IS NOT NULL", col)
-	if o.Kind == SecretOwnerWorkspace {
-		owner, args = "1", nil
-		conflict = "workspace_id, name) WHERE workspace_scope = 1"
-	}
-	_, err = s.DB.ExecContext(ctx, fmt.Sprintf(`
-		INSERT INTO named_value (%[1]s, name, type, value, formula, roll_script, roll_arg, created_at, updated_at)
-		VALUES (%[3]s, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(%[2]s
-		DO UPDATE SET type = excluded.type, value = excluded.value, formula = excluded.formula,
-			roll_script = excluded.roll_script, roll_arg = excluded.roll_arg, updated_at = excluded.updated_at`, col, conflict, owner),
-		append(args, name, typ, canonical, formula, rollScript, arg, now, now)...)
-	if err != nil {
-		return StoredValue{}, err
-	}
-	return StoredValue{Name: name, Type: typ, Value: canonical, Formula: formula, RollScript: script, RollArg: arg}, nil
+	return values[0], nil
 }
 
 // DeleteNamedValue removes one name. A missing name is not an error.
@@ -353,7 +329,7 @@ func (s *Store) listStored(ctx context.Context, o SecretOwner) ([]StoredValue, e
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT name, type, value, formula, COALESCE(roll_script, 0), roll_arg FROM named_value WHERE `+cond+` ORDER BY name`, args...)
+	rows, err := s.valueRead().QueryContext(ctx, `SELECT name, type, value, formula, COALESCE(roll_script, 0), roll_arg FROM named_value WHERE `+cond+` ORDER BY name`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +348,7 @@ func (s *Store) listStored(ctx context.Context, o SecretOwner) ([]StoredValue, e
 // NotePrivate reports whether the note is flagged private.
 func (s *Store) NotePrivate(ctx context.Context, id int64) (bool, error) {
 	var priv int
-	err := s.DB.QueryRowContext(ctx, `SELECT is_private FROM note WHERE id = ?`, id).Scan(&priv)
+	err := s.valueRead().QueryRowContext(ctx, `SELECT is_private FROM note WHERE id = ?`, id).Scan(&priv)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, ErrNotFound
 	}
@@ -413,14 +389,14 @@ func (s *Store) valueLinks(ctx context.Context, o SecretOwner) ([]valueLink, err
 func (s *Store) noteValueLinks(ctx context.Context, id int64) ([]valueLink, error) {
 	var links []valueLink
 	seen := map[int64]bool{}
-	for range maxValueChain {
+	for range int(limits.Specs["values_chain"].Max) {
 		if id <= 0 || seen[id] {
 			break
 		}
 		var parent sql.NullInt64
 		var title string
 		var priv int
-		err := s.DB.QueryRowContext(ctx, `SELECT parent_id, title, is_private FROM note WHERE id = ?`, id).Scan(&parent, &title, &priv)
+		err := s.valueRead().QueryRowContext(ctx, `SELECT parent_id, title, is_private FROM note WHERE id = ?`, id).Scan(&parent, &title, &priv)
 		if errors.Is(err, sql.ErrNoRows) {
 			break
 		}
@@ -457,7 +433,7 @@ func (s *Store) ownerTitle(ctx context.Context, o SecretOwner) string {
 		return ""
 	}
 	var title string
-	_ = s.DB.QueryRowContext(ctx, q, o.ID).Scan(&title)
+	_ = s.valueRead().QueryRowContext(ctx, q, o.ID).Scan(&title)
 	return title
 }
 
@@ -493,7 +469,7 @@ func (s *Store) collectNamedValues(ctx context.Context, o SecretOwner, skipPriva
 			if seen[row.Name] {
 				continue
 			}
-			if len(set.Effective) >= maxEffective {
+			if len(set.Effective) >= int(limits.Specs["values_effective"].Max) {
 				set.Truncated = true
 				return finishSet(set), nil
 			}

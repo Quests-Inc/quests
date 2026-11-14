@@ -754,3 +754,21 @@ export interface ValueSet {
   Effective: ValuePlace[];
   Truncated: boolean;
 }
+
+//////////
+// source: values_upsert.go
+
+/**
+ * ValueInput is a manual typed upsert: exactly one of value or formula is required.
+ */
+export interface ValueInput {
+  name: string;
+  type: string;
+  value?: any /* json.RawMessage */;
+  formula?: string;
+}
+export interface ValueBatchError {
+  index: number /* int */;
+  name: string;
+  message: string;
+}

@@ -199,3 +199,17 @@ test('catalog refresh does not create a new temporary layout; explicit navigatio
   await q.syncRoot()
   expect(calls.filter((c) => c === 'retarget')).toHaveLength(2)
 })
+
+test('adding a root prepares its visible position before updating roots', async () => {
+  const order: string[] = []
+  const { q } = make({
+    prepareAddition: (type: string, id: number) => {
+      order.push(`place:${type}:${id}`)
+    },
+    writeRoots: async () => {
+      order.push('write')
+    },
+  })
+  await q.addToMap('note', 9)
+  expect(order).toEqual(['place:note:9', 'write'])
+})

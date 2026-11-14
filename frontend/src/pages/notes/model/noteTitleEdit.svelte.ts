@@ -6,7 +6,7 @@ export function createTitleEdit(deps: {
   selectedId: () => number | null
   title: () => string
   save: (title: string) => Promise<unknown>
-  input: () => HTMLInputElement | null
+  input: () => HTMLTextAreaElement | null
 }) {
   let editing = $state(false)
   let draft = $state('')

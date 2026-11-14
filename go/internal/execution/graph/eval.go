@@ -366,6 +366,14 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 	}
 	switch rs.typ.Kind {
 	case KindSource:
+		if rs.node.Type == "constant" {
+			v, err := constantValue(rs.node.Params)
+			if err != nil {
+				return nil, err
+			}
+			set(map[string]Token{"value": v})
+			break
+		}
 		vals, err := h.Source(ctx, rs.node)
 		if err != nil {
 			return nil, err
@@ -398,6 +406,8 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 		var out map[string]Token
 		var err error
 		switch rs.typ.Name {
+		case "convert":
+			out, err = runConvert(rs, ins["in"][0])
 		case "compare":
 			out, err = runCompare(rs, ins["in"][0])
 		case "any_of":
@@ -420,9 +430,9 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 		case "json.build", "text.build":
 			out, err = runBuild(rs, ins)
 		case "markdown.table":
-			out, err = runMarkdownTable(rs, ins["text"][0], ins["column"]...)
+			out, err = runMarkdownTableInputs(rs, ins)
 		case "json.get":
-			out, err = runJSONGet(rs, ins["in"][0])
+			out, err = runJSONGet(rs, ins["in"][0], append(ins["path"], ins["index"]...)...)
 		}
 		if err != nil {
 			return nil, err

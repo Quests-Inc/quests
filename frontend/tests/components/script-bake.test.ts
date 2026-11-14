@@ -85,11 +85,11 @@ test('a failed roll stays in the text', async () => {
   expect(await bakeAutoScripts('script=1{2*con}?auto')).toBe('2\\*con — ошибка')
 })
 
-test('the seventeenth ?auto is left for a click', async () => {
+test('the export explains why the seventeenth automatic insert was not evaluated', async () => {
   const calls = mockEval(() => '1')
   const src = Array.from({ length: 17 }, () => 'script=1{1}?auto').join(' ')
   const out = await bakeAutoScripts(src)
   expect(calls).toHaveLength(16)
-  expect(out.endsWith(' 1')).toBe(true)
+  expect(out.endsWith('[лимит автовычислений]')).toBe(true)
   expect(out.split(' = 1')).toHaveLength(17)
 })

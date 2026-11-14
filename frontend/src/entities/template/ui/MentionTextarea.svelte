@@ -365,6 +365,8 @@
   }
 
   .mention-field--hl textarea::selection {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
     background: color-mix(in srgb, var(--color-accent, #c9a227) 35%, transparent);
   }
 

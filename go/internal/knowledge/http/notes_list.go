@@ -26,6 +26,7 @@ type NoteBriefListItem struct {
 	IsReadme       bool    `json:"is_readme"`
 	IsPrivate      bool    `json:"is_private"`
 	IsCategory     bool    `json:"is_category"`
+	IsSample       bool    `json:"is_sample"`
 	UpdatedAt      *string `json:"updated_at"`
 	DescriptionLen int     `json:"description_len"`
 	NoteVerdict
@@ -78,7 +79,7 @@ func briefNotePage(items []NoteListItem, limit int, cursor string) (NoteBriefPag
 		it := items[i]
 		page.Items = append(page.Items, NoteBriefListItem{
 			ID: it.ID, Title: it.Title, ParentID: it.ParentID, Pinned: it.Pinned, IsReadme: it.IsReadme,
-			IsPrivate: it.IsPrivate, IsCategory: it.IsCategory, UpdatedAt: it.UpdatedAt,
+			IsPrivate: it.IsPrivate, IsCategory: it.IsCategory, IsSample: it.IsSample, UpdatedAt: it.UpdatedAt,
 			DescriptionLen: utf8.RuneCountInString(it.Description), NoteVerdict: it.NoteVerdict, Popularity: it.Popularity,
 		})
 	}
@@ -145,6 +146,7 @@ var noteFlags = map[string]func(NoteListItem) bool{
 	"readme":   func(n NoteListItem) bool { return n.IsReadme },
 	"private":  func(n NoteListItem) bool { return n.IsPrivate },
 	"category": func(n NoteListItem) bool { return n.IsCategory },
+	"sample":   func(n NoteListItem) bool { return n.IsSample },
 	"pinned":   func(n NoteListItem) bool { return n.Pinned },
 	"pin":      func(n NoteListItem) bool { return n.Pinned },
 	"check":    func(n NoteListItem) bool { return n.HasCheck },
@@ -165,7 +167,7 @@ func filterNoteFlags(items []NoteListItem, raw string) ([]NoteListItem, error) {
 		neg := strings.HasPrefix(part, "-")
 		test, ok := noteFlags[strings.ToLower(strings.TrimLeft(part, "-"))]
 		if !ok {
-			return nil, fmt.Errorf("unknown flag %q; known: outdated, readme, private, category, pinned, check", part)
+			return nil, fmt.Errorf("unknown flag %q; known: outdated, readme, private, category, sample, pinned, check", part)
 		}
 		ws = append(ws, want{test, neg})
 	}

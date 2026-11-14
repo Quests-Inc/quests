@@ -20,6 +20,7 @@ import (
 func (h *Handler) RegisterNotes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes", h.listNotes)
 	mux.HandleFunc("POST /api/notes", h.createNote)
+	mux.HandleFunc("POST /api/notes/{id}/duplicate", h.duplicateNote)
 	mux.HandleFunc("GET /api/notes/search", h.searchNotes)
 	mux.HandleFunc("GET /api/notes/{id}/search", h.searchInNote)
 	mux.HandleFunc("POST /api/notes/{id}/feedback", h.noteFeedback)
@@ -185,6 +186,7 @@ func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 		IsReadme:    isReadme,
 		IsPrivate:   isPrivate,
 		IsCategory:  isCategory,
+		IsSample:    body["is_sample"] == true,
 		SortOrder:   sortOrder,
 		CreatedAt:   timeutil.NowUTC(),
 		UpdatedAt:   timeutil.NowUTC(),
@@ -486,4 +488,46 @@ func noteJSONInt(v any) (int, bool) {
 		return 0, false
 	}
 	return int(*p), true
+}
+
+func (h *Handler) duplicateNote(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id < 1 {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	var body struct {
+		Title    *string         `json:"title"`
+		ParentID json.RawMessage `json:"parent_id"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+		writeErr(w, 400, "invalid JSON")
+		return
+	}
+	var parent *int64
+	if len(body.ParentID) > 0 && string(body.ParentID) != "null" {
+		var n int64
+		if err := json.Unmarshal(body.ParentID, &n); err != nil || n < 1 {
+			writeErr(w, 422, "invalid parent_id")
+			return
+		}
+		parent = &n
+	}
+	if h.DuplicateNote == nil {
+		writeErr(w, 501, "duplicate unavailable")
+		return
+	}
+	note, err := h.DuplicateNote(r.Context(), id, body.Title, parent, len(body.ParentID) > 0, r.Header.Get("X-Quests-Source") == "mcp", h.DataDir)
+	if err != nil {
+		if strings.Contains(err.Error(), "приват") {
+			writeErr(w, 403, err.Error())
+		} else if errors.Is(err, knowledge.ErrNotFound) {
+			writeErr(w, 404, "note not found")
+		} else {
+			writeErr(w, 422, err.Error())
+		}
+		return
+	}
+	h.logNote(r.Context(), "note_created", note, "дубликат", 0)
+	writeJSON(w, 201, h.NotePayloadFiltered(r, note))
 }

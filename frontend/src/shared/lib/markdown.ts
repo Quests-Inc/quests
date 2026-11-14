@@ -6,6 +6,7 @@ import { mathExtensions, renderMathElements } from './markdownMath.ts'
 import { markTableTargets } from './markdownTargets.ts'
 import { REF_RE, refHref } from './refs.ts'
 import { escapeMdInline, scriptEmbedRe, scriptFlags, scriptHref, scriptLabel } from './scriptRef.ts'
+import { serverLimits } from './serverLimits.ts'
 
 /** Canonical language id for CSS / data-lang (aliases → primary). */
 const LANG_CANON: Record<string, string> = {
@@ -215,12 +216,11 @@ function splitCode(src: string) {
 
 const MUSTACHE_RE = /\{\{\s*([a-z][a-z0-9_]{0,23})\s*\}\}/g
 const FOREIGN_MUSTACHE_RE = /\{\{\s*(note|quest|questline|step|template)=(\d+)\.([a-z][a-z0-9_]{0,23})\s*\}\}/g
-const MAX_FOREIGN_VALUES = 8
 
 export type ForeignValueRef = { key: string; kind: string; id: number; name: string }
 
 /** `{{note=12.str}}` outside code and script braces. Eight different refs per text. */
-export function foreignValueRefs(source: string): ForeignValueRef[] {
+export function foreignValueRefs(source: string, limit = serverLimits.foreign_values): ForeignValueRef[] {
   const out: ForeignValueRef[] = []
   const seen = new Set<string>()
   const parts = splitCode(source)
@@ -231,7 +231,7 @@ export function foreignValueRefs(source: string): ForeignValueRef[] {
     for (const m of shielded.text.matchAll(FOREIGN_MUSTACHE_RE)) {
       const key = `${m[1]}=${m[2]}.${m[3]}`
       if (seen.has(key)) continue
-      if (seen.size >= MAX_FOREIGN_VALUES) {
+      if (seen.size >= limit) {
         FOREIGN_MUSTACHE_RE.lastIndex = 0
         return out
       }

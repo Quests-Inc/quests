@@ -57,6 +57,8 @@ export function searchForView(
   if (nextView === 'journal') return sel.quest != null ? { quest: sel.quest } : {}
   if (nextView === 'notes') return sel.note != null ? { note: sel.note } : { tab: 'notes' }
   if (nextView === 'graph') {
+    const layout = idParam('layout')
+    if (layout != null) return { layout }
     return sel.graph.id != null ? { tab: 'graph', gt: sel.graph.type, gid: sel.graph.id } : { tab: 'graph' }
   }
   if (nextView === 'repositories') {
@@ -98,6 +100,7 @@ export function initialRoute(): {
   if (fromAtt != null) return { view: 'attachments', attachmentId: fromAtt }
   if (fromNote != null) return { view: 'notes', noteId: fromNote }
   if (idParam('repo') != null) return { view: 'repositories' }
+  if (idParam('layout') != null) return { view: 'graph' }
   if (fromTab) {
     if (fromTab !== 'graph') return { view: fromTab }
     const gid = Number(param('gid'))

@@ -20,6 +20,8 @@
 
   let {
     stage,
+    textRevision = 0,
+    active = true,
     gest,
     folds,
     lk,
@@ -54,6 +56,8 @@
     zoneDrawing?: boolean
     onZonesChange?: (zones: GraphZone[]) => void
     onZoneFinish?: () => void
+    textRevision?: number
+    active?: boolean
     stage: Stage
     resize?: ReturnType<typeof import('../model/resize.svelte.ts').createCardResize>
     gest: Gest
@@ -156,6 +160,8 @@
         editingHere={editing?.key === n.key}
         picked={stage.picked.has(n.key)}
         ready={stage.ready}
+        {textRevision}
+        loadText={active}
         raster={rasterOf(n)}
         imagePixels={imagePixels(n,gest.cam,stage.stageSize,typeof window!=='undefined'?window.devicePixelRatio||1:1)}
         tier={tier.get(n.key)}

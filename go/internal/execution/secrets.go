@@ -104,7 +104,7 @@ func (s *Store) SecretOwnerExists(ctx context.Context, o SecretOwner) (bool, err
 		return false, fmt.Errorf("%w: %q", errBadSecretOwner, o.Kind)
 	}
 	var one int
-	err := s.DB.QueryRowContext(ctx, "SELECT 1 FROM "+table+" WHERE id = ?", o.ID).Scan(&one)
+	err := s.valueRead().QueryRowContext(ctx, "SELECT 1 FROM "+table+" WHERE id = ?", o.ID).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -217,7 +217,7 @@ func (s *Store) ListSecretKeys(ctx context.Context, o SecretOwner) ([]string, er
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT key FROM secret WHERE `+cond+` ORDER BY key`, args...)
+	rows, err := s.valueRead().QueryContext(ctx, `SELECT key FROM secret WHERE `+cond+` ORDER BY key`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -274,14 +274,14 @@ func (s *Store) secretChainBelow(ctx context.Context, o SecretOwner) ([]SecretOw
 	case SecretOwnerQuestline:
 		return []SecretOwner{o}, nil
 	case SecretOwnerTemplate:
-		err := s.DB.QueryRowContext(ctx, `SELECT questline_id FROM questtemplate WHERE id = ?`, o.ID).Scan(&questlineID)
+		err := s.valueRead().QueryRowContext(ctx, `SELECT questline_id FROM questtemplate WHERE id = ?`, o.ID).Scan(&questlineID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
 	case SecretOwnerQuest, SecretOwnerStep:
 		qid := o.ID
 		if o.Kind == SecretOwnerStep {
-			err := s.DB.QueryRowContext(ctx, `SELECT quest_id FROM queststep WHERE id = ?`, o.ID).Scan(&questID)
+			err := s.valueRead().QueryRowContext(ctx, `SELECT quest_id FROM queststep WHERE id = ?`, o.ID).Scan(&questID)
 			if errors.Is(err, sql.ErrNoRows) {
 				return []SecretOwner{o}, nil
 			}
@@ -290,7 +290,7 @@ func (s *Store) secretChainBelow(ctx context.Context, o SecretOwner) ([]SecretOw
 			}
 			qid = questID.Int64
 		}
-		err := s.DB.QueryRowContext(ctx, `SELECT questline_id, template_id FROM quest WHERE id = ?`, qid).Scan(&questlineID, &templateID)
+		err := s.valueRead().QueryRowContext(ctx, `SELECT questline_id, template_id FROM quest WHERE id = ?`, qid).Scan(&questlineID, &templateID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -321,7 +321,7 @@ func (s *Store) secretValues(ctx context.Context, o SecretOwner) (map[string]str
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT key, value FROM secret WHERE `+cond, args...)
+	rows, err := s.valueRead().QueryContext(ctx, `SELECT key, value FROM secret WHERE `+cond, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +528,7 @@ func (s *Store) SealedHealth(ctx context.Context) ([]SealedCounts, error) {
 		c   *SealedCounts
 		sql string
 	}{{&llm, `SELECT api_key_enc FROM user_llm`}, {&totp, `SELECT secret_enc FROM user_totp`}} {
-		rows, err := s.DB.QueryContext(ctx, q.sql)
+		rows, err := s.valueRead().QueryContext(ctx, q.sql)
 		if err != nil {
 			return nil, err
 		}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -64,7 +65,7 @@ func (h *Handler) quota() int64 {
 	if h.Quota > 0 {
 		return h.Quota
 	}
-	return DefaultQuota
+	return limits.Get("git_bytes")
 }
 func fail(w http.ResponseWriter, code int, err error) { httpx.WriteErr(w, code, err.Error()) }
 func jsonBody(w http.ResponseWriter, r *http.Request, v any) bool {

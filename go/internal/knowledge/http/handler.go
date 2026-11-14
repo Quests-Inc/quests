@@ -33,9 +33,10 @@ type ChangeEvent struct {
 
 // Handler serves the knowledge endpoints.
 type Handler struct {
-	Store   *knowledge.Store
-	Hub     *events.Hub // nil = no live events
-	DataDir string      // where note icons are kept
+	DuplicateNote func(context.Context, int64, *string, *int64, bool, bool, string) (knowledge.Note, error)
+	Store         *knowledge.Store
+	Hub           *events.Hub // nil = no live events
+	DataDir       string      // where note icons are kept
 
 	// ResolveRefs gives every mention in a text the title of what it points at (it may be a quest, a template…).
 	ResolveRefs func(r *http.Request, list []refs.Ref) []refs.Resolved

@@ -21,6 +21,7 @@ type Note struct {
 	IsReadme    bool
 	IsPrivate   bool
 	IsCategory  bool
+	IsSample    bool
 	SortOrder   int
 	ParentID    *int64
 	Color       string
@@ -39,6 +40,7 @@ type NoteRead struct {
 	IsReadme    bool    `json:"is_readme"`
 	IsPrivate   bool    `json:"is_private"`
 	IsCategory  bool    `json:"is_category"`
+	IsSample    bool    `json:"is_sample"`
 	SortOrder   int     `json:"sort_order"`
 	ParentID    *int64  `json:"parent_id"`
 	Color       string  `json:"color"`
@@ -58,6 +60,7 @@ type NoteBriefRead struct {
 	IsReadme   bool    `json:"is_readme"`
 	IsPrivate  bool    `json:"is_private"`
 	IsCategory bool    `json:"is_category"`
+	IsSample   bool    `json:"is_sample"`
 	Color      string  `json:"color"`
 	Icon       string  `json:"icon"`
 	IconURL    *string `json:"icon_url,omitempty"`
@@ -70,7 +73,7 @@ type NoteFilter struct {
 	Pinned      *bool
 }
 
-const noteCols = `id, title, description, pinned, is_readme, is_private, is_category, sort_order, parent_id, color, icon, custom_icon, created_at, updated_at`
+const noteCols = `id, title, description, pinned, is_readme, is_private, is_category, is_sample, sort_order, parent_id, color, icon, custom_icon, created_at, updated_at`
 
 func (s *Store) ListNotes(ctx context.Context, f NoteFilter) ([]Note, error) {
 	cols := noteCols
@@ -167,9 +170,9 @@ func (s *Store) CreateNote(ctx context.Context, n Note) (Note, error) {
 		n.Icon = "document"
 	}
 	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO note (title, description, pinned, is_readme, is_private, is_category, sort_order, parent_id, color, icon, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.Title, n.Description, pin, readme, private, category, n.SortOrder, n.ParentID, n.Color, n.Icon,
+		INSERT INTO note (title, description, pinned, is_readme, is_private, is_category, is_sample, sort_order, parent_id, color, icon, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.Title, n.Description, pin, readme, private, category, boolInt(n.IsSample), n.SortOrder, n.ParentID, n.Color, n.Icon,
 		timeutil.ToDBUTC(n.CreatedAt), timeutil.ToDBUTC(n.UpdatedAt))
 	if err != nil {
 		return Note{}, err
@@ -203,6 +206,9 @@ func (s *Store) UpdateNote(ctx context.Context, id int64, patch map[string]any) 
 	}
 	if v, ok := patch["is_category"].(bool); ok {
 		cur.IsCategory = v
+	}
+	if v, ok := patch["is_sample"].(bool); ok {
+		cur.IsSample = v
 	}
 	if v, ok := noteAsInt(patch["sort_order"]); ok {
 		cur.SortOrder = v
@@ -249,9 +255,9 @@ func (s *Store) UpdateNote(ctx context.Context, id int64, patch map[string]any) 
 	}
 	now := timeutil.NowUTC()
 	_, err = s.DB.ExecContext(ctx, `
-		UPDATE note SET title=?, description=?, pinned=?, is_readme=?, is_private=?, is_category=?, sort_order=?, parent_id=?, color=?, icon=?, updated_at=?
+		UPDATE note SET title=?, description=?, pinned=?, is_readme=?, is_private=?, is_category=?, is_sample=?, sort_order=?, parent_id=?, color=?, icon=?, updated_at=?
 		WHERE id=?`,
-		cur.Title, cur.Description, pin, readme, private, category, cur.SortOrder, cur.ParentID, cur.Color, cur.Icon,
+		cur.Title, cur.Description, pin, readme, private, category, boolInt(cur.IsSample), cur.SortOrder, cur.ParentID, cur.Color, cur.Icon,
 		timeutil.ToDBUTC(now), id)
 	if err != nil {
 		return Note{}, err
@@ -356,11 +362,11 @@ func (s *Store) DeleteNote(ctx context.Context, id int64) error {
 
 func scanNote(row rowScanner) (Note, error) {
 	var n Note
-	var pin, readme, private, category int
+	var pin, readme, private, category, sample int
 	var parent sql.NullInt64
 	var created, updated sql.NullString
 	var colorNS, iconNS, custom sql.NullString
-	err := row.Scan(&n.ID, &n.Title, &n.Description, &pin, &readme, &private, &category, &n.SortOrder, &parent, &colorNS, &iconNS, &custom, &created, &updated)
+	err := row.Scan(&n.ID, &n.Title, &n.Description, &pin, &readme, &private, &category, &sample, &n.SortOrder, &parent, &colorNS, &iconNS, &custom, &created, &updated)
 	if err != nil {
 		return n, err
 	}
@@ -368,6 +374,7 @@ func scanNote(row rowScanner) (Note, error) {
 	n.IsReadme = readme != 0
 	n.IsPrivate = private != 0
 	n.IsCategory = category != 0
+	n.IsSample = sample != 0
 	if parent.Valid {
 		v := parent.Int64
 		n.ParentID = &v
@@ -398,7 +405,7 @@ func scanNote(row rowScanner) (Note, error) {
 func NoteToRead(n Note) NoteRead {
 	out := NoteRead{
 		ID: n.ID, Title: n.Title, Description: n.Description, Pinned: n.Pinned,
-		IsReadme: n.IsReadme, IsPrivate: n.IsPrivate, IsCategory: n.IsCategory,
+		IsReadme: n.IsReadme, IsPrivate: n.IsPrivate, IsCategory: n.IsCategory, IsSample: n.IsSample,
 		SortOrder: n.SortOrder, ParentID: n.ParentID, Color: n.Color, Icon: n.Icon,
 		CreatedAt: timeutil.ToUTCISO(&n.CreatedAt), UpdatedAt: timeutil.ToUTCISO(&n.UpdatedAt),
 	}
@@ -417,7 +424,7 @@ func NoteToRead(n Note) NoteRead {
 func NoteBrief(n Note) NoteBriefRead {
 	out := NoteBriefRead{
 		ID: n.ID, Title: n.Title, ParentID: n.ParentID, Pinned: n.Pinned, IsReadme: n.IsReadme,
-		IsPrivate: n.IsPrivate, IsCategory: n.IsCategory, Color: n.Color, Icon: n.Icon,
+		IsPrivate: n.IsPrivate, IsCategory: n.IsCategory, IsSample: n.IsSample, Color: n.Color, Icon: n.Icon,
 	}
 	if n.CustomIcon != nil && *n.CustomIcon != "" {
 		u := fmt.Sprintf("/api/notes/%d/icon", n.ID)

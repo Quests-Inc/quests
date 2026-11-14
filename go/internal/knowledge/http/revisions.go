@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"io"
 	"net/http"
 	"strconv"
@@ -60,6 +61,9 @@ func (h *Handler) postAttachmentRevision(w http.ResponseWriter, r *http.Request,
 	}
 
 	maxBytes := h.MaxUploadBytes
+	if limits.Path() != "" {
+		maxBytes = limits.Get("upload_bytes")
+	}
 	if maxBytes <= 0 {
 		maxBytes = 25 << 20
 	}

@@ -3,6 +3,7 @@ package graph
 import (
 	"errors"
 	"fmt"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"sort"
 	"strings"
 )
@@ -57,8 +58,8 @@ func (g Graph) validate(reg Registry, fragment bool) []Problem {
 	if len(g.Nodes) == 0 {
 		return []Problem{{Message: "граф пуст"}}
 	}
-	if len(g.Nodes) > MaxNodes || len(g.Edges) > MaxEdges {
-		return []Problem{{Message: fmt.Sprintf("не больше %d нод и %d связей", MaxNodes, MaxEdges)}}
+	if len(g.Nodes) > int(limits.Get("graph_nodes")) || len(g.Edges) > MaxEdges {
+		return []Problem{{Message: fmt.Sprintf("не больше %d нод и %d связей", int(limits.Get("graph_nodes")), MaxEdges)}}
 	}
 
 	nodes := map[int]*resolved{}

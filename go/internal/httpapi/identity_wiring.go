@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 
 	"github.com/quests-inc/quests/go/internal/identity"
 	identityhttp "github.com/quests-inc/quests/go/internal/identity/http"
@@ -27,7 +28,11 @@ func (s *Server) identityHTTP() *identityhttp.Handler {
 			},
 			Usage: func(ctx context.Context) (int64, int64, bool) {
 				used, err := s.Store.Knowledge.AttachmentUsage(ctx)
-				return used, s.WorkspaceQuota, err == nil
+				quota := s.WorkspaceQuota
+				if limits.Path() != "" {
+					quota = limits.Get("attachment_bytes")
+				}
+				return used, quota, err == nil
 			},
 		}
 	})

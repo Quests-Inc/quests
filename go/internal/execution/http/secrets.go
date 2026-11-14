@@ -58,6 +58,17 @@ func (h *Handler) secretOwner(w http.ResponseWriter, r *http.Request, segment st
 		writeErr(w, http.StatusNotFound, secretOwnerLabels[kind]+" not found")
 		return o, false
 	}
+	if fromMCP(r) && o.Kind == execution.SecretOwnerNote {
+		private, err := h.Store.NotePrivate(r.Context(), o.ID)
+		if err != nil {
+			valueWriteErr(w, err)
+			return o, false
+		}
+		if private {
+			writeErr(w, http.StatusForbidden, "приватная заметка")
+			return o, false
+		}
+	}
 	return o, true
 }
 

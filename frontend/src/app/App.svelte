@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { navigationScope } from '@/shared/lib/urlSearch.ts'
+  import { refreshServerLimits } from '@/shared/api/capabilities.ts'
  import {listRepositories,resetRepositorySession} from '@/shared/api/repositories.ts'
  import {RepositoriesBlock} from '@/entities/repository'
  import ImageViewer from '@/shared/ui/ImageViewer.svelte'
@@ -229,7 +231,6 @@
       if (nav.view === 'graph') graphNonce += 1
     },
   })
-
   // Порядок вкладок задаёт направление слайда: см. model/navigation.svelte.ts
   let graphSeen = $state(false)
   let graphOn = $state(nav.view === 'graph')
@@ -258,7 +259,6 @@
       }
     }
   })
-
   async function refreshHealth() {
     try {
       const next = healthFrom(await fetchHealth())
@@ -268,11 +268,10 @@
       health = healthOffline()
     }
   }
-
   /** Boots data loading and live updates. Only runs once authenticated. */
   function startApp() {
     nav.start()
-    load()
+    void refreshServerLimits().catch(() => {}).then(() => load())
     refreshHealth()
     const tick = setInterval(() => {
       nowMs = Date.now()
@@ -324,14 +323,13 @@
       stop()
     }
   }
-
   function onAuthenticated(name: string) {
     username = name
     authed = true
     stopApp = startApp()
   }
-
   async function doLogout() {
+    navigationScope(true)
     try {
       await apiLogout()
     } catch {
@@ -348,7 +346,6 @@
     nav.selectedAttachmentId = null
     authed = false
   }
-
   onMount(() => {
     void refreshTemplates()
     // Native hosts select a landing tab without reloading the page.
@@ -360,7 +357,6 @@
     setOpenTarget((t) => {
       nav.openTarget(t)
     })
-
     applyTheme(loadSavedTheme())
     // A 401 from any later call means the session lapsed — fall back to login.
     setUnauthorizedHandler(() => {
@@ -578,6 +574,7 @@
     }
   })
 </script>
+<svelte:window onpopstate={() => nav.onPopState()} />
 
 {#if inviteToken}
   <InviteScreen token={inviteToken} />
@@ -632,6 +629,9 @@
       <NotesPage
         {questlines}
         selectedId={nav.selectedNoteId}
+        historyIds={nav.noteHistory}
+        historyIndex={nav.noteHistoryIndex}
+        onHistory={nav.goNoteHistory}
         labels={refLabels}
         onSelect={(id) => selectNoteFromUi(id)}
         onChanged={() => load({ silent: true })}

@@ -71,6 +71,7 @@ export type LayoutDeps = {
   /** Карта догрузилась и разложилась (после смены центра, глубины, раскрытий). */
   settled: () => boolean
   applyLayout: () => void
+  focusNode?: (key: string) => void
   addRoot?: (type: string, id: number) => Promise<void>
 }
 
@@ -182,12 +183,14 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     if (!options.rememberActive) return
     try {
       const url = new URL(location.href)
-      if (typeof id === 'number' && url.searchParams.get('tab') === 'graph') {
-        if (url.searchParams.get('layout') === String(id)) return
+      if (typeof id === 'number' && (url.searchParams.get('tab') === 'graph' || url.searchParams.has('layout'))) {
+        if (url.searchParams.get('layout') === String(id) && !url.searchParams.has('tab')) return
         url.searchParams.set('layout', String(id))
+        url.searchParams.delete('tab')
       } else {
         if (!url.searchParams.has('layout')) return
         url.searchParams.delete('layout')
+        url.searchParams.set('tab', 'graph')
       }
       history.replaceState(history.state, '', url)
     } catch {}
@@ -354,6 +357,8 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
       return run(async () => {
         if (id === current) {
           deps.saved.set(key, position)
+          deps.applyLayout()
+          deps.focusNode?.(key)
           return
         }
         const old =
@@ -375,6 +380,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
           deps.saved.set(key, position)
           await tick()
           deps.applyLayout()
+          deps.focusNode?.(key)
           return
         }
         const old =

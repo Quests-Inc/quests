@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 
 	"github.com/quests-inc/quests/go/internal/journal"
 	knowledgehttp "github.com/quests-inc/quests/go/internal/knowledge/http"
@@ -13,10 +14,11 @@ import (
 func (s *Server) knowledgeHTTP() *knowledgehttp.Handler {
 	s.knowledgeOnce.Do(func() {
 		s.kh = &knowledgehttp.Handler{
-			Store:       s.Store.Knowledge,
-			Hub:         s.Hub,
-			DataDir:     s.DataDir,
-			ResolveRefs: s.resolveRefs,
+			Store:         s.Store.Knowledge,
+			DuplicateNote: s.Store.DuplicateNote,
+			Hub:           s.Hub,
+			DataDir:       s.DataDir,
+			ResolveRefs:   s.resolveRefs,
 			PurgeAttachments: func(ctx context.Context, ownerType string, ownerID int64) {
 				s.knowledgeHTTP().PurgeOwnerAttachments(ctx, ownerType, ownerID)
 			},
@@ -24,7 +26,12 @@ func (s *Server) knowledgeHTTP() *knowledgehttp.Handler {
 			WebDAV:         s.WebDAV,
 			ClamAV:         s.ClamAV,
 			MaxUploadBytes: s.MaxUploadBytes,
-			Quota:          func() int64 { return s.WorkspaceQuota },
+			Quota: func() int64 {
+				if limits.Path() != "" {
+					return limits.Get("attachment_bytes")
+				}
+				return s.WorkspaceQuota
+			},
 			LogEvent: func(ctx context.Context, e knowledgehttp.ChangeEvent) {
 				_ = s.Store.Journal.LogEvent(ctx, journal.ChangeEvent{
 					Kind: e.Kind, EntityType: e.EntityType, EntityID: e.EntityID,

@@ -9,12 +9,21 @@ export const NOTE_SPEC = {
       { id: 'outdated', label: 'устарела', aliases: ['stale'] },
       { id: 'readme', label: 'README' },
       { id: 'private', label: 'PRIVATE' },
+      { id: 'sample', label: 'образец' },
       { id: 'category', label: 'CATEGORY' },
       { id: 'pinned', label: 'закреплена', aliases: ['pin'] },
       { id: 'check', label: 'есть проверка актуальности' },
     ],
     test: (
-      n: { outdated: any; is_readme: any; is_private: any; is_category: any; pinned: any; has_check: any },
+      n: {
+        outdated: any
+        is_readme: any
+        is_private: any
+        is_category: any
+        is_sample?: boolean
+        pinned: any
+        has_check: any
+      },
       v: string | number
     ) =>
       ({
@@ -22,6 +31,7 @@ export const NOTE_SPEC = {
         readme: !!n.is_readme,
         private: !!n.is_private,
         category: !!n.is_category,
+        sample: !!n.is_sample,
         pinned: !!n.pinned,
         check: !!n.has_check,
       })[v],

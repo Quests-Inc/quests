@@ -64,3 +64,12 @@ export function rollValue(kind: string, id: number, name: string, source?: { scr
     body: source ? JSON.stringify(source) : undefined,
   })
 }
+
+/** Manual atomic upsert; formulas may depend on rows later in the same batch. */
+export function setValues(
+  kind: string,
+  id: number,
+  values: { name: string; type: string; value?: unknown; formula?: string }[]
+) {
+  return request<{ items: ValueRow[] }>(valuesPath(kind, id), { method: 'PUT', body: JSON.stringify({ values }) })
+}

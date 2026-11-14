@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
+	"github.com/quests-inc/quests/go/internal/platform/limits"
 	"strconv"
 	"strings"
 
@@ -30,7 +30,7 @@ func runEgressCmd(st *store.Store, args []string) {
 	}
 	switch args[0] {
 	case "status":
-		p, err := egress.PolicyFromEnv(os.Getenv)
+		p, err := egress.PolicyFromEnv(limits.EgressEnv)
 		if err != nil {
 			fatal("%v", err)
 		}

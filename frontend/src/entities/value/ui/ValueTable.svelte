@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { serverLimits } from '@/shared/lib/serverLimits.ts'
   import { untrack } from 'svelte'
   import { deleteValue, fetchWorkspaces, listValues, putValue, rollValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
   import { ANY_HOST, hostKey, publishValues, touchValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
@@ -197,6 +198,7 @@
   {#if tab === 'secrets'}<SecretTable {owner} {readonly} />{/if}
   <div class="environment-values" hidden={tab !== 'values'}>
     <p class="values-hint">Имя пишется как здесь (str). В команде оно заглавное (STR).</p>
+    <p class="values-hint">Собственных: {own.length} / {serverLimits.values_own} · бюджет {serverLimits.values_bytes} байт · эффективных имён: {serverLimits.values_effective}</p>
     {#if truncated}<p class="values-hint">Дальние переменные не влезли в область видимости.</p>{/if}
     {#if own.length || inherited.length}
       <ul class="values-list">
