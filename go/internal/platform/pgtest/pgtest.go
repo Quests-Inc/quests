@@ -86,16 +86,19 @@ func NewWithURL(t testing.TB) (*sql.DB, string) {
 }
 
 func ensureTemplate(ctx context.Context, admin *sql.DB, base string) (string, error) {
-	tpl := "qt_tpl_" + db.ExpectedRevision()
+	return ensureNamedTemplate(ctx, admin, base, "qt_tpl_"+db.ExpectedRevision(), lockKey)
+}
+
+func ensureNamedTemplate(ctx context.Context, admin *sql.DB, base, tpl string, key int64) (string, error) {
 	conn, err := admin.Conn(ctx)
 	if err != nil {
 		return "", err
 	}
 	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, lockKey); err != nil {
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, key); err != nil {
 		return "", err
 	}
-	defer func() { _, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, lockKey) }()
+	defer func() { _, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, key) }()
 
 	var exists bool
 	if err := conn.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)`, tpl).Scan(&exists); err != nil {
