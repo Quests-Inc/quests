@@ -183,6 +183,13 @@
     color: var(--color-fg-muted, #9a9a9a);
     font-size: 0.78rem;
   }
+  .field input {
+    width: 100%; box-sizing: border-box; padding: .55rem .65rem;
+    color: var(--color-fg); background: var(--color-bg);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md, 6px); font: inherit;
+  }
+  .field input::placeholder { color: var(--color-fg-muted); opacity: 1; }
+  .field input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
   .enrol {
     display: flex;
     flex-wrap: wrap;
@@ -219,5 +226,11 @@
     border: 1px dashed var(--color-border, #333);
     border-radius: var(--radius-md, 6px);
     user-select: all;
+  }
+  input:autofill {
+    color: var(--color-fg);
+    -webkit-text-fill-color: var(--color-fg);
+    caret-color: var(--color-fg);
+    box-shadow: inset 0 0 0 1000px var(--color-bg);
   }
 </style>

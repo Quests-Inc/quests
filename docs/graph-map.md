@@ -132,3 +132,9 @@ the camera pans with its current zoom so the card's centre becomes the viewport
 centre. The pan lasts 500 ms with cubic ease-out. Pointer/wheel interaction cancels
 it immediately. Existing hand positions remain pinned; focusing does not rearrange
 other cards. Restoring a saved board does not automatically focus its draft cards.
+
+### Навигация клавишами
+
+Стрелки перемещают вид карты; Ctrl+стрелки (также Cmd на macOS) перемещают выделенные карточки, а при отсутствии группы — активную карточку. Скорость задаётся в экранных пикселях и не зависит от масштаба. При удержании Shift скорость постепенно увеличивается до восьмикратной; отпускание Shift возвращает обычную скорость. В полях ввода, диалогах и меню стрелки карту не двигают. Потеря фокуса и уход со вкладки останавливают движение.
+
+Новый корень добавляется в центр текущего вида, после чего камера плавно центрируется за 0,5 секунды. Сохранённые позиции других карточек остаются на месте. Раскладка следующих деревьев использует фактические границы уже размещённых карточек.

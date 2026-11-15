@@ -179,6 +179,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         style:transform="translate3d({n.x - n.w / 2}px, {n.y - n.h / 2}px, 0)"
         style:will-change={ready ? 'transform' : undefined}
         class:gcard--sized={n.sw != null}
+        class:gcard--compact={!editingHere && n.sh != null && n.sh < 80}
         class:gcard--resizing={resizing}
         style:width={n.sw != null ? `${n.sw}px` : big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
         style:height={n.sh != null ? `${editingHere ? Math.max(n.sh, 340) : n.sh}px` : square ? `${SQUARE}px` : ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
@@ -463,12 +464,13 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 
   .gcard__editbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
   }
 
   .gcard__edithint {
-    margin-left: auto;
+    flex-basis: 100%;
     font-size: 0.65rem;
     color: var(--color-fg-muted, #9a9a9a);
   }
@@ -625,6 +627,10 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     overflow-wrap: anywhere;
   }
 
+  .gcard--compact { padding: .25rem .4rem; gap: .15rem; }
+  .gcard--compact .gcard__head { flex: 0 1 auto; min-height: 0; overflow: hidden; }
+  .gcard--compact .gcard__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcard--compact .gcard__ghost { box-sizing: border-box; min-height: 0; padding: 0; }
   .gcard__title--line {
     overflow: hidden;
     text-overflow: ellipsis;

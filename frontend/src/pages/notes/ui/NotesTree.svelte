@@ -444,4 +444,17 @@
   .notes__status-dot {
     display: inline-flex;
   }
+
+  /* Keep the open item distinct inside a multi-selection, including on hover. */
+  .notes__row--picked.notes__row--on,
+  .hit--picked.hit--on {
+    border-left-color: transparent;
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227), inset -2px 0 0 var(--color-fg, #e8e8e8);
+  }
+  .notes__row--picked.notes__row--on:hover,
+  .hit--picked.hit--on:hover {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 30%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227), inset -2px 0 0 var(--color-fg, #e8e8e8);
+  }
 </style>

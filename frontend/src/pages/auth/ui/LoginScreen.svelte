@@ -193,4 +193,10 @@
     font-size: 0.82rem;
     color: var(--color-danger);
   }
+  input:autofill {
+    color: var(--color-fg);
+    -webkit-text-fill-color: var(--color-fg);
+    caret-color: var(--color-fg);
+    box-shadow: inset 0 0 0 1000px var(--color-bg);
+  }
 </style>

@@ -1,6 +1,7 @@
 // Что показать на экране карты: уровень детализации карточек по видимой площади и модель миникарты.
 import { STUB } from './geometry.ts'
 import type { GraphEdgeView, GraphNodeView } from './types.ts'
+import type { GraphZone } from './zones.ts'
 
 // How much of a card is built right now, by its share of the map area on screen:
 // 'lite' — frame only (< 0.5%, or well outside the window); 'title' — the head
@@ -66,17 +67,19 @@ const MINI_H = 120
 /** Minimap: every card as a small rectangle and the visible part as a frame (null while there is nothing to show). */
 export function minimapModel({
   nodes: all,
+  zones = [],
   ready,
   cam,
   stage,
 }: {
   nodes: GraphNodeView[]
+  zones?: GraphZone[]
   ready: boolean
   cam: { k: number; x: number; y: number }
   stage: { w: number; h: number }
 }) {
   const nodes = all.filter((n) => ready && Number.isFinite(n.x) && n.w)
-  if (!nodes.length || !stage.w) return null
+  if ((!nodes.length && !zones.length) || !stage.w) return null
   const vx = -cam.x / cam.k
   const vy = -cam.y / cam.k
   const vw = stage.w / cam.k
@@ -91,13 +94,19 @@ export function minimapModel({
     y0 = Math.min(y0, n.y - n.h / 2)
     y1 = Math.max(y1, n.y + n.h / 2)
   }
+  for (const z of zones) {
+    x0 = Math.min(x0, z.x)
+    y0 = Math.min(y0, z.y)
+    x1 = Math.max(x1, z.x + z.w)
+    y1 = Math.max(y1, z.y + z.h)
+  }
   const pad = Math.max(x1 - x0, y1 - y0) * 0.04
   x0 -= pad
   y0 -= pad
   x1 += pad
   y1 += pad
   const sc = Math.min(MINI_W / (x1 - x0), MINI_H / (y1 - y0))
-  return { x0, y0, sc, w: (x1 - x0) * sc, h: (y1 - y0) * sc, nodes, view: { x: vx, y: vy, w: vw, h: vh } }
+  return { x0, y0, sc, w: (x1 - x0) * sc, h: (y1 - y0) * sc, nodes, zones, view: { x: vx, y: vy, w: vw, h: vh } }
 }
 
 /**

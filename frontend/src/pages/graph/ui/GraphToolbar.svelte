@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { ComponentProps } from 'svelte'
+  import { centerPanel } from '@/shared/lib/centerPanel.ts'
+  import { onMount, type ComponentProps } from 'svelte'
   import { ENTITY_LABELS, ENTITY_TYPES, EDGES, LAYOUTS, TYPES } from '@/entities/graph'
   import { ENTITY_SPEC } from '@/entities/quest'
   import { QUEST_STATUSES, QUEST_STATUS_LABELS } from '@/shared/api/client.ts'
@@ -45,10 +46,20 @@
     children?: import('svelte').Snippet
   } = $props()
 
+  let toolbar: HTMLDivElement
+  onMount(() => {
+    function dismiss(e: Event) {
+      for (const details of toolbar.querySelectorAll<HTMLDetailsElement>('details[open]'))
+        if (!e.composedPath().includes(details)) details.open = false
+    }
+    document.addEventListener('pointerdown', dismiss, true)
+    document.addEventListener('click', dismiss, true)
+    return () => { document.removeEventListener('pointerdown', dismiss, true); document.removeEventListener('click', dismiss, true) }
+  })
   const layoutLabel = $derived(LAYOUTS[layoutMode as keyof typeof LAYOUTS] ?? LAYOUTS.tree)
 </script>
 
-<div class="graph__tools">
+<div class="graph__tools" bind:this={toolbar}>
   <div class="graph__pick">
     <input
       class="search graph__search"
@@ -76,7 +87,7 @@
   </div>
   <details class="graph__filter graph__defaults">
     <summary title="Эти параметры применяются только при добавлении дерева">Новое дерево: {layoutLabel} · {depth}</summary>
-    <div class="graph__filter-pop">
+    <div class="graph__filter-pop" use:centerPanel={{ viewport: true }}>
       <label class="graph__ctl">Раскладка
         <select bind:value={layoutMode} onchange={onLayoutChange} aria-label="Раскладка нового дерева">
           {#each Object.entries(LAYOUTS) as [k, label] (k)}<option value={k}>{label}</option>{/each}
@@ -95,7 +106,7 @@
     <summary title="Какие квесты показывать на карте и предлагать в «Добавить на карту»">
       Квесты: {statusLabel}{#if filteredOut} · скрыто {filteredOut}{/if}
     </summary>
-    <div class="graph__filter-pop">
+    <div class="graph__filter-pop" use:centerPanel={{ viewport: true }}>
       {#each QUEST_STATUSES as st (st)}
         <label>
           <input type="checkbox" checked={questStatuses.has(st)} onchange={() => onToggleStatus(st)} />
@@ -106,7 +117,7 @@
   </details>
   <details class="graph__filter">
     <summary title="Какие сущности показывать на карте">Сущности: {typesLabel}</summary>
-    <div class="graph__filter-pop">
+    <div class="graph__filter-pop" use:centerPanel={{ viewport: true }}>
       {#each ENTITY_TYPES as t (t)}
         <label>
           <input type="checkbox" checked={shownTypes.has(t)} onchange={() => onToggleType(t)} />
@@ -117,7 +128,7 @@
   </details>
   <details class="graph__filter">
     <summary>Связи</summary>
-    <div class="graph__filter-pop">
+    <div class="graph__filter-pop" use:centerPanel={{ viewport: true }}>
   {#each Object.entries(EDGES) as [k, e] (k)}
     <label class="graph__ctl graph__edge">
       <input type="checkbox" bind:checked={showEdge[k]} aria-label={e.label} />
@@ -144,7 +155,7 @@
   .graph__filter { position: relative; }
   .graph__filter summary { cursor: pointer; padding: 0.35rem 0.6rem; border: 1px solid var(--color-border, #333); border-radius: 6px; color: var(--color-fg, #e8e8e8); list-style: none; white-space: nowrap; }
   .graph__filter summary::-webkit-details-marker { display: none; }
-  .graph__filter-pop { position: absolute; z-index: 18; top: calc(100% + 0.3rem); right: 0; display: grid; gap: 0.5rem; min-width: 14rem; max-width: min(22rem, 85vw); padding: 0.7rem; border: 1px solid var(--color-border, #333); border-radius: 8px; background: var(--color-bg-raised, #1a1a1a); box-shadow: var(--pill-shadow, none); }
+  .graph__filter-pop { position: absolute; z-index: 18; top: calc(100% + 0.3rem); display: grid; gap: 0.5rem; min-width: 14rem; max-width: min(22rem, 85vw); padding: 0.7rem; border: 1px solid var(--color-border, #333); border-radius: 8px; background: var(--color-bg-raised, #1a1a1a); box-shadow: var(--pill-shadow, none); }
   .graph__filter-pop label { display: flex; align-items: center; gap: 0.4rem; color: var(--color-fg, #e8e8e8); }
   .graph__filter-pop .graph__edge { display: grid; grid-template-columns: 1.1rem 26px 1fr; justify-content: start; gap: 0.6rem; }
   .graph__edge input { margin: 0; }
@@ -156,6 +167,5 @@
   @media (max-width: 720px) {
     .graph__pick { flex-basis: 100%; }
     .graph__visibility { border: 0; padding: 0; }
-    .graph__defaults .graph__filter-pop { left: 0; right: auto; }
   }
 </style>

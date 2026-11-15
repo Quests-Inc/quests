@@ -1,9 +1,9 @@
 <script lang="ts">
   /** On/off switch with a label (a real checkbox underneath, so keyboard and screen readers work). */
-  let { checked = $bindable(false), label, disabled = false, hint = '' }: { checked?: boolean, label: string, disabled?: boolean, hint?: string } = $props()
+  let { checked = $bindable(false), label, disabled = false, hint = '', align = 'start' }: { checked?: boolean, label: string, disabled?: boolean, hint?: string, align?: 'start' | 'end' } = $props()
 </script>
 
-<label class="toggle" class:toggle--disabled={disabled}>
+<label class="toggle" class:toggle--disabled={disabled} class:toggle--end={align === 'end'}>
   <input type="checkbox" role="switch" bind:checked {disabled} />
   <span class="toggle__track" aria-hidden="true"><span class="toggle__thumb"></span></span>
   <span class="toggle__text">
@@ -23,6 +23,8 @@
     color: var(--color-fg);
     user-select: none;
   }
+  .toggle--end { display: flex; width: 100%; }
+  .toggle--end .toggle__track { order: 1; margin-left: auto; }
   .toggle--disabled {
     opacity: 0.55;
     cursor: not-allowed;

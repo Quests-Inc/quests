@@ -629,7 +629,7 @@
       <NotesPage
         {questlines}
         selectedId={nav.selectedNoteId}
-        historyIds={nav.noteHistory}
+        historyIds={nav.recentNotes} historyCount={nav.noteHistory.length}
         historyIndex={nav.noteHistoryIndex}
         onHistory={nav.goNoteHistory}
         labels={refLabels}

@@ -24,6 +24,21 @@ export function createNavigation(deps: {
   let noteHistory = $state<number[]>([])
   let noteEntries = $state<number[]>([])
   let noteHistoryIndex = $state(-1)
+  let recentNotes = $state<number[]>([])
+  function visitRecentNote(id: number) {
+    let saved: { scope?: string; ids?: number[] } = {}
+    try {
+      saved = JSON.parse(sessionStorage.getItem('questsRecentNotes') ?? '{}')
+    } catch {
+      /* ignore invalid session */
+    }
+    const ids =
+      saved.scope === navigationScope() && Array.isArray(saved.ids)
+        ? saved.ids.filter((id) => Number.isInteger(id) && id > 0)
+        : []
+    recentNotes = [id, ...ids.filter((previous) => previous !== id)].slice(0, 10)
+    sessionStorage.setItem('questsRecentNotes', JSON.stringify({ scope: navigationScope(), ids: recentNotes }))
+  }
   let entry = 0
   function routeState() {
     return {
@@ -35,6 +50,7 @@ export function createNavigation(deps: {
   }
   function restoreNoteHistory() {
     if (history.state?.questsScope && history.state.questsScope !== navigationScope()) {
+      recentNotes = []
       noteHistory = []
       noteEntries = []
       noteHistoryIndex = -1
@@ -77,6 +93,7 @@ export function createNavigation(deps: {
     }
   }
   function rememberNote(id: number, push: boolean) {
+    visitRecentNote(id)
     const same = location.search === `?note=${id}`
     if (push && !same) {
       history.replaceState(routeState(), '', location.href)
@@ -106,7 +123,10 @@ export function createNavigation(deps: {
     graphRoot = route.graphRoot ?? { type: null, id: null }
     restoreNoteHistory()
     history.replaceState(routeState(), '', location.href)
-    if (selectedNoteId != null) deps.revealDetail('notes')
+    if (selectedNoteId != null) {
+      visitRecentNote(selectedNoteId)
+      deps.revealDetail('notes')
+    }
   }
   function goNoteHistory(index: number) {
     if (index >= 0 && index < noteHistory.length) history.go(noteEntries[index] - entry)
@@ -319,6 +339,9 @@ export function createNavigation(deps: {
     },
     set pendingSelectId(v: number | null) {
       pendingSelectId = v
+    },
+    get recentNotes() {
+      return recentNotes
     },
     get noteHistory() {
       return noteHistory

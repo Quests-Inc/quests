@@ -1,3 +1,4 @@
+import { caretXY } from './caretXY.ts'
 /**
  * Approximate caret mapping between rendered markdown HTML and source text.
  * Not a full source-map — local substring match with proportional fallback.
@@ -119,14 +120,20 @@ export function scrollRootToTextOffset(
 
 export function placeTextareaCaret(ta: HTMLTextAreaElement, offset: number) {
   const o = clamp(offset, 0, ta.value.length)
-  ta.focus()
+  ta.focus({ preventScroll: true })
   ta.setSelectionRange(o, o)
-  const before = ta.value.slice(0, o)
-  const line = before.split('\n').length
-  const lh = parseFloat(getComputedStyle(ta).lineHeight)
-  const lineHeight = Number.isFinite(lh) && lh > 0 ? lh : 20
-  const pad = ta.clientHeight * 0.35
-  ta.scrollTop = Math.max(0, line * lineHeight - pad)
+  const caret = caretXY(ta, o)
+  if (!caret) return
+  ta.scrollTop = Math.max(0, caret.top - ta.clientHeight * 0.35)
+  // A notes editor may grow with its content: then its page, rather than the
+  // textarea itself, owns the scroll. Reveal the actual wrapped line there too.
+  for (let parent = ta.parentElement; parent; parent = parent.parentElement) {
+    if (!/(auto|scroll)/.test(getComputedStyle(parent).overflowY) || parent.scrollHeight <= parent.clientHeight)
+      continue
+    const y = ta.getBoundingClientRect().top + caret.top - ta.scrollTop
+    const r = parent.getBoundingClientRect()
+    parent.scrollTop += y - r.top - parent.clientHeight * 0.35
+  }
 }
 
 function locateByPrefix(src: string, ren: string, pos: number, len: number): number | null {

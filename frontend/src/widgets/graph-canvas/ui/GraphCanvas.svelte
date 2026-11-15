@@ -130,7 +130,7 @@
       · ПКМ или Esc — отмена
     </p>
   {/if}
-  {#if !center.id && !stage.view?.nodes?.length}
+  {#if !center.id && !stage.view?.nodes?.length && !zones.length}
     <p class="graph__msg">Выберите квест или заметку в поиске выше — или откройте карту из карточки квеста. ПКМ по полю создаёт новые.</p>
   {:else if error}
     <p class="graph__msg">{error}</p>
@@ -138,7 +138,24 @@
     <p class="graph__msg">Загрузка…</p>
   {/if}
 
-  <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish} />
+  <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish}>
+    {#snippet tools()}
+  <GraphTools inline
+    selectMode={stage.selectMode}
+    pickedCount={stage.picked.size}
+    full={stage.full}
+    {canClear}
+    {onHidePicked}
+    onClearPicked={stage.clearPicked}
+    {onToggleSelect}
+    onFit={stage.fit}
+    onRelayout={stage.relayout}
+    onToggleFull={stage.toggleFull}
+    {onClear}
+  />
+
+    {/snippet}
+  </GraphZones>
 
   <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready}>
     <GraphEdges drawEdges={renderedEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
@@ -199,19 +216,6 @@
     <GraphMinimap mini={stage.mini} onGo={stage.miniGo} />
   {/if}
 
-  <GraphTools
-    selectMode={stage.selectMode}
-    pickedCount={stage.picked.size}
-    full={stage.full}
-    {canClear}
-    {onHidePicked}
-    onClearPicked={stage.clearPicked}
-    {onToggleSelect}
-    onFit={stage.fit}
-    onRelayout={stage.relayout}
-    onToggleFull={stage.toggleFull}
-    {onClear}
-  />
 
   {@render children?.()}
 

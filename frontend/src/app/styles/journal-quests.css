@@ -460,9 +460,16 @@
     inset 0 0 0 1px color-mix(in srgb, var(--color-accent, #c9a227) 45%, transparent);
 }
 
-/* The quest that is open in the detail pane and also picked: the right edge keeps the "open" mark. */
+/* Open item within a multi-selection: keep the group bar and a distinct open marker. */
 .quest-row--picked.quest-row--active {
-  border-right-color: color-mix(in srgb, var(--color-accent, #c9a227) 60%, transparent);
+  border-right-color: transparent;
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+  box-shadow:
+    inset 3px 0 0 var(--color-accent, #c9a227),
+    inset -2px 0 0 var(--color-fg, #e8e8e8);
+}
+.quest-row--picked.quest-row--active:hover {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 30%, var(--color-bg-raised, #1a1a1a));
 }
 
 /* A short status label moves as one unit rather than splitting its words. */

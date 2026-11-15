@@ -10,6 +10,12 @@
   title="Клавиши"
   hint="Работают, пока курсор не в поле ввода и не открыто окно. Esc в поле возвращает управление странице. На телефоне не действуют."
 >
+  <h5 class="keys__group">Карта</h5>
+  <ul class="keys">
+    <li class="keys__row"><kbd class="keys__kbd">↑ ↓ ← →</kbd><span>Перемещать вид карты</span></li>
+    <li class="keys__row"><kbd class="keys__kbd">Ctrl + стрелки</kbd><span>Перемещать выделенные карточки</span></li>
+    <li class="keys__row"><kbd class="keys__kbd">Shift + стрелки</kbd><span>Постепенно ускорять движение; работает и вместе с Ctrl</span></li>
+  </ul>
   {#each hotkeys as g (g.title)}
     <h5 class="keys__group">{g.title}</h5>
     <ul class="keys">

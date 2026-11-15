@@ -4,6 +4,7 @@
   import StarterBlock from './sections/StarterBlock.svelte'
   import ServicesSection from './sections/ServicesSection.svelte'
   import AppearanceSection from './sections/AppearanceSection.svelte'
+  import UICustomizationSection from './sections/UICustomizationSection.svelte'
   import HotkeysSection from './sections/HotkeysSection.svelte'
   import WorkspaceSection from './sections/WorkspaceSection.svelte'
   import ArchiveSection from './sections/ArchiveSection.svelte'
@@ -27,6 +28,7 @@
   const sections = $derived([
     { id: 'services', label: 'Сервисы' },
     { id: 'appearance', label: 'Внешний вид' },
+    { id: 'ui', label: 'Кастомизация UI' },
     { id: 'hotkeys', label: 'Клавиши' },
     { id: 'examples', label: 'Примеры и гайды' },
     ...(wsx.loaded ? [{ id: 'workspace', label: 'Пространство' }] : []),
@@ -40,7 +42,7 @@
 
   $effect(() => {
     if (!open) return
-    active = section && ['services', 'appearance', 'hotkeys', 'trash', 'examples', 'workspace'].includes(section) ? section : 'services'
+    active = section && ['services', 'appearance', 'ui', 'hotkeys', 'trash', 'examples', 'workspace'].includes(section) ? section : 'services'
     pane = section ? 'content' : 'nav'
     if (onLogout || section === 'workspace') void loadWorkspaceState(!!onLogout)
   })
@@ -79,6 +81,8 @@
           <ServicesSection {health} {liveStatus} />
         {:else if active === 'appearance'}
           <AppearanceSection />
+        {:else if active === 'ui'}
+          <UICustomizationSection />
         {:else if active === 'hotkeys'}
           <HotkeysSection />
         {:else if active === 'examples'}

@@ -18,6 +18,7 @@
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import { GraphDraftLog, createGraphDraft, createGraphEdits } from '@/features/graph-draft'
   import { GraphCanvas, createCardResize, createClusterFolds, createGraphGestures, createGraphStage, createLinkMode } from '@/widgets/graph-canvas'
+  import { createArrowNavigation } from '../model/arrowNavigation.ts'
   import { handleGraphKey } from '../model/keys.ts'
   import { createGraphMenu } from '../model/menu.svelte.ts'
   import { createGraphPrefs } from '../model/prefs.svelte.ts'
@@ -119,6 +120,10 @@
       const key = `${type}:${id}`
       // Preserve the current scene and put a newly requested root where it is visible.
       for (const n of stage.nodes) saved.set(n.key, { x: n.x, y: n.y })
+      if (!saved.has(key)) {
+        const cam = gest.cam, size = stage.stageSize
+        saved.set(key, { x: (size.w / 2 - cam.x) / cam.k, y: (size.h / 2 - cam.y) / cam.k })
+      }
       const hidden = new Set(prefs.hidden)
       hidden.delete(key)
       prefs.saveHidden(hidden)
@@ -410,7 +415,24 @@
     } catch (err) { toast(err instanceof Error ? err.message : String(err), { kind: 'error' }) }
   }
 
+  const arrows = createArrowNavigation({
+    allowed: () => active && !layouts.busy && !ctx.open && !linking,
+    move: (dx, dy, selected) => {
+      stage.cancelCamera()
+      if (selected) {
+        const keys = stage.picked.size ? stage.picked : new Set(stage.selectedKey ? [stage.selectedKey] : [])
+        const cam = gest.cam
+        for (const n of stage.nodes) if (keys.has(n.key)) {
+          n.x += dx / cam.k; n.y += dy / cam.k
+          saved.set(n.key, { x: n.x, y: n.y })
+        }
+        stage.touch()
+      } else gest.cam = { ...gest.cam, x: gest.cam.x - dx, y: gest.cam.y - dy }
+    },
+  })
+  onDestroy(() => arrows.stop())
   function onKey(e: KeyboardEvent) {
+    if (arrows.down(e)) return
     handleGraphKey(e, {
       active,
       linking: !!linking,
@@ -451,6 +473,7 @@
   })
   $effect(() => {
     stage.leaveIfHidden(active)
+    if (!active) arrows.stop()
   })
   $effect(() => {
     stage.poke()
@@ -468,6 +491,8 @@
 <svelte:window
   onpaste={onPaste}
   onkeydown={onKey}
+  onkeyup={arrows.up}
+  onblur={arrows.stop}
 />
 <svelte:document onfullscreenchange={onFullscreenChange} />
 

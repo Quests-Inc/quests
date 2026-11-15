@@ -99,3 +99,20 @@ test('freeShift: свободный блок не двигается, занят
   // рамка блока выше, чем ниже карточки, поэтому ближе всего свободно сверху
   expect(Math.abs(shift.dy)).toBeGreaterThan(100)
 })
+
+test('minimap includes zones in bounds even with no cards', () => {
+  const zone = { id: 'z', title: 'Zone', color: '#ff0000', x: -1000, y: -800, w: 200, h: 300 }
+  const mini = minimapModel({
+    nodes: [],
+    zones: [zone],
+    ready: false,
+    cam: { x: 0, y: 0, k: 1 },
+    stage: { w: 800, h: 600 },
+  })
+  expect(mini).not.toBeNull()
+  expect(mini.zones).toEqual([zone])
+  expect(mini.x0).toBeLessThan(zone.x)
+  expect(mini.y0).toBeLessThan(zone.y)
+  expect(mini.w).toBeLessThanOrEqual(170)
+  expect(mini.h).toBeLessThanOrEqual(120)
+})

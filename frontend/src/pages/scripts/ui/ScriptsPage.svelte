@@ -559,7 +559,7 @@
     background: color-mix(in srgb, var(--color-fg, #e8e8e8) 4%, transparent);
   }
   .scripts__item--picked,
-  .scripts__item--picked,
+  .scripts__item--picked:hover,
   .scripts__item--on,
   .scripts__item--on:hover {
     border-left-color: var(--color-accent, #c9a227);
@@ -635,5 +635,16 @@
     .scripts__work {
       flex-direction: column;
     }
+  }
+
+  /* Keep the open item distinct inside a multi-selection, including on hover. */
+  .scripts__item--picked.scripts__item--on {
+    border-left-color: transparent;
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227), inset -2px 0 0 var(--color-fg, #e8e8e8);
+  }
+  .scripts__item--picked.scripts__item--on:hover {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 30%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227), inset -2px 0 0 var(--color-fg, #e8e8e8);
   }
 </style>

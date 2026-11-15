@@ -313,3 +313,23 @@ test('focus moves the camera to the added card over 500 ms and keeps the zoom', 
     globalThis.cancelAnimationFrame = originalCancel
   }
 })
+
+test('new trees follow actual saved bounds instead of accumulating invisible layout widths', async () => {
+  const trees = [
+    { key: 'quest:1', keys: ['quest:1'], layout: 'free' },
+    { key: 'quest:2', keys: ['quest:2'], layout: 'free' },
+    { key: 'note:4', keys: ['note:4'], layout: 'free' },
+  ]
+  const { stage, saved, prefs } = make(() => trees)
+  prefs.sizes = { 'quest:1': { w: 1200, h: 600 }, 'quest:2': { w: 1200, h: 600 } }
+  saved.set('quest:1', { x: 0, y: 0 })
+  saved.set('quest:2', { x: 0, y: 800 })
+  stage.compose()
+  await flush()
+  const root = stage.nodes.find((n) => n.key === 'note:4')!
+  expect(root.x - root.w / 2).toBeLessThanOrEqual(760)
+  saved.set('note:4', { x: -500, y: -400 })
+  stage.applyLayout()
+  expect(root).toMatchObject({ x: -500, y: -400 })
+  expect(stage.nodes.find((n) => n.key === 'quest:1')).toMatchObject({ x: 0, y: 0 })
+})

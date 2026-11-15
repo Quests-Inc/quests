@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { GraphZone } from '../model/zones.ts'
   import { TYPES } from '../model/constants.ts'
 
   /** Миникарта: все узлы мелкими прямоугольниками и рамка видимой области; клик и перетаскивание двигают вид. */
@@ -6,7 +7,7 @@
     mini,
     onGo,
   }: {
-    mini: { w: number; h: number; x0: number; y0: number; sc: number; nodes: { key: string; type: string; x: number; y: number; w: number; h: number; draft?: boolean; color?: string }[]; view: { x: number; y: number; w: number; h: number } }
+    mini: { zones?: GraphZone[]; w: number; h: number; x0: number; y0: number; sc: number; nodes: { key: string; type: string; x: number; y: number; w: number; h: number; draft?: boolean; color?: string }[]; view: { x: number; y: number; w: number; h: number } }
     onGo: (e: { currentTarget: HTMLElement; clientX: number; clientY: number }) => void
   } = $props()
 
@@ -35,6 +36,9 @@
       }}
     >
       <svg width={mini.w} height={mini.h} aria-hidden="true">
+        {#each mini.zones ?? [] as zone (zone.id)}
+          <rect class="gmini__zone" x={(zone.x - mini.x0) * mini.sc} y={(zone.y - mini.y0) * mini.sc} width={zone.w * mini.sc} height={zone.h * mini.sc} fill={zone.color} fill-opacity="0.12" stroke={zone.color} stroke-width="0.8" />
+        {/each}
         {#each mini.nodes as n (n.key)}
           <rect
             x={(n.x - n.w / 2 - mini.x0) * mini.sc}

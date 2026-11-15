@@ -20,6 +20,7 @@ import {
   stepOpenTarget,
   visibleGraph,
   type GraphGroupView,
+  type GraphZone,
   type GraphNodeView,
 } from '@/entities/graph'
 import { putGraphDraftRoots } from '@/shared/api/graph.ts'
@@ -41,6 +42,7 @@ export function createGraphStage(deps: {
   getDepth: () => number
   getQuests: () => { id: number; status?: string }[]
   prefs: {
+    zones?: GraphZone[]
     hidden: Set<string>
     questStatuses: Set<string>
     shownTypes: Set<string>
@@ -178,7 +180,16 @@ export function createGraphStage(deps: {
         n.x += right - left
         assigned.add(n.key)
       }
-      right = Math.max(...nodes.map((n) => n.x + n.w / 2)) + 160
+      const anchor = nodes.find((n) => n.key === tree.key)
+      const pinned = deps.saved.get(tree.key)
+      if (anchor && pinned) {
+        const dx = pinned.x - anchor.x,
+          dy = pinned.y - anchor.y
+        for (const n of nodes) {
+          n.x += dx
+          n.y += dy
+        }
+      }
       // Reapply hand positions only after the tree has its place on the canvas.
       for (const n of nodes) {
         const p = deps.saved.get(n.key)
@@ -187,6 +198,7 @@ export function createGraphStage(deps: {
           n.y = p.y
         }
       }
+      right = Math.max(right, ...nodes.map((n) => n.x + n.w / 2 + 160))
       groups.push(...treeGroups)
     }
     const rest = view.nodes.filter((n) => !assigned.has(n.key))
@@ -453,7 +465,7 @@ export function createGraphStage(deps: {
 
   /** Середина миникарты становится серединой поля. */
   function miniGo(e: { currentTarget: HTMLElement; clientX: number; clientY: number }) {
-    const m = minimapModel({ nodes: nodes(), ready, cam: deps.getCam(), stage: stageSize })
+    const m = minimapModel({ nodes: nodes(), zones: deps.prefs.zones, ready, cam: deps.getCam(), stage: stageSize })
     if (!m) return
     const r = e.currentTarget.getBoundingClientRect()
     const cam = deps.getCam()
@@ -478,7 +490,9 @@ export function createGraphStage(deps: {
     }
     return marks
   })
-  const mini = $derived(minimapModel({ nodes: nodes(), ready, cam: deps.getCam(), stage: stageSize }))
+  const mini = $derived(
+    minimapModel({ nodes: nodes(), zones: deps.prefs.zones, ready, cam: deps.getCam(), stage: stageSize })
+  )
 
   const map = () => nodesByKey()
 

@@ -1,11 +1,22 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
+  import Icon from '@/shared/ui/Icon.svelte'
+  import { centerPanel } from '@/shared/lib/centerPanel.ts'
   import { readZones, type GraphZone } from '@/entities/graph'
-  let { zones, cam, drawing = false, worldAt, onChange, onFinish }: {
+  let { zones, cam, drawing = false, worldAt, onChange, onFinish, tools }: {
+    tools?: import('svelte').Snippet
     zones: GraphZone[]; cam: { x: number; y: number; k: number }; drawing?: boolean
     worldAt: (e: { clientX: number; clientY: number }) => { x: number; y: number }
     onChange: (zones: GraphZone[]) => void; onFinish: () => void
   } = $props()
   let selected = $state<string | null>(null)
+  let editor = $state<HTMLDivElement | null>(null)
+  onMount(() => {
+    const dismiss = (e: Event) => { if (e.type === 'click' && e.target instanceof Element && e.target.closest('.zones')) return; if (selected && editor && !e.composedPath().includes(editor)) selected = null }
+    document.addEventListener('pointerdown', dismiss, true)
+    document.addEventListener('click', dismiss, true)
+    return () => { document.removeEventListener('pointerdown', dismiss, true); document.removeEventListener('click', dismiss, true) }
+  })
   let drag = $state<{ kind: 'draw' | 'move' | 'resize'; start: { x: number; y: number }; original: GraphZone; pointer: number } | null>(null)
   let preview = $state<GraphZone | null>(null)
   const shown = $derived(preview ? [...zones.filter((z) => z.id !== preview!.id), preview] : zones)
@@ -65,15 +76,15 @@
 {/if}
 {#if current && !drawing}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="zones__editor" role="group" aria-label="Настройки зоны" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.stopPropagation()}>
+  <div class="zones__editor" bind:this={editor} use:centerPanel={{ center: cam.x + ((preview?.x ?? current.x) + (preview?.w ?? current.w) / 2) * cam.k }} style:top="{cam.y + ((preview?.y ?? current.y) + (preview?.h ?? current.h)) * cam.k + 8}px" role="group" aria-label="Настройки зоны" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.stopPropagation()}>
     <input aria-label="Название зоны" maxlength="120" value={current.title} onchange={(e) => change({ title: e.currentTarget.value })} />
     <input type="color" aria-label="Цвет зоны" value={current.color} onchange={(e) => change({ color: e.currentTarget.value })} />
-    <label>Ш <input type="number" min="40" max="100000" aria-label="Ширина зоны" value={Math.round(current.w)} onchange={(e) => change({ w: Number(e.currentTarget.value) })} /></label>
-    <label>В <input type="number" min="40" max="100000" aria-label="Высота зоны" value={Math.round(current.h)} onchange={(e) => change({ h: Number(e.currentTarget.value) })} /></label>
-    <button type="button" class="graph__btn" onclick={() => { onChange(zones.filter((z) => z.id !== selected)); selected = null }}>Удалить зону</button>
-    <button type="button" class="graph__btn" onclick={() => selected = null}>Готово</button>
+    <label><input type="number" min="40" max="100000" aria-label="Ширина зоны" value={Math.round(current.w)} onchange={(e) => change({ w: Number(e.currentTarget.value) })} /></label>
+    <span aria-hidden="true">×</span><label><input type="number" min="40" max="100000" aria-label="Высота зоны" value={Math.round(current.h)} onchange={(e) => change({ h: Number(e.currentTarget.value) })} /></label>
+    <button type="button" class="zones__delete" aria-label="Удалить зону" title="Удалить зону" onclick={() => { onChange(zones.filter((z) => z.id !== selected)); selected = null }}><Icon name="delete" size={16} /></button>
   </div>
 {/if}
+<div class="zones__bottom">{@render tools?.()}</div>
 
 <style>
   .zones { position: absolute; inset: 0; pointer-events: none; }
@@ -85,8 +96,19 @@
   .zone__resize { position: absolute; right: 0; bottom: 0; border: 0; background: transparent; color: var(--zone-color); cursor: nwse-resize; pointer-events: auto; touch-action: none; }
   .zones--drawing .zone__title, .zones--drawing .zone__resize { pointer-events: none; }
   .zones__hint { position: absolute; z-index: 13; top: 8px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 12px; border-radius: 6px; background: var(--color-bg-raised, #1a1a1a); pointer-events: none; font-size: var(--text-sm); }
-  .zones__editor { position: absolute; z-index: 14; left: 10px; right: 10px; bottom: 52px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; background: var(--color-bg-raised, #1a1a1a); border: 1px solid var(--color-border, #333); border-radius: 8px; font-size: var(--text-xs); }
-  .zones__editor input { min-width: 0; padding: 4px; background: transparent; color: inherit; border: 1px solid var(--color-border, #333); border-radius: 4px; }
-  .zones__editor input[type=number] { width: 5rem; }
-  .zones__editor input[type=color] { width: 32px; height: 28px; padding: 1px; }
+  .zones__bottom { position: absolute; z-index: 14; left: .6rem; right: .6rem; bottom: .6rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .6rem; pointer-events: none; }
+  .zones__bottom > :global(*) { pointer-events: auto; }
+  .zones__bottom > :global(.gtools) { margin-left: auto; }
+  .zones__editor { position: absolute; z-index: 14; min-height: 2rem; flex: 0 1 auto; width: max-content; max-width: calc(100% - 16px); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px; background: var(--color-bg-raised, #1a1a1a); border: 0; border-radius: 8px; font-size: var(--text-xs); }
+  .zones__editor input { min-width: 0; height: 28px; box-sizing: border-box; padding: 2px 4px; font: inherit; background: transparent; color: inherit; border: 1px solid var(--color-border, #333); border-radius: 4px; }
+  .zones__editor input[type=number] { width: 4rem; }
+  .zones__editor input[type=color] { appearance: none; -webkit-appearance: none; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; overflow: hidden; }
+  .zones__editor input:not([type]) { width: 10rem; }
+  .zones__editor label { display: inline-flex; align-items: center; gap: 3px; }
+  .zones__editor button { height: 28px; box-sizing: border-box; padding: 0 .5rem; font: inherit; }
+  .zones__editor input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  .zones__editor input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+  .zones__editor input[type=color]::-moz-color-swatch { border: 0; border-radius: 50%; }
+  .zones__editor .zones__delete { display: grid; place-items: center; flex: none; width: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--color-danger, #b54a3a); cursor: pointer; }
+  .zones__delete:hover { background: color-mix(in srgb, var(--color-danger, #b54a3a) 12%, transparent); }
 </style>

@@ -6,6 +6,7 @@
    * Всё, чего у поля нет, просто не передаётся, и кнопки нет.
    */
   let {
+    inline = false,
     selectMode,
     pickedCount = 0,
     full,
@@ -22,6 +23,7 @@
     canUndo = false,
     canRedo = false,
   }: {
+    inline?: boolean
     selectMode: boolean
     pickedCount?: number
     full: boolean
@@ -42,7 +44,7 @@
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="gtools"
+    class="gtools" class:gtools--inline={inline}
     onpointerdown={(e) => e.stopPropagation()}
     onwheel={(e) => e.stopPropagation()}
     oncontextmenu={(e) => {
@@ -126,6 +128,8 @@
     gap: 0.35rem;
     cursor: default;
   }
+
+  .gtools--inline { position: static; flex: none; }
 
   .gtool {
     display: grid;

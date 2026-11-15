@@ -746,4 +746,15 @@
       padding-inline: 0.75rem;
     }
   }
+
+  /* Keep the open item distinct inside a multi-selection, including on hover. */
+  .attpage__item--picked.attpage__item--on {
+    border-left-color: transparent;
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 24%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227), inset -2px 0 0 var(--color-fg, #e8e8e8);
+  }
+  .attpage__item--picked.attpage__item--on:hover {
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 30%, var(--color-bg-raised, #1a1a1a));
+    box-shadow: inset 3px 0 0 var(--color-accent, #c9a227), inset -2px 0 0 var(--color-fg, #e8e8e8);
+  }
 </style>

@@ -19,7 +19,10 @@ function make() {
 }
 const url = () => location.pathname + location.search
 
-beforeEach(() => history.replaceState(null, '', '/'))
+beforeEach(() => {
+  history.replaceState(null, '', '/')
+  sessionStorage.removeItem('questsRecentNotes')
+})
 
 test('start читает вкладку и выбранное из адреса', () => {
   history.replaceState(null, '', '/?note=4&tab=graph')
@@ -198,4 +201,24 @@ test('back entries from a previous workspace cannot reopen its local note ids', 
   expect(nav.selectedNoteId).toBeNull()
   expect(nav.noteHistory).toEqual([])
   expect(location.search).toBe('?tab=notes')
+})
+
+test('recent notes move reopened notes to the front without changing browser visits', () => {
+  const { nav } = make()
+  nav.selectNote(1)
+  nav.selectNote(2)
+  const second = structuredClone(history.state)
+  nav.selectNote(3)
+  nav.selectNote(1)
+  expect(nav.recentNotes).toEqual([1, 3, 2])
+  expect(nav.noteHistory).toEqual([1, 2, 3, 1])
+  history.replaceState(second, '', '/?note=2')
+  nav.onPopState()
+  expect(nav.recentNotes).toEqual([2, 1, 3])
+  expect(nav.noteHistoryIndex).toBe(1)
+  const reloaded = make().nav
+  reloaded.start()
+  expect(reloaded.recentNotes).toEqual([2, 1, 3])
+  for (let id = 4; id <= 20; id++) reloaded.selectNote(id)
+  expect(reloaded.recentNotes).toEqual([20, 19, 18, 17, 16, 15, 14, 13, 12, 11])
 })
