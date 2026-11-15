@@ -163,6 +163,10 @@ export function createGraphEdits(deps: {
         }
       } else {
         const full = await getNote(Number(n.id))
+        if (full.is_sample) {
+          toast(`Заметка «${full.title}» помечена как образец. Редактирование запрещено`, { kind: 'error' })
+          return
+        }
         editing = {
           key: n.key,
           title: full.title ?? n.title ?? '',

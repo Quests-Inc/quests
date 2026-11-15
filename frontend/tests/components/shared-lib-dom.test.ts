@@ -4,7 +4,7 @@ import { questExportFilename } from '@/entities/quest/model/questExport.ts'
 import { buildPreviewTree, actionLabel } from '@/shared/lib/actionsPreview.ts'
 import { copyText } from '@/shared/lib/clipboard.ts'
 import { subscribeQuestEvents } from '@/shared/lib/live.ts'
-import { mapRenderedOffsetToSource, mapSourceOffsetToRendered } from '@/shared/lib/mdCaretMap.ts'
+import { mapRenderedOffsetToSource, mapSourceOffsetToRendered, rangeFromTextOffset } from '@/shared/lib/mdCaretMap.ts'
 import { DEFAULT_THEME, THEMES, applyTheme, currentThemeId, loadSavedTheme } from '@/shared/lib/theme.ts'
 
 beforeEach(() => {
@@ -157,4 +157,12 @@ test('live: события доходят до подписчика, ping пол
   expect(resyncs).toBe(1)
   stop()
   expect(statuses.at(-1)).toBe('off')
+})
+
+test('caret at a markdown block boundary uses the next visible text node', () => {
+  const root = document.createElement('div')
+  root.innerHTML = '<p>Alpha</p><p>Beta</p>'
+  const range = rangeFromTextOffset(root, 5)
+  expect(range?.startContainer.textContent).toBe('Beta')
+  expect(range?.startOffset).toBe(0)
 })

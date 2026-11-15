@@ -31,3 +31,20 @@ No mandatory separate category is imposed. Typed parameter overrides can be sent
 through set_values after creation; they are a separate atomic package, not a promise
 of a cross-operation transaction. A multi-owner batch or a combined duplicate+override
 transaction is deliberately outside this release.
+
+## Sample protection
+
+An existing sample is read-only: its title, Markdown, parent and other editable
+metadata, own named values/formulas and secrets cannot be changed or deleted.
+The note's sample flag can be changed alone; unmark it before editing. A request
+that unmarks and edits at once is rejected. Creation and duplication still work,
+and a duplicate is independent and editable. Inherited environment remains
+inherited; this flag does not freeze the workspace or ancestor notes.
+
+HTTP mutations return 403 with the note title. Map reference changes are text
+edits: outgoing references from a sample are rejected, while other notes can
+link to it. Draft admission checks the source, and storage triggers also protect
+old drafts, scripts and concurrent flag changes. The UI displays a sample seal
+in the tree and note heading, refuses text editing with a toast, and shows the
+environment read-only. This protection is not a permissions boundary against
+an administrator who can remove the flag.

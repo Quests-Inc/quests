@@ -1,4 +1,5 @@
 import { caretXY } from './caretXY.ts'
+import { orderedTextOffset } from './orderedTextMap.ts'
 /**
  * Approximate caret mapping between rendered markdown HTML and source text.
  * Not a full source-map — local substring match with proportional fallback.
@@ -41,7 +42,7 @@ export function rangeFromTextOffset(root: ParentNode, offset: number): Range | n
   while ((n = walker.nextNode())) {
     last = n as Text
     const len = last.textContent?.length ?? 0
-    if (left <= len) {
+    if (left < len) {
       const range = document.createRange()
       range.setStart(last, left)
       range.collapse(true)
@@ -62,6 +63,8 @@ export function mapRenderedOffsetToSource(source: string, rendered: string, rend
   if (!src) return 0
   if (!ren) return 0
   const pos = clamp(renderedOffset, 0, ren.length)
+  const ordered = orderedTextOffset(src, ren, pos)
+  if (ordered != null) return ordered
 
   for (const len of [56, 40, 28, 18, 12, 8]) {
     const hit = locateByPrefix(src, ren, pos, len)
@@ -88,6 +91,8 @@ export function mapSourceOffsetToRendered(source: string, rendered: string, sour
   if (!ren) return 0
   if (!src) return 0
   const pos = clamp(sourceOffset, 0, src.length)
+  const ordered = orderedTextOffset(src, ren, pos, true)
+  if (ordered != null) return ordered
 
   for (const len of [56, 40, 28, 18, 12, 8]) {
     const start = Math.max(0, pos - len)

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { toast } from '@/shared/lib/toasts.svelte.ts'
+  import { syncNoteColumns } from '@/shared/lib/syncNoteColumns.ts'
  import {RepositoriesBlock} from '@/entities/repository'
   import { AttachmentsBlock } from '@/entities/attachment'
   import { ValueTable } from '@/entities/value'
@@ -106,6 +108,11 @@
     onChanged: () => void
     onOpenSecrets?: (id: number) => void
   } = $props()
+  function sampleBlocked() {
+    if (!ed.detail?.is_sample) return false
+    toast(`Заметка «${ed.title}» помечена как образец. Редактирование запрещено`, { kind: 'error' })
+    return true
+  }
 </script>
 
 {#if ed.error}
@@ -135,6 +142,7 @@
     isReadme={ed.isReadme}
     isPrivate={ed.isPrivate}
     isCategory={ed.isCategory}
+    isSample={!!ed.detail?.is_sample}
     outdated={noteIsOutdated}
     outdatedReason={ed.detail?.outdated_reason ?? ''}
     saving={ed.saving}
@@ -149,7 +157,7 @@
       const n = notes.find((item) => item.id === selectedId)
       if (n) onOpenNoteMenu(e, n)
     }}
-    onTitleDblClick={onTitleDblClick}
+    onTitleDblClick={() => { if (!sampleBlocked()) onTitleDblClick() }}
     onTitleBlur={onTitleBlur}
     {onTitleKeydown}
     {onTogglePin}
@@ -167,7 +175,7 @@
   >
     {#snippet tools()}
       {#if selectedId && !(ed.isPrivate && !ed.privateRevealed)}
-        <ValueTable variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text, load) => {
+        <ValueTable readonly={!!ed.detail?.is_sample} variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text, load) => {
           noteValues = text
           valuesNoteId = load.id
           valuesLoading = load.state === 'loading'
@@ -188,7 +196,9 @@
       <NoteFind noteId={selectedId} container={viewMode === 'raw' ? null : previewEl} dep={ed.description} onClose={() => (findOpen = false)} />
     {/if}
     <div
+      onbeforeinput={(e) => { if (sampleBlocked()) e.preventDefault() }}
       class="notes__split"
+      use:syncNoteColumns={{ enabled: viewMode === 'combined', source: ed.description }}
       class:notes__split--raw={viewMode === 'raw'}
       class:notes__split--combined={viewMode === 'combined'}
       class:notes__split--formatted={viewMode === 'formatted'}
@@ -216,7 +226,7 @@
           class="notes__preview block--prose"
           class:notes__preview--doc={viewMode === 'formatted'}
           bind:this={previewEl}
-          ondblclick={onStartBodyEdit}
+          ondblclick={(e) => { if (!sampleBlocked()) onStartBodyEdit(e) }}
         >
           <MarkdownBody source={ed.description} {labels} {onRef} values={valuesNoteId === selectedId ? noteValues : {}} valuesLoading={valuesNoteId !== selectedId || valuesLoading} host={selectedId ? { kind: 'note', id: selectedId } : undefined} />
         </div>
@@ -322,6 +332,10 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 0 1.1rem;
   }
+
+  .notes__split--combined .notes__preview.block--prose { position: sticky; top: calc(-1 * var(--space-5, 1.5rem)); align-self: start; height: calc(100dvh - 3.5rem); scrollbar-width: none; min-height: 0; box-sizing: border-box; overflow: hidden; }
+
+  .notes__split--combined .notes__preview::-webkit-scrollbar { display: none; }
 
   .notes__split--raw,
   .notes__split--formatted {

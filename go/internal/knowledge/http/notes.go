@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -242,6 +243,13 @@ func (h *Handler) patchNote(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "invalid JSON")
 		return
+	}
+	if cur.IsSample {
+		_, onlyFlag := body["is_sample"]
+		if !onlyFlag || len(body) != 1 {
+			writeErr(w, 403, fmt.Sprintf("Заметка «%s» помечена как образец. Редактирование запрещено", cur.Title))
+			return
+		}
 	}
 	_, hasFullDesc := body["description"]
 	_, hasInsert := body["description_insert"]

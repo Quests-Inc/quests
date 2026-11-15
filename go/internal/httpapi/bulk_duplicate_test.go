@@ -86,3 +86,61 @@ func TestSampleFlagAndCreatingIndependentNote(t *testing.T) {
 		t.Fatal(code, list)
 	}
 }
+
+func TestSampleIsReadOnlyAcrossNotesEnvironmentAndMap(t *testing.T) {
+	h, s := secretsServer(t)
+	code, source := secretReq(h, "POST", "/api/notes", map[string]any{"title": "Locked blueprint", "description": "Original"})
+	if code != 201 {
+		t.Fatal(code, source)
+	}
+	id := jsonNum(source["id"])
+	base := "/api/notes/" + id
+	for _, request := range []struct {
+		method, path string
+		body         any
+	}{
+		{"PUT", base + "/values/hp", map[string]any{"type": "int", "value": 12}},
+		{"PUT", base + "/secrets/TOKEN", map[string]any{"value": "hidden"}},
+		{"PATCH", base, map[string]any{"is_sample": true}},
+	} {
+		if status, out := secretReq(h, request.method, request.path, request.body); status >= 300 {
+			t.Fatal(status, out)
+		}
+	}
+	for _, request := range []struct {
+		method, path string
+		body         any
+	}{
+		{"PATCH", base, map[string]any{"description": "Changed"}},
+		{"PATCH", base, map[string]any{"description_insert": map[string]any{"text": "changed", "position": 0}}},
+		{"PATCH", base, map[string]any{"title": "Changed"}},
+		{"PATCH", base, map[string]any{"is_sample": false, "description": "Sneak edit"}},
+		{"PUT", base + "/values/hp", map[string]any{"type": "int", "value": 99}},
+		{"PUT", base + "/values", map[string]any{"values": []any{map[string]any{"name": "hp", "type": "int", "value": 99}}}},
+		{"DELETE", base + "/values/hp", nil},
+		{"PUT", base + "/secrets/TOKEN", map[string]any{"value": "replaced"}},
+		{"DELETE", base + "/secrets/TOKEN", nil},
+		{"POST", "/api/graph-draft/ops", map[string]any{"kind": "add_ref", "payload": map[string]any{"from": "note:" + id, "to": "questline:7"}}},
+	} {
+		if status, out := secretReq(h, request.method, request.path, request.body); status != 403 {
+			t.Fatalf("%s %s: %d %v", request.method, request.path, status, out)
+		}
+	}
+	ctx := wsctx.With(t.Context(), 1)
+	// Direct storage writes, including scripts, cannot bypass the HTTP policy.
+	if _, err := s.Store.DB.ExecContext(ctx, "UPDATE named_value SET value='99' WHERE note_id=?", source["id"]); err == nil {
+		t.Fatal("direct value update accepted")
+	}
+	if _, err := s.Store.DB.ExecContext(ctx, "DELETE FROM secret WHERE note_id=?", source["id"]); err == nil {
+		t.Fatal("direct secret deletion accepted")
+	}
+	if status, out := secretReq(h, "POST", base+"/duplicate", map[string]any{"title": "Editable copy"}); status != 201 {
+		t.Fatal(status, out)
+	}
+	if status, out := secretReq(h, "PATCH", base, map[string]any{"is_sample": false}); status != 200 {
+		t.Fatal(status, out)
+	}
+	if status, out := secretReq(h, "PATCH", base, map[string]any{"description": "Now editable"}); status != 200 {
+		t.Fatal(status, out)
+	}
+}

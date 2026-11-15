@@ -10,6 +10,7 @@
   import chevronRight from '@/assets/icons/chevron-right.svg?raw'
   import clockAlert from '@/assets/icons/clock-alert.svg?raw'
   import close from '@/assets/icons/close.svg?raw'
+  import sample from '@/assets/icons/sample.svg?raw'
   import copy from '@/assets/icons/copy.svg?raw'
   import deleteIcon from '@/assets/icons/delete.svg?raw'
   import document from '@/assets/icons/document.svg?raw'
@@ -66,6 +67,7 @@
     'clock-alert': clockAlert,
     close,
     copy,
+    sample,
     delete: deleteIcon,
     document,
     download,

@@ -189,6 +189,12 @@ func (s *Store) UpdateNote(ctx context.Context, id int64, patch map[string]any) 
 	if err != nil {
 		return Note{}, err
 	}
+	if v, ok := patch["is_sample"].(bool); ok && len(patch) == 1 {
+		if _, err := s.DB.ExecContext(ctx, "UPDATE note SET is_sample=?, updated_at=? WHERE id=?", boolInt(v), timeutil.ToDBUTC(timeutil.NowUTC()), id); err != nil {
+			return Note{}, err
+		}
+		return s.GetNote(ctx, id)
+	}
 	if v, ok := patch["title"].(string); ok {
 		cur.Title = v
 	}

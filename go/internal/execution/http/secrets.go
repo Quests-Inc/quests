@@ -2,6 +2,7 @@ package executionhttp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -57,6 +58,18 @@ func (h *Handler) secretOwner(w http.ResponseWriter, r *http.Request, segment st
 	if !ok {
 		writeErr(w, http.StatusNotFound, secretOwnerLabels[kind]+" not found")
 		return o, false
+	}
+	if o.Kind == execution.SecretOwnerNote && r.Method != http.MethodGet && r.Method != http.MethodHead {
+		var title string
+		var sample int
+		if err := h.Store.DB.QueryRowContext(r.Context(), "SELECT title, is_sample FROM note WHERE id=?", o.ID).Scan(&title, &sample); err != nil {
+			writeErr(w, 500, err.Error())
+			return o, false
+		}
+		if sample != 0 {
+			writeErr(w, 403, fmt.Sprintf("Заметка «%s» помечена как образец. Редактирование запрещено", title))
+			return o, false
+		}
 	}
 	if fromMCP(r) && o.Kind == execution.SecretOwnerNote {
 		private, err := h.Store.NotePrivate(r.Context(), o.ID)

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getNote } from '@/shared/api/notes.ts'
   import { serverLimits } from '@/shared/lib/serverLimits.ts'
   import { untrack } from 'svelte'
   import { deleteValue, fetchWorkspaces, listValues, putValue, rollValue, type ValueRow, type ValueType } from '@/shared/api/client.ts'
@@ -35,7 +36,15 @@
   const TYPES: ValueType[] = ['int', 'float', 'str', 'bool']
 
   let workspaceReadonly = $state(true)
-  const editReadonly = $derived(readonly || (owner.kind === 'workspace' && workspaceReadonly))
+  let sampleReadonly = $state(false)
+  $effect(() => {
+    sampleReadonly = false
+    const target = owner
+    let live = true
+    if (target.kind === 'note') void getNote(target.id).then(n => { if (live) sampleReadonly = !!n.is_sample }).catch(() => {})
+    return () => { live = false }
+  })
+  const editReadonly = $derived(readonly || sampleReadonly || (owner.kind === 'workspace' && workspaceReadonly))
   let own = $state([] as ValueRow[])
   let inherited = $state([] as ValueRow[])
   let tab = $state<'values' | 'secrets'>('values')

@@ -3,6 +3,7 @@ package graphdraft
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,6 +67,24 @@ func (h *Handler) draftRefExists(ctx context.Context, ref draftRef, ops []store.
 // validateDraftOp checks shape and that referenced things exist. Whether the
 // draft as a whole can be saved is decided at commit.
 func (h *Handler) validateDraftOp(ctx context.Context, kind string, raw json.RawMessage, ops []store.DraftOp) string {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) == nil {
+		var target string
+		switch kind {
+		case "edit_note", "set_parent":
+			_ = json.Unmarshal(fields["id"], &target)
+		case "add_ref", "remove_ref":
+			_ = json.Unmarshal(fields["from"], &target)
+		}
+		if ref, ok := parseDraftRef(target); ok && ref.Type == "note" && !strings.HasPrefix(ref.ID, "t") {
+			var title string
+			var sample int
+			if err := h.Store.DB.QueryRowContext(ctx, "SELECT title,is_sample FROM note WHERE id=?", ref.ID).Scan(&title, &sample); err == nil && sample != 0 {
+				return fmt.Sprintf("Заметка «%s» помечена как образец. Редактирование запрещено", title)
+			}
+		}
+	}
+
 	needRef := func(v, what string, types ...string) string {
 		ref, ok := parseDraftRef(v)
 		if !ok {

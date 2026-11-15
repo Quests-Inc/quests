@@ -14,6 +14,7 @@
     isReadme,
     isPrivate,
     isCategory,
+    isSample = false,
     outdated,
     outdatedReason = '',
     saving,
@@ -50,6 +51,7 @@
     pinned: boolean
     isReadme: boolean
     isPrivate: boolean
+    isSample?: boolean
     isCategory: boolean
     outdated: boolean
     outdatedReason?: string
@@ -156,7 +158,7 @@
         {/if}
       </div>
       <div class="notes__colophon">
-        {#if isReadme || isPrivate || isCategory || outdated}<span class="hint">{[isReadme && 'к прочтению', isPrivate && 'приватная', isCategory && 'категория', outdated && 'устарела'].filter(Boolean).join(' · ')}</span>{/if}
+        {#if isSample || isReadme || isPrivate || isCategory || outdated}<span class="hint">{[isSample && 'образец', isReadme && 'к прочтению', isPrivate && 'приватная', isCategory && 'категория', outdated && 'устарела'].filter(Boolean).join(' · ')}</span>{/if}
         <nav class="notes__crumbs" aria-label="Родитель">
           {#each crumbs as c, i (c.id ?? 'root')}
             {#if i > 0}<span class="notes__crumb-sep" aria-hidden="true">/</span>{/if}

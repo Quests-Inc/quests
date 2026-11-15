@@ -9,7 +9,7 @@ mock.module('@/shared/api/graph.ts', () => ({
 const realNotes = await import('@/shared/api/notes.ts')
 mock.module('@/shared/api/notes.ts', () => ({
   ...realNotes,
-  getNote: async (id: number) => ({ id, title: 'Полная', description: 'весь текст' }),
+  getNote: async (id: number) => ({ id, title: 'Полная', description: 'весь текст', is_sample: id === 99 }),
 }))
 const realQuests = await import('@/shared/api/quests.ts')
 mock.module('@/shared/api/quests.ts', () => ({
@@ -136,4 +136,11 @@ test('draftEditQuest пишет только изменённые поля', asy
   expect(added).toEqual([])
   await ed.draftEditQuest({ title: 'Другое' })
   expect(added).toEqual([['edit_quest', { id: 'quest:1', fields: { title: 'Другое' } }]])
+})
+
+test('sample note does not enter editing when its card is double-clicked', async () => {
+  const ed = make()
+  await ed.startEditNote({ key: 'note:99', type: 'note', id: 99, title: 'Sample' })
+  expect(ed.editing).toBeNull()
+  expect(added).toEqual([])
 })
