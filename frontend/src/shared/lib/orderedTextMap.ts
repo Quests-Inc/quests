@@ -49,7 +49,13 @@ function align(source: string, rendered: string) {
   return pairs
 }
 
-export function orderedTextOffset(source: string, rendered: string, offset: number, reverse = false): number | null {
+export function orderedTextOffset(
+  source: string,
+  rendered: string,
+  offset: number,
+  reverse = false,
+  interpolateGaps = false
+): number | null {
   const pairs = align(source, rendered)
   const from = (p: Pair) => (reverse ? p.source : p.rendered)
   const to = (p: Pair) => (reverse ? p.rendered : p.source)
@@ -66,11 +72,16 @@ export function orderedTextOffset(source: string, rendered: string, offset: numb
     return to(next).start + Math.min(offset - from(next).start, to(next).end - to(next).start)
   // Whitespace and punctuation between adjacent aligned words. Do not guess
   // across a large generated block: the caller retains its fallback there.
-  if (next && previous && from(next).start - from(previous).end <= 64 && to(next).start - to(previous).end <= 64) {
+  if (
+    next &&
+    previous &&
+    (interpolateGaps || (from(next).start - from(previous).end <= 64 && to(next).start - to(previous).end <= 64))
+  ) {
     const ratio = (offset - from(previous).end) / Math.max(1, from(next).start - from(previous).end)
     return Math.round(to(previous).end + ratio * (to(next).start - to(previous).end))
   }
   if (next && from(next).start - offset <= 3) return to(next).start
   if (previous && offset - from(previous).end <= 3) return to(previous).end
+  if (interpolateGaps) return previous ? to(previous).end : next ? to(next).start : null
   return null
 }

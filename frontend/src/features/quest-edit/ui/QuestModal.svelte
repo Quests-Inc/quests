@@ -287,6 +287,7 @@
 
   /** Sync step list via CRUD (PATCH quest no longer replaces steps[]). */
   async function syncQuestSteps(questId: number, desired: any[], existing: any) {
+    const baseline = new Map(questStepsPayload((existing || []).map(questStepDraft)).map(s => [s.id, s]))
     const desiredIds = new Set(desired.filter((s: { id: null }) => s.id != null).map((s: { id: any }) => Number(s.id)))
     let saved = null
     for (const s of desired) {
@@ -297,7 +298,9 @@
       const was = (existing || []).find((o: { id: number }) => Number(o.id) === Number(id))?.script_id ?? null
       if (script_id && script_id !== was) await bindScript('step', id, script_id)
       else if (!script_id && was && !body.check_command) await unbindScript('step', id)
-      saved = await updateQuestStep(questId, id, body)
+      const previous = baseline.get(Number(id))
+      const patch = Object.fromEntries(Object.entries(body).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(previous?.[key as keyof typeof previous])))
+      if (Object.keys(patch).length || (script_id ?? null) !== was) saved = await updateQuestStep(questId, id, patch)
     }
     for (const s of desired) {
       if (s.id != null) continue

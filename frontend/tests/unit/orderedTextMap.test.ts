@@ -24,3 +24,10 @@ test('alignment resynchronizes after markdown links, code language and generated
   expect(orderedTextOffset(source, rendered, b)).toBe(a)
   expect(orderedTextOffset(source, rendered, a, true)).toBe(b)
 })
+
+test('column alignment interpolates unmatched blocks monotonically instead of global substring fallback', () => {
+  const source = 'Начало текста здесь ' + 'скрытая разметка '.repeat(20) + 'конечный видимый фрагмент'
+  const rendered = 'Начало текста здесь ' + 'результат вывода '.repeat(25) + 'конечный видимый фрагмент'
+  const mapped = Array.from({ length: source.length }, (_, i) => orderedTextOffset(source, rendered, i, true, true))
+  for (let i = 1; i < mapped.length; i++) expect(mapped[i]!).toBeGreaterThanOrEqual(mapped[i - 1]!)
+})

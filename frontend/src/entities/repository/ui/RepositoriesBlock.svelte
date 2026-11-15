@@ -90,8 +90,8 @@
  .repo-link a{display:flex;align-items:center;gap:.35rem;min-width:0;flex:1;font-weight:600}.repo-link a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .repo-link small{color:var(--color-fg-muted);font-family:var(--font-ui);font-size:.75rem}
  .repo-unlink{display:flex;padding:.25rem;background:transparent;border:0;color:var(--color-fg-muted);cursor:pointer}
- .repo-text-action{padding:0;background:transparent;border:0;color:var(--color-accent);font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
- .repo-attach-line{display:flex;align-items:baseline;gap:.25rem;flex-wrap:wrap;color:var(--color-fg-muted)}.repo-attach{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.repo-attach select{min-width:0;max-width:100%;flex:1}
+ .repo-text-action{padding:0;background:transparent;border:0;color:var(--color-accent);font:inherit;text-decoration:underline;text-underline-offset:.2em;cursor:pointer}
+ .repo-attach-line{font-size:var(--text-sm, .875rem);font-weight:400;display:flex;align-items:baseline;gap:.35rem;flex-wrap:wrap;color:var(--color-fg-muted)}.repo-attach{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.repo-attach select{min-width:0;max-width:100%;flex:1}
  .repo-sidebar{display:flex;flex-direction:column;min-height:0;overflow:hidden;font-family:var(--font-ui)}
  .repo-summary{display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;font-size:.75rem;color:var(--color-fg-muted)}
  .repo-list{overflow:auto;min-height:0;flex:1}.repo-row{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--color-border);background:transparent;color:var(--color-fg);padding:.7rem .75rem;cursor:pointer;font:inherit;overflow-wrap:anywhere}

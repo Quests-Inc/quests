@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test'
 
-import { middleSourceOffset, syncAnchorFraction, followScrollPosition } from '../../src/shared/lib/syncNoteColumns.ts'
+import {
+  middleSourceOffset,
+  syncAnchorFraction,
+  followScrollPosition,
+  sourceLineAnchors,
+} from '../../src/shared/lib/syncNoteColumns.ts'
 
 test('middle follows the containing visual line and clamps at both ends', () => {
   const lines = [
@@ -30,4 +35,21 @@ test('smooth scroll speed is proportional to distance and independent of frame r
   expect(followScrollPosition(near, 100, 16)).toBeCloseTo(followScrollPosition(0, 100, 32))
   expect(followScrollPosition(100, 0, 16)).toBeGreaterThan(0)
   expect(followScrollPosition(100, 0, 16)).toBeLessThan(100)
+})
+
+test('reference shifts continuously between neighbouring visual lines', () => {
+  const lines = [
+    { y: 10, offset: 0 },
+    { y: 30, offset: 40 },
+    { y: 50, offset: 80 },
+  ]
+  expect(sourceLineAnchors(lines, 15).fraction).toBe(0.25)
+  expect(sourceLineAnchors(lines, 25).fraction).toBe(0.75)
+  expect(sourceLineAnchors(lines, 30)).toMatchObject({ before: lines[1], after: lines[2], fraction: 0 })
+  const position = (y: number) => {
+    const a = sourceLineAnchors(lines, y)
+    return a.before.offset + (a.after.offset - a.before.offset) * a.fraction
+  }
+  expect(position(29)).toBeCloseTo(38)
+  expect(position(31)).toBeCloseTo(42)
 })

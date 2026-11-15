@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -176,6 +177,7 @@ func (h *Handler) patchStep(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "Step not found")
 		return
 	}
+	original := *st
 	wasDone := st.Done
 	if body.Title != nil {
 		st.Title = *body.Title
@@ -224,15 +226,21 @@ func (h *Handler) patchStep(w http.ResponseWriter, r *http.Request) {
 	}
 	journal.NormalizeStepCheck(st)
 	journal.ClampStep(st)
+	journal.NormalizeStepCheck(&original)
+	journal.ClampStep(&original)
+	if reflect.DeepEqual(original, *st) {
+		writeJSON(w, http.StatusOK, journal.ToQuestRead(q, timeutil.NowUTC()))
+		return
+	}
 	now := timeutil.NowUTC()
 	journal.SyncStatusFromSteps(&q, now)
 	q.UpdatedAt = now
 	kind := "quest_updated"
 	detail := "изменено"
-	if st.Done {
+	if st.Done && !wasDone {
 		kind = "step_completed"
 		detail = st.Title
-	} else if wasDone {
+	} else if wasDone && !st.Done {
 		kind = "step_reopened"
 		detail = st.Title
 	}

@@ -1,4 +1,5 @@
-import { mapSourceOffsetToRendered, rangeFromTextOffset } from './mdCaretMap.ts'
+import { rangeFromTextOffset } from './mdCaretMap.ts'
+import { orderedTextOffset } from './orderedTextMap.ts'
 
 type Options = { enabled: boolean; source: string }
 export function middleSourceOffset(lines: { y: number; offset: number }[], middle: number) {
@@ -10,6 +11,23 @@ export function middleSourceOffset(lines: { y: number; offset: number }[], middl
     else hi = mid
   }
   return lines[Math.max(0, lo - 1)]?.offset ?? 0
+}
+
+export function sourceLineAnchors(lines: { y: number; offset: number }[], y: number) {
+  let lo = 0,
+    hi = lines.length
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1
+    if (lines[mid].y <= y) lo = mid + 1
+    else hi = mid
+  }
+  const before = lines[Math.max(0, lo - 1)],
+    after = lines[Math.min(lines.length - 1, lo)]
+  return {
+    before,
+    after,
+    fraction: before && after ? Math.max(0, Math.min(1, (y - before.y) / Math.max(1, after.y - before.y))) : 0,
+  }
 }
 
 export function syncAnchorFraction(passed: number, remaining: number, visible: number) {
@@ -112,6 +130,8 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
       preview = node.querySelector<HTMLElement>('.notes__preview'),
       md = preview?.querySelector<HTMLElement>('.md')
     if (!ta || !preview || !md) return
+    // On a narrow screen the columns stack; there is no adjacent preview to sync.
+    if (preview.getBoundingClientRect().left < ta.getBoundingClientRect().right - 2) return
     measure(ta)
     if (!lines.length) return
     const a = ta.getBoundingClientRect(),
@@ -132,23 +152,35 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
       return
     }
     const middle = top + visible * fraction - a.top + ta.scrollTop
-    const offset = middleSourceOffset(lines, middle)
+    const anchors = sourceLineAnchors(lines, middle)
     const rendered = md.textContent ?? ''
-    let target = mapSourceOffsetToRendered(options.source, rendered, offset)
-    while (target < rendered.length && /\s/.test(rendered[target])) target++
-    const range = rangeFromTextOffset(md, target)
-    if (!range) return
-    if (
-      range.startContainer.nodeType === Node.TEXT_NODE &&
-      range.startOffset < (range.startContainer.textContent?.length ?? 0)
-    )
-      range.setEnd(range.startContainer, range.startOffset + 1)
-    const rect = range.getBoundingClientRect(),
-      box = preview.getBoundingClientRect()
-    if (!rect.height) return
+    const box = preview.getBoundingClientRect()
+    function renderedY(offset: number) {
+      let target = orderedTextOffset(options.source, rendered, offset, true, true)
+      if (target == null) return null
+      for (let tries = 0; tries < 64 && target < rendered.length; target++, tries++) {
+        if (/\s/.test(rendered[target])) continue
+        const range = rangeFromTextOffset(md, target)
+        if (!range) return null
+        if (
+          range.startContainer.nodeType === Node.TEXT_NODE &&
+          range.startOffset < (range.startContainer.textContent?.length ?? 0)
+        )
+          range.setEnd(range.startContainer, range.startOffset + 1)
+        const rect = range.getBoundingClientRect()
+        if (rect.height) return preview.scrollTop + rect.top - box.top
+      }
+      return null
+    }
+    const y0 = renderedY(anchors.before.offset),
+      y1 = renderedY(anchors.after.offset)
+    if (y0 == null && y1 == null) return
+    const from = y0 ?? y1!,
+      to = Math.max(from, y1 ?? from)
+    const position = from + (to - from) * anchors.fraction
     const previewTop = Math.max(box.top, p.top),
       previewBottom = Math.min(box.bottom, p.bottom)
-    follow(preview, preview.scrollTop + rect.top - (previewTop + (previewBottom - previewTop) * fraction))
+    follow(preview, position - (previewTop - box.top + (previewBottom - previewTop) * fraction))
   }
   function schedule() {
     if (!frame) frame = requestAnimationFrame(sync)
@@ -158,7 +190,13 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
     if (!(e.target instanceof Element && e.target.closest('.notes__preview'))) schedule()
   }
   node.addEventListener('scroll', sourceScroll, true)
-  const observer = new ResizeObserver(schedule)
+  const resized = () => {
+    signature = ''
+    schedule()
+  }
+  window.addEventListener('resize', resized)
+  document.fonts?.addEventListener('loadingdone', resized)
+  const observer = new ResizeObserver(resized)
   observer.observe(node)
   const changes = new MutationObserver(schedule)
   changes.observe(node, { childList: true, subtree: true })
@@ -173,6 +211,8 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
       if (frame) cancelAnimationFrame(frame)
       page?.removeEventListener('scroll', schedule)
       node.removeEventListener('scroll', sourceScroll, true)
+      window.removeEventListener('resize', resized)
+      document.fonts?.removeEventListener('loadingdone', resized)
       observer.disconnect()
       changes.disconnect()
     },

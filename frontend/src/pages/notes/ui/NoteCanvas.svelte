@@ -402,6 +402,7 @@
   }
 
   @media (max-width: 720px) {
+    .notes__split--combined .notes__preview.block--prose { position: static; height: auto; overflow: visible; }
     .notes__split--combined {
       grid-template-columns: 1fr;
       gap: 0.85rem;
