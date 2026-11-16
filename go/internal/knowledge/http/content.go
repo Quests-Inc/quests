@@ -184,6 +184,164 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, body)
 }
 
+// InlineAudioTypes is what <audio> may load. Anything else stays a download:
+// the sniffed type is the allow-list, never the type the client declared.
+var InlineAudioTypes = map[string]bool{
+	"audio/mpeg":  true,
+	"audio/mp4":   true,
+	"audio/aac":   true,
+	"audio/ogg":   true,
+	"audio/wav":   true,
+	"audio/wave":  true,
+	"audio/x-wav": true,
+	"audio/webm":  true,
+	"audio/flac":  true,
+	"audio/x-m4a": true,
+}
+
+// getAttachmentAudio is the sound counterpart of getAttachmentImage: one
+// inline file, seekable. A Range header is forwarded to WebDAV; if the file
+// server ignores it, the bytes are sliced here so the player can still seek.
+func (h *Handler) getAttachmentAudio(w http.ResponseWriter, r *http.Request) {
+	aid, _ := strconv.ParseInt(r.PathValue("aid"), 10, 64)
+	a, err := h.Store.GetAttachment(r.Context(), aid)
+	if errors.Is(err, knowledge.ErrNotFound) {
+		writeErr(w, 404, "attachment not found")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if !h.WebDAVOK() {
+		writeErr(w, 503, "attachment storage is not configured")
+		return
+	}
+	if a.Hidden && r.URL.Query().Get("preview") != "1" {
+		writeErr(w, 404, "attachment not found")
+		return
+	}
+	pathToGet := a.WebDAVPath
+	detected := a.ContentTypeDetected
+	size := a.SizeBytes
+	if revStr := strings.TrimSpace(r.URL.Query().Get("revision")); revStr != "" {
+		revN, err := strconv.Atoi(revStr)
+		if err != nil || revN < 1 {
+			writeErr(w, 422, "revision must be a positive integer")
+			return
+		}
+		rev, err := h.Store.GetAttachmentRevision(r.Context(), a.ID, revN)
+		if errors.Is(err, knowledge.ErrNotFound) {
+			writeErr(w, 404, "revision not found")
+			return
+		}
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		pathToGet = rev.WebDAVPath
+		detected = rev.ContentTypeDetected
+		size = rev.SizeBytes
+	}
+	ctype, _, _ := strings.Cut(detected, ";")
+	ctype = strings.ToLower(strings.TrimSpace(ctype))
+	if !InlineAudioTypes[ctype] {
+		writeErr(w, 415, "attachment is not a playable audio file")
+		return
+	}
+	obj, err := h.WebDAV.Open(r.Context(), pathToGet, r.Header.Get("Range"))
+	if errors.Is(err, webdav.ErrNotFound) {
+		writeErr(w, 404, "file missing on the file server")
+		return
+	}
+	if err != nil {
+		writeErr(w, 502, "file server unreachable: "+err.Error())
+		return
+	}
+	defer obj.Body.Close()
+
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("Accept-Ranges", "bytes")
+	if obj.Status == http.StatusRequestedRangeNotSatisfiable {
+		if size > 0 {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", size))
+		}
+		w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+		return
+	}
+	if obj.Status == http.StatusPartialContent {
+		if obj.Range != "" {
+			w.Header().Set("Content-Range", obj.Range)
+		}
+		if obj.Length != "" {
+			w.Header().Set("Content-Length", obj.Length)
+		}
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = io.Copy(w, obj.Body)
+		return
+	}
+	rng := strings.TrimSpace(r.Header.Get("Range"))
+	if rng != "" && size > 0 {
+		start, end, ok := byteRange(rng, size)
+		if !ok {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", size))
+			w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		if _, err := io.CopyN(io.Discard, obj.Body, start); err != nil {
+			return
+		}
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
+		w.Header().Set("Content-Length", strconv.FormatInt(end-start+1, 10))
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = io.CopyN(w, obj.Body, end-start+1)
+		return
+	}
+	if size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, obj.Body)
+}
+
+func byteRange(spec string, size int64) (int64, int64, bool) {
+	if size <= 0 || !strings.HasPrefix(spec, "bytes=") || strings.Contains(spec, ",") {
+		return 0, 0, false
+	}
+	left, right, ok := strings.Cut(strings.TrimPrefix(spec, "bytes="), "-")
+	if !ok {
+		return 0, 0, false
+	}
+	if left == "" {
+		n, err := strconv.ParseInt(right, 10, 64)
+		if err != nil || n <= 0 {
+			return 0, 0, false
+		}
+		if n > size {
+			n = size
+		}
+		return size - n, size - 1, true
+	}
+	start, err := strconv.ParseInt(left, 10, 64)
+	if err != nil || start < 0 || start >= size {
+		return 0, 0, false
+	}
+	end := size - 1
+	if right != "" {
+		end, err = strconv.ParseInt(right, 10, 64)
+		if err != nil || end < start {
+			return 0, 0, false
+		}
+		if end >= size {
+			end = size - 1
+		}
+	}
+	return start, end, true
+}
+
 // ContentDisposition sends an ASCII fallback plus RFC 5987 UTF-8, so a Russian
 // filename survives without breaking older clients.
 func ContentDisposition(name string) string {

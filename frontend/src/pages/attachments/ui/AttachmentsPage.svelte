@@ -13,6 +13,8 @@
   import { createFoldedGroups } from '../model/foldedGroups.svelte.ts'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import { fileKind } from '@/shared/lib/fileKind.ts'
+  import { trackOf } from '@/shared/lib/player.svelte.ts'
+  import PlayFile from '@/shared/ui/PlayFile.svelte'
   import AttachmentPanel from './AttachmentPanel.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
@@ -177,12 +179,20 @@
     onDeleted: (ids) => ids.includes(selectedId ?? -1) && onSelect?.(null),
   })
 
+  // Only scroll the list pane — scrollIntoView would also drag page-layout__content and jerk the tab slide.
   $effect(() => {
     const id = selectedId
     filtered
     if (id == null || typeof document === 'undefined') return
     queueMicrotask(() => {
-      document.querySelector(`[data-att-id="${id}"]`)?.scrollIntoView({ block: 'nearest' })
+      const el = document.querySelector(`[data-att-id="${id}"]`)
+      if (!(el instanceof HTMLElement)) return
+      const list = el.closest('.attpage__list')
+      if (!(list instanceof HTMLElement)) return
+      const er = el.getBoundingClientRect()
+      const lr = list.getBoundingClientRect()
+      if (er.top < lr.top) list.scrollTop -= lr.top - er.top
+      else if (er.bottom > lr.bottom) list.scrollTop += er.bottom - lr.bottom
     })
   })
 
@@ -392,6 +402,8 @@
     class:attpage__item--on={a.id === selectedId}
     class:attpage__item--picked={grp.multi.has(a.id)}
     class:attpage__item--hidden={a.hidden}
+    class:is-playing-file={trackOf(a.id) === 'playing'}
+    class:is-current-file={trackOf(a.id) === 'paused'}
     data-att-id={a.id}
     role="listitem"
     onclick={(e) => !grp.click(e, a.id, visibleIds()) && onSelect?.(a.id)}
@@ -413,6 +425,7 @@
     <div class="attpage__main">
       <div class="attpage__name">
         <span class="attpage__file" title={a.filename}>{a.filename || `attachment=${a.id}`}</span>
+        <PlayFile file={a} />
         {#if a.hidden}
           <span class="attpage__chip attpage__chip--hidden" title="Скрыто"><Icon name="eye-off" size={11} /></span>
         {/if}
@@ -544,6 +557,11 @@
     height: 100%;
   }
 
+  /* List/panel own the scroll; outer auto-scroll made the page jump on select. */
+  .attpage :global(.page-layout__content) {
+    overflow: hidden;
+  }
+
   .attpage__split {
     flex: 1 1 auto;
     min-height: 0;
@@ -623,6 +641,13 @@
     min-width: 0;
     display: grid;
     gap: 0.15rem;
+  }
+
+  .attpage__name {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
   }
 
   .attpage__file {

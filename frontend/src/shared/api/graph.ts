@@ -1,4 +1,5 @@
 import { toast } from '@/shared/lib/toasts.svelte.ts'
+import { assertUploadSize } from '@/shared/lib/uploadLimit.ts'
 
 import type { GraphDraftView } from './graphdraft.gen'
 import { BASE, request } from './http.ts'
@@ -113,6 +114,7 @@ export async function commitGraphDraft() {
  * @param owner "quest:5" etc.
  */
 export async function uploadGraphDraftFile(file: File, owner: string = '', scope = draftScope) {
+  assertUploadSize(file)
   const fd = new FormData()
   fd.append('file', file)
   if (owner) fd.append('owner', owner)

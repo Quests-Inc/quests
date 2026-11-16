@@ -45,15 +45,30 @@
   opacity: 0.55;
 }
 
+.attach__row.is-playing-file,
+.attpage__item.is-playing-file {
+  box-shadow: inset 3px 0 0 var(--color-accent, #c9a227);
+}
+
+.attach__row.is-current-file,
+.attpage__item.is-current-file {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-accent, #c9a227) 45%, transparent);
+}
+
 .attach__name {
   font-weight: 600;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   max-width: 100%;
+}
+
+.attach__filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .attach__rev {

@@ -140,25 +140,52 @@ func (c *Client) Put(ctx context.Context, path, contentType string, body io.Read
 	return nil
 }
 
+// Object is one GET, including a partial (206) response. The caller closes Body.
+type Object struct {
+	Status int
+	Length string
+	Range  string
+	Body   io.ReadCloser
+}
+
 // Get returns the body; the caller closes it.
 func (c *Client) Get(ctx context.Context, path string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.urlFor(path), nil)
+	obj, err := c.Open(ctx, path, "")
 	if err != nil {
 		return nil, err
+	}
+	return obj.Body, nil
+}
+
+// Open GETs path. rng is forwarded as a Range header when set, so a player can
+// seek without downloading the whole file. 206 and 416 are returned as Object
+// rather than errors; the caller writes them through.
+func (c *Client) Open(ctx context.Context, path, rng string) (Object, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.urlFor(path), nil)
+	if err != nil {
+		return Object{}, err
+	}
+	if rng != "" {
+		req.Header.Set("Range", rng)
 	}
 	resp, err := c.do(req)
 	if err != nil {
-		return nil, err
+		return Object{}, err
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		resp.Body.Close()
-		return nil, ErrNotFound
+		return Object{}, ErrNotFound
 	}
-	if resp.StatusCode >= 300 {
+	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
 		resp.Body.Close()
-		return nil, fmt.Errorf("webdav: GET %s: %s", path, resp.Status)
+		return Object{}, fmt.Errorf("webdav: GET %s: %s", path, resp.Status)
 	}
-	return resp.Body, nil
+	return Object{
+		Status: resp.StatusCode,
+		Length: resp.Header.Get("Content-Length"),
+		Range:  resp.Header.Get("Content-Range"),
+		Body:   resp.Body,
+	}, nil
 }
 
 func (c *Client) Delete(ctx context.Context, path string) error {

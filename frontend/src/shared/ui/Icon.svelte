@@ -30,7 +30,10 @@
   import list from '@/assets/icons/list.svg?raw'
   import map from '@/assets/icons/map.svg?raw'
   import more from '@/assets/icons/more.svg?raw'
+  import pause from '@/assets/icons/pause.svg?raw'
   import pin from '@/assets/icons/pin.svg?raw'
+  import play from '@/assets/icons/play.svg?raw'
+  import toStart from '@/assets/icons/to-start.svg?raw'
   import pinFilled from '@/assets/icons/pin-filled.svg?raw'
   import pinOff from '@/assets/icons/pin-off.svg?raw'
   import redo from '@/assets/icons/redo.svg?raw'
@@ -45,6 +48,7 @@
   import fit from '@/assets/icons/fit.svg?raw'
   import fullscreen from '@/assets/icons/fullscreen.svg?raw'
   import fullscreenExit from '@/assets/icons/fullscreen-exit.svg?raw'
+  import imageOpen from '@/assets/icons/image-open.svg?raw'
   import select from '@/assets/icons/select.svg?raw'
   import sidebar from '@/assets/icons/sidebar.svg?raw'
   import subtract from '@/assets/icons/subtract.svg?raw'
@@ -78,6 +82,7 @@
     fit,
     fullscreen,
     'fullscreen-exit': fullscreenExit,
+    'image-open': imageOpen,
     filter,
     search,
     flag,
@@ -90,7 +95,10 @@
     list,
     map,
     more,
+    pause,
     pin,
+    play,
+    'to-start': toStart,
     'pin-filled': pinFilled,
     'pin-off': pinOff,
     redo,

@@ -4,6 +4,7 @@
  import {listRepositories,resetRepositorySession} from '@/shared/api/repositories.ts'
  import {RepositoriesBlock} from '@/entities/repository'
  import ImageViewer from '@/shared/ui/ImageViewer.svelte'
+  import { AudioPlayerHost } from '@/widgets/audio-player'
   // Quests web UI — orchestrator (state, load, overlays)
   import { CalendarPage } from '@/pages/calendar'
   import { HistoryPage } from '@/pages/history'
@@ -788,13 +789,10 @@
 {/if}
 
 <ImageViewer />
+<AudioPlayerHost onOpenAttachment={(id) => selectAttachmentFromUi(id)} onOpenOwner={(kind, id) => onJournalRef(kind, id)} onShowMap={() => setView('graph')} />
 
 <style>
   .journal__review-page { height: 100%; overflow: auto; padding: 1rem; }
-  /* Blank canvas while the auth probe is in flight — avoids flashing either
-     the login card or the journal before we know which one is right. */
-  .boot-gate {
-    min-height: 100vh;
-    background: var(--color-bg);
-  }
+  /* Blank canvas while auth is probed — no login/journal flash. */
+  .boot-gate { min-height: 100vh; background: var(--color-bg); }
 </style>

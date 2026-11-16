@@ -62,7 +62,9 @@ async function show(selected: ReturnType<typeof quest>, quests: ReturnType<typeo
     props: {
       selected,
       quests,
-      questlines: [{ id: 7, title: 'Линия', description: 'Длинное описание квестлайна', color: '#111', icon: 'document' }],
+      questlines: [
+        { id: 7, title: 'Линия', description: 'Длинное описание квестлайна', color: '#111', icon: 'document' },
+      ],
       nowMs: Date.parse('2026-03-01T10:00:00Z'),
       statusBusy: false,
       deleting: false,

@@ -17,6 +17,7 @@
   import { eventPhrase } from '@/shared/lib/event.ts'
   import { parseRefs } from '@/shared/lib/refs.ts'
   import { OPEN_STATUSES, periodBadge, questTimer, quantifiedProgress, significanceLabel, statusColor, downloadQuestPdfSimple, downloadQuestPdf as downloadQuestPdfRich } from '@/entities/quest'
+  import { alignDetailScroll } from '../model/alignDetailScroll.ts'
   import { createQuestPdf } from '../model/pdfExport.svelte.ts'
   import { toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
   import { animateText } from '@/shared/lib/typewriter.ts'
@@ -173,27 +174,6 @@
 
   let detailEl = $state<HTMLElement | null>(null)
 
-  /** A questline page starts with the line, not the quest. Land on the quest title. */
-  function alignDetailScroll(inLine: boolean) {
-    const scroller = detailEl
-    if (!scroller) return
-    const title = inLine ? scroller.querySelector('.detail__quest .detail__title') : null
-    if (!(title instanceof HTMLElement)) {
-      scroller.scrollTo({ top: 0 })
-      return
-    }
-    const style = getComputedStyle(scroller)
-    const pad = parseFloat(style.paddingTop) || 0
-    const border = parseFloat(style.borderTopWidth) || 0
-    const top =
-      title.getBoundingClientRect().top -
-      scroller.getBoundingClientRect().top +
-      scroller.scrollTop -
-      border -
-      pad
-    scroller.scrollTo({ top: Math.max(0, top) })
-  }
-
   /** Only jump when switching quests — not on every silent refresh / step bump. */
   let lastDetailQuestId = (null as number | null)
 
@@ -271,8 +251,11 @@
       stepDisplayDesc = freshDesc
       prevStepAutomatedDesc = freshPrev
       if (id != null) {
+        const scroller = detailEl
         const inLine = Boolean(q?.questline_id)
-        void tick().then(() => alignDetailScroll(inLine))
+        void tick().then(() => {
+          if (scroller) alignDetailScroll(scroller, inLine)
+        })
       }
       return
     }
@@ -340,7 +323,6 @@
     prevAutomatedTitle = title
     prevAutomatedDescription = description
   })
-
 
   /** Erase-before-delete: App.svelte flips deleteAnimActive after the
    * confirm dialog is accepted and awaits onDeleteAnimDone before actually
@@ -649,9 +631,7 @@
 
   {#if timer}
     <div class="deadline-timer" data-tone={timer.tone}>
-      {#if timer.rem > 0}
-        <span class="deadline-timer__label">До срока</span>
-      {/if}
+      {#if timer.rem > 0}<span class="deadline-timer__label">До срока</span>{/if}
       <span class="deadline-timer__value">{timer.detailLabel}</span>
     </div>
   {/if}

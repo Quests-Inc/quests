@@ -1,5 +1,7 @@
 <script lang="ts">
   import {attachmentImage,showImages} from '@/shared/lib/imageViewer.svelte.ts'
+  import { trackOf } from '@/shared/lib/player.svelte.ts'
+  import PlayFile from '@/shared/ui/PlayFile.svelte'
   import {isRaster} from '../model/list.ts'
   import Icon from '@/shared/ui/Icon.svelte'
   import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
@@ -408,12 +410,20 @@
         <li
           class="attach__row"
           class:attach__row--off={unavailable}
+          class:is-playing-file={trackOf(a.id) === 'playing'}
+          class:is-current-file={trackOf(a.id) === 'paused'}
           oncontextmenu={(e) => openAttMenu(e, a)}
         >
           <span class="attach__file">
             <span class="attach__name">
               <FileKindIcon att={a} size={16} />
-              {#if isRaster(a) && !unavailable && a.scan_status==='clean'}<button type="button" class="attach__image-open" onclick={()=>showImages(visible.filter(isRaster).map(attachmentImage),attachmentImage(a).src)}>{a.filename}</button>{:else}{a.filename}{/if}
+              <span class="attach__filename" title={a.filename}>{a.filename}</span>
+              <PlayFile file={a} />
+              {#if isRaster(a) && !unavailable && a.scan_status==='clean'}
+                <button type="button" class="attach__image-open" aria-label={`Открыть изображение ${a.filename}`} title="Открыть изображение" onclick={() => showImages(visible.filter(isRaster).map(attachmentImage), attachmentImage(a).src)}>
+                  <Icon name="image-open" size={15} />
+                </button>
+              {/if}
               {#if revCount > 1}
                 <button
                   type="button"
@@ -610,7 +620,23 @@
 />
 
 <style>
- .attach__image-open{padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:zoom-in;text-decoration:underline;text-underline-offset:3px}
+  .attach__image-open {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-fg-muted, #9a9a9a);
+    cursor: zoom-in;
+  }
+  .attach__image-open:hover { color: var(--color-accent, #c9a227); }
+  .attach__image-open:focus-visible {
+    outline: 2px solid var(--color-accent, #c9a227);
+    outline-offset: 2px;
+  }
   .attach__toggle {
     display: flex;
     width: fit-content;

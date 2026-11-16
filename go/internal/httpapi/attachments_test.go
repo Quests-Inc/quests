@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -35,6 +36,31 @@ type davFile struct {
 type fakeDAV struct {
 	mu    sync.Mutex
 	files map[string]davFile
+}
+
+func parseTestRange(spec string, size int) (int, int, bool) {
+	if !strings.HasPrefix(spec, "bytes=") || strings.Contains(spec, ",") {
+		return 0, 0, false
+	}
+	left, right, ok := strings.Cut(strings.TrimPrefix(spec, "bytes="), "-")
+	if !ok || size <= 0 {
+		return 0, 0, false
+	}
+	start, err := strconv.Atoi(left)
+	if err != nil || start < 0 || start >= size {
+		return 0, 0, false
+	}
+	end := size - 1
+	if right != "" {
+		end, err = strconv.Atoi(right)
+		if err != nil || end < start {
+			return 0, 0, false
+		}
+		if end >= size {
+			end = size - 1
+		}
+	}
+	return start, end, true
 }
 
 func newFakeDAV() *httptest.Server {
@@ -62,8 +88,22 @@ func newFakeDAV() *httptest.Server {
 				http.NotFound(w, r)
 				return
 			}
-			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Accept-Ranges", "bytes")
 			w.Header().Set("Last-Modified", f.mod.Format(http.TimeFormat))
+			if rng := r.Header.Get("Range"); rng != "" {
+				start, end, ok := parseTestRange(rng, len(f.body))
+				if !ok {
+					w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(f.body)))
+					w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+					return
+				}
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(f.body)))
+				w.Header().Set("Content-Length", fmt.Sprintf("%d", end-start+1))
+				w.WriteHeader(http.StatusPartialContent)
+				_, _ = w.Write(f.body[start : end+1])
+				return
+			}
+			w.Header().Set("Content-Type", "application/octet-stream")
 			_, _ = w.Write(f.body)
 		case http.MethodHead:
 			fs.mu.Lock()
@@ -914,5 +954,54 @@ func TestAttachmentWorkspaceQuota(t *testing.T) {
 	s.WorkspaceQuota = 0 // unlimited
 	if w := postFile(t, s.Handler(), path, "d.bin", "", bytes.Repeat([]byte("d"), 500)); w.Code != 201 {
 		t.Fatalf("no quota set, upload refused: %d", w.Code)
+	}
+}
+
+func TestAttachmentAudioInline(t *testing.T) {
+	dav := newFakeDAV()
+	t.Cleanup(dav.Close)
+	s := newAttachmentServer(t, dav.URL, fakeClamd(t, "stream: OK"), 0)
+	qid := seedQuest(t, s)
+	h := s.Handler()
+	body := append([]byte("ID3\x03\x00\x00\x00\x00\x00\x01"), bytes.Repeat([]byte{0}, 64)...)
+	body = append(body, []byte("TAIL")...)
+
+	w := postFile(t, h, fmt.Sprintf("/api/quests/%d/attachments", qid), "theme.mp3", "", body)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("upload = %d %s", w.Code, w.Body.String())
+	}
+	var m map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &m)
+	aid := int64(m["id"].(float64))
+	if ct, _ := m["content_type_detected"].(string); !strings.HasPrefix(ct, "audio/") {
+		t.Fatalf("detected = %q", ct)
+	}
+
+	get := func(path string, rng string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		if rng != "" {
+			req.Header.Set("Range", rng)
+		}
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	full := get(fmt.Sprintf("/api/attachments/%d/audio", aid), "")
+	if full.Code != 200 || full.Header().Get("Content-Type") != "audio/mpeg" ||
+		full.Header().Get("Content-Disposition") != "inline" ||
+		full.Header().Get("Accept-Ranges") != "bytes" ||
+		!bytes.Equal(full.Body.Bytes(), body) {
+		t.Fatalf("audio = %d type=%q disp=%q range=%q body=%d", full.Code, full.Header().Get("Content-Type"), full.Header().Get("Content-Disposition"), full.Header().Get("Accept-Ranges"), full.Body.Len())
+	}
+	part := get(fmt.Sprintf("/api/attachments/%d/audio", aid), "bytes=0-3")
+	if part.Code != http.StatusPartialContent || part.Body.String() != "ID3\x03" ||
+		!strings.Contains(part.Header().Get("Content-Range"), "bytes 0-3/") {
+		t.Fatalf("range = %d %q %q", part.Code, part.Header().Get("Content-Range"), part.Body.Bytes())
+	}
+	png := postFile(t, h, fmt.Sprintf("/api/quests/%d/attachments", qid), "pic.png", "", tinyPNG)
+	var pic map[string]any
+	_ = json.Unmarshal(png.Body.Bytes(), &pic)
+	if refused := get(fmt.Sprintf("/api/attachments/%d/audio", int64(pic["id"].(float64))), ""); refused.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("png audio = %d", refused.Code)
 	}
 }

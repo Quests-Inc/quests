@@ -61,7 +61,7 @@
 
 .attpage .attpage__list.attpage__list--cards .attpage__name {
   flex: none;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__file,
@@ -75,7 +75,8 @@
 }
 
 .attpage .attpage__list.attpage__list--cards .attpage__file {
-  flex: 1 1 100%;
+  flex: 1 1 0;
+  min-width: 0;
   max-height: 1.45em;
   -webkit-line-clamp: 1;
   line-clamp: 1;

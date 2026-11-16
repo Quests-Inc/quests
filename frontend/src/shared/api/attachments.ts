@@ -1,5 +1,39 @@
+import { assertUploadSize } from '@/shared/lib/uploadLimit.ts'
+
 import { onUnauthorized, UnauthorizedError, BASE, request } from './http.ts'
 import type { AttachmentRevisions, AttachmentView } from './knowledge_http.gen'
+
+async function postForm(url: string, body: FormData) {
+  try {
+    return await fetch(url, { method: 'POST', credentials: 'same-origin', body })
+  } catch (e) {
+    if (e instanceof TypeError) {
+      throw new Error('Не удалось отправить файл: соединение оборвалось', { cause: e })
+    }
+    throw e
+  }
+}
+
+async function readUpload(res: Response) {
+  if (res.status === 401) {
+    if (onUnauthorized) onUnauthorized()
+    throw new UnauthorizedError()
+  }
+  const text = await res.text()
+  let data = null
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      throw new Error(res.ok ? 'Ответ не JSON' : `HTTP ${res.status}`)
+    }
+  }
+  if (!res.ok) {
+    const detail = data?.detail ?? res.statusText
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  return data
+}
 
 function ownerAttachmentsPath(ownerType: string, ownerId: number, attachmentId?: number | null) {
   const seg =
@@ -39,32 +73,11 @@ export function attachmentDownloadUrl(
 }
 
 export async function uploadAttachment(ownerType: string, ownerId: number, file: File | Blob, comment = '') {
+  assertUploadSize(file)
   const body = new FormData()
   body.append('file', file)
   if (comment) body.append('comment', comment)
-  const res = await fetch(`${BASE}${ownerAttachmentsPath(ownerType, ownerId)}`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    body,
-  })
-  if (res.status === 401) {
-    if (onUnauthorized) onUnauthorized()
-    throw new UnauthorizedError()
-  }
-  const text = await res.text()
-  let data = null
-  if (text) {
-    try {
-      data = JSON.parse(text)
-    } catch {
-      throw new Error(res.ok ? 'Ответ не JSON' : `HTTP ${res.status}`)
-    }
-  }
-  if (!res.ok) {
-    const detail = data?.detail ?? res.statusText
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
-  }
-  return data
+  return readUpload(await postForm(`${BASE}${ownerAttachmentsPath(ownerType, ownerId)}`, body))
 }
 
 /** Upload a new revision of an existing attachment (becomes current). */
@@ -75,32 +88,11 @@ export async function uploadAttachmentRevision(
   file: File | Blob,
   comment = ''
 ) {
+  assertUploadSize(file)
   const body = new FormData()
   body.append('file', file)
   if (comment) body.append('comment', comment)
-  const res = await fetch(`${BASE}${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    body,
-  })
-  if (res.status === 401) {
-    if (onUnauthorized) onUnauthorized()
-    throw new UnauthorizedError()
-  }
-  const text = await res.text()
-  let data = null
-  if (text) {
-    try {
-      data = JSON.parse(text)
-    } catch {
-      throw new Error(res.ok ? 'Ответ не JSON' : `HTTP ${res.status}`)
-    }
-  }
-  if (!res.ok) {
-    const detail = data?.detail ?? res.statusText
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
-  }
-  return data
+  return readUpload(await postForm(`${BASE}${ownerAttachmentsPath(ownerType, ownerId, attachmentId)}/revisions`, body))
 }
 
 export function listAttachmentRevisions(ownerType: string, ownerId: number, attachmentId: number) {
@@ -167,9 +159,10 @@ export async function getAttachmentPreview(
 
 /** A workspace file with no quest/note owner. It outlives the board that displays it. */
 export async function uploadUnboundAttachment(file: File) {
+  assertUploadSize(file)
   const body = new FormData()
   body.append('file', file)
-  const response = await fetch(`${BASE}/api/attachments`, { method: 'POST', credentials: 'same-origin', body })
+  const response = await postForm(`${BASE}/api/attachments`, body)
   const data = await response.json()
   if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`)
   return data as AttachmentView

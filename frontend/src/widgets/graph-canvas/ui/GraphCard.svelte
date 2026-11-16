@@ -4,6 +4,9 @@
   import { getNote } from '@/shared/api/notes.ts'
 
  import {attachmentImage,showImages,type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
+  import { isAudioFile } from '@/shared/lib/audioFile.ts'
+  import { trackOf } from '@/shared/lib/player.svelte.ts'
+  import PlayFile from '@/shared/ui/PlayFile.svelte'
  import GraphImage from './GraphImage.svelte'
  import NoteSilhouette from './NoteSilhouette.svelte'
   import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
@@ -198,6 +201,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         class:gcard--ownerless={ownerless}
         class:gcard--editing={editingHere}
         class:gcard--picked={picked}
+        class:gcard--playing={n.type === 'attachment' && trackOf(Number(n.id)) === 'playing'}
+        class:gcard--current={n.type === 'attachment' && trackOf(Number(n.id)) === 'paused'}
         class:gcard--pill={!big && !square && !withText}
         style:--c={ownerless ? `color-mix(in srgb, ${t.color} 35%, #e0443e)` : t.color}
         style:--c-fill={tint && !ownerless ? tinted(t.color, tint) : undefined}
@@ -230,6 +235,9 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
               <span class="gcard__count">{n.title.split(' ')[0]}</span>
             {:else}
               <FileKindIcon att={{ filename: n.title, content_type_detected: n.mime }} size={30} />
+              {#if n.type === 'attachment' && isAudioFile({ filename: n.title, mime: n.mime })}
+                <PlayFile floating file={{ id: n.id, filename: n.title, mime: n.mime }} />
+              {/if}
             {/if}
             <span class="gcard__name">{n.type === 'cluster' ? 'вложений' : n.title}</span>
           </div>
@@ -458,6 +466,9 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     border-radius: 18px;
     text-align: center;
   }
+
+  .gcard--playing { outline: 2px solid var(--color-accent, #c9a227); outline-offset: 1px; }
+  .gcard--current { outline: 2px solid color-mix(in srgb, var(--color-accent, #c9a227) 45%, transparent); outline-offset: 1px; }
 
   .gcard--root {
     border-width: 3px;

@@ -5,4 +5,6 @@ export const serverLimits = {
   values_own: 32,
   values_bytes: 8192,
   values_effective: 64,
+  /** One attachment. Bytes, same budget as the server's upload_bytes (25 MiB). */
+  upload_bytes: 25 * 1024 * 1024,
 }

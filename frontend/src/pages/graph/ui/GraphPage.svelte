@@ -13,6 +13,7 @@
   import { FindEntityModal } from '@/features/find-entity'
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
+  import { clearGraphPresence, setGraphPresence } from '@/shared/lib/graphPresence.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
@@ -307,7 +308,37 @@
   }, { rememberActive: true })
 
   $effect(() => { if (!new URL(location.href).searchParams.has('rasterbench')) layouts.track() })
-  onDestroy(() => { layouts.dispose(); stage.cancelCamera() })
+  /**
+   * Same camera glide as prepareAddition / placeEntity (`stage.focusNode`).
+   * Folded attachments live under cluster:<owner> — expand that ball, then queue focus
+   * until rebuild puts the real card back (focusKey survives the missing node).
+   */
+  function focusPresence(key: string) {
+    if (!stage.nodeMap.has(key) && key.startsWith('attachment:')) {
+      for (const e of query.data?.edges ?? []) {
+        if (e.kind !== 'structure' || e.to !== key) continue
+        const ck = `cluster:${e.from}`
+        const ball = stage.nodeMap.get(ck)
+        if (ball) {
+          folds.expand(ball)
+          break
+        }
+      }
+    }
+    stage.focusNode(key)
+  }
+
+  // Cheap “is this attachment on the current map?” for the player — keys from the keep-alive scene only.
+  $effect(() => {
+    const keys = new Set(stage.entities.map((e) => e.key))
+    for (const n of stage.nodes) keys.add(n.key)
+    setGraphPresence(keys, focusPresence)
+  })
+  onDestroy(() => {
+    clearGraphPresence()
+    layouts.dispose()
+    stage.cancelCamera()
+  })
 
   function toggleSelectMode() {
     stage.toggleSelectMode()

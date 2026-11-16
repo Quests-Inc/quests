@@ -224,7 +224,10 @@ export function createNavigation(deps: {
     if (n == null) return
     pendingSelectId = n
     selectedId = n
-    if (view !== 'journal') view = 'journal'
+    if (view !== 'journal') {
+      slideTo('journal')
+      view = 'journal'
+    }
     if (pushUrl) replaceSearch({ quest: n })
     deps.revealDetail('journal')
     try {
@@ -243,7 +246,10 @@ export function createNavigation(deps: {
       return
     }
     selectedNoteId = n
-    if (view !== 'notes') view = 'notes'
+    if (view !== 'notes') {
+      slideTo('notes')
+      view = 'notes'
+    }
     if (pushUrl) rememberNote(n, true)
     deps.revealDetail('notes')
   }
@@ -256,7 +262,10 @@ export function createNavigation(deps: {
       return
     }
     selectedAttachmentId = n
-    if (view !== 'attachments') view = 'attachments'
+    if (view !== 'attachments') {
+      slideTo('attachments')
+      view = 'attachments'
+    }
     if (pushUrl) replaceSearch({ attachment: n })
   }
 
