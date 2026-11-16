@@ -24,6 +24,7 @@ type Drag = {
 
 export function createGraphGestures(deps: {
   onInteract?: () => void
+  minZoom?: () => number
   getStage: () => HTMLElement | null
   nodes: () => GraphNodeView[]
   nodeMap: () => Map<string, GraphNodeView>
@@ -56,7 +57,7 @@ export function createGraphGestures(deps: {
   // scrollable text and links, so reading and scrolling are not hijacked.
   /** Zooms to `k` keeping the stage point (px, py) on the same world point. */
   function zoomAt(k: number, px: number, py: number) {
-    k = clampK(k, cam.k)
+    k = clampK(k, cam.k, deps.minZoom?.())
     cam = { k, x: px - ((px - cam.x) / cam.k) * k, y: py - ((py - cam.y) / cam.k) * k }
   }
 
@@ -215,7 +216,7 @@ export function createGraphGestures(deps: {
       const [a, b] = [...touches.values()]
       const r = deps.getStage()?.getBoundingClientRect()
       if (!r) return
-      const k = clampK((drag.k * Math.hypot(a.x - b.x, a.y - b.y)) / drag.d, drag.k)
+      const k = clampK((drag.k * Math.hypot(a.x - b.x, a.y - b.y)) / drag.d, drag.k, deps.minZoom?.())
       cam = {
         k,
         x: (a.x + b.x) / 2 - r.left - drag.wx * k,
@@ -323,6 +324,7 @@ export function createGraphGestures(deps: {
 
   /** Zoom around the middle of the field from the keyboard: 1 closer, −1 farther, 0 back to 1:1. */
   function zoomStep(dir: 1 | -1 | 0) {
+    deps.onInteract?.()
     const r = deps.getStage()?.getBoundingClientRect()
     if (!r) return
     zoomAt(dir === 0 ? 1 : cam.k * (dir > 0 ? 1.25 : 1 / 1.25), r.width / 2, r.height / 2)

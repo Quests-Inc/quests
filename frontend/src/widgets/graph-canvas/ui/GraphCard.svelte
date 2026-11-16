@@ -203,8 +203,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         style:--c-fill={tint && !ownerless ? tinted(t.color, tint) : undefined}
         style:--fill-w={tint && !ownerless ? '17%' : undefined}
         style:z-index={editingHere ? 1_000_000 : z}
-        style:transform="translate3d({n.x - n.w / 2}px, {n.y - n.h / 2}px, 0)"
-        style:will-change={ready ? 'transform' : undefined}
+        style:transform="translate({n.x - n.w / 2}px, {n.y - n.h / 2}px)"
         class:gcard--sized={n.sw != null}
         class:gcard--compact={!editingHere && n.sh != null && n.sh < 80}
         class:gcard--resizing={resizing}

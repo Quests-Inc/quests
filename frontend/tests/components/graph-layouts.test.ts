@@ -172,3 +172,23 @@ test('zones and entity manifest survive capture/restore; old layouts clear zones
   await applyLayoutState(b.deps, state)
   expect(restored).toEqual([])
 })
+
+test('restoring roots never waits for content or restores the camera after user movement', async () => {
+  const { st, deps } = fakeMap()
+  let release!: () => void
+  deps.settled = () => false
+  deps.writeRoots = async (roots) => {
+    await new Promise<void>((resolve) => {
+      release = resolve
+    })
+    st.roots = roots
+  }
+  const state = captureLayout(deps)
+  state.roots = [{ type: 'note', id: 8 }]
+  state.view = { cx: 10, cy: 20, k: 0.2 }
+  const pending = applyLayoutState(deps, state)
+  st.cam = { x: 77, y: 88, k: 0.12 }
+  release()
+  await pending
+  expect(st.cam).toEqual({ x: 77, y: 88, k: 0.12 })
+}, 1000)

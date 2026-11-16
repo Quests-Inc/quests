@@ -35,7 +35,7 @@ test('spreadEnds: рёбра с одной стороны получают ра�
 
 test('clampK: не выходит за пределы, но не прыгает с карты, уже вне диапазона', () => {
   expect(clampK(10, 1)).toBe(2.5)
-  expect(clampK(0.01, 1)).toBe(0.2)
+  expect(clampK(0.01, 1)).toBe(0.05)
   expect(clampK(0.1, 0.05)).toBe(0.1)
 })
 
@@ -46,4 +46,10 @@ test('arrowHead: треугольник стрелки на конце ребр�
   const down = edgePath(box(0, 0), box(0, 200))
   expect(down).toMatchObject({ ex: 0, ey: 180, fx: 0, fy: 1 })
   expect(arrowHead(down, 10)).toMatch(/^M0 187L/)
+})
+
+test('zoom can reach the fit scale even below the fourfold wider default limit', () => {
+  expect(clampK(0.04, 1)).toBe(0.05)
+  expect(clampK(0.01, 1, 0.012)).toBe(0.012)
+  expect(clampK(0.02, 0.012, 0.012)).toBe(0.02)
 })

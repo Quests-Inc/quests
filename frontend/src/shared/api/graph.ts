@@ -2,7 +2,7 @@ import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 import type { GraphDraftView } from './graphdraft.gen'
 import { BASE, request } from './http.ts'
-import type { Graph } from './store.gen'
+import type { Graph, GraphBatch } from './store.gen'
 
 /**
  * Relations map around one entity (plus optional extra roots).
@@ -20,6 +20,39 @@ export function getGraph(
   return request<Graph>(
     `/api/graph?${encodeURIComponent(type)}=${id}&depth=${depth}${more ? `&extra=${encodeURIComponent(more)}` : ''}${open ? `&expand=${encodeURIComponent(open)}` : ''}`
   )
+}
+
+/** One corpus build and one copy of each card for all independent trees of a board. */
+export async function getGraphBatch(
+  roots: { type: string; id: number; depth: number }[],
+  expand: { type: string; id: number; only?: string }[] = [],
+  signal?: AbortSignal
+): Promise<Graph[]> {
+  const result: Graph[] = []
+  for (let start = 0; start < roots.length; start += 128) {
+    const batch = roots
+      .slice(start, start + 128)
+      .map((r) => `${r.type}:${r.id}:${r.depth}`)
+      .join(',')
+    const open = expand.map((r) => `${r.type}:${r.id}${r.only ? `>${r.only}` : ''}`).join(',')
+    const reply = await request<GraphBatch>(
+      `/api/graph?batch=${encodeURIComponent(batch)}${open ? `&expand=${encodeURIComponent(open)}` : ''}`,
+      { signal }
+    )
+    const nodes = new Map(reply.nodes.map((n) => [n.key, n]))
+    for (const tree of reply.trees) {
+      const keys = new Set(tree.nodes)
+      result.push({
+        root: tree.root,
+        roots: [tree.root],
+        depth: tree.depth,
+        truncated: tree.truncated,
+        nodes: tree.nodes.flatMap((k) => (nodes.get(k) ? [nodes.get(k)!] : [])),
+        edges: reply.edges.filter((e) => keys.has(e.from) && keys.has(e.to)),
+      })
+    }
+  }
+  return result
 }
 
 let draftScope = ''

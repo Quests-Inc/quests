@@ -22,12 +22,13 @@ export interface EdgeItem<E = unknown> {
 /** Straight run at the end of an edge, so the arrowhead sits on the line. */
 export const STUB = 16
 
-export const MIN_K = 0.2
+export const MIN_K = 0.05
 export const MAX_K = 2.5
 
 /** Limits a zoom step that starts at `from`. Fit can go below MIN_K on a big
  * map; from there zooming in must not jump straight to MIN_K. */
-export const clampK = (k: number, from: number) => Math.max(Math.min(MIN_K, from), Math.min(Math.max(MAX_K, from), k))
+export const clampK = (k: number, from: number, fit = MIN_K) =>
+  Math.max(Math.min(MIN_K, from, fit), Math.min(Math.max(MAX_K, from), k))
 
 /** Which sides of a and b an edge uses: facing sides, horizontal if far apart in x. */
 export function sidesOf(a: { x: number; w: number; y: number }, b: { x: number; w: number; y: number }) {

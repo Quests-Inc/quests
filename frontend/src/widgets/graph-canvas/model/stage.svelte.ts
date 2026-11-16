@@ -69,6 +69,11 @@ export function createGraphStage(deps: {
 
   let view = $state<LaidOut | null>(null)
   let ready = $state(false)
+  let previewing = $state(false)
+  let sceneHidden = $state(false)
+  let cameraVersion = 0
+  let sceneVersion = 0
+  let cameraManaged = false
   let el = $state<HTMLDivElement | null>(null)
   let stageSize = $state({ w: 0, h: 0 })
   let showEdge = $state<Record<string, boolean>>({ structure: true, reference: true, dependency: true, deadline: true })
@@ -153,7 +158,7 @@ export function createGraphStage(deps: {
   }
 
   function applyLayout() {
-    if (!view) return
+    if (!view || previewing) return
     const trees = deps.getTrees?.() ?? []
     if (!trees.length) {
       view = { ...view, groups: arrangeView(view, layoutMode, { loose: deps.folds.loose, saved: deps.saved }) }
@@ -209,11 +214,17 @@ export function createGraphStage(deps: {
     view = { ...view, groups }
   }
 
+  function fitBoxes() {
+    return [
+      ...nodes(),
+      ...(deps.prefs.zones ?? []).map((z) => ({ x: z.x + z.w / 2, y: z.y + z.h / 2, w: z.w, h: z.h })),
+    ]
+  }
   function fit() {
     const node = el
-    if (!view || !node) return
+    if (!node) return
     const r = node.getBoundingClientRect()
-    const cam = fitCamera(view.nodes, { w: r.width, h: r.height })
+    const cam = fitCamera(fitBoxes(), { w: r.width, h: r.height })
     if (cam) deps.setCam(cam)
   }
 
@@ -235,6 +246,7 @@ export function createGraphStage(deps: {
       for (const n of wasReady ? (view?.nodes ?? []) : [])
         if (!deps.saved.has(n.key)) deps.saved.set(n.key, { x: n.x, y: n.y })
     })
+    previewing = false
     view = fresh
     await tick()
     await tick()
@@ -259,7 +271,7 @@ export function createGraphStage(deps: {
     const fitKey = `${g.root}|${deps.getTrees ? '' : deps.getDepth()}`
     if (fitKey !== lastFitKey) {
       lastFitKey = fitKey
-      if (!focusKey) fit()
+      if (!focusKey && !cameraManaged && cameraVersion === sceneVersion) fit()
     }
     if (focusKey) focusNode(focusKey)
   }
@@ -465,6 +477,8 @@ export function createGraphStage(deps: {
 
   /** Середина миникарты становится серединой поля. */
   function miniGo(e: { currentTarget: HTMLElement; clientX: number; clientY: number }) {
+    cameraVersion++
+    cancelCamera()
     const m = minimapModel({ nodes: nodes(), zones: deps.prefs.zones, ready, cam: deps.getCam(), stage: stageSize })
     if (!m) return
     const r = e.currentTarget.getBoundingClientRect()
@@ -592,6 +606,81 @@ export function createGraphStage(deps: {
     get canRecenter() {
       const n = selectedKey ? map().get(selectedKey) : null
       return Boolean(n && n.key !== deps.getData()?.root && CENTERABLE.has(n.type) && !n.draft)
+    },
+    revealScene() {
+      sceneHidden = false
+    },
+    hideScene() {
+      sceneHidden = true
+      sceneVersion = cameraVersion
+      cancelCamera()
+    },
+    interact() {
+      cameraVersion++
+      cancelCamera()
+      focusKey = null
+    },
+    get previewing() {
+      return previewing
+    },
+    get sceneHidden() {
+      return sceneHidden
+    },
+    get minimumZoom() {
+      return Math.min(0.05, fitCamera(fitBoxes(), stageSize)?.k ?? 0.05)
+    },
+    beginScene(state: {
+      entities?: { key: string; title: string }[]
+      positions?: Record<string, Spot>
+      sizes?: Record<string, { w: number; h: number }>
+      hidden?: string[]
+      types?: string[]
+      view?: { cx: number; cy: number; k: number } | null
+    }) {
+      buildSeq++
+      cancelCamera()
+      focusKey = null
+      composed = false
+      shownKeys = new Set()
+      lastFitKey = ''
+      const entries = state.entities?.length
+        ? state.entities
+        : Object.keys(state.positions ?? {}).map((key) => ({ key, title: key }))
+      const hidden = new Set(state.hidden ?? [])
+      const geometry: GraphNodeView[] = []
+      for (const entry of entries) {
+        const [type, raw] = entry.key.split(':')
+        const id = Number(raw)
+        if (!id || hidden.has(entry.key) || (state.types?.length && !state.types.includes(type))) continue
+        const size = state.sizes?.[entry.key]
+        const spot = state.positions?.[entry.key] ?? {
+          x: (geometry.length % 6) * 380,
+          y: Math.floor(geometry.length / 6) * 260,
+        }
+        geometry.push({
+          key: entry.key,
+          type,
+          id,
+          title: entry.title,
+          links: 0,
+          depth: 0,
+          ...spot,
+          w: size?.w ?? (type === 'attachment' ? 96 : 320),
+          h: size?.h ?? (type === 'attachment' ? 96 : 180),
+        })
+      }
+      view = { nodes: geometry, edges: [], groups: [] }
+      entityManifest = geometry.map((n) => ({ key: n.key, title: n.title }))
+      previewing = true
+      sceneHidden = false
+      ready = true
+      cameraManaged = !!state.view || geometry.length > 0
+      if (cameraVersion === sceneVersion) {
+        if (state.view && stageSize.w && stageSize.h) {
+          const v = state.view
+          deps.setCam({ k: v.k, x: stageSize.w / 2 - v.cx * v.k, y: stageSize.h / 2 - v.cy * v.k })
+        } else if (geometry.length) fit()
+      }
     },
     measureContent(key: string, width: number, height: number) {
       const n = nodesByKey().get(key)

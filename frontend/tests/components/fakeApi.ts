@@ -193,7 +193,7 @@ export function installFakeApi(data = fixtureData(), opts: { authRequired?: bool
     if (p === '/api/quest-log') return json([])
     if (p === '/api/graph-draft') return json({ ops: [], roots: [] })
     if (p === '/api/graph') {
-      return json({
+      const graph = {
         root: 'quest:1',
         roots: ['quest:1'],
         truncated: false,
@@ -203,7 +203,25 @@ export function installFakeApi(data = fixtureData(), opts: { authRequired?: bool
           { key: 'note:1', type: 'note', id: 1, title: 'Корневая', depth: 1, links: 1 },
         ],
         edges: [{ from: 'quest:1', to: 'note:1', kind: 'reference' }],
-      })
+      }
+      if (url.searchParams.has('batch'))
+        return json({
+          nodes: graph.nodes,
+          edges: graph.edges,
+          trees: url.searchParams
+            .get('batch')!
+            .split(',')
+            .map((root) => {
+              const [type, id, depth] = root.split(':')
+              return {
+                root: `${type}:${id}`,
+                depth: Number(depth),
+                nodes: graph.nodes.map((n) => n.key),
+                truncated: false,
+              }
+            }),
+        })
+      return json(graph)
     }
     if (/\/(attachments|secrets|tags|stats|revisions|steak|streak|emit-attempts)$/.test(p) || p === '/api/tags')
       return json([])

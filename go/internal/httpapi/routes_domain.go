@@ -31,6 +31,10 @@ var serveIcon = httpx.ServeIcon
 // optional &depth=1..4 (default 2).
 func (s *Server) getGraph(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	if q.Has("batch") {
+		s.getGraphBatch(w, r)
+		return
+	}
 	var rootType string
 	var rootID int64
 	for _, t := range []string{"quest", "note", "questline", "attachment"} {
@@ -243,4 +247,43 @@ func (s *Server) getNoteContext(w http.ResponseWriter, r *http.Request, id int64
 		"quests":      []any{},
 		"attachments": map[string]any{"note": attachments},
 	})
+}
+
+func (s *Server) getGraphBatch(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Query().Get("batch"), ",")
+	if len(parts) > 128 {
+		writeErr(w, 400, "at most 128 graph roots")
+		return
+	}
+	roots := make([]store.GraphTreeRequest, 0, len(parts))
+	for _, part := range parts {
+		fields := strings.Split(part, ":")
+		if len(fields) != 3 {
+			writeErr(w, 400, "batch: type:id:depth expected")
+			return
+		}
+		kind := fields[0]
+		id, err := strconv.ParseInt(fields[1], 10, 64)
+		depth, depthErr := strconv.Atoi(fields[2])
+		if err != nil || depthErr != nil || id <= 0 || (kind != "quest" && kind != "note" && kind != "questline" && kind != "attachment") {
+			writeErr(w, 400, "invalid graph root")
+			return
+		}
+		roots = append(roots, store.GraphTreeRequest{Type: kind, ID: id, Depth: depth})
+	}
+	var expand []store.GraphRoot
+	for _, part := range strings.Split(r.URL.Query().Get("expand"), ",") {
+		part, only, _ := strings.Cut(strings.TrimSpace(part), ">")
+		kind, raw, ok := strings.Cut(part, ":")
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if ok && err == nil && id > 0 {
+			expand = append(expand, store.GraphRoot{Type: kind, ID: id, Only: only})
+		}
+	}
+	graph, err := s.Store.BuildGraphBatch(r.Context(), roots, expand)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, graph)
 }

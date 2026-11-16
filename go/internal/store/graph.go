@@ -125,13 +125,21 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 	if len(roots) == 0 {
 		return Graph{}, ErrNotFound
 	}
-	rootType, rootID := roots[0].Type, roots[0].ID
-	if depth < 1 {
-		depth = 1
+	index, err := s.loadGraphIndex(ctx)
+	if err != nil {
+		return Graph{}, err
 	}
-	if depth > 4 {
-		depth = 4
-	}
+	return index.selectGraph(roots, depth, expand)
+}
+
+type graphIndex struct {
+	nodes map[string]*GraphNode
+	edges []GraphEdge
+	adj   map[string][]string
+	links map[string]int
+}
+
+func (s *Store) loadGraphIndex(ctx context.Context) (*graphIndex, error) {
 	nodes := map[string]*GraphNode{}
 	var edges []GraphEdge
 	seenEdge := map[string]bool{}
@@ -190,7 +198,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		}
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	if err := scan(`SELECT id, title, icon, color, custom_icon FROM questline`, func(r interface{ Scan(...any) error }) error {
 		var id int64
@@ -208,7 +216,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		n.Icon, n.IconURL, n.Color = is.icon, is.url, is.color
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	if err := scan(`SELECT id, title FROM questtemplate`, func(r interface{ Scan(...any) error }) error {
 		var id int64
@@ -219,7 +227,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		addNode("template", id, title, "")
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	if err := scan(`SELECT id, title, parent_id, description, icon, color, custom_icon FROM note`, func(r interface{ Scan(...any) error }) error {
 		var id int64
@@ -245,7 +253,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		}
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	type stepRow struct {
 		id, quest int64
@@ -277,7 +285,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		steps = append(steps, sr)
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	for _, st := range steps {
 		if qn := nodes[nodeKey("quest", st.quest)]; qn != nil {
@@ -305,7 +313,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		addEdge(nodeKey(otype, owner), nodeKey("attachment", id), EdgeStructure)
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 
 	if err := scan(`SELECT id, title, COALESCE(color,''), COALESCE(icon,''), description FROM event`, func(r interface{ Scan(...any) error }) error {
@@ -319,7 +327,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		n.Icon, n.Color = icon, color
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	if err := scan(`SELECT id, event_id FROM quest WHERE event_id IS NOT NULL`, func(r interface{ Scan(...any) error }) error {
 		var qid, eid int64
@@ -329,7 +337,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		addEdge(nodeKey("event", eid), nodeKey("quest", qid), EdgeDeadline)
 		return nil
 	}); err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 
 	for qid, lid := range questLine {
@@ -341,7 +349,7 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 	// References from text.
 	corpus, err := s.Knowledge.ListLinkCorpus(ctx)
 	if err != nil {
-		return Graph{}, err
+		return nil, err
 	}
 	for _, doc := range corpus {
 		from := nodeKey(doc.Kind, doc.ID)
@@ -351,11 +359,6 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 				addEdge(from, to, EdgeReference)
 			}
 		}
-	}
-
-	root := nodeKey(rootType, rootID)
-	if _, ok := nodes[root]; !ok {
-		return Graph{}, ErrNotFound
 	}
 
 	// Edges whose endpoints both exist; adjacency over them.
@@ -376,6 +379,24 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 	}
 	edges = kept
 
+	return &graphIndex{nodes: nodes, edges: edges, adj: adj, links: links}, nil
+}
+
+func (index *graphIndex) selectGraph(roots []GraphRoot, depth int, expand []GraphRoot) (Graph, error) {
+	if len(roots) == 0 {
+		return Graph{}, ErrNotFound
+	}
+	depth = max(1, min(4, depth))
+	root := nodeKey(roots[0].Type, roots[0].ID)
+	if index.nodes[root] == nil {
+		return Graph{}, ErrNotFound
+	}
+	nodes := make(map[string]*GraphNode, len(index.nodes))
+	for key, node := range index.nodes {
+		copy := *node
+		nodes[key] = &copy
+	}
+	edges, adj, links := index.edges, index.adj, index.links
 	// Breadth-first from the root. A questline is shown but not expanded: it
 	// would pull in every quest of the line. The root itself always expands.
 	g := Graph{Root: root, Depth: depth, Roots: []string{root}}
@@ -459,4 +480,59 @@ func (s *Store) BuildGraphExpanded(ctx context.Context, roots []GraphRoot, depth
 		}
 	}
 	return g, nil
+}
+
+// GraphTree keeps independent traversal/depth membership while sharing card data on the wire.
+type GraphTree struct {
+	Root      string   `json:"root"`
+	Depth     int      `json:"depth"`
+	Nodes     []string `json:"nodes"`
+	Truncated bool     `json:"truncated"`
+}
+type GraphBatch struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+	Trees []GraphTree `json:"trees"`
+}
+type GraphTreeRequest struct {
+	Type  string `json:"type"`
+	ID    int64  `json:"id"`
+	Depth int    `json:"depth"`
+}
+
+// BuildGraphBatch reads the corpus once, rather than once per tree of a saved board.
+func (s *Store) BuildGraphBatch(ctx context.Context, roots []GraphTreeRequest, expand []GraphRoot) (GraphBatch, error) {
+	out := GraphBatch{Nodes: []GraphNode{}, Edges: []GraphEdge{}, Trees: []GraphTree{}}
+	index, err := s.loadGraphIndex(ctx)
+	if err != nil {
+		return out, err
+	}
+	seenNodes, seenEdges := map[string]bool{}, map[string]bool{}
+	for _, root := range roots {
+		graph, err := index.selectGraph([]GraphRoot{{Type: root.Type, ID: root.ID}}, root.Depth, expand)
+		if err == ErrNotFound {
+			out.Trees = append(out.Trees, GraphTree{Root: nodeKey(root.Type, root.ID), Depth: max(1, min(4, root.Depth)), Nodes: []string{}})
+			continue
+		}
+		if err != nil {
+			return out, err
+		}
+		tree := GraphTree{Root: graph.Root, Depth: graph.Depth, Nodes: []string{}, Truncated: graph.Truncated}
+		for _, node := range graph.Nodes {
+			tree.Nodes = append(tree.Nodes, node.Key)
+			if !seenNodes[node.Key] {
+				seenNodes[node.Key] = true
+				out.Nodes = append(out.Nodes, node)
+			}
+		}
+		for _, edge := range graph.Edges {
+			key := edge.From + "|" + edge.To + "|" + edge.Kind
+			if !seenEdges[key] {
+				seenEdges[key] = true
+				out.Edges = append(out.Edges, edge)
+			}
+		}
+		out.Trees = append(out.Trees, tree)
+	}
+	return out, nil
 }

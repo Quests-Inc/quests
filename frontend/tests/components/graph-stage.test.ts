@@ -348,3 +348,26 @@ test('deferred content refines automatic sizes and leaves explicit sizes intact'
   expect(note.w).toBe(320)
   expect(note.h).toBe(230)
 })
+
+test('saved geometry is available before graph content, and late layout cannot undo manual camera changes', async () => {
+  const t = make()
+  t.stage.stageSize.w = 800
+  t.stage.stageSize.h = 600
+  t.stage.hideScene()
+  expect(t.stage.sceneHidden).toBe(true)
+  t.stage.beginScene({
+    entities: [{ key: 'note:4', title: 'Saved' }],
+    positions: { 'note:4': { x: 100, y: 200 } },
+    sizes: { 'note:4': { w: 500, h: 400 } },
+    view: { cx: 100, cy: 200, k: 0.1 },
+  })
+  expect(t.stage.previewing).toBe(true)
+  expect(t.stage.sceneHidden).toBe(false)
+  expect(t.stage.nodes[0]).toMatchObject({ x: 100, y: 200, w: 500, h: 400 })
+  t.stage.interact()
+  t.setCam({ x: 123, y: 456, k: 0.08 })
+  t.stage.compose()
+  await flush()
+  expect(t.stage.previewing).toBe(false)
+  expect(t.cam()).toEqual({ x: 123, y: 456, k: 0.08 })
+})

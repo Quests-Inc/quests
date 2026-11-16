@@ -153,3 +153,24 @@ test('saved layout URLs omit tab, restore on reload, and temporary boards restor
   layouts.dispose()
   history.replaceState(null, '', '/')
 })
+
+test('the initial temporary board remains openable after restoring a saved layout URL', async () => {
+  const first = createGraphLayouts(map().deps)
+  await first.newEmpty('Saved entry')
+  const savedId = first.current
+  history.replaceState(null, '', `/?layout=${savedId}`)
+  const m = map()
+  const restored = createGraphLayouts(m.deps, { rememberActive: true })
+  const temporaryId = restored.current
+  await restored.load()
+  expect(restored.current).toBe(savedId)
+  await restored.open(temporaryId)
+  expect(restored.current).toBe(temporaryId)
+  expect(m.deps.center()).toEqual({ type: null, id: null })
+  expect(location.search).toBe('?tab=graph')
+  await restored.open(savedId)
+  expect(restored.current).toBe(savedId)
+  restored.dispose()
+  first.dispose()
+  history.replaceState(null, '', '/')
+})

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { benchmarkRaster } from '../model/rasterBenchmark.ts'
  import {attachmentImage} from '@/shared/lib/imageViewer.svelte.ts'
   import {imagePixels} from '../model/imageQuality.ts'
   import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
@@ -88,12 +89,12 @@
     children?: Snippet
   } = $props()
 
-  const pendingScene = $derived(switching || loading)
+  const pendingScene = $derived((switching && !stage.view) || loading || stage.previewing || stage.sceneHidden)
 
   // All cards mount during measurement. Once laid out, retain only the viewport and active editors.
   const bounds = $derived(stage.ready ? viewportBounds(gest.cam, stage.stageSize) : null)
   const contentBounds = $derived(viewportBounds(gest.cam, stage.stageSize, 0))
-  const renderedNodes = $derived((stage.view?.nodes ?? []).filter((n) =>
+  const renderedNodes = $derived((stage.previewing ? [] : stage.view?.nodes ?? []).filter((n) =>
     n.key === editing?.key || n.key === resize?.active || boxInViewport(n, bounds)))
   const renderedGroups = $derived(stage.groups.filter((g) => boxInViewport(g, bounds)))
   const renderedEdges = $derived(stage.drawEdges.filter((e) => edgeInViewport(e, bounds)))
@@ -107,6 +108,13 @@
   const rasterOf = (n: { type: string; mime?: string }) =>
     n.type === 'attachment' && RASTER.has(String(n.mime || '').split(';')[0].trim())
   const galleryImages=$derived(stage.nodes.filter(rasterOf).map(node=>attachmentImage({id:node.id,filename:node.title})))
+  let benchmarkStarted = false
+  $effect(() => {
+    if (!benchmarkStarted && active && stage.ready && !pendingScene && stage.el && new URL(location.href).searchParams.has('rasterbench')) {
+      benchmarkStarted = true
+      return benchmarkRaster(stage.el, () => gest.cam, c => gest.cam = c)
+    }
+  })
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -143,6 +151,7 @@
     <p class="graph__msg">{error}</p>
   {/if}
 
+  {#if !stage.sceneHidden}
   <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish}>
     {#snippet tools()}
   <GraphTools inline
@@ -161,6 +170,15 @@
 
     {/snippet}
   </GraphZones>
+  {/if}
+
+  {#if stage.previewing && !stage.sceneHidden}
+    <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" aria-label="Геометрия карты, содержимое загружается">
+      {#each (stage.view?.nodes ?? []).filter(n => boxInViewport(n, bounds)) as n (n.key)}
+        <div class="graph__geometry" style:transform="translate({n.x - n.w / 2}px, {n.y - n.h / 2}px)" style:width="{n.w}px" style:height="{n.h}px"><span>{n.title}</span></div>
+      {/each}
+    </div>
+  {/if}
 
   <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready || pendingScene}>
     <GraphEdges drawEdges={renderedEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
@@ -220,7 +238,7 @@
   {/if}
 
   {#if stage.mini}
-    {#if !pendingScene}<GraphMinimap mini={stage.mini} onGo={stage.miniGo} />{/if}
+    {#if !stage.sceneHidden && (!pendingScene || stage.previewing)}<GraphMinimap mini={stage.mini} onGo={stage.miniGo} />{/if}
   {/if}
 
 
@@ -242,6 +260,18 @@
 {/if}
 
 <style>
+  .graph__geometry {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border, #666);
+    border-radius: 10px;
+    background: var(--color-bg-raised, #262626);
+    color: var(--color-fg-muted, #aaa);
+    pointer-events: none;
+    overflow: hidden;
+    padding: 10px;
+  }
+
   .graph__stage {
     position: relative;
     flex: 1 1 auto;

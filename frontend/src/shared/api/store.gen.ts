@@ -136,6 +136,25 @@ export interface GraphRoot {
    */
   Only: string;
 }
+/**
+ * GraphTree keeps independent traversal/depth membership while sharing card data on the wire.
+ */
+export interface GraphTree {
+  root: string;
+  depth: number /* int */;
+  nodes: string[];
+  truncated: boolean;
+}
+export interface GraphBatch {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  trees: GraphTree[];
+}
+export interface GraphTreeRequest {
+  type: string;
+  id: number /* int64 */;
+  depth: number /* int */;
+}
 
 //////////
 // source: graphdraft.go

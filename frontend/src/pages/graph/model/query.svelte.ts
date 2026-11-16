@@ -1,7 +1,7 @@
 // Центр карты и загрузка графа вокруг него: поиск корня, дополнительные центры, очистка.
 import { CENTERABLE } from '@/entities/graph'
 import { ENTITY_SPEC } from '@/entities/quest'
-import { getGraph, putGraphDraftRoots } from '@/shared/api/graph.ts'
+import { getGraph, getGraphBatch, putGraphDraftRoots } from '@/shared/api/graph.ts'
 import type { Graph } from '@/shared/api/store.gen'
 import { parseQuery } from '@/shared/lib/searchFlags.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
@@ -53,6 +53,7 @@ export function createGraphQuery(deps: {
   clearEditing: () => void
   clearSelection: () => void
   loadDraft: () => Promise<void>
+  fetchGraphs?: typeof getGraphBatch
   fetchGraph?: typeof getGraph
   writeRoots?: (roots: Root[]) => Promise<unknown>
 }) {
@@ -64,11 +65,14 @@ export function createGraphQuery(deps: {
   let data = $state<Graph | null>(null)
   let memberships = $state<Record<string, string[]>>({})
   let loading = $state(false)
+  let paused = $state(false)
+  const cache = new Map<string, { graph: Graph; memberships: Record<string, string[]> }>()
   let retargeting = $state(false)
   let error = $state('')
   let rootQuery = $state('')
   let pickOpen = $state(false)
 
+  let activeRequest: AbortController | null = null
   let seq = 0
   let lastRootKey = ''
   let lastDataJson = ''
@@ -95,7 +99,8 @@ export function createGraphQuery(deps: {
 
   /** Запросить граф. Пока вкладка скрыта — нет. Пустой центр — пустая карта, чтобы черновик всё равно было куда класть. */
   function load() {
-    if (!deps.getActive()) return
+    if (!deps.getActive() || paused) return
+    activeRequest?.abort()
     if (!center.type || !center.id) {
       seq += 1
       loading = false
@@ -115,14 +120,32 @@ export function createGraphQuery(deps: {
     void deps.getNonce()
     void deps.getReloadTick()
     const mine = ++seq
+    const controller = new AbortController()
+    activeRequest = controller
     loading = true
     error = ''
     const roots = [{ type: c.type, id: c.id }, ...extra]
     for (const r of roots) deps.initTree?.(`${r.type}:${r.id}`, d)
-    const requests = deps.getTreeSettings
-      ? roots.map((r) => fetchGraph(r.type!, r.id!, deps.getTreeSettings!(`${r.type}:${r.id}`)?.depth ?? d, [], open))
-      : [fetchGraph(c.type, c.id, d, extra, open)]
-    Promise.all(requests)
+    const specs = roots.map((r) => ({ ...r, depth: deps.getTreeSettings?.(`${r.type}:${r.id}`)?.depth ?? d }))
+    const cacheKey = JSON.stringify([specs, open])
+    const cached = cache.get(cacheKey)
+    if (cached) {
+      data = cached.graph
+      memberships = cached.memberships
+      lastDataJson = JSON.stringify(cached.graph)
+      loading = false
+      cache.delete(cacheKey)
+      cache.set(cacheKey, cached)
+    }
+    const requests =
+      deps.getTreeSettings && (deps.fetchGraphs || !deps.fetchGraph)
+        ? (deps.fetchGraphs ?? getGraphBatch)(specs, open, controller.signal)
+        : Promise.all(
+            deps.getTreeSettings
+              ? specs.map((r) => fetchGraph(r.type, r.id, r.depth, [], open))
+              : [fetchGraph(c.type, c.id, d, extra, open)]
+          )
+    requests
       .then((graphs) => {
         const first = graphs[0]
         const g = {
@@ -139,6 +162,9 @@ export function createGraphQuery(deps: {
         memberships = Object.fromEntries(
           graphs.map((g, i) => [`${roots[i].type}:${roots[i].id}`, g.nodes.map((n) => n.key)])
         )
+        cache.delete(cacheKey)
+        cache.set(cacheKey, { graph: g, memberships })
+        if (cache.size > 8) cache.delete(cache.keys().next().value!)
         const json = JSON.stringify(g)
         if (json !== lastDataJson) {
           lastDataJson = json
@@ -146,7 +172,7 @@ export function createGraphQuery(deps: {
         }
       })
       .catch((e: unknown) => {
-        if (mine === seq) error = messageOf(e)
+        if (mine === seq && !controller.signal.aborted) error = messageOf(e)
       })
       .finally(() => {
         if (mine === seq) loading = false
@@ -172,8 +198,8 @@ export function createGraphQuery(deps: {
     focus(n.type, n.id)
   }
 
-  function setCenter(c: { type: string; id: number }) {
-    lastRootKey = `${c.type}:${c.id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
+  function setCenter(c: Center, rememberVisit = true) {
+    if (rememberVisit) lastRootKey = `${c.type}:${c.id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
     center = { type: c.type, id: c.id }
     deps.onCenter(c.type, c.id)
   }
@@ -221,6 +247,22 @@ export function createGraphQuery(deps: {
   }
 
   return {
+    beginScene() {
+      activeRequest?.abort()
+      paused = true
+      seq++
+      data = null
+      memberships = {}
+      lastDataJson = ''
+      loading = false
+      error = ''
+    },
+    endScene() {
+      paused = false
+    },
+    get paused() {
+      return paused
+    },
     get memberships() {
       return memberships
     },

@@ -83,7 +83,8 @@
     resetPositions: () => folds.forgetPositions(),
   })
   gest = createGraphGestures({
-    onInteract: () => stage.cancelCamera(),
+    onInteract: () => stage.interact(),
+    minZoom: () => stage.minimumZoom,
     getStage: () => stage.el,
     nodes: () => stage.nodes,
     nodeMap: () => stage.nodeMap,
@@ -265,9 +266,17 @@
   })
 
   const layouts = createGraphLayouts({
+    hideScene: () => stage.hideScene(),
+    revealScene: () => stage.revealScene(),
+    beginScene: (state) => {
+      query.beginScene()
+      prefs.restoreZones(state.zones ?? [])
+      stage.beginScene(state)
+    },
+    endScene: () => query.endScene(),
     center: () => query.center,
     setCenter: (c) => query.setCenter(c),
-    clearCenter: () => query.clearMap(),
+    clearCenter: async () => query.setCenter({ type: null, id: null }, false),
     roots: () => gd.draft.roots,
     writeRoots: putGraphDraftRoots,
     loadDraft: () => gd.load(),
@@ -291,13 +300,13 @@
     saved,
     cam: { get: () => gest.cam, set: (c) => (gest.cam = c) },
     stageSize: () => stage.stageSize,
-    settled: () => !query.loading && stage.ready && stage.stageSize.w > 0 && stage.stageSize.h > 0,
+    settled: () => !query.loading && !query.paused && !stage.previewing && stage.ready && stage.stageSize.w > 0 && stage.stageSize.h > 0,
     applyLayout: () => stage.applyLayout(),
     addRoot: (type,id) => query.addToMap(type,id),
     focusNode: (key) => stage.focusNode(key),
   }, { rememberActive: true })
 
-  $effect(() => { layouts.track() })
+  $effect(() => { if (!new URL(location.href).searchParams.has('rasterbench')) layouts.track() })
   onDestroy(() => { layouts.dispose(); stage.cancelCamera() })
 
   function toggleSelectMode() {
@@ -418,7 +427,7 @@
   const arrows = createArrowNavigation({
     allowed: () => active && !layouts.busy && !ctx.open && !linking,
     move: (dx, dy, selected) => {
-      stage.cancelCamera()
+      stage.interact()
       if (selected) {
         const keys = stage.picked.size ? stage.picked : new Set(stage.selectedKey ? [stage.selectedKey] : [])
         const cam = gest.cam

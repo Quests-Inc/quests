@@ -40,6 +40,10 @@ export type LayoutState = {
 }
 
 export type LayoutDeps = {
+  beginScene?: (state: LayoutState) => void
+  endScene?: () => void
+  hideScene?: () => void
+  revealScene?: () => void
   center: () => { type: string | null; id: number | null }
   setCenter: (c: { type: string; id: number }) => void
   clearCenter: () => Promise<void>
@@ -117,25 +121,7 @@ export function captureLayout(d: LayoutDeps): LayoutState {
 const sameRoots = (a: Root[], b: Root[]) =>
   a.length === b.length && a.every((r, i) => r.type === b[i].type && r.id === b[i].id)
 
-async function until(ok: () => boolean, ms = 6000) {
-  const end = Date.now() + ms
-  while (!ok() && Date.now() < end) await new Promise((r) => setTimeout(r, 50))
-}
-
-/** Поставить карту в сохранённое состояние. Смена центра забывает позиции и раскрытия — поэтому они ставятся после неё. */
-export async function applyLayoutState(d: LayoutDeps, s: LayoutState) {
-  if (!sameRoots(d.roots(), s.roots ?? [])) {
-    await d.writeRoots(s.roots ?? [])
-    await d.loadDraft()
-  }
-  const c = d.center()
-  if (!s.center?.type || !s.center.id) {
-    if (c.type) await d.clearCenter()
-  } else if (c.type !== s.center.type || c.id !== s.center.id) {
-    d.setCenter({ type: s.center.type, id: s.center.id })
-  }
-  await tick()
-  await tick()
+function restoreScenePreferences(d: LayoutDeps, s: LayoutState) {
   d.depth.set(s.depth || 2)
   d.layout.set(s.layout || 'tree')
   d.prefs.restoreTrees?.(
@@ -157,12 +143,27 @@ export async function applyLayoutState(d: LayoutDeps, s: LayoutState) {
   d.folds.restore(s.folds ?? {})
   d.saved.clear()
   for (const [k, p] of Object.entries(s.positions ?? {})) d.saved.set(k, p)
-  await tick()
-  if (s.center?.id || s.roots?.length || d.nodes().length) await until(d.settled)
-  d.applyLayout()
+}
+
+/** Restore metadata once, then load the selected roots without waiting for card content. */
+export async function applyLayoutState(d: LayoutDeps, s: LayoutState, prepared = false) {
+  // Restore the camera before any network wait; late content must never overwrite user gestures.
   const size = d.stageSize()
-  if (s.view && size.w && size.h)
+  if (!d.beginScene && s.view && size.w && size.h)
     d.cam.set({ k: s.view.k, x: size.w / 2 - s.view.cx * s.view.k, y: size.h / 2 - s.view.cy * s.view.k })
+  if (!sameRoots(d.roots(), s.roots ?? [])) {
+    await d.writeRoots(s.roots ?? [])
+    await d.loadDraft()
+  }
+  const c = d.center()
+  if (!s.center?.type || !s.center.id) {
+    if (c.type) await d.clearCenter()
+  } else if (c.type !== s.center.type || c.id !== s.center.id) {
+    d.setCenter({ type: s.center.type, id: s.center.id })
+  }
+  if (!prepared) restoreScenePreferences(d, s)
+  await tick()
+  d.applyLayout()
 }
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -238,6 +239,9 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
       view: { cx: 0, cy: 0, k: 1 },
     }
   }
+  // A saved URL bypasses this initial temporary board, so it has not been stashed yet.
+  snapshots.set(String(current), { ...empty(), draft_scope: scope })
+
   async function load() {
     const list = await listGraphLayouts()
     items = [...items.filter((i) => i.temporary), ...list]
@@ -268,7 +272,10 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     await task
   }
   function run(fn: () => Promise<void>, switchBoard = false) {
-    if (switchBoard) switchJobs++
+    if (switchBoard) {
+      switchJobs++
+      deps.hideScene?.()
+    }
     const job = pending.then(async () => {
       busy = true
       clearTimeout(timer)
@@ -280,7 +287,10 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
         toast(failure, { kind: 'error' })
       } finally {
         busy = false
-        if (switchBoard) switchJobs--
+        if (switchBoard) {
+          switchJobs--
+          deps.revealScene?.()
+        }
       }
     })
     pending = job
@@ -298,8 +308,14 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     setGraphDraftScope(scope)
     current = id
     remember(id)
-    await deps.loadDraft()
-    await applyLayoutState(deps, state)
+    deps.beginScene?.(state)
+    restoreScenePreferences(deps, state)
+    try {
+      await deps.loadDraft()
+      await applyLayoutState(deps, state, true)
+    } finally {
+      deps.endScene?.()
+    }
     remember(id)
     lastSaved = typeof id === 'number' && state.draft_scope ? JSON.stringify(capture()) : ''
   }
@@ -455,11 +471,17 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
       })
     },
     open(id: number | string) {
+      if (id === current) return Promise.resolve()
       return run(async () => {
-        if (id === current) return
-        await stash()
-        const state = typeof id === 'number' ? ((await getGraphLayout(id)).state as LayoutState) : snapshots.get(id)
+        const saved = stash().then(
+          (): Error | null => null,
+          (error): Error | null => (error instanceof Error ? error : new Error(String(error)))
+        )
+        const cached = snapshots.get(String(id))
+        const state = cached ?? (typeof id === 'number' ? ((await getGraphLayout(id)).state as LayoutState) : undefined)
         if (state) await activate(id, state)
+        const saveError = await saved
+        if (saveError) throw saveError
       }, true)
     },
     rename(id: number | string, title: string) {

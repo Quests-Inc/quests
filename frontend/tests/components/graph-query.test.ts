@@ -228,3 +228,83 @@ test('a slow external retarget enters loading before awaiting draft state', asyn
   await work
   expect(q.loading).toBe(false)
 })
+
+test('restoring a board pauses queries; returning to it uses cached data while revalidating', async () => {
+  const { q, pending, calls } = make()
+  q.beginScene()
+  q.load()
+  expect(calls.filter((c) => c.startsWith('fetch'))).toHaveLength(0)
+  q.endScene()
+  q.load()
+  pending[0].resolve(graph)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(q.loading).toBe(false)
+  q.beginScene()
+  q.endScene()
+  q.load()
+  expect(q.data?.root).toBe('quest:5')
+  expect(q.loading).toBe(false)
+  expect(pending).toHaveLength(2)
+  pending[1].resolve({ ...graph, truncated: true })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(q.data?.truncated).toBe(true)
+})
+
+test('independent tree settings use a single batch request', async () => {
+  const batches: unknown[] = []
+  const { q, roots, calls } = make({
+    getTreeSettings: (key: string) => ({ depth: key === 'quest:5' ? 1 : 3, layout: 'free' }),
+    fetchGraphs: async (specs: unknown, open: unknown) => {
+      batches.push([specs, open])
+      return [graph, { ...graph, root: 'note:8' }]
+    },
+  })
+  roots.push({ type: 'note', id: 8 })
+  q.load()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(batches).toHaveLength(1)
+  expect(batches[0]).toEqual([
+    [
+      { type: 'quest', id: 5, depth: 1 },
+      { type: 'note', id: 8, depth: 3 },
+    ],
+    [{ type: 'quest', id: 5, only: 'note' }],
+  ])
+  expect(calls.filter((c) => c.startsWith('fetch'))).toHaveLength(0)
+})
+
+test('dirty and reconnect revisions revalidate cached cards without blanking the board', async () => {
+  const { q, pending, setRoot } = make()
+  q.load()
+  pending[0].resolve(graph)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  setRoot('quest', 5, 2)
+  q.load()
+  expect(q.loading).toBe(false)
+  expect(q.data?.root).toBe('quest:5')
+  expect(pending).toHaveLength(2)
+  pending[1].resolve({ ...graph, truncated: true })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(q.data?.truncated).toBe(true)
+})
+
+test('restoring an empty centre does not clear saved roots or reset board preferences', () => {
+  const { q, roots, calls, written } = make()
+  roots.push({ type: 'note', id: 8 })
+  q.setCenter({ type: null, id: null })
+  expect(q.center).toEqual({ type: null, id: null })
+  expect(roots).toEqual([{ type: 'note', id: 8 }])
+  expect(calls).not.toContain('forget')
+  expect(calls).not.toContain('reset')
+  expect(written).toEqual([])
+})
+
+test('an external centre survives preparation of an empty temporary board', async () => {
+  const box = make({
+    onRetarget: async () => {
+      box.q.setCenter({ type: null, id: null }, false)
+    },
+  })
+  await box.q.syncRoot()
+  expect(box.q.center).toEqual({ type: 'quest', id: 5 })
+})
