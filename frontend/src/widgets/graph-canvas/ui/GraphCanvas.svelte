@@ -30,6 +30,7 @@
     center,
     error,
     loading,
+    switching = false,
     canClear,
     tier,
     edgeActions,
@@ -68,6 +69,7 @@
     center: { id: number | null }
     error: string
     loading: boolean
+    switching?: boolean
     canClear: boolean
     tier: Map<string, string>
     edgeActions: (edge: { draft?: string; from: string; to: string; kind: string }) => { id: string; label?: string }[]
@@ -86,8 +88,11 @@
     children?: Snippet
   } = $props()
 
+  const pendingScene = $derived(switching || loading)
+
   // All cards mount during measurement. Once laid out, retain only the viewport and active editors.
   const bounds = $derived(stage.ready ? viewportBounds(gest.cam, stage.stageSize) : null)
+  const contentBounds = $derived(viewportBounds(gest.cam, stage.stageSize, 0))
   const renderedNodes = $derived((stage.view?.nodes ?? []).filter((n) =>
     n.key === editing?.key || n.key === resize?.active || boxInViewport(n, bounds)))
   const renderedGroups = $derived(stage.groups.filter((g) => boxInViewport(g, bounds)))
@@ -130,12 +135,12 @@
       · ПКМ или Esc — отмена
     </p>
   {/if}
-  {#if !center.id && !stage.view?.nodes?.length && !zones.length}
+  {#if pendingScene}
+    <p class="graph__msg" role="status">Загрузка карты…</p>
+  {:else if !center.id && !stage.view?.nodes?.length && !zones.length}
     <p class="graph__msg">Выберите квест или заметку в поиске выше — или откройте карту из карточки квеста. ПКМ по полю создаёт новые.</p>
   {:else if error}
     <p class="graph__msg">{error}</p>
-  {:else if loading && !stage.view}
-    <p class="graph__msg">Загрузка…</p>
   {/if}
 
   <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish}>
@@ -157,7 +162,7 @@
     {/snippet}
   </GraphZones>
 
-  <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready}>
+  <div class="gworld" style:transform="translate({gest.cam.x}px, {gest.cam.y}px) scale({gest.cam.k})" class:gworld--hidden={!stage.ready || pendingScene}>
     <GraphEdges drawEdges={renderedEdges} lit={stage.lit} linking={lk.linking} nodeMap={stage.nodeMap} linkCursor={lk.cursor} {edgeActions} {onEdgeCtx} />
     <GraphGroups groups={renderedGroups} collapseKey={stage.collapseKey} onGroupDown={gest.onGroupDown} {onGroupCtx} onCollapse={folds.collapse} />
     {#each renderedNodes as n (n.key)}
@@ -176,9 +181,11 @@
         ownerless={stage.ownerless.has(n.key)}
         editingHere={editing?.key === n.key}
         picked={stage.picked.has(n.key)}
-        ready={stage.ready}
+        ready={stage.ready && !pendingScene}
+        deferContent
+        onContentMeasure={stage.measureContent}
         {textRevision}
-        loadText={active}
+        loadText={active && !pendingScene && boxInViewport(n, contentBounds)}
         raster={rasterOf(n)}
         imagePixels={imagePixels(n,gest.cam,stage.stageSize,typeof window!=='undefined'?window.devicePixelRatio||1:1)}
         tier={tier.get(n.key)}
@@ -213,7 +220,7 @@
   {/if}
 
   {#if stage.mini}
-    <GraphMinimap mini={stage.mini} onGo={stage.miniGo} />
+    {#if !pendingScene}<GraphMinimap mini={stage.mini} onGo={stage.miniGo} />{/if}
   {/if}
 
 
@@ -224,6 +231,7 @@
   {/if}
 </div>
 
+{#if !pendingScene}
 <GraphFoot
   selected={stage.selected}
   target={stage.selected ? stage.openTarget(stage.selected) : null}
@@ -231,6 +239,7 @@
   {onOpen}
   {onRecenter}
 />
+{/if}
 
 <style>
   .graph__stage {

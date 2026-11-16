@@ -92,8 +92,8 @@ test('ссылка на квест открывает его с шагами', a
 test('ссылка на заметку открывает её; ссылка в тексте подписана названием квеста; дочерняя раскрывается', async () => {
   await openAt('?note=1')
   expect(window.questsNav!.currentTab()).toBe('notes')
-  const title = document.querySelector('.notes__title') as HTMLInputElement
-  expect(title?.value).toBe('Корневая')
+  const title = document.querySelector('h1.notes__title-display')
+  expect(title?.textContent).toBe('Корневая')
   expect(document.body.textContent).toContain('Первый квест')
   expect(document.body.textContent).not.toContain('Вложенная')
   ;(document.querySelector('.notes__fold:not(.notes__fold--spacer)') as HTMLElement).click()

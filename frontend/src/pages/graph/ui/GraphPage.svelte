@@ -542,6 +542,7 @@
     {center}
     {error}
     {loading}
+    switching={layouts.switching}
     {canClear}
     {tier}
     {edgeActions}

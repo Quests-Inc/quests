@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { afterPaint } from '@/shared/lib/frameTasks.ts'
   import { untrack } from 'svelte'
   import { getNote } from '@/shared/api/notes.ts'
 
@@ -32,6 +33,8 @@
     ready = false,
     textRevision = 0,
     loadText = true,
+    deferContent = false,
+    onContentMeasure,
     raster = false,
     imagePixels = 128,
     imageGallery = [],
@@ -70,6 +73,8 @@
     ready?: boolean
     textRevision?: number
     loadText?: boolean
+    deferContent?: boolean
+    onContentMeasure?: (key: string, width: number, height: number) => void
     imageGallery?: GalleryImage[]
     imagePixels?: number
     raster?: boolean
@@ -114,6 +119,14 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   grab()
 }
 
+  let cardEl = $state<HTMLElement | null>(null)
+  let contentReady = $state(!deferContent)
+  $effect(() => {
+    const enabled = !deferContent || (ready && loadText && tier !== 'lite' && tier !== 'title')
+    contentReady = !deferContent
+    if (deferContent && enabled) return afterPaint(() => { contentReady = true })
+  })
+
   let fullText = $state<{ preview: string; revision: number; text: string } | null>(null)
   let textError = $state(false)
   let textLoading = $state(false)
@@ -125,7 +138,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     const revision = textRevision
     const id = Number(n.id)
     void textRetry
-    if (n.type !== 'note' || n.draft || changed || !ready || !loadText || tier === 'lite' || tier === 'title' ||
+    if (n.type !== 'note' || n.draft || changed || !ready || !loadText || !contentReady || tier === 'lite' || tier === 'title' ||
       !Number.isInteger(id) || id <= 0 || !preview.endsWith('…') || [...preview].length <= 4000) return
     if (untrack(() => fullText?.preview === preview && fullText.revision === revision)) {
       textLoading = false
@@ -144,6 +157,20 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     return () => { cancelled = true }
   })
   const bodyText = $derived(!n.draft && !changed && fullText && fullText.preview === n.desc ? fullText.text : n.desc)
+
+  // Refine an automatic size once the real body exists; explicit user sizes stay fixed.
+  $effect(() => {
+    void bodyText
+    const el = cardEl
+    if (!deferContent || !contentReady || !ready || editingHere || n.sh != null || !el || !onContentMeasure) return
+    untrack(() => {
+      const previous = el.style.height
+      el.style.height = 'auto'
+      const width = el.offsetWidth, height = el.offsetHeight
+      el.style.height = previous
+      onContentMeasure?.(n.key, width, height)
+    })
+  })
 
   const t = $derived(TYPES[n.type] ?? TYPES.step)
   const square = $derived(n.type === 'attachment' || n.type === 'cluster')
@@ -183,6 +210,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         class:gcard--resizing={resizing}
         style:width={n.sw != null ? `${n.sw}px` : big ? `${CARD[n.type].w}px` : withText ? `${CARD.stepBody.w}px` : square ? `${SQUARE}px` : undefined}
         style:height={n.sh != null ? `${editingHere ? Math.max(n.sh, 340) : n.sh}px` : square ? `${SQUARE}px` : ready && n.h ? `${editingHere ? Math.max(n.h, 340) : n.h}px` : undefined}
+        bind:this={cardEl}
         data-gkey={n.key}
         title="{t.label}: {n.title}{orphan ? ' — на неё нет ссылок' : ''}"
         onpointerdown={(e) => {
@@ -265,7 +293,11 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
           {#if n.type==='note'&&tier==='title'}<NoteSilhouette text={n.desc||''}/>{/if}
           {#if bodyText && tier !== 'title'}
             <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
+              {#if contentReady}
               <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} onRef={(k, id) => onOpen?.(k, id)} />
+              {:else}
+                <div class="gcard__placeholder" aria-hidden="true">{bodyText}</div>
+              {/if}
               {#if textLoading}<p role="status">Загрузка полного текста…</p>{/if}
               {#if textError}<button type="button" onpointerdown={e => e.stopPropagation()} onclick={() => textRetry++}>Повторить загрузку полного текста</button>{/if}
             </div>
@@ -333,6 +365,8 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 {/snippet}
 
 <style>
+  .gcard__placeholder { white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.18; }
+
  .gcard__image-open{position:absolute;right:3px;top:3px;padding:2px 5px;background:var(--color-bg-raised);border:0;border-radius:4px;color:var(--color-fg);cursor:zoom-in}
 
  .gcard__ghost{height:100%;display:flex;flex-direction:column;padding:12px;gap:8px;overflow:hidden}.gcard__ghost span{opacity:.55;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

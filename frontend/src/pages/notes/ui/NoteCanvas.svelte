@@ -9,6 +9,7 @@
   import { MentionTextarea } from '@/entities/template'
   import type { NoteEditor } from '../model/noteEditor.svelte.ts'
   import Icon from '@/shared/ui/Icon.svelte'
+  import RefText from '@/shared/ui/RefText.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
   import NoteHead from './NoteHead.svelte'
   import NoteLinks from './NoteLinks.svelte'
@@ -120,6 +121,11 @@
 {/if}
 {#if selectedId == null}
   <p class="notes__empty">Выберите заметку или создайте новую</p>
+{:else if ed.loadedId !== selectedId}
+  <section class="notes__loading" aria-busy={ed.loading}>
+    <h1><RefText source={notes.find(n => n.id === selectedId)?.title ?? 'Заметка'} {labels} {onRef} /></h1>
+    {#if ed.loading}<p role="status">Загрузка заметки…</p>{/if}
+  </section>
 {:else}
   {#if ed.external}
     <div class="notes__external" role="status">
@@ -175,7 +181,7 @@
   >
     {#snippet tools()}
       {#if selectedId && !(ed.isPrivate && !ed.privateRevealed)}
-        <ValueTable readonly={!!ed.detail?.is_sample} variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text, load) => {
+        <ValueTable noteIsSample={!!ed.detail?.is_sample} readonly={!!ed.detail?.is_sample} variant="icon" owner={{ kind: 'note', id: selectedId }} onEffective={(text, load) => {
           noteValues = text
           valuesNoteId = load.id
           valuesLoading = load.state === 'loading'
@@ -242,7 +248,7 @@
   />
   {#if selectedId}
     <div class="block notes__attach">
-      <NoteCheck noteId={selectedId} {onChanged} onOpenSecrets={() => onOpenSecrets?.(selectedId)} />
+      <NoteCheck initialCheck={ed.detail?.check ?? null} noteId={selectedId} {onChanged} onOpenSecrets={() => onOpenSecrets?.(selectedId)} />
     </div>
     <div class="block notes__attach">
       <RepositoriesBlock owner={{kind:'note',id:selectedId}} />
@@ -255,6 +261,17 @@
 {/if}
 
 <style>
+  .notes__loading h1 {
+    margin: 0 0 var(--space-3, 0.75rem);
+    font-family: var(--font-display, Georgia, serif);
+    font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  .notes__loading p {
+    color: var(--color-fg-muted, #9a9a9a);
+  }
+
   .notes__private-gate {
     display: flex;
     flex-direction: column;

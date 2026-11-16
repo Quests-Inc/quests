@@ -176,6 +176,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
   let scope = String(current)
   setGraphDraftScope(scope)
   let busy = $state(false)
+  let switchJobs = $state(0)
   let saving = $state(false)
   let failure = $state('')
   const snapshots = new Map<string, LayoutState>()
@@ -266,7 +267,8 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     writes = task.catch(() => {})
     await task
   }
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<void>, switchBoard = false) {
+    if (switchBoard) switchJobs++
     const job = pending.then(async () => {
       busy = true
       clearTimeout(timer)
@@ -278,6 +280,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
         toast(failure, { kind: 'error' })
       } finally {
         busy = false
+        if (switchBoard) switchJobs--
       }
     })
     pending = job
@@ -309,6 +312,9 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     },
     get current() {
       return current
+    },
+    get switching() {
+      return switchJobs > 0
     },
     get busy() {
       return busy
@@ -407,7 +413,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
         const l = await createGraphLayout(title.trim() || nextName(), state)
         await load()
         await activate(l.id, state)
-      })
+      }, true)
     },
     newTemporary() {
       return run(async () => {
@@ -427,7 +433,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
           { id, title: nextName('Временная раскладка'), temporary: true, updated_at: new Date().toISOString() },
         ]
         await activate(id, state)
-      })
+      }, true)
     },
     saveNew(title: string) {
       return run(async () => {
@@ -454,7 +460,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
         await stash()
         const state = typeof id === 'number' ? ((await getGraphLayout(id)).state as LayoutState) : snapshots.get(id)
         if (state) await activate(id, state)
-      })
+      }, true)
     },
     rename(id: number | string, title: string) {
       return run(async () => {

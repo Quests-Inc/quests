@@ -57,6 +57,7 @@ export function createNoteEditor(deps: {
   let error = $state('')
   let saved = $state<NoteForm>({ ...EMPTY })
   let loadedId = $state<number | null>(null)
+  let loading = $state(false)
 
   const dirty = $derived(!noteFormsEqual(formDraft(), saved))
 
@@ -93,6 +94,9 @@ export function createNoteEditor(deps: {
     untrack(() => {
       if (loadedId != null && loadedId !== id) syncDraft(loadedId)
     })
+    error = ''
+    external = null
+    loading = false
     if (id == null) {
       detail = null
       apply(EMPTY)
@@ -107,10 +111,13 @@ export function createNoteEditor(deps: {
       apply({ ...next, ...getNoteDraft(id) })
       saved = next
       loadedId = id
+      loading = false
+      external = null
       error = ''
     }
     const cached = noteCache.get(id)
     if (cached) untrack(() => show(cached))
+    else loading = true
     getNote(id)
       .then((row) => {
         if (cancelled) return
@@ -125,11 +132,16 @@ export function createNoteEditor(deps: {
         show(row)
       })
       .catch((e) => {
-        if (!cancelled && !cached) error = messageOf(e)
+        if (!cancelled && !cached) {
+          loading = false
+          error = messageOf(e)
+        }
       })
     return () => {
       cancelled = true
-      untrack(() => syncDraft(id))
+      untrack(() => {
+        if (loadedId === id) syncDraft(id)
+      })
     }
   })
 
@@ -213,7 +225,7 @@ export function createNoteEditor(deps: {
 
   async function save() {
     const id = deps.selectedId()
-    if (id == null || saving) return
+    if (id == null || loadedId !== id || saving) return
     const t = title.trim()
     if (!t) {
       error = 'Нужен заголовок'
@@ -250,7 +262,7 @@ export function createNoteEditor(deps: {
   /** Заголовок сохраняется отдельно от описания: по blur/Enter. */
   async function commitTitle(next: string = title) {
     const id = deps.selectedId()
-    if (id == null) return
+    if (id == null || loadedId !== id) return
     const t = next.trim()
     if (!t || t === saved.title) {
       title = saved.title
@@ -363,6 +375,9 @@ export function createNoteEditor(deps: {
     },
     get saved() {
       return saved
+    },
+    get loading() {
+      return loading
     },
     get loadedId() {
       return loadedId

@@ -91,6 +91,7 @@
       <div class="notes__head-row">
         <div class="notes__title-cluster" class:notes__title-cluster--editing={titleEditing}>
           <span class="notes__title-grow">
+            {#if titleEditing}
             <span class="notes__title-sizer" aria-hidden="true">{title || '\u00a0'}</span>
             <textarea
               rows="1"
@@ -104,6 +105,12 @@
               onblur={onTitleBlur}
               onkeydown={onTitleKeydown}
             ></textarea>
+            {:else}
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <h1 class="notes__title-display" title="Двойной клик — переименовать" ondblclick={(event) => {
+                if (!(event.target instanceof Element && event.target.closest('a'))) onTitleDblClick()
+              }}><RefText source={title} {labels} {onRef} /></h1>
+            {/if}
           </span>
           {#if dirty && !titleEditing}<span class="notes__unsaved" title="Несохранено">*</span>{/if}
         </div>
@@ -284,6 +291,15 @@
     background: transparent;
     color: inherit;
     box-sizing: border-box;
+  }
+
+  .notes__title-display {
+    margin: 0;
+    min-width: 0;
+    padding: 0.15rem 0;
+    font: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   .notes__title--locked {

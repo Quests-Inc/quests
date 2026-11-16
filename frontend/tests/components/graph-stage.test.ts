@@ -333,3 +333,18 @@ test('new trees follow actual saved bounds instead of accumulating invisible lay
   expect(root).toMatchObject({ x: -500, y: -400 })
   expect(stage.nodes.find((n) => n.key === 'quest:1')).toMatchObject({ x: 0, y: 0 })
 })
+
+test('deferred content refines automatic sizes and leaves explicit sizes intact', async () => {
+  const { stage } = make()
+  stage.compose()
+  await flush()
+  const note = stage.nodes.find((n) => n.key === 'note:4')!
+  stage.measureContent(note.key, 320, 230)
+  expect(note.w).toBe(320)
+  expect(note.h).toBe(230)
+  note.sw = 360
+  note.sh = 420
+  stage.measureContent(note.key, 999, 999)
+  expect(note.w).toBe(320)
+  expect(note.h).toBe(230)
+})

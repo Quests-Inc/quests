@@ -17,11 +17,14 @@
   let {
     owner,
     readonly = false,
+    noteIsSample,
     variant = 'text',
     onEffective,
   }: {
     owner: { kind: string; id: number }
     readonly?: boolean
+    /** Already known by the note page; avoids fetching the whole note again for this flag. */
+    noteIsSample?: boolean
     variant?: 'text' | 'icon' | 'hidden' | 'inline' | 'panel'
     onEffective?: (text: Record<string, string>, load: { kind: string; id: number; state: 'loading' | 'ready' | 'error' }) => void
   } = $props()
@@ -38,10 +41,10 @@
   let workspaceReadonly = $state(true)
   let sampleReadonly = $state(false)
   $effect(() => {
-    sampleReadonly = false
+    sampleReadonly = noteIsSample ?? false
     const target = owner
     let live = true
-    if (target.kind === 'note') void getNote(target.id).then(n => { if (live) sampleReadonly = !!n.is_sample }).catch(() => {})
+    if (target.kind === 'note' && noteIsSample === undefined) void getNote(target.id).then(n => { if (live) sampleReadonly = !!n.is_sample }).catch(() => {})
     return () => { live = false }
   })
   const editReadonly = $derived(readonly || sampleReadonly || (owner.kind === 'workspace' && workspaceReadonly))

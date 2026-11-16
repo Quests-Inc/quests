@@ -64,6 +64,7 @@ export function createGraphQuery(deps: {
   let data = $state<Graph | null>(null)
   let memberships = $state<Record<string, string[]>>({})
   let loading = $state(false)
+  let retargeting = $state(false)
   let error = $state('')
   let rootQuery = $state('')
   let pickOpen = $state(false)
@@ -80,11 +81,16 @@ export function createGraphQuery(deps: {
     const key = `${rootType}:${rootId}:${deps.getRootNonce?.() ?? deps.getNonce()}`
     if (key === lastRootKey) return
     lastRootKey = key
-    const retarget = deps.onRetarget()
-    if (retarget && typeof retarget.then === 'function') await retarget
-    if (key !== lastRootKey) return
-    deps.initTree?.(`${rootType}:${rootId}`, depth)
-    center = { type: rootType, id: rootId }
+    retargeting = true
+    try {
+      const retarget = deps.onRetarget()
+      if (retarget && typeof retarget.then === 'function') await retarget
+      if (key !== lastRootKey) return
+      deps.initTree?.(`${rootType}:${rootId}`, depth)
+      center = { type: rootType, id: rootId }
+    } finally {
+      if (key === lastRootKey) retargeting = false
+    }
   }
 
   /** Запросить граф. Пока вкладка скрыта — нет. Пустой центр — пустая карта, чтобы черновик всё равно было куда класть. */
@@ -231,7 +237,7 @@ export function createGraphQuery(deps: {
       return data
     },
     get loading() {
-      return loading
+      return loading || retargeting
     },
     get error() {
       return error

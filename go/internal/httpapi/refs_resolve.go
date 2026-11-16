@@ -11,6 +11,30 @@ import (
 
 func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 	out := make([]refs.Resolved, 0, len(list))
+	// Resolving a title must not fetch each entire note (including its body) separately.
+	noteIDs := make([]any, 0)
+	for _, ref := range list {
+		if ref.Kind == "note" {
+			noteIDs = append(noteIDs, ref.ID)
+		}
+	}
+	noteTitles := make(map[int64]string)
+	for start := 0; start < len(noteIDs); start += 256 {
+		end := min(start+256, len(noteIDs))
+		args := noteIDs[start:end]
+		rows, err := s.Store.DB.QueryContext(r.Context(), `SELECT id, title FROM note WHERE id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...)
+		if err != nil {
+			continue
+		}
+		for rows.Next() {
+			var id int64
+			var title string
+			if rows.Scan(&id, &title) == nil {
+				noteTitles[id] = title
+			}
+		}
+		_ = rows.Close()
+	}
 	for _, ref := range list {
 		row := refs.Resolved{Kind: ref.Kind, ID: ref.ID}
 		switch ref.Kind {
@@ -20,9 +44,8 @@ func (s *Server) resolveRefs(r *http.Request, list []refs.Ref) []refs.Resolved {
 				row.Title = &title
 			}
 		case "note":
-			n, err := s.Store.Knowledge.GetNote(r.Context(), ref.ID)
-			if err == nil {
-				row.Title = &n.Title
+			if title, ok := noteTitles[ref.ID]; ok {
+				row.Title = &title
 			}
 		case "quest":
 			q, err := s.Store.Journal.GetQuest(r.Context(), ref.ID)

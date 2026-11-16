@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import RunnerPicker from '@/shared/ui/RunnerPicker.svelte'
   import HelpTip from '@/shared/ui/HelpTip.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
@@ -13,7 +14,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
    * is "out of date?" — a bare 0/1 or {"outdated": 0|1, "reason": "…"}. The state follows the server;
    * this block polls it while open.
    */
-  let { noteId, onOpenSecrets, onChanged }: { noteId: number, onOpenSecrets?: () => void, onChanged?: () => void } = $props()
+  let { noteId, initialCheck, onOpenSecrets, onChanged }: { noteId: number, initialCheck?: NoteCheckView | null, onOpenSecrets?: () => void, onChanged?: () => void } = $props()
 
   let check = $state((null as any | null))
   let open = $state(false)
@@ -26,7 +27,7 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
   let error = $state('')
   let dirty = $state(false)
 
-  function adopt(c: NoteCheckView) {
+  function adopt(c: NoteCheckView | null) {
     check = c
     if (!dirty) {
       command = c?.command ?? ''
@@ -50,7 +51,13 @@ import type { NoteCheckView } from '@/shared/api/knowledge_http.gen.ts'
     dirty = false
     error = ''
     check = null
-    void load()
+    const known = untrack(() => initialCheck)
+    if (known !== undefined) adopt(known)
+    else void load()
+  })
+  $effect(() => {
+    const known = initialCheck
+    if (known !== undefined) untrack(() => adopt(known))
   })
 
   // Follow the verdict while the block is open (a check may finish any moment).

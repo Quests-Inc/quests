@@ -19,11 +19,16 @@ const row = (over: any = {}) => ({
 let server: Record<number, any> = {}
 const puts: any[] = []
 let failSave = false
+const pendingReads = new Map<number, { resolve: (row: unknown) => void; reject: (error: Error) => void }>()
+const delayReads = new Set<number>()
 
 const real = await import('@/shared/api/client.ts')
 mock.module('@/shared/api/client.ts', () => ({
   ...real,
-  getNote: async (id: number) => structuredClone(server[id]),
+  getNote: async (id: number) =>
+    delayReads.has(id)
+      ? new Promise((resolve, reject) => pendingReads.set(id, { resolve, reject }))
+      : structuredClone(server[id]),
   updateNote: async (id: number, patch: any) => {
     if (failSave) throw new Error('нет связи')
     puts.push([id, patch])
@@ -71,6 +76,8 @@ beforeEach(() => {
   server = { 1: row(), 2: row({ id: 2, title: 'Вторая' }) }
   puts.length = 0
   failSave = false
+  pendingReads.clear()
+  delayReads.clear()
   for (const k of Object.keys(noteDrafts)) delete noteDrafts[k]
 })
 
@@ -174,5 +181,42 @@ test('patched: быстрое сохранение поля обновляет �
   expect(t.ed.saved.pinned).toBe(true)
   t.ed.patched(2, row(), { pinned: false })
   expect(t.ed.pinned).toBe(true)
+  t.stop()
+})
+
+test('pending switches cannot save into the new note or leave a draft on a cancelled load', async () => {
+  server[81] = row({ id: 81, title: 'Old' })
+  server[82] = row({ id: 82, title: 'Pending' })
+  server[83] = row({ id: 83, title: 'Newest' })
+  const t = make()
+  await t.open(81)
+  t.ed.description = 'unsaved old draft'
+  delayReads.add(82)
+  await t.open(82)
+  expect(t.ed.loading).toBe(true)
+  expect(t.ed.loadedId).toBe(81)
+  await t.ed.save()
+  expect(puts).toHaveLength(0)
+  await t.open(83)
+  expect(t.ed.loading).toBe(false)
+  expect(t.ed.title).toBe('Newest')
+  expect(noteDrafts['81']?.description).toBe('unsaved old draft')
+  expect(noteDrafts['82']).toBeUndefined()
+  pendingReads.get(82)!.resolve(server[82])
+  await settle()
+  expect(t.ed.title).toBe('Newest')
+  t.stop()
+})
+
+test('a failed first load ends the loading state', async () => {
+  delayReads.add(84)
+  const t = make()
+  await t.open(84)
+  expect(t.ed.loading).toBe(true)
+  pendingReads.get(84)!.reject(new Error('offline'))
+  await settle()
+  expect(t.ed.loading).toBe(false)
+  expect(t.ed.loadedId).not.toBe(84)
+  expect(t.ed.error).toBe('offline')
   t.stop()
 })

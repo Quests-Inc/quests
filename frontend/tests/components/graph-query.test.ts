@@ -213,3 +213,18 @@ test('adding a root prepares its visible position before updating roots', async 
   await q.addToMap('note', 9)
   expect(order).toEqual(['place:note:9', 'write'])
 })
+
+test('a slow external retarget enters loading before awaiting draft state', async () => {
+  let release!: () => void
+  const { q } = make({
+    onRetarget: () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      }),
+  })
+  const work = q.syncRoot()
+  expect(q.loading).toBe(true)
+  release()
+  await work
+  expect(q.loading).toBe(false)
+})

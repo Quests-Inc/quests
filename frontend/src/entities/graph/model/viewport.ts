@@ -133,9 +133,13 @@ export function fitCamera(
 }
 
 /** World bounds with a screen-space buffer, so cards mount before entering the window. */
-export function viewportBounds(cam: { x: number; y: number; k: number }, stage: { w: number; h: number }) {
+export function viewportBounds(
+  cam: { x: number; y: number; k: number },
+  stage: { w: number; h: number },
+  padding = 240
+) {
   if (!stage.w || !stage.h || cam.k <= 0) return null
-  const pad = 240 / cam.k
+  const pad = padding / cam.k
   return {
     x0: -cam.x / cam.k - pad,
     y0: -cam.y / cam.k - pad,

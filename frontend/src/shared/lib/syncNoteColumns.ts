@@ -132,8 +132,6 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
     if (!ta || !preview || !md) return
     // On a narrow screen the columns stack; there is no adjacent preview to sync.
     if (preview.getBoundingClientRect().left < ta.getBoundingClientRect().right - 2) return
-    measure(ta)
-    if (!lines.length) return
     const a = ta.getBoundingClientRect(),
       p = page.getBoundingClientRect()
     const top = Math.max(a.top, p.top),
@@ -151,6 +149,8 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
       follow(preview, preview.scrollHeight)
       return
     }
+    measure(ta)
+    if (!lines.length) return
     const middle = top + visible * fraction - a.top + ta.scrollTop
     const anchors = sourceLineAnchors(lines, middle)
     const rendered = md.textContent ?? ''
@@ -190,12 +190,13 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
     if (!(e.target instanceof Element && e.target.closest('.notes__preview'))) schedule()
   }
   node.addEventListener('scroll', sourceScroll, true)
-  const resized = () => {
+  const resized = schedule
+  const fontsChanged = () => {
     signature = ''
     schedule()
   }
   window.addEventListener('resize', resized)
-  document.fonts?.addEventListener('loadingdone', resized)
+  document.fonts?.addEventListener('loadingdone', fontsChanged)
   const observer = new ResizeObserver(resized)
   observer.observe(node)
   const changes = new MutationObserver(schedule)
@@ -212,7 +213,7 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
       page?.removeEventListener('scroll', schedule)
       node.removeEventListener('scroll', sourceScroll, true)
       window.removeEventListener('resize', resized)
-      document.fonts?.removeEventListener('loadingdone', resized)
+      document.fonts?.removeEventListener('loadingdone', fontsChanged)
       observer.disconnect()
       changes.disconnect()
     },

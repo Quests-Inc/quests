@@ -23,7 +23,15 @@ test('opening and switching notes never renders raw variables or values from the
   document.body.append(target)
   const noop = () => {}
   const props = {
-    ed: { title: 'Персонаж', description: 'Здоровье: {{hp}}', detail: {}, dirty: false },
+    ed: {
+      get loadedId() {
+        return selected.value
+      },
+      title: 'Персонаж',
+      description: 'Здоровье: {{hp}}',
+      detail: {},
+      dirty: false,
+    },
     get selectedId() {
       return selected.value
     },

@@ -94,3 +94,25 @@ test('failed full text loading can be retried', async () => {
   expect(view.target.textContent).toContain(ending)
   await view.close()
 })
+
+test('measuring deferred cards show placeholders without requesting bodies', async () => {
+  requests = 0
+  const view = await show({ ready: false, deferContent: true })
+  expect(view.target.querySelector('.gcard__placeholder')).not.toBeNull()
+  expect(view.target.querySelector('.md')).toBeNull()
+  expect(requests).toBe(0)
+  await view.close()
+})
+
+test('visible deferred cards mount content after placeholders have painted', async () => {
+  requests = 0
+  const view = await show({ deferContent: true })
+  for (let i = 0; i < 12; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    flushSync()
+    if (requests > 0) break
+  }
+  expect(requests).toBe(1)
+  expect(view.target.textContent).toContain(ending)
+  await view.close()
+})

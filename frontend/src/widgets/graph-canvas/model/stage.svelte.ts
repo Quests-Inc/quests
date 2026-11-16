@@ -593,6 +593,21 @@ export function createGraphStage(deps: {
       const n = selectedKey ? map().get(selectedKey) : null
       return Boolean(n && n.key !== deps.getData()?.root && CENTERABLE.has(n.type) && !n.draft)
     },
+    measureContent(key: string, width: number, height: number) {
+      const n = nodesByKey().get(key)
+      if (
+        !ready ||
+        !n ||
+        n.sh != null ||
+        !width ||
+        !height ||
+        (Math.abs(n.w - width) < 1 && Math.abs(n.h - height) < 1)
+      )
+        return
+      n.w = width
+      n.h = height
+      applyLayout()
+    },
     focusNode,
     cancelCamera,
     touch,
