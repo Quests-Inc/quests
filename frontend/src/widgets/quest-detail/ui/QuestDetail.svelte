@@ -1,6 +1,6 @@
 <script lang="ts">
  import {RepositoriesBlock} from '@/entities/repository'
-  import { untrack } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import { QuestlineIcon } from '@/entities/questline'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
@@ -171,7 +171,30 @@
     onSelectQuest?.(id)
   }
 
-  /** Only jump to top when switching quests — not on every silent refresh / step bump. */
+  let detailEl = $state<HTMLElement | null>(null)
+
+  /** A questline page starts with the line, not the quest. Land on the quest title. */
+  function alignDetailScroll(inLine: boolean) {
+    const scroller = detailEl
+    if (!scroller) return
+    const title = inLine ? scroller.querySelector('.detail__quest .detail__title') : null
+    if (!(title instanceof HTMLElement)) {
+      scroller.scrollTo({ top: 0 })
+      return
+    }
+    const style = getComputedStyle(scroller)
+    const pad = parseFloat(style.paddingTop) || 0
+    const border = parseFloat(style.borderTopWidth) || 0
+    const top =
+      title.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top +
+      scroller.scrollTop -
+      border -
+      pad
+    scroller.scrollTo({ top: Math.max(0, top) })
+  }
+
+  /** Only jump when switching quests — not on every silent refresh / step bump. */
   let lastDetailQuestId = (null as number | null)
 
   /** What's actually rendered — equals selected.title/description except mid-animation. */
@@ -248,9 +271,8 @@
       stepDisplayDesc = freshDesc
       prevStepAutomatedDesc = freshPrev
       if (id != null) {
-        queueMicrotask(() => {
-          document.querySelector('.detail')?.scrollTo({ top: 0 })
-        })
+        const inLine = Boolean(q?.questline_id)
+        void tick().then(() => alignDetailScroll(inLine))
       }
       return
     }
@@ -627,13 +649,15 @@
 
   {#if timer}
     <div class="deadline-timer" data-tone={timer.tone}>
-      <span class="deadline-timer__label">До срока</span>
+      {#if timer.rem > 0}
+        <span class="deadline-timer__label">До срока</span>
+      {/if}
       <span class="deadline-timer__value">{timer.detailLabel}</span>
     </div>
   {/if}
 {/snippet}
 
-<section class="detail" aria-live="polite">
+<section class="detail" aria-live="polite" bind:this={detailEl}>
   {#if !selected}
     <div class="detail__empty">
       <p class="detail__empty-prompt">Выберите квест слева</p>

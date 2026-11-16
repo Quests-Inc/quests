@@ -315,7 +315,8 @@
   --tone: var(--color-warning, #c47a20);
 }
 
-.deadline-timer[data-tone='red'] {
+.deadline-timer[data-tone='red'],
+.deadline-timer[data-tone='overdue'] {
   --tone: var(--color-danger, #b54a3a);
 }
 
@@ -328,6 +329,7 @@
 }
 
 .deadline-timer__value {
+  margin-left: auto;
   font-size: var(--text-lg, 1.25rem);
   font-weight: 700;
   font-variant-numeric: tabular-nums;

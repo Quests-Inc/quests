@@ -26,13 +26,17 @@ test('подписи: период шаблона, значимость, про�
   expect(quantifiedProgress({ steps_total: 4, progress_label: '1/4' })).toBe('1/4')
 })
 
-test('questTimer: нет срока, закрытый или просроченный — без таймера; окно задаёт цвет', () => {
+test('questTimer: нет срока, закрытый или уже просроченный — без таймера; окно задаёт цвет', () => {
   const now = Date.parse('2026-03-01T10:00:00Z')
   expect(questTimer({}, now)).toBeNull()
   expect(questTimer({ deadline_at: '2026-03-01T11:00:00Z', status: 'completed' }, now)).toBeNull()
+  // Status already says «просрочен»; the countdown must not say «просрочено» again.
   expect(
-    questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active', expire_on_deadline: true }, now).tone
-  ).toBe('overdue')
+    questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'expired', expire_on_deadline: true }, now)
+  ).toBeNull()
+  expect(
+    questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active', expire_on_deadline: true }, now)
+  ).toMatchObject({ tone: 'overdue', label: 'просрочено', detailLabel: 'просрочено' })
   expect(
     questTimer({ deadline_at: '2026-03-01T09:00:00Z', status: 'active', expire_on_deadline: false }, now)
   ).toMatchObject({ tone: null, label: 'срок наступил' })

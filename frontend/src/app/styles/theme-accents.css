@@ -25,7 +25,8 @@
 .row-timer.row-timer[data-tone='orange'] {
   color: var(--color-timer-warn);
 }
-.row-timer.row-timer[data-tone='red'] {
+.row-timer.row-timer[data-tone='red'],
+.row-timer.row-timer[data-tone='overdue'] {
   color: var(--color-timer-urgent);
 }
 

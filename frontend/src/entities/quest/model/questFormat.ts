@@ -29,13 +29,15 @@ export function quantifiedProgress(q: { steps_total: any; progress_label: any })
   return q.progress_label || null
 }
 
-/** Both fixed and event-derived deadlines use their real urgency window. */
+/** Both fixed and event-derived deadlines use their real urgency window.
+ *  An expired quest already reads «просрочен»; a second «просрочено» repeats it.
+ */
 export function questTimer(q: any, nowMs: number) {
-  if (!q?.deadline_at || (q.status && !OPEN_STATUSES.has(q.status))) return null
+  if (!q?.deadline_at || q.status === 'expired' || (q.status && !OPEN_STATUSES.has(q.status))) return null
   const rem = remainingFromDeadline(q.deadline_at, nowMs)
   if (rem == null) return null
   if (rem <= 0) {
-    const overdue = q.status === 'expired' || (q.expire_on_deadline ?? true)
+    const overdue = q.expire_on_deadline ?? true
     return {
       rem,
       label: overdue ? 'просрочено' : 'срок наступил',
