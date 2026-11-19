@@ -54,7 +54,8 @@ function make(
       return new Promise((resolve, reject) => pending.push({ resolve, reject }))
     },
     writeRoots: async (next) => {
-      written.push(next)
+      written.push(next.map((r) => ({ ...r })))
+      roots.splice(0, roots.length, ...next)
     },
     ...over,
   })
@@ -137,19 +138,30 @@ test('повтор того же ответа не подменяет объек
 })
 
 test('выбор корня и очистка карты', async () => {
-  const { q, calls, written } = make()
+  const { q, calls, written, roots } = make()
   q.rootQuery = 'аль'
   q.pickOpen = true
   expect(q.found.items.map((m) => m.title)).toEqual(['Альфа'])
-  q.chooseRoot({ type: 'note', id: 2 })
+  await q.chooseRoot({ type: 'note', id: 2 })
   expect(q.rootQuery).toBe('')
   expect(q.pickOpen).toBe(false)
   expect(q.center).toEqual({ type: 'note', id: 2 })
+  expect(roots).toEqual([{ type: 'quest', id: 5 }])
+  expect(written[0]).toEqual([{ type: 'quest', id: 5 }])
   expect(calls).toContain('fresh')
   await q.clearMap()
   expect(q.center).toEqual({ type: null, id: null })
-  expect(written).toEqual([[]])
+  expect(written.at(-1)).toEqual([])
   expect(calls).toContain('center:null:null')
+})
+
+test('сделать центром оставляет прежнее дерево на карте', async () => {
+  const { q, roots, written } = make()
+  roots.push({ type: 'note', id: 79 })
+  await q.recenter({ type: 'note', id: 79 })
+  expect(q.center).toEqual({ type: 'note', id: 79 })
+  expect(roots).toEqual([{ type: 'quest', id: 5 }])
+  expect(written[0]).toEqual([{ type: 'quest', id: 5 }])
 })
 
 test('первый добавленный становится центром, повтор — нет', async () => {

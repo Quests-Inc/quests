@@ -109,11 +109,13 @@ export function createGraphStage(deps: {
     const n = nodesByKey().get(key),
       element = el
     if (!ready || !n || !element) return
+    const r = element.getBoundingClientRect()
+    // Keep-alive map stays display:none off-tab; a zero box would aim the camera at nothing.
+    if (r.width < 8 || r.height < 8) return
     focusKey = null
     cancelCamera()
     selectedKey = key
-    const r = element.getBoundingClientRect(),
-      from = { ...deps.getCam() }
+    const from = { ...deps.getCam() }
     const to = { x: r.width / 2 - n.x * from.k, y: r.height / 2 - n.y * from.k }
     const start = performance.now()
     function frame(now: number) {
@@ -316,6 +318,13 @@ export function createGraphStage(deps: {
       buildLater = false
       buildTick += 1
     }
+    // Tab just shown: retry a focus that waited for a non-zero stage box.
+    if (deps.getActive() && focusKey) {
+      const pending = focusKey
+      requestAnimationFrame(() => {
+        if (focusKey === pending) focusNode(pending)
+      })
+    }
   }
 
   function relayout() {
@@ -333,7 +342,12 @@ export function createGraphStage(deps: {
         const c = untrack(() => deps.getCam())
         deps.setCam({ ...c, x: c.x + (w - prev.w) / 2, y: c.y + (h - prev.h) / 2 })
       }
-      if (w && h) stageSize = { w, h }
+      if (w && h) {
+        stageSize = { w, h }
+        // A focus queued while the map was display:none can run now that the box is real.
+        const pending = focusKey
+        if (pending) focusNode(pending)
+      }
     })
     ro.observe(node)
     return () => ro.disconnect()

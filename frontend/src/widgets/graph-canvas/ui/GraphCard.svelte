@@ -3,16 +3,15 @@
   import { untrack } from 'svelte'
   import { getNote } from '@/shared/api/notes.ts'
 
- import {attachmentImage,showImages,type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
-  import { isAudioFile } from '@/shared/lib/audioFile.ts'
+ import {type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
   import { trackOf } from '@/shared/lib/player.svelte.ts'
-  import PlayFile from '@/shared/ui/PlayFile.svelte'
- import GraphImage from './GraphImage.svelte'
+  import { focusEditorAt, focusWhenShown, sourceCaretFromMarkdownClick } from '../model/noteEditCaret.ts'
+ import GraphSquareMedia from './GraphSquareMedia.svelte'
  import NoteSilhouette from './NoteSilhouette.svelte'
   import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
   import { QuestlineIcon } from '@/entities/questline'
+  import { MentionTextarea } from '@/entities/template'
   import { statusWord } from '@/shared/lib/questStatus.ts'
-  import FileKindIcon from '@/shared/ui/FileKindIcon.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
 
   /**
@@ -91,7 +90,7 @@
     /** Stacking order among cards (higher = nearer). */
     z?: number
     onCtx: (e: MouseEvent, n: GraphNodeView) => void
-    onStartEdit(n: GraphNodeView): void
+    onStartEdit(n: GraphNodeView, opts?: { caret?: number | null }): void
     onFinishEdit: (save: boolean) => void
     onOpen?: (kind: string, id: number) => void
     /** Подписи ссылок kind:id → заголовок, те же что в обычном просмотре. */
@@ -105,24 +104,33 @@
     resizing?: boolean
   } = $props()
 
-const autofocusIf = (node: { focus: () => void }, on: unknown) => {
-  if (on) node.focus()
-}
-
 /** Title of a brand-new note: focused with the whole text selected. */
 const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
-  // The card is mounted while the map is still hidden for measuring, and a
-  // hidden field cannot take focus — keep trying until it shows.
-  let tries = 0
-  const grab = () => {
-    node.focus()
-    node.select()
-    if (document.activeElement !== node && node.isConnected && tries++ < 30) requestAnimationFrame(grab)
-  }
-  grab()
+  focusWhenShown(node, (el) => {
+    ;(el as HTMLInputElement).focus()
+    ;(el as HTMLInputElement).select()
+  })
+}
+
+function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
+  if (event.target instanceof Element && event.target.closest('a, button, textarea, input, a.md-script')) return
+  event.preventDefault()
+  const mdRoot = cardEl?.querySelector('.gcard__body .md') ?? cardEl?.querySelector('.gcard__body')
+  void onStartEdit(node, { caret: sourceCaretFromMarkdownClick(mdRoot, bodyText ?? '', event.clientX, event.clientY) })
 }
 
   let cardEl = $state<HTMLElement | null>(null)
+  let editEl = $state<HTMLTextAreaElement | null>(null)
+  let focusedEditKey: string | null = null
+  $effect(() => {
+    if (!editingHere) { focusedEditKey = null; return }
+    const ed = editing, ta = editEl
+    if (!ed || ed.fresh || !ta || focusedEditKey === ed.key) return
+    focusedEditKey = ed.key
+    const offset = ed.caret ?? null
+    if (ed.caret != null) ed.caret = null
+    focusEditorAt(ta, offset)
+  })
   let contentReady = $state(!deferContent)
   $effect(() => {
     const enabled = !deferContent || (ready && loadText && tier !== 'lite' && tier !== 'title')
@@ -223,21 +231,23 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
         }}
         oncontextmenu={(e) => onCtx(e, n)}
         ondblclick={(e) => {
-          if (n.type === 'note' && !(e.target instanceof Element && (e.target as Element).closest('a, button, textarea, input'))) void onStartEdit(n)
+          if (n.type === 'note') beginNoteEdit(e, n)
         }}
       >
         {#if square}
           <div class="gcard__sq">
-            {#if raster}
-              <GraphImage id={n.id} pixels={imagePixels} />
-              <button type="button" class="gcard__image-open" aria-label={`Открыть изображение ${n.title}`} title="Открыть изображение" onpointerdown={e=>e.stopPropagation()} onclick={e=>{e.stopPropagation();const image=attachmentImage({id:n.id,filename:n.title});showImages(imageGallery.length?imageGallery:[image],image.src)}}>⤢</button>
-            {:else if n.type === 'cluster'}
+            {#if n.type === 'cluster'}
               <span class="gcard__count">{n.title.split(' ')[0]}</span>
             {:else}
-              <FileKindIcon att={{ filename: n.title, content_type_detected: n.mime }} size={30} />
-              {#if n.type === 'attachment' && isAudioFile({ filename: n.title, mime: n.mime })}
-                <PlayFile floating file={{ id: n.id, filename: n.title, mime: n.mime }} />
-              {/if}
+              <GraphSquareMedia
+                id={n.id}
+                title={n.title}
+                mime={n.mime}
+                {raster}
+                {imagePixels}
+                {imageGallery}
+                loadCover={contentReady}
+              />
             {/if}
             <span class="gcard__name">{n.type === 'cluster' ? 'вложений' : n.title}</span>
           </div>
@@ -264,12 +274,13 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
               <input class="gcard__titleedit" bind:value={editing.title} aria-label="Заголовок" />
             {/if}
           </div>
-          <textarea
+          <MentionTextarea
             class="gcard__editor"
             bind:value={editing.text}
-            use:autofocusIf={!editing.fresh}
+            bind:el={editEl}
+            host={hostOf}
+            placement="inside"
             placeholder="Markdown"
-            spellcheck="false"
             onkeydown={(e) => {
               if (e.key === 'Escape') {
                 e.stopPropagation()
@@ -279,7 +290,7 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
                 void onFinishEdit(true)
               }
             }}
-          ></textarea>
+          />
           <div class="gcard__editbar">
             <button type="button" class="graph__btn graph__btn--primary" onclick={() => onFinishEdit(true)}>Готово</button>
             <button type="button" class="graph__btn" onclick={() => onFinishEdit(false)}>Отмена</button>
@@ -373,8 +384,6 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
 
 <style>
   .gcard__placeholder { white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.18; }
-
- .gcard__image-open{position:absolute;right:3px;top:3px;padding:2px 5px;background:var(--color-bg-raised);border:0;border-radius:4px;color:var(--color-fg);cursor:zoom-in}
 
  .gcard__ghost{height:100%;display:flex;flex-direction:column;padding:12px;gap:8px;overflow:hidden}.gcard__ghost span{opacity:.55;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -491,18 +500,32 @@ const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
     font-weight: 600;
   }
 
-  .gcard__editor {
+  .gcard :global(.mention-field--inside) {
     flex: 1 1 auto;
     min-height: 0;
-    resize: none;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--color-border, #333);
+    height: auto;
+    display: flex;
+    flex-direction: column;
     border-radius: 6px;
     background: color-mix(in srgb, var(--c-fill, var(--c, #888)) 14%, var(--color-bg, #121212));
-    color: var(--color-fg, #e8e8e8);
+  }
+
+  .gcard :global(.gcard__editor),
+  .gcard :global(.mention-field--hl .mdh-layer) {
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
     line-height: 1.45;
+  }
+  .gcard :global(.gcard__editor) {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    resize: none;
+    border: 1px solid var(--color-border, #333);
+    background: transparent;
+    color: var(--color-fg, #e8e8e8);
     user-select: text;
   }
 

@@ -179,9 +179,29 @@ export function createGraphQuery(deps: {
       })
   }
 
-  function focus(type: string, id: number) {
+  function sameRoots(a: Root[], b: Root[]) {
+    return a.length === b.length && a.every((r, i) => r.type === b[i]?.type && r.id === b[i]?.id)
+  }
+
+  /** Changing the centre must not drop the previous tree: it becomes an extra root; the new centre leaves the extras. */
+  async function keepTreesWhenChangingCenter(next: Root) {
+    const prev = center
+    if (!prev.type || prev.id == null) return
+    if (prev.type === next.type && prev.id === next.id) return
+    const roots = deps.getDraftRoots()
+    const withoutNext = roots.filter((r) => !(r.type === next.type && r.id === next.id))
+    const nextRoots = withoutNext.some((r) => r.type === prev.type && r.id === prev.id)
+      ? withoutNext
+      : [...withoutNext, { type: prev.type, id: prev.id }]
+    if (sameRoots(roots, nextRoots)) return
+    await writeRoots(nextRoots)
+    await deps.loadDraft()
+  }
+
+  async function focus(type: string, id: number) {
     lastRootKey = `${type}:${id}:${deps.getRootNonce?.() ?? deps.getNonce()}`
     deps.initTree?.(`${type}:${id}`, depth)
+    await keepTreesWhenChangingCenter({ type, id })
     deps.prepareFresh()
     center = { type, id }
     deps.onCenter(type, id)
@@ -190,12 +210,12 @@ export function createGraphQuery(deps: {
   function chooseRoot(m: { type: string; id: number }) {
     rootQuery = ''
     pickOpen = false
-    focus(m.type, m.id)
+    return focus(m.type, m.id)
   }
 
   function recenter(n: { type: string; draft?: unknown; id: number | string }) {
     if (!CENTERABLE.has(n.type) || n.draft || typeof n.id !== 'number') return
-    focus(n.type, n.id)
+    return focus(n.type, n.id)
   }
 
   function setCenter(c: Center, rememberVisit = true) {

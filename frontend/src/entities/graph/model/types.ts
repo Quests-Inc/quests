@@ -59,6 +59,8 @@ export interface GraphNoteEditing {
   title: string
   text: string
   fresh?: boolean
+  /** Source caret after opening from a rendered-body click; consumed once on focus. */
+  caret?: number | null
   orig?: { title: string; description: string }
   opId?: number
   payload?: unknown

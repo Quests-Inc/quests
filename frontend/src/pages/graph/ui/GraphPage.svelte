@@ -591,7 +591,7 @@
     {onEdgeCtx}
     {onOpen}
     {labels}
-    onStartEdit={startEditNote}
+    onStartEdit={(n, opts) => void startEditNote(n, false, opts?.caret ?? null)}
     onFinishEdit={finishEdit}
     onShowChanges={showChanges}
     onHidePicked={hidePicked}

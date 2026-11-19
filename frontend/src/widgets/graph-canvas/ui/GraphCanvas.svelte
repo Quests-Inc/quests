@@ -79,7 +79,7 @@
     onEdgeCtx: (e: MouseEvent, edge: { from: string; to: string; kind: string }) => void
     onOpen?: (kind: string, id: number) => void
     labels?: Record<string, string>
-    onStartEdit: (n: { key: string }) => void
+    onStartEdit: (n: Stage['nodes'][number], opts?: { caret?: number | null }) => void
     onFinishEdit: (saveIt: boolean) => void
     onShowChanges: (key: string) => void
     onHidePicked: () => void

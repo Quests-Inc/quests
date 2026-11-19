@@ -29,6 +29,8 @@ export type NoteEditing = {
   opId: number | null
   payload?: any
   fresh?: boolean
+  /** Source caret after opening from a rendered-body click; consumed once on focus. */
+  caret?: number | null
 }
 
 const PLAIN: Pick<EntityModal, 'owner' | 'linkFrom' | 'edit'> = { owner: '', linkFrom: '', edit: null }
@@ -56,7 +58,7 @@ export function createGraphEdits(deps: {
   }
 
   async function startEdit(n: EditNode, at: At) {
-    if (n.type === 'note') return startEditNote(n)
+    if (n.type === 'note') return startEditNote(n, false)
     if (n.draft) {
       const op = deps.ops().find((o) => o.id === n.op)
       if (!op) return
@@ -145,7 +147,7 @@ export function createGraphEdits(deps: {
   }
 
   /** Заметка правится на карточке: полный текст берётся с сервера (на карте виден только его начало). */
-  async function startEditNote(n: EditNode, fresh = false) {
+  async function startEditNote(n: EditNode, fresh = false, caret: number | null = null) {
     if (editing?.key === n.key) return
     try {
       if (n.draft) {
@@ -160,6 +162,7 @@ export function createGraphEdits(deps: {
           opId: op.id,
           payload: op.payload,
           fresh,
+          caret,
         }
       } else {
         const full = await getNote(Number(n.id))
@@ -173,6 +176,7 @@ export function createGraphEdits(deps: {
           text: full.description ?? '',
           orig: { title: full.title ?? '', description: full.description ?? '' },
           opId: null,
+          caret,
         }
       }
     } catch {

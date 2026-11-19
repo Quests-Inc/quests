@@ -317,6 +317,7 @@
     left: 0;
     bottom: 1rem;
     z-index: 40;
+    transition: left 0.2s ease;
   }
   .dock--pinned { left: 0.75rem; }
   .dock__card {
@@ -331,11 +332,16 @@
     height: var(--dock-h);
     padding: 0.28rem 0.28rem 0.22rem 0.42rem;
     border: 1px solid var(--color-border, #333);
-    border-radius: 10px;
+    border-left: 0;
+    border-radius: 0 10px 10px 0;
     background: var(--color-bg-raised, #1a1a1a);
     color: var(--color-fg, #e8e8e8);
     transform: translateX(calc(-100% - 2px));
-    transition: transform 180ms ease;
+    transition: transform 180ms ease, border-radius 0.2s ease, border-left-width 0.2s ease;
+  }
+  .dock--pinned .dock__card {
+    border-left: 1px solid var(--color-border, #333);
+    border-radius: 10px;
   }
   .dock--pinned .dock__card,
   .dock:hover .dock__card,
