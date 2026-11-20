@@ -85,7 +85,7 @@ func ParseHeads(raw string) (HeadScope, error) {
 		return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
 	})
 	if len(fields) == 0 {
-		return HeadScope{}, fmt.Errorf("нужен список головных: note=12, note=12+2 или note=12+!")
+		return HeadScope{}, fmt.Errorf("нужен список головных, например note=12+! или note=12+2")
 	}
 	if len(fields) > maxHeads {
 		return HeadScope{}, fmt.Errorf("головных больше %d", maxHeads)
@@ -95,7 +95,7 @@ func ParseHeads(raw string) (HeadScope, error) {
 	for _, field := range fields {
 		m := headToken.FindStringSubmatch(field)
 		if m == nil {
-			return HeadScope{}, fmt.Errorf("головная %q: нужно note=12, note=12+2 или note=12+!", field)
+			return HeadScope{}, fmt.Errorf("головная %q: нужно note=12+! или note=12+2", field)
 		}
 		id, err := strconv.ParseInt(m[1], 10, 64)
 		if err != nil {
@@ -130,7 +130,7 @@ func headDepth(suffix string) (int, error) {
 	}
 	n, err := strconv.Atoi(suffix[1:])
 	if err != nil || n < 1 || n > maxHeadDepth {
-		return 0, fmt.Errorf("поколение от 1 до %d, либо +!", maxHeadDepth)
+		return 0, fmt.Errorf("глубина +! либо число поколений от 1 до %d", maxHeadDepth)
 	}
 	return n, nil
 }
