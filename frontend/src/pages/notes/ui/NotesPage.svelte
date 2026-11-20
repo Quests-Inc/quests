@@ -57,6 +57,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onRef,
     onOpenSecrets,
     onOpenGraph,
+    onNoteMissing = () => {},
+    onNoteAvailable = () => {},
   }: {
     selectedId: number | null,
     historyIds?: number[],
@@ -70,6 +72,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     onRef?: (kind: string, id: number) => void,
     onOpenSecrets?: (id: number) => void,
     onOpenGraph?: (type: 'note', id: number) => void,
+    onNoteMissing?: (id: number) => void,
+    onNoteAvailable?: (id: number) => void,
   } = $props()
 
   let notes = $derived(noteCatalog.list)
@@ -81,7 +85,13 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   /** Ссылки/Ссылаются — свёрнуты по умолчанию. */
   let refsOpen = $state(false)
   let backlinksOpen = $state(false)
-  const ed = createNoteEditor({ selectedId: () => selectedId, notes: () => notes, onChanged: () => onChanged() })
+  const ed = createNoteEditor({
+    selectedId: () => selectedId,
+    notes: () => notes,
+    onChanged: () => onChanged(),
+    onMissing: (id) => onNoteMissing(id),
+    onAvailable: (id) => onNoteAvailable(id),
+  })
   const save = ed.save
   const revert = ed.revert
   let deleting = $state(false)
@@ -103,7 +113,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
   let filtered = $derived(withAncestors(notes, notes.filter(flagOk)))
   let searchActive = $derived(search.trim().length > 0)
-  const remoteSearch = createEntitySearch(() => searchActive ? {q: searchText, types:['note'], filters:searchFilters(parsedSearch, NOTE_SPEC)} : null, {all:true})
+  const remoteSearch = createEntitySearch(() => searchActive ? {q: searchText, types:['note'], filters:searchFilters(parsedSearch, NOTE_SPEC)} : null, {all:true, catalog: () => noteCatalog.list.map((n) => ({ id: n.id, title: n.title || '' }))})
   let searchHits = $derived(remoteSearch.hits)
 
   /** Grouping key for the tree: the open note's own live `ed.parentId` field
@@ -584,6 +594,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   let iconModalNote = $derived(iconModalNoteId == null ? null : noteById(iconModalNoteId))
+  let iconModalParent = $derived(iconModalNote?.parent_id == null ? null : noteById(iconModalNote.parent_id))
 
   function onIconSaved(row: NotePayload) {
     if (selectedId === row?.id) {
@@ -745,6 +756,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 <NoteIconModal
   open={iconModalOpen}
   note={iconModalNote}
+  parent={iconModalParent}
   onClose={() => {
     iconModalOpen = false
     iconModalNoteId = null

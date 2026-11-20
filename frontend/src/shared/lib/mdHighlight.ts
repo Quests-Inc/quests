@@ -6,11 +6,13 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 const wrap = (cls: string, s: string) => `<span class="mdh-${cls}">${esc(s)}</span>`
 
-const REF = '(?:note|quest|questline|step|attachment|template|event)=\\d+\\b'
+const REF =
+  '(?:note=\\d+(?:#[a-z][a-z0-9_-]{0,63}(?:\\/[a-z][a-z0-9_-]{0,63})?)?|(?:quest|questline|step|attachment|template|event)=\\d+)\\b'
 const FLAG = '(?:auto(?:=1)?|hide(?:=1)?|set=[a-z][a-z0-9_]{0,23}|on=[a-z0-9][a-z0-9_,-]{0,80})'
 
 /** Inline tokens, first match at the earliest position wins; at one position the earlier entry of the list does. */
 const INLINE: { cls: string; re: RegExp; inner?: (m: RegExpExecArray) => string }[] = [
+  { cls: 'comment', re: /<!--[^\n]*?-->/y },
   // Ours first: a script link and a named value stay whole even inside emphasis marks.
   {
     cls: 'script',
@@ -28,7 +30,17 @@ const INLINE: { cls: string; re: RegExp; inner?: (m: RegExpExecArray) => string 
   { cls: 'strike', re: /~~(?=\S)[^\n]*?\S~~/y },
 ]
 
-const FIRST = /[`![*_~{snqtah]/ // cheap pre-filter: the characters a token can start with
+const FIRST = /[`![*_~{snqtah<]/ // cheap pre-filter: the characters a token can start with
+
+/** Service comments each have their own colour. Anything else in <!-- --> is the generic kind. */
+function commentKind(token: string) {
+  const body = token.replace(/^<!--\s*/, '').replace(/\s*-->$/, '')
+  if (/^table:\s*(?:left|top|both|none)$/.test(body)) return 'corient'
+  if (/^table-id:\s*[a-z][a-z0-9_-]{0,63}$/.test(body)) return 'ctable'
+  if (/^row-id:\s*[a-z][a-z0-9_-]{0,63}$/.test(body)) return 'crow'
+  if (/^\/?span-id:\s*[a-z][a-z0-9_-]{0,63}$/.test(body)) return 'cspan'
+  return 'cmeta'
+}
 
 /** One line of inline text → HTML. */
 function inline(text: string): string {
@@ -47,7 +59,7 @@ function inline(text: string): string {
         if (m && m.index === i && m[0].length) {
           flush()
           // Emphasis can hold our tokens: colour the inside too (the marks stay in the emphasis colour).
-          out += nested(t.cls, m[0])
+          out += nested(t.cls === 'comment' ? commentKind(m[0]) : t.cls, m[0])
           i += m[0].length
           continue outer
         }

@@ -56,11 +56,11 @@ var wordRe = regexp.MustCompile(`[\p{L}\p{N}_]+`)
 
 // SearchNotes finds notes matching q, best first.
 func (s *Store) SearchNotes(ctx context.Context, q string, o SearchOpts) ([]SearchHit, error) {
-	req := search.Request{Query: q, Types: []string{"note"}, Limit: o.Limit, ExcludePrivate: o.ExcludePrivate, Filters: o.Filters}
+	req := search.NormalizeNoteVars(search.Request{Query: q, Types: []string{"note"}, Limit: o.Limit, ExcludePrivate: o.ExcludePrivate, Filters: o.Filters})
 	if err := req.Normalize(); err != nil {
 		return nil, err
 	}
-	if req.Query == "" {
+	if req.Query == "" && !search.HasVarFilter(req.Filters) {
 		return []SearchHit{}, nil
 	}
 	found, err := s.SearchEntities(ctx, req)

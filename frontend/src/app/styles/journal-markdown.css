@@ -401,6 +401,10 @@ a:has(> .md-ref__ico) {
 .md-script--err {
   color: var(--color-danger, #d85a5a);
 }
+.md-script-block {
+  display: block;
+  margin: 0.35rem 0 0.8rem;
+}
 
 /* Подсветка исходного текста при вводе (слой под полем, shared/lib/mdHighlight.ts). Цвета — токены, поэтому темы работают. */
 .mdh-layer .mdh-mark {
@@ -456,6 +460,21 @@ a:has(> .md-ref__ico) {
   color: #b48ad6;
   background: color-mix(in srgb, #b48ad6 14%, transparent);
   border-radius: 3px;
+}
+.mdh-layer .mdh-corient {
+  color: #c9a227;
+}
+.mdh-layer .mdh-ctable {
+  color: #6aa8c9;
+}
+.mdh-layer .mdh-crow {
+  color: #7a9e6a;
+}
+.mdh-layer .mdh-cspan {
+  color: #b48ad6;
+}
+.mdh-layer .mdh-cmeta {
+  color: var(--color-fg-subtle, #6e6e6e);
 }
 
 /* User prose has its own hierarchy; a quote is not a UI explanation pill. */
@@ -542,8 +561,40 @@ a:has(> .md-ref__ico) {
     inset 0 1px 0 var(--color-accent),
     inset 0 -1px 0 var(--color-accent);
 }
+.md :is(td, th) {
+  transition: background-color 0.45s ease;
+}
 .md tr.md-target--flash > :is(td, th) {
-  background: color-mix(in srgb, var(--color-accent) 30%, var(--color-bg));
+  background-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-bg));
+}
+.md [data-md-span] {
+  border-radius: 0.45rem;
+  background-color: transparent;
+  transition: background-color 0.45s ease, box-shadow 0.45s ease;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.md [data-md-span].md-target--flash {
+  background-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+.md span[data-md-span] {
+  padding-inline: 0.2rem;
+  margin-inline: -0.2rem;
+}
+.md div[data-md-span] {
+  box-shadow: 0 0 0 0.35rem transparent;
+}
+.md div[data-md-span].md-target--flash {
+  box-shadow: 0 0 0 0.35rem color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .md :is(td, th),
+  .md [data-md-span] {
+    transition: none;
+  }
+}
+.md a.md-ref--miss {
+  color: var(--color-danger, #d85a5a);
 }
 .md-target-link {
   border: 0;

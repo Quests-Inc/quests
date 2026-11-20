@@ -39,6 +39,8 @@ export function createNoteEditor(deps: {
   selectedId: () => number | null
   notes: () => NoteListItem[]
   onChanged: () => void
+  onMissing?: (id: number) => void
+  onAvailable?: (id: number) => void
 }) {
   let detail = $state<NotePayload | null>(null)
   let title = $state('')
@@ -130,11 +132,14 @@ export function createNoteEditor(deps: {
           return
         }
         show(row)
+        deps.onAvailable?.(id)
       })
       .catch((e) => {
         if (!cancelled && !cached) {
           loading = false
           error = messageOf(e)
+          const status = (e as { status?: number }).status
+          if (status === 404 || status === 403) deps.onMissing?.(id)
         }
       })
     return () => {

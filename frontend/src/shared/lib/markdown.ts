@@ -3,8 +3,9 @@ import { marked } from 'marked'
 
 import { highlightCode } from './codeHighlight.ts'
 import { mathExtensions, renderMathElements } from './markdownMath.ts'
+import { markSpanTargets } from './markdownSpans.ts'
 import { markTableTargets } from './markdownTargets.ts'
-import { REF_RE, refHref } from './refs.ts'
+import { REF_LINK_RE, REF_RE, refHref } from './refs.ts'
 import { escapeMdInline, scriptEmbedRe, scriptFlags, scriptHref, scriptLabel } from './scriptRef.ts'
 import { serverLimits } from './serverLimits.ts'
 
@@ -87,7 +88,17 @@ const PURIFY_OPTS = {
     'span',
   ],
   ALLOWED_ATTR: ['href', 'rel', 'target', 'src', 'alt', 'align', 'class', 'scope'],
-  ADD_ATTR: ['data-md-table', 'data-md-row', 'data-lang', 'data-math', 'data-display', 'type', 'checked', 'disabled'],
+  ADD_ATTR: [
+    'data-md-table',
+    'data-md-row',
+    'data-md-span',
+    'data-lang',
+    'data-math',
+    'data-display',
+    'type',
+    'checked',
+    'disabled',
+  ],
   ALLOW_DATA_ATTR: false,
 }
 
@@ -127,7 +138,7 @@ export function shapeTables(dirty: string): string {
       }
     }
     const head = table.tHead
-    const headRow = head?.rows[0]
+    const headRow = head?.rows?.[0]
     const headCells = headRow ? Array.from(headRow.cells) : []
     const emptyHead = headCells.length > 0 && headCells.every((c) => !(c.textContent || '').trim())
     const use: TableSide = side || (emptyHead ? 'left' : 'top')
@@ -144,7 +155,8 @@ export function shapeTables(dirty: string): string {
       for (const th of Array.from(table.querySelectorAll('thead th'))) th.setAttribute('scope', 'col')
     }
     if (use === 'left' || use === 'both') {
-      for (const row of Array.from(body.rows)) {
+      const rows = body.rows ? Array.from(body.rows) : Array.from(body.querySelectorAll('tr'))
+      for (const row of rows) {
         const first = row.cells[0]
         if (first && first.tagName === 'TD') first.replaceWith(asCell(first, 'th', 'row'))
       }
@@ -299,9 +311,12 @@ function linkifyRefs(
       })
       chunk = chunk
         .replace(ATTACHMENT_IMG_RE, (_, alt, id) => `![${alt}](${attachmentImageSrc(id)})`)
-        .replace(REF_RE, (full, kind, id) => {
-          const label = labels[`${kind}:${id}`] || full
-          return `[${label}](${refHref(kind, id)})`
+        .replace(REF_LINK_RE, (full, noteKind, noteId, fragment, otherKind, otherId) => {
+          const kind = noteKind || otherKind
+          const id = noteId || otherId
+          // A fragment link's text is the quoted piece, filled in later. The note title is not a second label.
+          const label = fragment ? full : labels[`${kind}:${id}`] || full
+          return `[${label}](${refHref(kind, Number(id))}${noteKind ? fragment || '' : ''})`
         })
         .replace(/%%SCRIPT(\d+)%%/g, (_, n) => shielded.saved[Number(n)] ?? '')
         .replace(/%%HOLD(\d+)%%/g, (_, n) => held[Number(n)] ?? '')
@@ -350,7 +365,7 @@ export function renderMarkdown(
   let dirty = marked.parse(linkifyRefs(text, opts, bag), { async: false })
   if (typeof dirty !== 'string' || typeof window === 'undefined') return ''
   ensureLinkHook()
-  dirty = shapeTables(markTableTargets(dirty))
+  dirty = shapeTables(markTableTargets(markSpanTargets(dirty)))
   let html = DOMPurify.sanitize(dirty, PURIFY_OPTS)
   if (bag.length) html = html.replace(/⟦V(\d+)⟧/g, (_, n) => bag[Number(n)] ?? '')
   html = renderMathElements(html)

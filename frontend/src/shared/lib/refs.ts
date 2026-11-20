@@ -2,6 +2,10 @@
 
 export const REF_RE = /\b(note|quest|questline|step|attachment|template|event|repo)=(\d+)\b/g
 
+/** A note token may name a piece: `note=12#light` or a table row `note=12#spell/classes`. The whole token is one link. */
+export const REF_LINK_RE =
+  /\b(?:(note)=(\d+)(#[a-z][a-z0-9_-]{0,63}(?:\/[a-z][a-z0-9_-]{0,63})?)?|(quest|questline|step|attachment|template|event|repo)=(\d+))\b/g
+
 export const REF_KINDS = ['note', 'quest', 'questline', 'step', 'attachment', 'template', 'event', 'repo']
 
 export function parseRefs(text: string): { kind: string; id: number }[] {
@@ -38,15 +42,16 @@ export function renderRefTextHtml(source: string, opts: { labels?: Record<string
   if (!text) return ''
   let out = ''
   let lastIndex = 0
-  const re = new RegExp(REF_RE.source, REF_RE.flags)
+  const re = new RegExp(REF_LINK_RE.source, REF_LINK_RE.flags)
   for (const m of text.matchAll(re)) {
     const idx = m.index ?? 0
     if (idx > lastIndex) out += escapeHtml(text.slice(lastIndex, idx))
-    const kind = m[1]
-    const id = m[2]
+    const kind = m[1] || m[4]
+    const id = m[2] || m[5]
+    const fragment = m[3] || ''
     const full = m[0]
-    const label = labels[`${kind}:${id}`] || full
-    const href = refHref(kind, Number(id))
+    const label = fragment ? full : labels[`${kind}:${id}`] || full
+    const href = refHref(kind, Number(id)) + fragment
     out += `<a href="${escapeAttr(href)}" class="md-ref">${escapeHtml(label)}</a>`
     lastIndex = idx + full.length
   }
@@ -61,7 +66,12 @@ export function parseRefHref(href: string) {
       const raw = u.searchParams.get(kind)
       if (!raw) continue
       const id = Number(raw)
-      if (Number.isFinite(id) && id > 0) return { kind, id }
+      if (Number.isFinite(id) && id > 0) {
+        const fragment = kind === 'note' ? decodeURIComponent(u.hash.replace(/^#/, '')) : ''
+        if (fragment && /^[a-z][a-z0-9_-]{0,63}(?:\/[a-z][a-z0-9_-]{0,63})?$/.test(fragment))
+          return { kind, id, fragment }
+        return { kind, id }
+      }
     }
   } catch {
     /* ignore */

@@ -33,6 +33,18 @@ test('наши вставки: скрипт с флагами, переменн�
   expect(cls('**{{hp}}**')).toEqual(['bold', 'value'])
 })
 
+test('служебные комментарии красятся по виду, а в коде остаются кодом', () => {
+  expect(cls('<!-- table: left -->')).toEqual(['corient'])
+  expect(cls('<!-- table-id: spell -->')).toEqual(['ctable'])
+  expect(cls('<!-- row-id: classes -->')).toEqual(['crow'])
+  expect(cls('<!-- span-id: light --> фраза <!-- /span-id: light -->')).toEqual(['cspan', 'cspan'])
+  expect(cls('<!-- todo -->')).toEqual(['cmeta'])
+  expect(cls('note=544#light и note=540#spell/classes')).toEqual(['ref', 'ref'])
+  const fenced = '```\n<!-- table-id: spell -->\n```'
+  expect(cls(fenced)).toEqual(['code', 'code', 'code'])
+  expect(plain(highlightMarkdown(fenced))).toBe(fenced + ' ')
+})
+
 test('незакрытая пара и середина слова не красятся; код-блок не разбирается', () => {
   expect(cls('**ещё не закрыто')).toEqual([])
   expect(cls('snake_case_name и 2*3*4')).toEqual([])

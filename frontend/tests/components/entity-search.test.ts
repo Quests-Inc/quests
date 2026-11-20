@@ -12,6 +12,9 @@ mock.module('@/shared/api/entitySearch.ts', () => ({
       return new Promise((resolve) => {
         finishOld = resolve
       })
+    if (q.q === 'hold')
+      return new Promise(() => {})
+    if (q.q === 'boom') throw new Error('сеть')
     return q.offset
       ? { hits: [{ kind: 'note', id: 2, title: 'Вторая' }], more: false, next: 2 }
       : { hits: [{ kind: 'note', id: 1, title: 'Первая' }], more: true, next: 1 }
@@ -50,6 +53,23 @@ test('server pages are combined and late replies cannot replace a new query', as
   await settle()
   flushSync()
   expect(document.querySelector('output')?.textContent).toBe('пусто')
+})
+test('a new query keeps the previous rows until the server answers, and a failure keeps them too', async () => {
+  app = mount(Harness, { target: document.body })
+  flushSync()
+  type('new')
+  await settle()
+  flushSync()
+  expect(document.querySelector('output')?.textContent).toBe('1,2')
+  type('hold')
+  await settle()
+  flushSync()
+  expect(document.querySelector('output')?.textContent).toBe('1,2')
+  type('boom')
+  await settle()
+  flushSync()
+  expect(document.querySelector('output')?.textContent).toBe('1,2')
+  expect(document.body.textContent).toContain('сеть')
 })
 test('parsed flags preserve alternatives, conjunctions and negative tokens', () => {
   const result = searchFilters(

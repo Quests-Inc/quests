@@ -1,5 +1,6 @@
 // Wiki-превью при наведении на реф note=/quest=/questline=. Один попап на документ, рефы внутри него — не ссылки (без каскада).
 // Данные берутся из каталогов в памяти через provider (App), поэтому лишних запросов нет.
+import { setPendingFragment } from './noteFragment.ts'
 import { parseRefHref, REF_RE } from './refs.ts'
 import { scriptEmbedRe, scriptFlags } from './scriptRef.ts'
 
@@ -20,6 +21,17 @@ let labelOf: (key: string) => string | undefined = () => undefined
 export const setRefPreviewProvider = (p: Provider | null, labels?: (key: string) => string | undefined) => {
   provider = p
   labelOf = labels ?? (() => undefined)
+}
+
+/** Titles for `note=12` tokens in a text, from the same catalog the rest of the page uses. */
+export function labelsForRefs(text: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const m of text.matchAll(/\b(note|quest|questline|step|attachment|template|event|repo)=(\d+)\b/g)) {
+    const key = `${m[1]}:${m[2]}`
+    const label = labelOf(key)
+    if (label) out[key] = label
+  }
+  return out
 }
 
 const SHOW_MS = 350
@@ -137,6 +149,8 @@ function open(a: HTMLAnchorElement, kind: string, id: number, onRef?: (kind: str
   go.addEventListener('click', () => {
     const target = a
     close()
+    const ref = parseRefHref(target.getAttribute('href') || '')
+    if (ref?.fragment && ref.kind === 'note') setPendingFragment(ref.id, ref.fragment)
     if (onRef) onRef(kind, id)
     else target.click()
   })

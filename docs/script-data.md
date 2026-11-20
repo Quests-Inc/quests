@@ -41,6 +41,18 @@ Limits: 64 KiB source and each output, 1000 body rows, column 0–100. The brows
 Goldmark: their table/marker contract is exercised on the same shape of GFM fixtures; full Markdown dialect parity is
 not claimed. Escaped pipes, inline formatting and stable markers are covered by parser tests.
 
+## Notes by a table row (`notes.by_row`)
+
+```json
+{"table":"spell","row":"classes","heads":"note=530+\nnote=540"}
+```
+
+Input `ref` is the note the row must cite (`source.note` of the text that launched the script). Output `value` is a Markdown list of matching notes, grouped by the parent title. `items` is `[{id,title}]`. `errors` is cards that mention the table id but do not parse.
+
+`heads` is a list, commas or lines. `note=12` reads that note only. `note=12+` and `note=12+1` also read its direct children, `note=12+2` reads two generations below it, `note=12+!` reads every generation below it (at most 32, so a cycle stops). The note itself is always included. The same id keeps the deeper reach. At least one head, at most 64. The workspace is not scanned. A quote link already names its note and does not use this node.
+
+Private notes are omitted. A card with a broken `table-id` / `row-id` pair stays out of the list and appears under «Не разобраны». A parsed table that simply has no such row is skipped.
+
 ## Text: build (`text.build`)
 
 ```json

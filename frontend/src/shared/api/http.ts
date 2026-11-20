@@ -53,7 +53,9 @@ export async function request<T = any>(path: string, options: RequestInit = {}):
     // over its own error — quietly don't). A toast means a failure is
     // never *silent*, even where nothing else shows this specific message.
     toast(msg, { kind: 'error' })
-    throw new Error(msg)
+    const err = new Error(msg) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
   return data as T
 }

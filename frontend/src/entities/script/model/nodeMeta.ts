@@ -63,6 +63,8 @@ export function defaultParams(type: string): unknown {
       return { inputs: [{ name: 'value', type: 'str' }], template: '{{value}}' }
     case 'markdown.table':
       return { table: 'example', column: 0 }
+    case 'notes.by_row':
+      return { table: 'example', row: 'ok', heads: 'note=1+' }
     case 'json.get':
       return { path: 'value', type: 'str' }
   }

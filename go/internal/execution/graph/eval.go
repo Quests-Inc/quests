@@ -431,6 +431,8 @@ func (r *Run) run(ctx context.Context, h Host, rs *resolved, ins map[string][]To
 			out, err = runBuild(rs, ins)
 		case "markdown.table":
 			out, err = runMarkdownTableInputs(rs, ins)
+		case "notes.by_row":
+			out, err = runNotesByRow(ctx, rs, ins)
 		case "json.get":
 			out, err = runJSONGet(rs, ins["in"][0], append(ins["path"], ins["index"]...)...)
 		}

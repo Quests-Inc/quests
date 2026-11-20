@@ -7,6 +7,7 @@ import (
 
 // SearchEntities federates narrow context-owned projections, then applies one global page.
 func (s *Store) SearchEntities(ctx context.Context, r search.Request) (search.Page, error) {
+	r = search.NormalizeNoteVars(r)
 	if err := r.Normalize(); err != nil {
 		return search.Page{}, err
 	}

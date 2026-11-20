@@ -2,6 +2,7 @@
  import TypedParams from './params/TypedParams.svelte'
   import BuildParams from './params/BuildParams.svelte'
   import MarkdownTableParams from './params/MarkdownTableParams.svelte'
+  import NotesByRowParams from './params/NotesByRowParams.svelte'
   import Icon from '@/shared/ui/Icon.svelte'
   import type { ScriptUse } from '@/shared/api/execution.gen.ts'
   import { openTarget } from '@/shared/lib/openTarget.ts'
@@ -113,6 +114,8 @@
         <BuildParams params={node.params as never} text={node.type === 'text.build'} onChange={set} />
       {:else if node.type === 'markdown.table'}
         <MarkdownTableParams params={node.params as never} onChange={set} />
+      {:else if node.type === 'notes.by_row'}
+        <NotesByRowParams params={node.params as never} onChange={set} />
       {:else if node.type === 'constant' || node.type === 'convert'}
         <TypedParams params={node.params as never} constant={node.type === 'constant'} onChange={set} />
       {:else if node.type === 'json.get'}

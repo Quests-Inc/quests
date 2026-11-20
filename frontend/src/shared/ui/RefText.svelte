@@ -4,6 +4,7 @@
   import { tailFade } from '@/shared/lib/typewriter.ts'
   import { refPreview } from '@/shared/lib/refPreview.ts'
   import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
+  import { setPendingFragment } from '@/shared/lib/noteFragment.ts'
   import { renderRefTextHtml, parseRefHref } from '@/shared/lib/refs.ts'
 
   let {
@@ -40,6 +41,7 @@
     if (!ref) return
     event.preventDefault()
     event.stopPropagation()
+    if (ref.fragment && ref.kind === 'note') setPendingFragment(ref.id, ref.fragment)
     onRef?.(ref.kind, ref.id)
   }
 </script>

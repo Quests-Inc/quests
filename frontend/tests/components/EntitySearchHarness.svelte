@@ -4,4 +4,5 @@
  const search = createEntitySearch(() => q ? {q,types:['note']} : null,{delay:0,all:true})
 </script>
 <input aria-label="Запрос" bind:value={q}/>
-<output>{search.pending ? 'ожидание' : search.error || search.hits?.map(h=>h.id).join(',') || 'пусто'}</output>
+<output>{search.hits?.map(h=>h.id).join(',') || 'пусто'}</output>
+{#if search.error}<p>{search.error}</p>{/if}

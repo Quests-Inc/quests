@@ -12,6 +12,7 @@ ADR-0003 §6b.
 | `script=12{5+3к8}` | a click calls the script and shows `5+3к8 = 19`; the next click throws again; nothing is stored |
 | `script=12{8+pb+str}?auto` | computed when the text is shown, and again when it is exported (Markdown or PDF) |
 | `…?hide` | hides the formula: with `?auto` the reader sees only the value; without it the link shows `?` until a click. Either order works (`?hide&auto`) |
+| a result with a newline | drawn as Markdown under the link; the link says «Список» and runs the script again |
 | `script=12{2к8+2}?set=hp` | a click writes the result into the variable `hp` of the text's owner ([`variables.md`](variables.md)) |
 | `script=12{55.75,37.62}?on=stand` | the script has a Code node: a click starts a run on a runner |
 

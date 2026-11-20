@@ -2,7 +2,7 @@
 
 Entity lists and pickers now share [the entity-search contract](entity-search.md). The notes endpoint below is a compatibility adapter over that matcher.
 
-`GET /api/notes/search?q=…&limit=…` (MCP: `search_notes`). The web Notes tab uses the shared `/api/search` route from any non-empty query, with explicit pending/error states and ranked snippets. It does not substitute a local tree matcher.
+`GET /api/notes/search?q=…&limit=…` (MCP: `search_notes`). The web Notes tab uses the shared `/api/search` route from any non-empty query, with explicit pending/error states and ranked snippets. While the server answers, the previous rows stay on screen; a longer query narrows them, and titles from the loaded catalog are shown beside them. The server list then replaces that draft. See [entity search](entity-search.md).
 
 ## What it can do (PostgreSQL)
 
@@ -30,7 +30,7 @@ Parsing is shared: `frontend/src/shared/lib/searchFlags.ts`, hints are `shared/u
 
 | Where | Tokens |
 |---|---|
-| Notes | `flag:outdated` (`stale`) / `readme` / `private` / `category` / `pinned` / `check`; the server search and MCP `search_notes(flags="-outdated")` take the same flags |
+| Notes | `flag:outdated` (`stale`) / `readme` / `private` / `category` / `pinned` / `check`; `var:name` and `var:name=value` (a note's own variable: the name and the stored value, not the formula text and not a secret; `-var:` excludes). Several `var:` tokens are alternatives. The same tokens work in the web field, in `POST /api/search` filters (`key` `var`), and in MCP `search_notes` / `search_entities` (`var:` inside `q`, or a filter). The value is whatever was saved last, so a formula is found by its result. The server search and MCP `search_notes(flags="-outdated")` take the same flags |
 | Journal (quests) | `status:active\|done\|failed\|expired\|frozen\|archived\|all` (`all` = the “show completed” checkbox; any `status:` shows closed ones), `flag:pinned\|hidden` (in the overlay always / never), `type:automated\|manual`, `sig:epic`, `tag:infra`, `cat:<category>` and `line:<questline id>` (= the dropdowns of categories / questline) |
 | Attachments | `owner:quest\|questline\|note` (segment), `flag:hidden` (“hidden”), `show:all` (“all”), `ftype:pdf` (an extension, a MIME type or part of it: `png`, `image`), `rev:N` / `>N` / `<N` / `>=N` / `<=N` (the number of versions) |
 | History | `type:quest\|note\|attachment`, `act:done\|new\|edit\|miss\|del`, `line:<id>`, `cat:<category>`, `tag:<tag>`, `when:today\|7\|30`, `day:YYYY-MM-DD`: all the page's selectors; the address bar keeps only `q=` (the old `?et=&kg=…` turn into tokens) |

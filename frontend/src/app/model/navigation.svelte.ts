@@ -1,6 +1,7 @@
 // Навигация приложения: открытая вкладка, выбранный квест / заметка / вложение, центр карты и адресная строка.
 // Всё, что «открывает» сущность из интерфейса (ссылки, карта, календарь), проходит здесь, чтобы адрес и выбор не расходились.
 import { initialRoute, searchForView as searchForRoute } from '@/app/model/route.ts'
+import { takePendingFragment, validNoteHash } from '@/shared/lib/noteFragment.ts'
 import { searchOfTarget, type OpenTarget } from '@/shared/lib/openTarget.ts'
 import { navigationScope, searchAfterWorkspaceSwitch } from '@/shared/lib/urlSearch.ts'
 import { TAB_ORDER, type View } from '@/shared/lib/viewTabs.ts'
@@ -25,7 +26,24 @@ export function createNavigation(deps: {
   let noteEntries = $state<number[]>([])
   let noteHistoryIndex = $state(-1)
   let recentNotes = $state<number[]>([])
+  /** Ids the catalog has listed. Null until the first successful load, so a note opened from the address is not dropped early. */
+  let knownNoteIds: Set<number> | null = null
+  /** Opened and rejected (404/403), even if a stale catalog row is still around. */
+  const missingNotes = new Set<number>()
+  /** Confirmed by a successful read this session; a later catalog refresh must not drop them. */
+  const confirmedNotes = new Set<number>()
+  /** The address shows a note that never entered the trail. The next real note overwrites that entry. */
+  let danglingMissing = false
+  function isMissing(id: number) {
+    if (missingNotes.has(id)) return true
+    return knownNoteIds != null && !knownNoteIds.has(id)
+  }
+  function persistRecent(ids: number[]) {
+    recentNotes = ids
+    sessionStorage.setItem('questsRecentNotes', JSON.stringify({ scope: navigationScope(), ids }))
+  }
   function visitRecentNote(id: number) {
+    if (isMissing(id)) return
     let saved: { scope?: string; ids?: number[] } = {}
     try {
       saved = JSON.parse(sessionStorage.getItem('questsRecentNotes') ?? '{}')
@@ -36,8 +54,41 @@ export function createNavigation(deps: {
       saved.scope === navigationScope() && Array.isArray(saved.ids)
         ? saved.ids.filter((id) => Number.isInteger(id) && id > 0)
         : []
-    recentNotes = [id, ...ids.filter((previous) => previous !== id)].slice(0, 10)
-    sessionStorage.setItem('questsRecentNotes', JSON.stringify({ scope: navigationScope(), ids: recentNotes }))
+    persistRecent([id, ...ids.filter((previous) => previous !== id)].slice(0, 10))
+  }
+  function dropFromRecent(id: number) {
+    if (!recentNotes.includes(id)) return
+    persistRecent(recentNotes.filter((previous) => previous !== id))
+  }
+  /** The note cannot be opened. It leaves the visit strip; leaving the page also drops the address entry. */
+  function noteMissing(id: number) {
+    missingNotes.add(id)
+    confirmedNotes.delete(id)
+    knownNoteIds?.delete(id)
+    dropFromRecent(id)
+    if (selectedNoteId === id) {
+      danglingMissing = true
+      if (noteHistory[noteHistoryIndex] === id) {
+        noteHistory = noteHistory.slice(0, noteHistoryIndex)
+        noteEntries = noteEntries.slice(0, noteHistoryIndex)
+        noteHistoryIndex = noteHistory.length - 1
+      }
+    }
+  }
+  function noteAvailable(id: number) {
+    missingNotes.delete(id)
+    confirmedNotes.add(id)
+    knownNoteIds?.add(id)
+    visitRecentNote(id)
+  }
+  /** Catalog ids. Anything in the visit strip that is not among them is dropped. */
+  function setKnownNotes(ids: number[]) {
+    knownNoteIds = new Set(ids)
+    for (const id of confirmedNotes) knownNoteIds.add(id)
+    for (const id of missingNotes) knownNoteIds.delete(id)
+    const next = recentNotes.filter((id) => knownNoteIds!.has(id))
+    if (next.length !== recentNotes.length) persistRecent(next)
+    if (selectedNoteId != null && isMissing(selectedNoteId)) noteMissing(selectedNoteId)
   }
   let entry = 0
   function routeState() {
@@ -55,6 +106,10 @@ export function createNavigation(deps: {
       noteEntries = []
       noteHistoryIndex = -1
       entry = 0
+      danglingMissing = false
+      knownNoteIds = null
+      missingNotes.clear()
+      confirmedNotes.clear()
       const qs = new URLSearchParams(searchAfterWorkspaceSwitch(location.search))
       history.replaceState(routeState(), '', `${location.pathname}${qs.size ? `?${qs}` : ''}`)
       return
@@ -93,8 +148,36 @@ export function createNavigation(deps: {
     }
   }
   function rememberNote(id: number, push: boolean) {
-    visitRecentNote(id)
-    const same = location.search === `?note=${id}`
+    const missing = isMissing(id)
+    if (!missing) visitRecentNote(id)
+    const pending = takePendingFragment(id)
+    const hash = pending ? `#${pending}` : !push && validNoteHash(location.hash) && location.search === `?note=${id}` ? location.hash : ''
+    const same = location.search === `?note=${id}` && location.hash === hash
+    const url = `${location.pathname}?note=${id}${hash}`
+    // The page being left was a note that never belonged in the trail: overwrite it.
+    if (danglingMissing && !missing) {
+      if (noteHistory[noteHistoryIndex] !== id) {
+        noteHistory = [...noteHistory.slice(0, noteHistoryIndex + 1), id]
+        noteEntries = [...noteEntries.slice(0, noteHistoryIndex + 1), entry]
+        noteHistoryIndex = noteHistory.length - 1
+      } else {
+        noteEntries = [...noteEntries]
+        noteEntries[noteHistoryIndex] = entry
+      }
+      danglingMissing = false
+      history.replaceState(routeState(), '', url)
+      return
+    }
+    if (missing) {
+      if (push && !same) {
+        history.replaceState(routeState(), '', location.href)
+        entry++
+        history.pushState(routeState(), '', url)
+      } else history.replaceState(routeState(), '', url)
+      danglingMissing = true
+      return
+    }
+    danglingMissing = false
     if (push && !same) {
       history.replaceState(routeState(), '', location.href)
       entry++
@@ -107,8 +190,7 @@ export function createNavigation(deps: {
       noteEntries = [...noteEntries]
       noteEntries[noteHistoryIndex] = entry
     }
-    const state = routeState(),
-      url = `${location.pathname}?note=${id}`
+    const state = routeState()
     if (push && !same) history.pushState(state, '', url)
     else history.replaceState(state, '', url)
   }
@@ -123,10 +205,9 @@ export function createNavigation(deps: {
     graphRoot = route.graphRoot ?? { type: null, id: null }
     restoreNoteHistory()
     history.replaceState(routeState(), '', location.href)
-    if (selectedNoteId != null) {
-      visitRecentNote(selectedNoteId)
-      deps.revealDetail('notes')
-    }
+    danglingMissing = selectedNoteId != null && isMissing(selectedNoteId)
+    if (selectedNoteId != null && !danglingMissing) visitRecentNote(selectedNoteId)
+    if (selectedNoteId != null) deps.revealDetail('notes')
   }
   function goNoteHistory(index: number) {
     if (index >= 0 && index < noteHistory.length) history.go(noteEntries[index] - entry)
@@ -370,6 +451,9 @@ export function createNavigation(deps: {
     openTarget,
     selectQuest,
     selectNote,
+    noteMissing,
+    noteAvailable,
+    setKnownNotes,
     selectAttachment,
     clearQuest,
     openRef,

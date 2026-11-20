@@ -77,6 +77,42 @@ func TestSearchRanksTitleAboveBodyAndHidesPrivate(t *testing.T) {
 	}
 }
 
+func TestSearchOwnVariablesNotFormulasOrParents(t *testing.T) {
+	st := seedSearchNotes(t)
+	_, err := st.DB.Exec(`INSERT INTO named_value (note_id, name, type, value, formula, created_at, updated_at) VALUES
+ (1, 'slot', 'int', '99', '', '2026-10-01 10:00:00', '2026-10-01 10:00:00'),
+ (2, 'hp', 'int', '12', 'секретнаяформула', '2026-10-02 10:00:00', '2026-10-02 10:00:00'),
+ (2, 'motto', 'str', 'огонь', '', '2026-10-02 10:00:00', '2026-10-02 10:00:00')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := st.SearchNotes(context.Background(), "огонь", SearchOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].ID != 2 {
+		t.Fatalf("value text: %+v", hits)
+	}
+	if hits, err = st.SearchNotes(context.Background(), "секретнаяформула", SearchOpts{}); err != nil || len(hits) != 0 {
+		t.Fatalf("formula text must stay out: %v %+v", err, hits)
+	}
+	if hits, err = st.SearchNotes(context.Background(), "var:hp", SearchOpts{}); err != nil || len(hits) != 1 || hits[0].ID != 2 {
+		t.Fatalf("var:hp: %v %+v", err, hits)
+	}
+	if hits, err = st.SearchNotes(context.Background(), "var:hp=12", SearchOpts{}); err != nil || len(hits) != 1 || hits[0].ID != 2 {
+		t.Fatalf("var:hp=12: %v %+v", err, hits)
+	}
+	if hits, err = st.SearchNotes(context.Background(), "var:hp=99", SearchOpts{}); err != nil || len(hits) != 0 {
+		t.Fatalf("wrong value: %v %+v", err, hits)
+	}
+	if hits, err = st.SearchNotes(context.Background(), "var:slot", SearchOpts{}); err != nil || len(hits) != 1 || hits[0].ID != 1 {
+		t.Fatalf("own slot, not the child: %v %+v", err, hits)
+	}
+	if hits, err = st.SearchNotes(context.Background(), "мониторинг -var:hp", SearchOpts{}); err != nil || len(hits) != 0 {
+		t.Fatalf("excluded: %v %+v", err, hits)
+	}
+}
+
 func TestSearchInNote(t *testing.T) {
 	st := &Store{DB: pgtest.New(t)}
 	body := "Как выкатить сервис.\n\nДеплой делает ci-deploy.sh.\n\nБорщ и пельмени"

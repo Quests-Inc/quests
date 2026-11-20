@@ -118,7 +118,7 @@ func calendarTools(c *Client) []Tool {
 			return nil, &Err{422, "unknown calendar event action"}
 		}
 	})
-	find := Typed("search_entities", "Shared workspace entity search: exact kind=ID or bare ID first, then title/body and title typos. Types narrow the entity kinds; filters and allowed/excluded scopes apply before pagination. Returns hits {kind,id,title,where,snippet,parent_kind,parent_id}, more and next (offset). Private notes are excluded for MCP. This is entity discovery, not in-document text search.", func(ctx context.Context, a search.Request) (any, error) {
+	find := Typed("search_entities", "Shared workspace entity search: exact kind=ID or bare ID first, then title/body and title typos. Types narrow the entity kinds; filters and allowed/excluded scopes apply before pagination. Filter key var with value name or name=value matches a note's own variable (var: tokens in q do the same); -var: excludes. Returns hits {kind,id,title,where,snippet,parent_kind,parent_id}, more and next (offset). Private notes are excluded for MCP. This is entity discovery, not in-document text search.", func(ctx context.Context, a search.Request) (any, error) {
 		var page map[string]any
 		if err := c.Do(ctx, http.MethodPost, "/api/search", nil, a, &page); err != nil {
 			return nil, err

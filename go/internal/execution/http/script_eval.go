@@ -122,6 +122,12 @@ func (h *Handler) runEmbedded(w http.ResponseWriter, r *http.Request, scriptID i
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
+	if len(hostNotes) > 0 {
+		ctx = graph.WithHostNote(ctx, hostNotes[0])
+	}
+	if h.ListTableNotes != nil {
+		ctx = graph.WithTableNotes(ctx, h.ListTableNotes)
+	}
 	out, err := graph.EvaluateFetch(ctx, g, reg, args, scope, h.Store.NewFetcher(h.Egress, scriptID), func(ctx context.Context, id int64) (string, string, error) {
 		if id == 0 && len(hostNotes) > 0 {
 			id = hostNotes[0]

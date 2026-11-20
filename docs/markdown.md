@@ -77,6 +77,21 @@ Metadata is invisible in the browser and PDF. Reordering rows preserves identity
 rendered text, row IDs within that table. Missing or duplicate targets leave the result readable and show “Строка
 недоступна”; there is no substring matching or positional fallback.
 
+## A piece of a note (`span-id`)
+
+`<!-- span-id: light -->` … `<!-- /span-id: light -->` names an arbitrary piece. The key uses the same grammar as
+`table-id` and `row-id`. The closing comment repeats the key. A key is unique in the note. A missing close, a close
+with another key, or two pairs that cross is not a target. The pair may sit on its own lines around blocks, or inside
+a paragraph around a phrase. In preview the comments stay hidden. Inside a fenced code block they stay code.
+
+`note=544#light` is one link to that piece. `note=540#spell/classes` is one link to a table row. For backlinks both are
+still a link to the note. A click opens the note and scrolls to the piece. The link text is the piece itself, as
+readable text, without the source note's title and without quotation marks. A missing piece stays readable and is
+marked «Кусок недоступен»; a missing or broken row is marked «Строка недоступна».
+
+In the text and split editors, service comments are coloured and the source is unchanged: table orientation, `table-id`,
+`row-id`, a `span-id` pair, and any other `<!-- … -->` each have their own colour. Fenced code is not recoloured.
+
 ## UI review checklist
 
 Check a populated view and an empty view, loading/error, hover, keyboard focus, disabled/busy, long titles and content.

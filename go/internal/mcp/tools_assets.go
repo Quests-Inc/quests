@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -155,16 +156,11 @@ func assetTools(c *Client) []Tool {
 			return ok(ctx, c, int64(num(row["id"])), map[string]any{"filename": row["filename"], "scan_status": row["scan_status"]}), nil
 		})
 
-	type iconArgs struct {
-		Event     *int64  `json:"event,omitempty"`
-		Action    string  `json:"action" enum:"set,clear,color"`
-		Questline *int64  `json:"questline,omitempty"`
-		Note      *int64  `json:"note,omitempty"`
-		FilePath  string  `json:"file_path,omitempty" desc:"set: local image"`
-		Color     *string `json:"color,omitempty" desc:"color: hex like #c47a20"`
-	}
-	icon := Typed("icon", "A calendar event's, questline's or note's icon: action=set (file_path), clear, or color (hex).",
+	icon := Typed("icon", "A calendar event's, questline's or note's icon: action=set (file_path), clear, or color (hex). action=apply sets one color, built-in icon and one image on many notes; each note keeps its own file copy.",
 		func(ctx context.Context, a iconArgs) (any, error) {
+			if a.Action == "apply" {
+				return applyNoteIcons(ctx, c, a)
+			}
 			var seg string
 			var oid int64
 			var err error
@@ -213,6 +209,76 @@ func assetTools(c *Client) []Tool {
 		})
 
 	return []Tool{get, hide, upload, icon}
+}
+
+type iconArgs struct {
+	Event     *int64  `json:"event,omitempty"`
+	Action    string  `json:"action" enum:"set,clear,color,apply"`
+	Questline *int64  `json:"questline,omitempty"`
+	Note      *int64  `json:"note,omitempty"`
+	Notes     []int64 `json:"notes,omitempty" desc:"apply: note ids; one color and one file or copy_from for every id"`
+	CopyFrom  *int64  `json:"copy_from,omitempty" desc:"apply: copy this note's uploaded icon onto each id"`
+	Icon      *string `json:"icon,omitempty" desc:"apply: built-in icon name"`
+	FilePath  string  `json:"file_path,omitempty" desc:"set or apply: local image, copied once per note"`
+	Color     *string `json:"color,omitempty" desc:"color or apply: hex like #c47a20"`
+}
+
+func applyNoteIcons(ctx context.Context, c *Client, a iconArgs) (any, error) {
+	if len(a.Notes) == 0 {
+		return nil, &Err{422, "apply needs notes"}
+	}
+	if a.Event != nil || a.Questline != nil || a.Note != nil {
+		return nil, &Err{422, "apply takes notes, not one event, questline or note"}
+	}
+	ids := make([]string, len(a.Notes))
+	for i, id := range a.Notes {
+		if id <= 0 {
+			return nil, &Err{422, "apply needs positive note ids"}
+		}
+		ids[i] = strconv.FormatInt(id, 10)
+	}
+	color, icon := "", ""
+	if a.Color != nil {
+		color = strings.TrimSpace(*a.Color)
+		if color != "" && !strings.HasPrefix(color, "#") {
+			color = "#" + color
+		}
+	}
+	if a.Icon != nil {
+		icon = strings.TrimSpace(*a.Icon)
+	}
+	var res map[string]any
+	if a.FilePath != "" {
+		if a.CopyFrom != nil {
+			return nil, &Err{422, "apply takes a file or copy_from, not both"}
+		}
+		extra := map[string]string{"ids": strings.Join(ids, ",")}
+		if color != "" {
+			extra["color"] = color
+		}
+		if icon != "" {
+			extra["icon"] = icon
+		}
+		if err := uploadFile(ctx, c, "/api/notes/icons", a.FilePath, extra, &res); err != nil {
+			return nil, err
+		}
+	} else {
+		body := map[string]any{"ids": a.Notes}
+		if color != "" {
+			body["color"] = color
+		}
+		if icon != "" {
+			body["icon"] = icon
+		}
+		if a.CopyFrom != nil {
+			body["copy_from"] = *a.CopyFrom
+		}
+		if err := c.Do(ctx, http.MethodPost, "/api/notes/icons", nil, body, &res); err != nil {
+			return nil, err
+		}
+	}
+	res["workspace"] = c.Workspace(ctx)
+	return res, nil
 }
 
 // uploadFile posts a local file as multipart/form-data (field "file", plus extra text fields).

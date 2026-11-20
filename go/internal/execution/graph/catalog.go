@@ -69,6 +69,7 @@ func Builtin() Registry {
 	add(NodeType{Name: "json.build", Title: "JSON: собрать", Kind: KindLogic, Trusted: true, Ports: func(p json.RawMessage) ([]Port, []Port, error) { return buildPorts(p, false) }})
 	add(NodeType{Name: "text.build", Title: "Текст: собрать", Kind: KindLogic, Trusted: true, Ports: func(p json.RawMessage) ([]Port, []Port, error) { return buildPorts(p, true) }})
 	add(NodeType{Name: "markdown.table", Title: "Markdown: таблица", Kind: KindLogic, Trusted: true, Ports: tablePorts})
+	add(NodeType{Name: "notes.by_row", Title: "Заметки: по строке таблицы", Kind: KindLogic, Trusted: true, Ports: notesByRowPorts})
 	add(NodeType{Name: "http.get", Title: "HTTP: запрос", Kind: KindLogic, Trusted: true, Network: true, Ports: httpPorts})
 	add(NodeType{Name: "json.get", Title: "JSON: достать", Kind: KindLogic, Trusted: true, Ports: jsonGetPorts})
 

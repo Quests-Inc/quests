@@ -146,13 +146,15 @@
         listQuests({}),
         listCategories(),
         listQuestlines(),
-        listNotes({catalog:true}).catch((): any[] => []),
+        listNotes({catalog:true}).then((rows) => ({ ok: true as const, rows })).catch(() => ({ ok: false as const, rows: [] as any[] })),
         listAllAttachments().catch((): any => null),
         listEvents().catch((): any[] => []),
         listRepositories().catch(():null=>null),
       ])
       setQuests(next)
-      setNotes(Array.isArray(nextNotes) ? nextNotes : [])
+      const noteRows = Array.isArray(nextNotes?.rows) ? nextNotes.rows : []
+      setNotes(noteRows)
+      if (nextNotes?.ok) nav.setKnownNotes(noteRows.map((n) => n.id))
       setAttachmentIndex(attIndex && typeof attIndex === 'object' ? attIndex : null)
       categories = Array.isArray(cats) ? cats : []
       questlines = Array.isArray(lines) ? lines : []

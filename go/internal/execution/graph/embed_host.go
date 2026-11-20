@@ -20,11 +20,18 @@ func (h *embedHost) Source(ctx context.Context, n Node) (map[string]any, error) 
 		if err := strictParams(n.Params, &p); err != nil {
 			return nil, err
 		}
-		title, description, err := h.notes(ctx, p.ID)
+		id := p.ID
+		if id == 0 {
+			id = hostNoteID(ctx)
+		}
+		if id <= 0 {
+			return nil, fmt.Errorf("источник заметки: укажите id или запускайте из заметки")
+		}
+		title, description, err := h.notes(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"title": title, "description": description}, nil
+		return map[string]any{"title": title, "description": description, "ref": Ref{Kind: "note", ID: id}}, nil
 	}
 	if n.Type != "args" {
 		return nil, fmt.Errorf("источник %s здесь не работает", n.Type)

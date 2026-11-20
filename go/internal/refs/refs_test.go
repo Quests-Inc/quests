@@ -15,6 +15,13 @@ func TestParseDedupesAndIgnoresJunk(t *testing.T) {
 	}
 }
 
+func TestParseKeepsNoteWhenAFragmentFollows(t *testing.T) {
+	got := Parse("see note=544#light and note=540#spell/classes")
+	if len(got) != 2 || got[0] != (Ref{Kind: "note", ID: 544}) || got[1] != (Ref{Kind: "note", ID: 540}) {
+		t.Fatalf("got=%v", got)
+	}
+}
+
 func TestParseDoesNotPrefixMatch(t *testing.T) {
 	got := Parse("note=12 vs note=120")
 	if len(got) != 2 || got[0].ID != 12 || got[1].ID != 120 {

@@ -86,6 +86,15 @@ func Samples() []Sample {
 			Graph:       TemplateEmit(templateEmitScript),
 		},
 		{
+			ID: "note-by-row", Title: "Заметка: список по строке таблицы", Subject: "note", NeedsRunner: false,
+			Description: "Вставка script=N{}?hide&auto на заметке. Головные — список: note=12 только она, note=12+ и note=12+1 она и прямые дочки, note=12+2 ещё поколение, note=12+! все ниже. В строке row таблицы table ищется note= этой заметки. Результат — список ссылок, сгруппированный по родителю.",
+			Graph: buildGraph([]nodeSpec{
+				{1, "source.note", nil},
+				{2, "notes.by_row", kv{"table": "spell", "row": "classes", "heads": "note=1+"}},
+				{3, "sink.result", nil},
+			}, [4]any{1, "ref", 2, "ref"}, [4]any{2, "value", 3, "value"}),
+		},
+		{
 			ID: "note-freshness", Title: "Заметка: актуальность по коммиту", Subject: "note", NeedsRunner: true,
 			Description: "Сравнивает зафиксированный коммит с origin/main по списку файлов: изменились — заметка устарела, с причиной.",
 			Graph:       NoteCheck(freshnessScript),

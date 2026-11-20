@@ -6,7 +6,13 @@
   import ModalFoot from '@/shared/ui/ModalFoot.svelte'
   import { untrack } from 'svelte'
 
-  let { open = false, note = null, onClose, onSaved }: { open: boolean, note?: any | null, onClose: () => void, onSaved: (row: any) => void } = $props()
+  let { open = false, note = null, parent = null, onClose, onSaved }: {
+    open: boolean
+    note?: any | null
+    parent?: { color?: string, icon?: string, icon_url?: string | null } | null
+    onClose: () => void
+    onSaved: (row: any) => void
+  } = $props()
 
   let color = $state('#9a9a9a')
   let icon = $state('document')
@@ -30,6 +36,27 @@
       iconUrl = note?.icon_url || null
     })
   })
+
+  async function likeParent() {
+    if (!parent || saving) return
+    formError = ''
+    color = parent.color || '#9a9a9a'
+    icon = parent.icon || 'document'
+    pendingFile = null
+    clearCustom = true
+    if (!parent.icon_url) return
+    try {
+      const res = await fetch(parent.icon_url)
+      if (!res.ok) throw new Error('Не удалось взять иконку родителя')
+      const blob = await res.blob()
+      const type = blob.type || 'image/png'
+      const ext = type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : type.includes('svg') ? 'svg' : 'png'
+      pendingFile = new File([blob], `parent.${ext}`, { type })
+      clearCustom = false
+    } catch (e) {
+      formError = e instanceof Error ? e.message : String(e)
+    }
+  }
 
   async function onSubmit(event: { preventDefault: () => void }) {
     event.preventDefault()
@@ -63,6 +90,12 @@
   {/if}
   <form class="modal__form" onsubmit={onSubmit}>
     <ColorIconPicker bind:color bind:icon {iconUrl} bind:pendingFile bind:clearCustom ownerLabel="этой заметки" />
-    <ModalFoot onCancel={onClose} submitLabel="Сохранить" submitIcon="save" busy={saving} />
+    <ModalFoot onCancel={onClose} submitLabel="Сохранить" submitIcon="save" busy={saving}>
+      {#snippet left()}
+        {#if parent}
+          <button type="button" class="btn btn--ghost" onclick={likeParent} disabled={saving}>Как у родителя</button>
+        {/if}
+      {/snippet}
+    </ModalFoot>
   </form>
 </ModalShell>

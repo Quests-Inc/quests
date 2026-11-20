@@ -7,6 +7,7 @@ import (
 
 	automationhttp "github.com/quests-inc/quests/go/internal/automation/http"
 	"github.com/quests-inc/quests/go/internal/execution"
+	"github.com/quests-inc/quests/go/internal/execution/graph"
 	executionhttp "github.com/quests-inc/quests/go/internal/execution/http"
 	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
@@ -51,6 +52,25 @@ func (s *Server) executionHTTP() *executionhttp.Handler {
 					return "", "", errors.New("приватные заметки недоступны источнику вставки")
 				}
 				return n.Title, n.Description, nil
+			},
+			ListTableNotes: func(ctx context.Context, tableID string, scope graph.HeadScope) ([]graph.TableNote, error) {
+				ids := make([]int64, len(scope.Heads))
+				depths := make([]int, len(scope.Heads))
+				for i, h := range scope.Heads {
+					ids[i], depths[i] = h.ID, h.Depth
+				}
+				rows, err := s.Store.Knowledge.NotesMarkedIn(ctx, tableID, ids, depths)
+				if err != nil {
+					return nil, err
+				}
+				out := make([]graph.TableNote, 0, len(rows))
+				for _, n := range rows {
+					out = append(out, graph.TableNote{
+						ID: n.ID, Title: n.Title, Description: n.Description,
+						ParentTitle: n.ParentTitle, ParentSort: n.ParentSort, SortOrder: n.SortOrder,
+					})
+				}
+				return out, nil
 			},
 			RequireOwner: s.identityHTTP().RequireOwner,
 			SubjectExists: func(ctx context.Context, kind string, id int64) (bool, error) {

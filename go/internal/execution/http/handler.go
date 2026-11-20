@@ -19,6 +19,8 @@ type Handler struct {
 	Store *execution.Store
 	// ReadNote reads non-private Markdown under the request workspace. It never executes inserts.
 	ReadNote graph.NoteReader
+	// ListTableNotes reads non-private notes named by a row query (those notes and, for a `+` head, their children).
+	ListTableNotes graph.TableNoteLister
 
 	// RequireOwner answers 403 and false unless the caller owns the workspace (identity decides who is the owner).
 	RequireOwner func(w http.ResponseWriter, r *http.Request, what string) bool

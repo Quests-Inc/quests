@@ -34,6 +34,7 @@ func (h *Handler) RegisterNotes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/trash/notes/{id}/restore", h.restoreNote)
 	mux.HandleFunc("DELETE /api/trash/notes/{id}", h.purgeNote)
 	mux.HandleFunc("DELETE /api/trash/notes", h.emptyTrashNotes)
+	mux.HandleFunc("POST /api/notes/icons", h.postNoteIcons)
 	mux.HandleFunc("GET /api/notes/{id}/icon", h.getNoteIcon)
 	mux.HandleFunc("POST /api/notes/{id}/icon", h.postNoteIcon)
 	mux.HandleFunc("DELETE /api/notes/{id}/icon", h.deleteNoteIcon)

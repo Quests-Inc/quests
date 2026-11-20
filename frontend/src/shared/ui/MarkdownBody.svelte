@@ -8,6 +8,8 @@
   import { valueHover, type ValueEditTarget } from '@/shared/lib/valueHover.ts'
   import { proseValue } from '@/shared/lib/valueText.ts'
   import ValueEditDialog from './ValueEditDialog.svelte'
+  import { refQuotes, scrollFragment } from '@/shared/lib/markdownSpans.ts'
+  import { setPendingFragment, validNoteHash } from '@/shared/lib/noteFragment.ts'
   import { parseRefHref } from '@/shared/lib/refs.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { tailFade } from '@/shared/lib/typewriter.ts'
@@ -138,6 +140,26 @@
       .join('&')
   )
   let root: HTMLDivElement | undefined = $state()
+  let fragmentKey = ''
+  let fragmentScrolls = 0
+  $effect(() => {
+    void html
+    if (!root || host?.kind !== 'note' || !validNoteHash(location.hash)) return
+    if (location.search !== `?note=${host.id}`) return
+    const key = `${host.id}:${location.hash}`
+    if (fragmentKey !== key) {
+      fragmentKey = key
+      fragmentScrolls = 0
+    }
+    // The first paint can be replaced when titles arrive. Scroll that one too, then stop.
+    if (fragmentScrolls >= 2) return
+    const node = root
+    const hash = location.hash.slice(1)
+    queueMicrotask(() => {
+      if (fragmentScrolls >= 2 || !node.isConnected) return
+      if (scrollFragment(node, hash)) fragmentScrolls++
+    })
+  })
 
   $effect(() => {
     const el = root
@@ -225,6 +247,13 @@
     const ref = parseRefHref(href)
     if (!ref) return
     event.preventDefault()
+    if (ref.fragment && ref.kind === 'note' && host?.kind === 'note' && host.id === ref.id && root) {
+      scrollFragment(root, ref.fragment)
+      const hash = `#${ref.fragment}`
+      if (location.hash !== hash) history.replaceState(history.state, '', `${location.pathname}${location.search}${hash}`)
+      return
+    }
+    if (ref.fragment && ref.kind === 'note') setPendingFragment(ref.id, ref.fragment)
     onRef?.(ref.kind, ref.id)
   }
 </script>
@@ -240,6 +269,7 @@
     use:captureImgErrors
     use:refIcons
     use:scriptEmbed={merged}
+    use:refQuotes={{ source, noteId: host?.kind === 'note' ? host.id : null, html }}
     use:refPreview={onRef}
     use:tailFade={typing}
     use:valueHover={hoverOpts}

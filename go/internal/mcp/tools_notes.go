@@ -84,7 +84,7 @@ func noteTools(c *Client) []Tool {
 		})
 
 	type searchArgs struct {
-		Q     string `json:"q" desc:"fuzzy: tolerates wrong keyboard layout and typos; \"exact phrase\"; -excluded"`
+		Q     string `json:"q" desc:"fuzzy: layout and typos; \"exact phrase\"; -excluded. var:name and var:name=value match a note's own variable; -var: excludes"`
 		Limit int    `json:"limit,omitempty" desc:"default 10, max 50"`
 		Flags string `json:"flags,omitempty" desc:"as in list_notes, e.g. -outdated"`
 	}

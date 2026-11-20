@@ -53,9 +53,11 @@ type Source struct {
 	Kind, From, ID, Title, Body, Where, ParentKind, ParentID string
 	RankFactor                                               string // optional bounded domain relevance multiplier, applied before LIMIT
 	// Fields are scalar expressions. Tests handle enumerated/boolean flags.
-	Fields map[string]string
-	Lists  map[string]string
-	Tests  map[string]map[string]string
+	// Predicates are trusted SQL with exactly one ? per filter value.
+	Fields     map[string]string
+	Lists      map[string]string
+	Tests      map[string]map[string]string
+	Predicates map[string]string
 }
 
 var Kinds = []string{"quest", "step", "questline", "note", "attachment", "template", "script", "hook", "event", "tag", "category", "runner", "job"}
@@ -207,6 +209,11 @@ func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) 
 		}
 		parts := []string{}
 		for _, v := range f.Values {
+			if pred, ok := s.Predicates[f.Key]; ok {
+				parts = append(parts, "("+pred+")")
+				args = append(args, v)
+				continue
+			}
 			if test, ok := s.Tests[f.Key][v]; ok {
 				parts = append(parts, "("+test+")")
 				continue

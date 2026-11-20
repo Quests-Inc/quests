@@ -3,6 +3,8 @@
 import { rollValue } from '@/shared/api/client.ts'
 import { evalScriptText } from '@/shared/api/scripts.ts'
 
+import { renderMarkdown } from './markdown.ts'
+import { labelsForRefs } from './refPreview.ts'
 import { findMarkdownTarget, targetResult, type MarkdownTarget } from './markdownTargets.ts'
 import { labelParts, autoScriptLimit, parseScriptHref } from './scriptRef.ts'
 import { hostKey, touchValues } from './valueLive.svelte.ts'
@@ -17,7 +19,15 @@ function valueHost(node: HTMLElement) {
 }
 
 /** `label` is the formula shown with its values as chips, then `tail`; without a label `text` is shown as is. */
-type Row = { text: string; label?: string; tail?: string; err: boolean; title: string; target?: MarkdownTarget }
+type Row = {
+  text: string
+  label?: string
+  tail?: string
+  err: boolean
+  title: string
+  block?: boolean
+  target?: MarkdownTarget
+}
 
 type Parsed = { id: number; arg: string; auto: boolean; hide: boolean; set: string; on: string }
 
@@ -30,6 +40,7 @@ function rowFor(parsed: Parsed, value: string | null, errTitle = ''): Row {
   if (errTitle) return { text: parsed.hide ? '?' : `${label} — ошибка`, err: true, title: errTitle }
   if (value == null) return { text: parsed.hide ? '?' : label, err: false, title: '' }
   const title = parsed.auto || parsed.hide ? 'Пересчитать' : ''
+  if (value.includes('\n')) return { text: value, block: true, err: false, title: title || 'Пересчитать' }
   if (parsed.hide) return { text: value, err: false, title }
   return { text: `${label} = ${value}`, label: label, tail: ` = ${value}`, err: false, title }
 }
@@ -101,8 +112,22 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
     if (!alive || !node.contains(a)) return
     a.dataset.resultPainted = '1'
     if (a.nextElementSibling?.classList.contains('md-target-link')) a.nextElementSibling.remove()
-    if (row.label != null) fillLabel(a, row.label, row.tail ?? '')
-    else a.textContent = row.text
+    const previous = blockAfter(a)
+    if (row.block && !row.err) {
+      a.textContent = 'Список'
+      let box = previous
+      if (!box) {
+        box = document.createElement('div')
+        box.className = 'md-script-block'
+        const after = a.nextElementSibling?.classList.contains('md-target-link') ? a.nextElementSibling : a
+        after.after(box)
+      }
+      box.innerHTML = renderMarkdown(row.text, { labels: labelsForRefs(row.text) })
+    } else {
+      previous?.remove()
+      if (row.label != null) fillLabel(a, row.label, row.tail ?? '')
+      else a.textContent = row.text
+    }
     a.classList.toggle('md-script--err', row.err)
     if (row.title) a.title = row.title
     else a.removeAttribute('title')
@@ -175,7 +200,14 @@ export function scriptEmbed(node: HTMLElement, initial: Record<string, string> =
     }
   }
 
-  const anchors = () => [...node.querySelectorAll<HTMLAnchorElement>('a[href^="?script="]')]
+  const anchors = () =>
+    [...node.querySelectorAll<HTMLAnchorElement>('a[href^="?script="]')].filter((a) => !a.closest('.md-script-block'))
+
+  const blockAfter = (a: HTMLElement) => {
+    let n = a.nextElementSibling
+    if (n?.classList.contains('md-target-link')) n = n.nextElementSibling
+    return n?.classList.contains('md-script-block') ? (n as HTMLElement) : null
+  }
 
   /** Cache hits paint at once. Links still waiting for a roll are returned. */
   const paint = () => {

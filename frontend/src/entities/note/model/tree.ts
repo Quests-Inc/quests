@@ -36,6 +36,11 @@ export const NOTE_SPEC = {
         check: !!n.has_check,
       })[v],
   },
+  var: {
+    label: 'переменная',
+    hint: 'имя или имя=значение',
+    test: () => true,
+  },
 }
 
 /** The given notes and the chain of their parents, in the original order. */

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -469,6 +470,75 @@ func noteAsInt64Ptr(v any) *int64 {
 		return nil
 	}
 }
+
+// MarkedNote is a non-private note whose text mentions a table id, limited to an explicit set of notes.
+type MarkedNote struct {
+	ID          int64
+	Title       string
+	Description string
+	ParentTitle string
+	ParentSort  int
+	SortOrder   int
+}
+
+// NotesMarkedIn returns notes reachable from the heads that mention table-id.
+// Depth 0 is the head alone, n includes n generations below it, a negative depth includes every generation.
+// An empty list reads nothing. Private notes are neither returned nor walked through.
+func (s *Store) NotesMarkedIn(ctx context.Context, tableID string, ids []int64, depths []int) ([]MarkedNote, error) {
+	if !tableKeyNote.MatchString(tableID) {
+		return nil, fmt.Errorf("неверный table-id")
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if len(ids) != len(depths) {
+		return nil, fmt.Errorf("список головных расходится с глубиной")
+	}
+	args := make([]any, 0, len(ids)*2+1)
+	var values strings.Builder
+	for i, id := range ids {
+		if i > 0 {
+			values.WriteByte(',')
+		}
+		values.WriteString("(?::bigint, ?::int)")
+		args = append(args, id, depths[i])
+	}
+	args = append(args, tableID)
+	q := `
+		WITH RECURSIVE reach AS (
+			SELECT n.id, 0 AS gen, h.depth
+			FROM note n
+			JOIN (VALUES ` + values.String() + `) AS h(id, depth) ON n.id = h.id
+			WHERE n.is_private = 0
+			UNION ALL
+			SELECT c.id, r.gen + 1, r.depth
+			FROM note c
+			JOIN reach r ON c.parent_id = r.id
+			WHERE c.is_private = 0 AND r.gen < 32 AND (r.depth < 0 OR r.gen < r.depth)
+		)
+		SELECT n.id, n.title, n.description, COALESCE(p.title, ''), COALESCE(p.sort_order, 0), n.sort_order
+		FROM note n
+		JOIN (SELECT DISTINCT id FROM reach) r ON r.id = n.id
+		LEFT JOIN note p ON p.id = n.parent_id AND p.is_private = 0
+		WHERE n.description ~ ('table-id:[[:space:]]*' || ? || '[[:space:]]*-->')
+		ORDER BY COALESCE(p.sort_order, 0), COALESCE(p.title, ''), n.sort_order, n.title, n.id`
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]MarkedNote, 0)
+	for rows.Next() {
+		var n MarkedNote
+		if err := rows.Scan(&n.ID, &n.Title, &n.Description, &n.ParentTitle, &n.ParentSort, &n.SortOrder); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+var tableKeyNote = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
 
 type LinkDoc struct {
 	Kind  string
