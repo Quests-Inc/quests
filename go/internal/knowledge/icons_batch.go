@@ -43,32 +43,32 @@ const noteIconBatchMax = 200
 // ApplyNoteIcons updates every id or none. A missing id, a sample, or a foreign workspace (not visible here) fails the call.
 func (s *Store) ApplyNoteIcons(ctx context.Context, dataDir string, b NoteIconBatch) ([]Note, error) {
 	if len(b.IDs) == 0 {
-		return nil, &IconBatchError{422, "ids required"}
+		return nil, &IconBatchError{Code: 422, Msg: "ids required"}
 	}
 	if len(b.IDs) > noteIconBatchMax {
-		return nil, &IconBatchError{422, "too many notes"}
+		return nil, &IconBatchError{Code: 422, Msg: "too many notes"}
 	}
 	seen := map[int64]bool{}
 	for _, id := range b.IDs {
 		if id <= 0 || seen[id] {
-			return nil, &IconBatchError{422, "ids must be unique positive note ids"}
+			return nil, &IconBatchError{Code: 422, Msg: "ids must be unique positive note ids"}
 		}
 		seen[id] = true
 	}
 	if b.Color == "" && b.Icon == "" && b.CopyFrom == 0 && len(b.File) == 0 {
-		return nil, &IconBatchError{422, "color, icon, file or copy_from required"}
+		return nil, &IconBatchError{Code: 422, Msg: "color, icon, file or copy_from required"}
 	}
 	if b.Color != "" && !noteIconColor.MatchString(b.Color) {
-		return nil, &IconBatchError{422, "color must be #rgb or #rrggbb"}
+		return nil, &IconBatchError{Code: 422, Msg: "color must be #rgb or #rrggbb"}
 	}
 	if b.Icon != "" && !noteIconName.MatchString(b.Icon) {
-		return nil, &IconBatchError{422, "unknown icon name"}
+		return nil, &IconBatchError{Code: 422, Msg: "unknown icon name"}
 	}
 	if b.CopyFrom != 0 && len(b.File) > 0 {
-		return nil, &IconBatchError{422, "pass a file or copy_from, not both"}
+		return nil, &IconBatchError{Code: 422, Msg: "pass a file or copy_from, not both"}
 	}
 	if len(b.File) > 512*1024 {
-		return nil, &IconBatchError{422, "icon too large or empty"}
+		return nil, &IconBatchError{Code: 422, Msg: "icon too large or empty"}
 	}
 	notes := make([]Note, 0, len(b.IDs))
 	var missing []int64
@@ -82,28 +82,28 @@ func (s *Store) ApplyNoteIcons(ctx context.Context, dataDir string, b NoteIconBa
 			return nil, err
 		}
 		if n.IsSample {
-			return nil, &IconBatchError{403, fmt.Sprintf("note %d is a sample", id)}
+			return nil, &IconBatchError{Code: 403, Msg: fmt.Sprintf("note %d is a sample", id)}
 		}
 		notes = append(notes, n)
 	}
 	if len(missing) > 0 {
-		return nil, &IconBatchError{404, fmt.Sprintf("unknown note ids: %s", joinIDs(missing))}
+		return nil, &IconBatchError{Code: 404, Msg: fmt.Sprintf("unknown note ids: %s", joinIDs(missing))}
 	}
 	raw, ext := b.File, b.Ext
 	if b.CopyFrom != 0 {
 		src, err := s.GetNote(ctx, b.CopyFrom)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
-				return nil, &IconBatchError{404, "copy_from note not found"}
+				return nil, &IconBatchError{Code: 404, Msg: "copy_from note not found"}
 			}
 			return nil, err
 		}
 		if src.CustomIcon == nil || *src.CustomIcon == "" || !SafeIconName(*src.CustomIcon) {
-			return nil, &IconBatchError{422, "copy_from has no uploaded icon"}
+			return nil, &IconBatchError{Code: 422, Msg: "copy_from has no uploaded icon"}
 		}
 		raw, err = os.ReadFile(filepath.Join(dataDir, "note-icons", *src.CustomIcon))
 		if err != nil {
-			return nil, &IconBatchError{422, "copy_from icon file is missing"}
+			return nil, &IconBatchError{Code: 422, Msg: "copy_from icon file is missing"}
 		}
 		ext = filepath.Ext(*src.CustomIcon)
 	}
@@ -165,7 +165,7 @@ func writeNoteIconFile(dataDir string, id int64, ext string, raw []byte) (string
 	}
 	name := strconv.FormatInt(id, 10) + ext
 	if !SafeIconName(name) {
-		return "", &IconBatchError{422, "bad icon file name"}
+		return "", &IconBatchError{Code: 422, Msg: "bad icon file name"}
 	}
 	dir := filepath.Join(dataDir, "note-icons")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

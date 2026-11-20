@@ -124,7 +124,7 @@ func readNoteIconBatch(r *http.Request) (knowledge.NoteIconBatch, error) {
 		if v := strings.TrimSpace(r.FormValue("copy_from")); v != "" {
 			id, err := strconv.ParseInt(v, 10, 64)
 			if err != nil || id <= 0 {
-				return batch, &knowledge.IconBatchError{422, "copy_from must be a note id"}
+				return batch, &knowledge.IconBatchError{Code: 422, Msg: "copy_from must be a note id"}
 			}
 			batch.CopyFrom = id
 		}
@@ -133,7 +133,7 @@ func readNoteIconBatch(r *http.Request) (knowledge.NoteIconBatch, error) {
 			defer file.Close()
 			raw, err := io.ReadAll(io.LimitReader(file, 512*1024+1))
 			if err != nil || len(raw) == 0 || len(raw) > 512*1024 {
-				return batch, &knowledge.IconBatchError{422, "icon too large or empty"}
+				return batch, &knowledge.IconBatchError{Code: 422, Msg: "icon too large or empty"}
 			}
 			batch.File = raw
 			batch.Ext = iconExt(hdr.Header.Get("Content-Type"), hdr.Filename)
@@ -158,13 +158,13 @@ func readNoteIconBatch(r *http.Request) (knowledge.NoteIconBatch, error) {
 
 func parseNoteIDs(raw string) ([]int64, error) {
 	if strings.TrimSpace(raw) == "" {
-		return nil, &knowledge.IconBatchError{422, "ids required"}
+		return nil, &knowledge.IconBatchError{Code: 422, Msg: "ids required"}
 	}
 	var ids []int64
 	for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == ' ' || r == '\n' }) {
 		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
 		if err != nil || id <= 0 {
-			return nil, &knowledge.IconBatchError{422, "ids must be unique positive note ids"}
+			return nil, &knowledge.IconBatchError{Code: 422, Msg: "ids must be unique positive note ids"}
 		}
 		ids = append(ids, id)
 	}
