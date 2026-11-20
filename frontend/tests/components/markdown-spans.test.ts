@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
 import { renderMarkdown } from '@/shared/lib/markdown.ts'
+import { markSpanTargets } from '@/shared/lib/markdownSpanMark.ts'
 import { fragmentQuote, scrollFragment } from '@/shared/lib/markdownSpans.ts'
 import { findMarkdownTarget } from '@/shared/lib/markdownTargets.ts'
 import { parseRefHref } from '@/shared/lib/refs.ts'
@@ -33,6 +34,9 @@ test('a span pair is a hidden target and a quote, a broken pair is not', () => {
   expect(
     fragmentQuote('<!-- span-id: a -->x<!-- /span-id: a --><!-- span-id: a -->y<!-- /span-id: a -->', 'a')
   ).toBeNull()
+  expect(markSpanTargets('<p><!-- span-id: light -->фраза<!-- /span-id: light --></p>')).toContain(
+    'data-md-span="light"'
+  )
   const html = renderMarkdown(piece)
   const root = document.createElement('div')
   root.innerHTML = html

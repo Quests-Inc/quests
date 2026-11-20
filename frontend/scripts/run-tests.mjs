@@ -9,7 +9,7 @@ const only = process.argv[2]
 const groups = [
   {
     name: 'unit',
-    args: ['--conditions', 'browser', '--preload', './tests/sveltePlugin.ts', 'tests/unit'],
+    args: ['tests/unit'],
     perFile: false,
   },
   {

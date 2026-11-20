@@ -3,7 +3,7 @@ import { marked } from 'marked'
 
 import { highlightCode } from './codeHighlight.ts'
 import { mathExtensions, renderMathElements } from './markdownMath.ts'
-import { markSpanTargets } from './markdownSpans.ts'
+import { markSpanTargets } from './markdownSpanMark.ts'
 import { markTableTargets } from './markdownTargets.ts'
 import { REF_LINK_RE, REF_RE, refHref } from './refs.ts'
 import { escapeMdInline, scriptEmbedRe, scriptFlags, scriptHref, scriptLabel } from './scriptRef.ts'
