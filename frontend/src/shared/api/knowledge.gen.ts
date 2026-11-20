@@ -83,6 +83,33 @@ export interface RevisionRead {
 }
 
 //////////
+// source: icons_batch.go
+
+/**
+ * IconBatchError rejects the whole batch. Nothing is written.
+ */
+export interface IconBatchError {
+  Code: number /* int */;
+  Msg: string;
+}
+/**
+ * NoteIconBatch sets one color and one built-in icon on many notes, and gives each its own copy of one image.
+ * The image is either the uploaded bytes or the file already stored for CopyFrom.
+ */
+export interface NoteIconBatch {
+  IDs: number /* int64 */[];
+  Color: string;
+  Icon: string;
+  CopyFrom: number /* int64 */;
+  File: string /* []byte */;
+  Ext: string;
+}
+
+//////////
+// source: note_search_vars.go
+
+
+//////////
 // source: notecheck.go
 
 /**
@@ -192,6 +219,17 @@ export interface NoteFilter {
   ParentID?: number /* int64 */;
   ParentUnset: boolean;
   Pinned?: boolean;
+}
+/**
+ * MarkedNote is a non-private note whose text mentions a table id, limited to an explicit set of notes.
+ */
+export interface MarkedNote {
+  ID: number /* int64 */;
+  Title: string;
+  Description: string;
+  ParentTitle: string;
+  ParentSort: number /* int */;
+  SortOrder: number /* int */;
 }
 export interface LinkDoc {
   Kind: string;
