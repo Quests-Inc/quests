@@ -2,7 +2,14 @@ import { expect, test } from 'bun:test'
 
 import { draftHits, queryExtends } from '../../src/shared/lib/entitySearchDraft.ts'
 
-const note = (id: number, title: string, snippet = '') => ({ kind: 'note', id, title, where: 'body', snippet, score: 1 })
+const note = (id: number, title: string, snippet = '') => ({
+  kind: 'note',
+  id,
+  title,
+  where: 'body',
+  snippet,
+  score: 1,
+})
 
 test('a longer query keeps rows whose title or snippet contains it and adds catalog titles', () => {
   const prev = { q: 'ог', types: ['note'] }

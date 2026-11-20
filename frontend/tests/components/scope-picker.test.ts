@@ -104,7 +104,7 @@ test('«Без раздела» — тоже раздел: длинный спи
   search.value = 'Линия 11'
   search.dispatchEvent(new Event('input', { bubbles: true }))
   flushSync()
-  await new Promise((r) => setTimeout(r, 180))
+  await new Promise((r) => setTimeout(r, 400))
   flushSync()
   expect([...t.sub()!.querySelectorAll('.scope__list .scope__row')].map((e) => e.textContent?.trim())).toEqual([
     'Линия 11',

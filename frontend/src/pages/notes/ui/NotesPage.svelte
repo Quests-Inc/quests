@@ -2,6 +2,7 @@
   import { QuestlineIcon } from '@/entities/questline'
   import { uiPreferences } from '@/shared/model/uiPreferences.svelte.ts'
   import { createEntitySearch, searchFilters } from '@/shared/lib/entitySearch.svelte.ts'
+  import { parentKeyOf } from '../model/parentKey.ts'
   import { createNoteScroll, revealOpenRow } from '../model/noteScroll.ts'
   import { createTitleEdit } from '../model/noteTitleEdit.svelte.ts'
   import { tick } from 'svelte'
@@ -116,30 +117,10 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   const remoteSearch = createEntitySearch(() => searchActive ? {q: searchText, types:['note'], filters:searchFilters(parsedSearch, NOTE_SPEC)} : null, {all:true, catalog: () => noteCatalog.list.map((n) => ({ id: n.id, title: n.title || '' }))})
   let searchHits = $derived(remoteSearch.hits)
 
-  /** Grouping key for the tree: the open note's own live `ed.parentId` field
-   * (even before it's written into noteDrafts — that only happens once the
-   * whole form differs from `ed.saved`), else its draft if one exists, else the
-   * server's own `parent_id`. Lets picking a new parent move the row in the
-   * sidebar immediately — parentMenuItems already excludes self/descendants,
-   * so this can't introduce a cycle.
-   *
-   * Only trust `ed.parentId` once it's actually loaded for this note
-   * (ed.loadedId === selectedId) — right after switching notes, selectedId has
-   * already moved on but the async getNote() fetch hasn't landed yet, so
-   * `ed.parentId` still holds the *previous* note's value. Using it anyway for
-   * that one tick drew the row at a wrong/stale spot that then snapped to
-   * the right one a moment later — the flash this was fixing. */
-  function parentKeyOf(n: { id: number; parent_id: null }) {
-    if (n.id === selectedId && ed.loadedId === selectedId) return ed.parentId === '' ? 'root' : ed.parentId
-    const draft = noteDrafts[String(n.id)]
-    if (draft) return draft.parentId === '' ? 'root' : draft.parentId
-    return n.parent_id == null ? 'root' : String(n.parent_id)
-  }
-
   let byParent = $derived.by(() => {
     const m: Map<string, any[]> = new Map()
     for (const n of filtered) {
-      const key = parentKeyOf(n)
+      const key = parentKeyOf(n, selectedId, ed, noteDrafts[String(n.id)]?.parentId)
       if (!m.has(key)) m.set(key, [])
       m.get(key).push(n)
     }

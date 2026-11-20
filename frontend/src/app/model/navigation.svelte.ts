@@ -151,7 +151,11 @@ export function createNavigation(deps: {
     const missing = isMissing(id)
     if (!missing) visitRecentNote(id)
     const pending = takePendingFragment(id)
-    const hash = pending ? `#${pending}` : !push && validNoteHash(location.hash) && location.search === `?note=${id}` ? location.hash : ''
+    const hash = pending
+      ? `#${pending}`
+      : !push && validNoteHash(location.hash) && location.search === `?note=${id}`
+        ? location.hash
+        : ''
     const same = location.search === `?note=${id}` && location.hash === hash
     const url = `${location.pathname}?note=${id}${hash}`
     // The page being left was a note that never belonged in the trail: overwrite it.

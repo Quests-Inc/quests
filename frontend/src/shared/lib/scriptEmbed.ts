@@ -4,8 +4,8 @@ import { rollValue } from '@/shared/api/client.ts'
 import { evalScriptText } from '@/shared/api/scripts.ts'
 
 import { renderMarkdown } from './markdown.ts'
-import { labelsForRefs } from './refPreview.ts'
 import { findMarkdownTarget, targetResult, type MarkdownTarget } from './markdownTargets.ts'
+import { labelsForRefs } from './refPreview.ts'
 import { labelParts, autoScriptLimit, parseScriptHref } from './scriptRef.ts'
 import { hostKey, touchValues } from './valueLive.svelte.ts'
 

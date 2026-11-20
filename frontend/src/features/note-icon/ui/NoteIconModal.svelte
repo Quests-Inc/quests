@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { clearNoteIcon, updateNote, uploadNoteIcon } from '@/shared/api/client.ts'
+  import { clearNoteIcon, fetchNoteIconFile, updateNote, uploadNoteIcon } from '@/shared/api/client.ts'
   import { ColorIconPicker } from '@/entities/questline'
   import ModalShell from '@/shared/ui/ModalShell.svelte'
   import ModalHead from '@/shared/ui/ModalHead.svelte'
@@ -46,12 +46,7 @@
     clearCustom = true
     if (!parent.icon_url) return
     try {
-      const res = await fetch(parent.icon_url)
-      if (!res.ok) throw new Error('Не удалось взять иконку родителя')
-      const blob = await res.blob()
-      const type = blob.type || 'image/png'
-      const ext = type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : type.includes('svg') ? 'svg' : 'png'
-      pendingFile = new File([blob], `parent.${ext}`, { type })
+      pendingFile = await fetchNoteIconFile(parent.icon_url)
       clearCustom = false
     } catch (e) {
       formError = e instanceof Error ? e.message : String(e)

@@ -65,6 +65,24 @@ export function clearNoteIcon(id: number) {
   return request(`/api/notes/${id}/icon`, { method: 'DELETE' })
 }
 
+/** Copy a note's custom icon into a File so another note can upload its own. */
+export async function fetchNoteIconFile(url: string) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Не удалось взять иконку родителя')
+  const blob = await res.blob()
+  const type = blob.type || 'image/png'
+  const ext = type.includes('jpeg')
+    ? 'jpg'
+    : type.includes('webp')
+      ? 'webp'
+      : type.includes('gif')
+        ? 'gif'
+        : type.includes('svg')
+          ? 'svg'
+          : 'png'
+  return new File([blob], `parent.${ext}`, { type })
+}
+
 /** Ranked note search: [{ id, title, score, where: 'title'|'body'|'fuzzy', snippet (matches in ⟪ ⟫), … }]. */
 export function searchNotes(q: string, limit = 30) {
   return request(`/api/notes/search?q=${encodeURIComponent(q)}&limit=${limit}`)

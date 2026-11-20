@@ -12,8 +12,7 @@ mock.module('@/shared/api/entitySearch.ts', () => ({
       return new Promise((resolve) => {
         finishOld = resolve
       })
-    if (q.q === 'hold')
-      return new Promise(() => {})
+    if (q.q === 'hold') return new Promise(() => {})
     if (q.q === 'boom') throw new Error('сеть')
     return q.offset
       ? { hits: [{ kind: 'note', id: 2, title: 'Вторая' }], more: false, next: 2 }

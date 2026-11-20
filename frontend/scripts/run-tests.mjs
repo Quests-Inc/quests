@@ -7,7 +7,11 @@ const root = new URL('..', import.meta.url).pathname
 const only = process.argv[2]
 
 const groups = [
-  { name: 'unit', args: ['tests/unit'], perFile: false },
+  {
+    name: 'unit',
+    args: ['--conditions', 'browser', '--preload', './tests/sveltePlugin.ts', 'tests/unit'],
+    perFile: false,
+  },
   {
     name: 'components',
     args: ['--conditions', 'browser', '--preload', './tests/components/setup.ts'],

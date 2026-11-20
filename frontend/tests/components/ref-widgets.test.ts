@@ -340,10 +340,10 @@ test('?auto&hide показывает только число', async () => {
 })
 
 test('a note fragment quotes the piece beside the link', async () => {
-  const el = body(
-    'класс note=3#light\n\n<!-- span-id: light -->Домен Света<!-- /span-id: light -->',
-    { host: { kind: 'note', id: 3 }, labels: { 'note:3': 'Жрец' } }
-  )
+  const el = body('класс note=3#light\n\n<!-- span-id: light -->Домен Света<!-- /span-id: light -->', {
+    host: { kind: 'note', id: 3 },
+    labels: { 'note:3': 'Жрец' },
+  })
   await sleep(30)
   const link = el.querySelector('a[href="?note=3#light"]')
   expect(link?.textContent).toBe('Домен Света')

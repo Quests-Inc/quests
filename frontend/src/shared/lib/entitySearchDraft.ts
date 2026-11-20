@@ -33,7 +33,7 @@ export function draftHits(
   previous: EntitySearchRequest | null,
   current: EntitySearchHit[] | null,
   query: EntitySearchRequest,
-  catalog: CatalogTitle[] | null,
+  catalog: CatalogTitle[] | null
 ): EntitySearchHit[] {
   let rows = current ? [...current] : []
   const needle = query.q.trim().toLowerCase()

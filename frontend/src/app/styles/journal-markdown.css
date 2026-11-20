@@ -570,7 +570,9 @@ a:has(> .md-ref__ico) {
 .md [data-md-span] {
   border-radius: 0.45rem;
   background-color: transparent;
-  transition: background-color 0.45s ease, box-shadow 0.45s ease;
+  transition:
+    background-color 0.45s ease,
+    box-shadow 0.45s ease;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }

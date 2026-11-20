@@ -27,8 +27,12 @@ test('a span pair is a hidden target and a quote, a broken pair is not', () => {
   expect(fragmentQuote(piece, 'domain')).toBe('Свет Жрец света.')
   expect(fragmentQuote(piece, 'fake')).toBeNull()
   expect(fragmentQuote('<!-- span-id: a -->x<!-- /span-id: b -->', 'a')).toBeNull()
-  expect(fragmentQuote('<!-- span-id: a --><!-- span-id: b -->x<!-- /span-id: a --><!-- /span-id: b -->', 'a')).toBeNull()
-  expect(fragmentQuote('<!-- span-id: a -->x<!-- /span-id: a --><!-- span-id: a -->y<!-- /span-id: a -->', 'a')).toBeNull()
+  expect(
+    fragmentQuote('<!-- span-id: a --><!-- span-id: b -->x<!-- /span-id: a --><!-- /span-id: b -->', 'a')
+  ).toBeNull()
+  expect(
+    fragmentQuote('<!-- span-id: a -->x<!-- /span-id: a --><!-- span-id: a -->y<!-- /span-id: a -->', 'a')
+  ).toBeNull()
   const html = renderMarkdown(piece)
   const root = document.createElement('div')
   root.innerHTML = html

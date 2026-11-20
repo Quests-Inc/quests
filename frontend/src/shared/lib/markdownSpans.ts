@@ -1,7 +1,8 @@
 // span-id pairs and note=N#key quotes. Comments stay hidden; a valid pair becomes data-md-span.
 
-import { getNote } from '@/shared/api/client.ts'
 import { marked } from 'marked'
+
+import { getNote } from '@/shared/api/client.ts'
 
 import { findMarkdownTarget } from './markdownTargets.ts'
 

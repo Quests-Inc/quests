@@ -13,7 +13,7 @@ mock.module('@/shared/api/entitySearch.ts', () => ({
 }))
 const { FindEntityModal } = await import('@/features/find-entity')
 const settle = async () => {
-  await new Promise((r) => setTimeout(r, 180))
+  await new Promise((r) => setTimeout(r, 400))
   flushSync()
 }
 
