@@ -3,11 +3,18 @@ import { expect, test } from 'bun:test'
 import { flushSync, mount, unmount } from 'svelte'
 
 import Harness from './GraphImageHarness.svelte'
+
+async function nextFrame() {
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+  flushSync()
+}
+
 test('preview starts small, increases on demand and does not reload a lower quality while zooming out', async () => {
   const target = document.createElement('div')
   document.body.append(target)
   const app = mount(Harness, { target })
   flushSync()
+  await nextFrame()
   const src = () => target.querySelector('img')?.getAttribute('src')
   expect(src()).toContain('thumb=128')
   const input = target.querySelector('input')!
@@ -17,6 +24,7 @@ test('preview starts small, increases on demand and does not reload a lower qual
     flushSync()
     await new Promise((r) => setTimeout(r, 180))
     flushSync()
+    await nextFrame()
   }
   await resize(600)
   expect(src()).toContain('thumb=1024')
@@ -59,6 +67,7 @@ test('a raster card has a real initial height before the first image is decoded'
     },
   })
   flushSync()
+  await nextFrame()
   const card = target.querySelector<HTMLElement>('.gcard')!
   expect(parseFloat(card.style.height)).toBeGreaterThan(50)
   expect(card.querySelector('img')).not.toBeNull()

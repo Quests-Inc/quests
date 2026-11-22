@@ -14,6 +14,7 @@
   import { putGraphDraftRoots } from '@/shared/api/graph.ts'
   import { copyText } from '@/shared/lib/clipboard.ts'
   import { clearGraphPresence, setGraphPresence } from '@/shared/lib/graphPresence.svelte.ts'
+  import { clearRevealedNotes } from '@/shared/lib/privateReveal.svelte.ts'
   import { toast } from '@/shared/lib/toasts.svelte.ts'
   import ConfirmModal from '@/shared/ui/ConfirmModal.svelte'
   import ContextMenu from '@/shared/ui/ContextMenu.svelte'
@@ -338,6 +339,7 @@
   })
   onDestroy(() => {
     clearGraphPresence()
+    clearRevealedNotes()
     layouts.dispose()
     stage.cancelCamera()
   })

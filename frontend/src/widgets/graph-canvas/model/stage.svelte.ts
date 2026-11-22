@@ -18,6 +18,7 @@ import {
   placedGroups,
   planHide,
   prepareGraph,
+  referenceEdges,
   stepOpenTarget,
   visibleGraph,
   type GraphGroupView,
@@ -26,6 +27,7 @@ import {
 } from '@/entities/graph'
 import { putGraphDraftRoots } from '@/shared/api/graph.ts'
 import type { DraftOp, Graph } from '@/shared/api/store.gen'
+import { revealedEntries } from '@/shared/lib/privateReveal.svelte.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 type Spot = { x: number; y: number }
@@ -176,6 +178,17 @@ export function createGraphStage(deps: {
 
   function touch() {
     if (view) view = { ...view }
+  }
+
+  function withRevealedRefs(nodes: { key: string }[], edges: ViewEdge[]) {
+    const extra = untrack(() => referenceEdges(nodes, edges, revealedEntries()))
+    return extra.length ? [...edges, ...extra] : edges
+  }
+
+  function revealNote(key: string, text: string) {
+    if (!view) return
+    const extra = referenceEdges(view.nodes, view.edges, [[key, text]])
+    if (extra.length) view = { ...view, edges: [...view.edges, ...extra] }
   }
 
   function applyLayout() {
@@ -329,7 +342,7 @@ export function createGraphStage(deps: {
       buildLater = true
       return
     }
-    void rebuild({ ...g, nodes: vis.nodes, edges: vis.edges }, open)
+    void rebuild({ ...g, nodes: vis.nodes, edges: withRevealedRefs(vis.nodes, vis.edges) }, open)
   }
 
   function poke() {
@@ -734,6 +747,7 @@ export function createGraphStage(deps: {
     focusZone,
     cancelCamera,
     touch,
+    revealNote,
     /** Разложить заново с тем, что сейчас в `saved` (расклад поставил позиции карточек). */
     applyLayout,
     compose,

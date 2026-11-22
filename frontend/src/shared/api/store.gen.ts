@@ -73,8 +73,13 @@ export interface GraphNode {
   status?: string; // quest status; "done"/"open" for a step
   /**
    * Desc is the start of the description (quest, step, note), for the node card.
+   * A private note leaves this empty: the text is not part of the map payload.
    */
   desc?: string;
+  /**
+   * Private is a note whose text stays off the map until the person asks to see it.
+   */
+  private?: boolean;
   /**
    * Progress is "cur/total" of a step; Sort its position within the quest.
    */

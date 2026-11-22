@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 
+import { resetImageStarts, scheduleImage } from '@/shared/lib/imageStart.ts'
 import { enqueueMedia, resetMediaQueue, setMediaPaused } from '@/shared/lib/mediaQueue.ts'
 
 test('одновременно декодируются только две картинки, пауза не пускает следующую', () => {
@@ -25,4 +26,31 @@ test('одновременно декодируются только две ка
   setMediaPaused(false)
   expect(done.length).toBe(3)
   resetMediaQueue()
+})
+
+test('адрес картинки назначается по два за кадр и не ждёт загрузки', () => {
+  resetImageStarts()
+  const frames: Array<FrameRequestCallback> = []
+  const orig = globalThis.requestAnimationFrame
+  globalThis.requestAnimationFrame = (cb) => {
+    frames.push(cb)
+    return frames.length
+  }
+  const started: number[] = []
+  const cancel: Array<() => void> = []
+  for (let i = 0; i < 5; i++) {
+    const n = i
+    cancel.push(scheduleImage(() => started.push(n)))
+  }
+  expect(started).toEqual([])
+  expect(frames).toHaveLength(1)
+  frames.shift()!(0)
+  expect(started).toEqual([0, 1])
+  frames.shift()!(1)
+  expect(started).toEqual([0, 1, 2, 3])
+  cancel[4]()
+  frames.shift()!(2)
+  expect(started).toEqual([0, 1, 2, 3])
+  globalThis.requestAnimationFrame = orig
+  resetImageStarts()
 })

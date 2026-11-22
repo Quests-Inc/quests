@@ -28,7 +28,7 @@ var thumbs = struct {
 	order *list.List
 	bytes int
 }{items: map[string]*list.Element{}, order: list.New()}
-var thumbSlots = make(chan struct{}, 2)
+var thumbSlots = make(chan struct{}, 6)
 
 const maxThumbnailCache = 24 << 20
 

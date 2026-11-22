@@ -5,12 +5,63 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/quests-inc/quests/go/internal/knowledge"
 	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/store"
 )
+
+func TestPrivateNoteTextStaysOffTheMap(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	ctx := wsctx.With(t.Context(), 1)
+	mentioned, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "Сосед"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{Title: "Открытая", Description: "видно"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "секретный текст note=" + strconv.FormatInt(mentioned.ID, 10)
+	priv, err := s.Store.Knowledge.CreateNote(ctx, knowledge.Note{
+		Title: "Тайная", Description: secret, IsPrivate: true, ParentID: &parent.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := s.Store.BuildGraph(ctx, "note", parent.ID, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var card *store.GraphNode
+	for i := range g.Nodes {
+		n := &g.Nodes[i]
+		if strings.Contains(n.Desc, "секрет") {
+			t.Fatalf("private text on %s", n.Key)
+		}
+		if n.Key == "note:"+strconv.FormatInt(priv.ID, 10) {
+			card = n
+		}
+	}
+	if card == nil || !card.Private || card.Desc != "" {
+		t.Fatalf("private card: %+v", card)
+	}
+	privKey := card.Key
+	var parentEdge bool
+	for _, e := range g.Edges {
+		if e.From == "note:"+strconv.FormatInt(parent.ID, 10) && e.To == privKey && e.Kind == store.EdgeStructure {
+			parentEdge = true
+		}
+		if e.To == "note:"+strconv.FormatInt(mentioned.ID, 10) && e.From == privKey {
+			t.Fatalf("private text pulled a neighbour: %+v", e)
+		}
+	}
+	if !parentEdge {
+		t.Fatal("parent edge missing")
+	}
+}
 
 func TestGraphBatchSharesCardsAndKeepsIndependentTreeMembership(t *testing.T) {
 	s := newAttachmentServer(t, "", "", 0)

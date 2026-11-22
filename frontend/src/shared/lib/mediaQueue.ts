@@ -1,4 +1,4 @@
-/** At most two photo / cover / embedded-image jobs decode at once. A camera gesture pauses new ones. */
+/** A two-wide job queue with a pause. Map photos do not use it. */
 
 type Job = {
   start: (release: () => void) => void
@@ -58,40 +58,4 @@ export function resetMediaQueue() {
   jobs.splice(0)
   active = 0
   paused = false
-}
-
-/** Hold image bytes until a decode slot is free. A second call restarts the queue. */
-export function paceImages(node: HTMLElement, enabled: boolean) {
-  let stops: Array<() => void> = []
-  const apply = (on: boolean) => {
-    for (const stop of stops) stop()
-    stops = []
-    if (!on) return
-    for (const img of node.querySelectorAll<HTMLImageElement>('img[src]')) {
-      const url = img.getAttribute('src') || ''
-      if (!url) continue
-      img.removeAttribute('src')
-      stops.push(
-        enqueueMedia((release) => {
-          const finish = () => {
-            img.removeEventListener('load', finish)
-            img.removeEventListener('error', finish)
-            release()
-          }
-          img.addEventListener('load', finish)
-          img.addEventListener('error', finish)
-          img.src = url
-        })
-      )
-    }
-  }
-  apply(enabled)
-  return {
-    update(on: boolean) {
-      apply(on)
-    },
-    destroy() {
-      apply(false)
-    },
-  }
 }

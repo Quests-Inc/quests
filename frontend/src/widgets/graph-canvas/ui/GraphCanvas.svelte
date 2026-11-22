@@ -1,7 +1,6 @@
 <script lang="ts">
   import { benchmarkRaster } from '../model/rasterBenchmark.ts'
   import { planContent } from '../model/contentDwell.ts'
-  import { setMediaPaused } from '@/shared/lib/mediaQueue.ts'
  import {attachmentImage} from '@/shared/lib/imageViewer.svelte.ts'
   import {imagePixels} from '../model/imageQuality.ts'
   import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
@@ -97,8 +96,7 @@
 
   const pendingScene = $derived((switching && !stage.view) || loading || stage.previewing || stage.sceneHidden)
 
-  // Photos, covers and markdown start once the camera is still. New work is staggered
-  // and paused while the camera moves; a flyover does not start fetches.
+  // Markdown starts once the camera is still, two cards a frame. Photos take their address two a frame and do not wait for that.
   let warm = $state(new Set<string>())
   let dwellTick = $state(0)
   let seenCam = { x: Number.NaN, y: Number.NaN, k: Number.NaN }
@@ -128,7 +126,6 @@
     })
     idleSince = plan.idleSince
     clocks = plan.clocks
-    setMediaPaused(!plan.idle)
     const kept = new Set<string>()
     for (const key of warm) if (plan.warm.has(key)) kept.add(key)
     if (kept.size !== warm.size) warm = kept
@@ -295,6 +292,7 @@
         {onStartEdit}
         {onFinishEdit}
         {onOpen}
+        onRevealed={(key, text) => stage.revealNote(key, text)}
         {labels}
         onOpenMore={stage.openMore}
         {onShowChanges}

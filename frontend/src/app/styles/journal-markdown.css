@@ -355,6 +355,26 @@ a:has(> .md-ref__ico) {
 .ref-preview__body {
   margin-top: 0.4rem;
   overflow-wrap: anywhere;
+  max-height: 14rem;
+  overflow: auto;
+}
+.ref-preview__body h1,
+.ref-preview__body h2,
+.ref-preview__body h3 {
+  font-size: 1em;
+  margin: 0.3rem 0;
+}
+.ref-preview__body p {
+  margin: 0.3rem 0;
+}
+.ref-preview__body pre,
+.ref-preview__body table {
+  font-size: 0.85em;
+}
+.ref-preview__body img {
+  max-width: 100%;
+  max-height: 8rem;
+  object-fit: contain;
 }
 .ref-preview__open {
   margin-top: 0.5rem;

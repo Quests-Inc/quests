@@ -27,7 +27,10 @@ type GraphNode struct {
 	Title  string `json:"title"`
 	Status string `json:"status,omitempty"` // quest status; "done"/"open" for a step
 	// Desc is the start of the description (quest, step, note), for the node card.
+	// A private note leaves this empty: the text is not part of the map payload.
 	Desc string `json:"desc,omitempty"`
+	// Private is a note whose text stays off the map until the person asks to see it.
+	Private bool `json:"private,omitempty"`
 	// Progress is "cur/total" of a step; Sort its position within the quest.
 	Progress string `json:"progress,omitempty"`
 	Sort     int    `json:"sort"`
@@ -229,16 +232,21 @@ func (s *Store) loadGraphIndex(ctx context.Context) (*graphIndex, error) {
 	}); err != nil {
 		return nil, err
 	}
-	if err := scan(`SELECT id, title, parent_id, description, icon, color, custom_icon FROM note`, func(r interface{ Scan(...any) error }) error {
+	if err := scan(`SELECT id, title, parent_id, description, icon, color, custom_icon, is_private FROM note`, func(r interface{ Scan(...any) error }) error {
 		var id int64
 		var title, desc string
 		var parent *int64
 		var icon, color, custom *string
-		if err := r.Scan(&id, &title, &parent, &desc, &icon, &color, &custom); err != nil {
+		var private int
+		if err := r.Scan(&id, &title, &parent, &desc, &icon, &color, &custom, &private); err != nil {
 			return err
 		}
 		nn := addNode("note", id, title, "")
-		nn.Desc = clip(desc, descNote)
+		if private != 0 {
+			nn.Private = true
+		} else {
+			nn.Desc = clip(desc, descNote)
+		}
 		if icon != nil {
 			nn.Icon = *icon
 		}

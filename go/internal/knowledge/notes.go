@@ -566,7 +566,8 @@ func (s *Store) ListLinkCorpus(ctx context.Context) ([]LinkDoc, error) {
 		}
 		return rows.Err()
 	}
-	if err := add(`SELECT 'note', id, title, description FROM note`); err != nil {
+	// A private note contributes its title only. The description is not a source of reference edges or backlinks.
+	if err := add(`SELECT 'note', id, title, CASE WHEN is_private = 0 THEN description ELSE '' END FROM note`); err != nil {
 		return nil, err
 	}
 	if err := add(`SELECT 'quest', id, title, description FROM quest`); err != nil {

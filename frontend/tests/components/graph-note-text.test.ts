@@ -104,6 +104,43 @@ test('measuring deferred cards show placeholders without requesting bodies', asy
   await view.close()
 })
 
+test('a private note stays shut until Show, and does not draw a text silhouette', async () => {
+  requests = 0
+  const view = await show({
+    n: {
+      key: 'note:7',
+      id: 7,
+      type: 'note',
+      title: 'Тайная',
+      desc: '',
+      private: true,
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 300,
+      links: 0,
+      depth: 0,
+    },
+    tier: 'full',
+  })
+  expect(view.target.textContent).toContain('Показать')
+  expect(view.target.textContent).toContain('Тайная')
+  expect(view.target.querySelector('.note-outline')).toBeNull()
+  expect(view.target.querySelector('.md')).toBeNull()
+  expect(requests).toBe(0)
+  const showBtn = [...view.target.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('Показать')
+  )!
+  showBtn.click()
+  flushSync()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  flushSync()
+  expect(requests).toBe(1)
+  expect(view.target.textContent).toContain(ending)
+  expect(view.target.textContent).not.toContain('Показать')
+  await view.close()
+})
+
 test('visible deferred cards mount content after placeholders have painted', async () => {
   requests = 0
   const view = await show({ deferContent: true })

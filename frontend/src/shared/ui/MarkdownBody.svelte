@@ -17,7 +17,6 @@
   import { scriptEmbed } from '@/shared/lib/scriptEmbed.ts'
   import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
   import { mapJumps, type MapJump } from '@/shared/lib/mapJumps.ts'
-  import { paceImages } from '@/shared/lib/mediaQueue.ts'
   import copySvg from '@/assets/icons/copy.svg?raw'
   import checkSvg from '@/assets/icons/checkmark.svg?raw'
 
@@ -32,7 +31,6 @@
     onRef,
     typing = false,
     mapJump = null,
-    paceMedia = false,
   }: {
     source?: string,
     class?: string,
@@ -46,8 +44,6 @@
     typing?: boolean,
     /** When the linked entity is on the same map, a button after the link focuses it there. */
     mapJump?: MapJump | null,
-    /** Images in this body take a shared decode slot instead of starting all at once. */
-    paceMedia?: boolean,
   } = $props()
 
   let foreign = $state({} as Record<string, string>)
@@ -282,7 +278,6 @@
     use:tailFade={typing}
     use:valueHover={hoverOpts}
     use:mapJumps={mapJump}
-    use:paceImages={paceMedia}
   >{@html html}</div>
 {/if}
 {#if edit}

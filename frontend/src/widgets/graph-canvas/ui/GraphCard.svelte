@@ -2,6 +2,7 @@
   import { afterPaint } from '@/shared/lib/frameTasks.ts'
   import { untrack } from 'svelte'
   import { getNote } from '@/shared/api/notes.ts'
+  import Icon from '@/shared/ui/Icon.svelte'
 
  import {type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
   import { trackOf } from '@/shared/lib/player.svelte.ts'
@@ -11,6 +12,7 @@
   import { CARD, ENTITY_LABELS, SQUARE, TYPES, tinted, type GraphNodeView, type GraphNoteEditing } from '@/entities/graph'
   import { QuestlineIcon } from '@/entities/questline'
   import { MentionTextarea } from '@/entities/template'
+  import { rememberRevealed, revealedBody } from '@/shared/lib/privateReveal.svelte.ts'
   import { statusWord } from '@/shared/lib/questStatus.ts'
   import type { MapJump } from '@/shared/lib/mapJumps.ts'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
@@ -59,6 +61,7 @@
     onResizeStart,
     onResizeReset,
     resizing = false,
+    onRevealed,
   }: {
     n: GraphNodeView
     selected?: boolean
@@ -106,8 +109,8 @@
     /** Double click on the grip: back to the size of the content. */
     onResizeReset?: (n: GraphNodeView) => void
     resizing?: boolean
+    onRevealed?: (key: string, text: string) => void
   } = $props()
-
 /** Title of a brand-new note: focused with the whole text selected. */
 const focusSelect = (node: HTMLInputElement | HTMLTextAreaElement) => {
   focusWhenShown(node, (el) => {
@@ -171,7 +174,24 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
     })
     return () => { cancelled = true }
   })
-  const bodyText = $derived(!n.draft && !changed && fullText && fullText.preview === n.desc ? fullText.text : n.desc)
+  const opened = $derived(n.private ? revealedBody(n.key) : undefined)
+  const sealed = $derived(Boolean(n.private) && opened === undefined)
+  const bodyText = $derived(sealed ? '' : opened !== undefined ? opened : !n.draft && !changed && fullText && fullText.preview === n.desc ? fullText.text : n.desc)
+  let revealing = $state(false)
+  let revealError = $state(false)
+  async function showPrivate(event: MouseEvent) {
+    event.stopPropagation()
+    const id = Number(n.id)
+    if (revealing || !Number.isInteger(id) || id <= 0) return
+    revealing = true
+    revealError = false
+    try {
+      const note = await getNote(id)
+      const text = note.description ?? ''
+      rememberRevealed(n.key, text)
+      onRevealed?.(n.key, text)
+    } catch { revealError = true } finally { revealing = false }
+  }
 
   // Refine an automatic size once the real body exists; explicit user sizes stay fixed.
   $effect(() => {
@@ -235,7 +255,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
         }}
         oncontextmenu={(e) => onCtx(e, n)}
         ondblclick={(e) => {
-          if (n.type === 'note') beginNoteEdit(e, n)
+          if (n.type === 'note' && !sealed) beginNoteEdit(e, n)
         }}
       >
         {#if square}
@@ -250,7 +270,6 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
                 {raster}
                 {imagePixels}
                 {imageGallery}
-                loadCover={contentReady}
               />
             {/if}
             <span class="gcard__name">{n.type === 'cluster' ? 'вложений' : n.title}</span>
@@ -301,7 +320,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
             <span class="gcard__edithint">Ctrl+Enter — готово · Esc — отмена</span>
           </div>
         {:else if tier === 'lite'}
-          {#if n.type==='note'}<div class="gcard__ghost"><span>{n.title}</span><NoteSilhouette text={n.desc||''}/></div>{/if}
+          {#if n.type==='note'}<div class="gcard__ghost"><span>{n.title}</span>{#if !n.private}<NoteSilhouette text={n.desc||''}/>{/if}</div>{/if}
         {:else if big || withText}
           <div class="gcard__head">
             {@render glyph(n, t)}
@@ -312,10 +331,12 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
               <span class="gcard__prog">{n.progress}</span>
             {/if}
           </div>
-          {#if n.type==='note'&&(tier==='title' || !contentReady)}<NoteSilhouette text={n.desc||''}/>{/if}
+          {#if sealed && tier !== 'title' && contentReady}
+            <div class="gcard__private"><Icon name="lock" size={16} /><p>Приватная заметка — содержимое скрыто от случайного взгляда.</p><button type="button" class="gcard__show" disabled={revealing} onpointerdown={(e) => e.stopPropagation()} ondblclick={(e) => e.stopPropagation()} onclick={showPrivate}>{revealError ? 'Повторить' : 'Показать'}</button></div>
+          {:else if n.type==='note'&& !n.private && (tier==='title' || !contentReady)}<NoteSilhouette text={n.desc||''}/>{/if}
           {#if bodyText && tier !== 'title' && contentReady}
             <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
-              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} {mapJump} paceMedia={deferContent} onRef={(k, id) => onOpen?.(k, id)} />
+              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} {mapJump} onRef={(k, id) => onOpen?.(k, id)} />
               {#if textLoading}<p role="status">Загрузка полного текста…</p>{/if}
               {#if textError}<button type="button" onpointerdown={e => e.stopPropagation()} onclick={() => textRetry++}>Повторить загрузку полного текста</button>{/if}
             </div>
@@ -384,6 +405,8 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
 
 <style>
   .gcard__placeholder { white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.18; }
+  .gcard__private { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; color: var(--color-fg-muted, #9a9a9a); } .gcard__private p { margin: 0; }
+  .gcard__show { font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 8px; padding: 0.15rem 0.6rem; cursor: pointer; }
 
  .gcard__ghost{height:100%;display:flex;flex-direction:column;padding:12px;gap:8px;overflow:hidden}.gcard__ghost span{opacity:.55;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 

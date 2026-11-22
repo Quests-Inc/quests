@@ -1,7 +1,8 @@
 // Wiki-превью при наведении на реф note=/quest=/questline=. Один попап на документ, рефы внутри него — не ссылки (без каскада).
 // Данные берутся из каталогов в памяти через provider (App), поэтому лишних запросов нет.
+import { renderMarkdown } from './markdown.ts'
 import { setPendingFragment } from './noteFragment.ts'
-import { parseRefHref, REF_RE } from './refs.ts'
+import { parseRefHref } from './refs.ts'
 import { scriptEmbedRe, scriptFlags } from './scriptRef.ts'
 
 export type RefPreview = {
@@ -11,7 +12,7 @@ export type RefPreview = {
   type: string
   /** Короткие флаги и поля в одну строку. */
   meta: string[]
-  /** Плоский текст, уже урезанный. */
+  /** Целый кусок markdown, уже урезанный до безопасной границы. */
   body?: string
 }
 
@@ -85,34 +86,6 @@ function place(el: HTMLElement, a: HTMLElement) {
   el.style.top = `${Math.max(8, top)}px`
 }
 
-/** Plain text with note=/quest=/… tokens made into links (no preview of their own: no cascade). */
-function appendWithRefs(
-  into: HTMLElement,
-  text: string,
-  origin: HTMLAnchorElement,
-  onRef?: (kind: string, id: number) => void
-) {
-  let last = 0
-  for (const m of text.matchAll(new RegExp(REF_RE.source, REF_RE.flags))) {
-    const idx = m.index ?? 0
-    if (idx > last) into.append(text.slice(last, idx))
-    const a = document.createElement('a')
-    a.className = 'md-ref'
-    a.href = `?${m[1]}=${m[2]}`
-    a.textContent = labelOf(`${m[1]}:${m[2]}`) || m[0]
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      close()
-      if (onRef) onRef(m[1], Number(m[2]))
-      else origin.click()
-    })
-    into.append(a)
-    last = idx + m[0].length
-  }
-  if (last < text.length) into.append(text.slice(last))
-}
-
 function open(a: HTMLAnchorElement, kind: string, id: number, onRef?: (kind: string, id: number) => void) {
   const p = provider?.(kind, id)
   close()
@@ -139,7 +112,17 @@ function open(a: HTMLAnchorElement, kind: string, id: number, onRef?: (kind: str
   if (p.body) {
     const b = document.createElement('div')
     b.className = 'ref-preview__body'
-    appendWithRefs(b, p.body, a, onRef)
+    b.innerHTML = renderMarkdown(p.body, { labels: labelsForRefs(p.body) })
+    for (const link of b.querySelectorAll<HTMLAnchorElement>('a[href^="?"]')) {
+      link.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        close()
+        const ref = parseRefHref(link.getAttribute('href') || '')
+        if (ref && onRef) onRef(ref.kind, ref.id)
+        else a.click()
+      })
+    }
     el.append(b)
   }
   const go = document.createElement('button')

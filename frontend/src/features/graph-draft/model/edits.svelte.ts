@@ -5,10 +5,12 @@ import { putGraphDraftOp } from '@/shared/api/graph.ts'
 import { getNote } from '@/shared/api/notes.ts'
 import { getQuestFull } from '@/shared/api/quests.ts'
 import type { DraftOp } from '@/shared/api/store.gen'
+import { revealedBody } from '@/shared/lib/privateReveal.svelte.ts'
 import { toast } from '@/shared/lib/toasts.svelte.ts'
 
 type At = { x: number; y: number }
-type EditNode = Pick<GraphNodeView, 'key' | 'title'> & Partial<Pick<GraphNodeView, 'type' | 'id' | 'draft' | 'op'>>
+type EditNode = Pick<GraphNodeView, 'key' | 'title'> &
+  Partial<Pick<GraphNodeView, 'type' | 'id' | 'draft' | 'op' | 'private'>>
 type Edge = { kind: string; from: string; to: string }
 type EntityModal = {
   open: boolean
@@ -149,6 +151,7 @@ export function createGraphEdits(deps: {
   /** Заметка правится на карточке: полный текст берётся с сервера (на карте виден только его начало). */
   async function startEditNote(n: EditNode, fresh = false, caret: number | null = null) {
     if (editing?.key === n.key) return
+    if (n.private && revealedBody(n.key) === undefined) return
     try {
       if (n.draft) {
         const op = deps.ops().find((o) => o.id === n.op)

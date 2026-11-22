@@ -6,6 +6,8 @@ export interface GraphNodeView {
   id: number | string
   title: string
   desc?: string
+  /** Note text is withheld until the person asks to see it on this map. */
+  private?: boolean
   status?: string
   progress?: string
   mime?: string

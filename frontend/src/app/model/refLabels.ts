@@ -1,4 +1,5 @@
-import { plainExcerpt, type RefPreview } from '@/shared/lib/refPreview.ts'
+import { previewMarkdown } from '@/shared/lib/previewMarkdown.ts'
+import { type RefPreview } from '@/shared/lib/refPreview.ts'
 
 // Подписи для ссылок вида kind:id: как показывать упоминание квеста, заметки, шага, шаблона или вложения.
 
@@ -106,7 +107,8 @@ export function buildRefPreview({
         Boolean
       ) as string[]
       if (n.is_private) return { kind, type: 'Заметка', title: n.title || `note=${id}`, meta: ['приватная'] }
-      return { kind, type: 'Заметка', title: n.title || `note=${id}`, meta, body: plainExcerpt(n.description || '') }
+      const body = previewMarkdown(n.description || '')
+      return { kind, type: 'Заметка', title: n.title || `note=${id}`, meta, body: body || undefined }
     }
     if (kind === 'quest') {
       const q = quests.find((x) => x.id === id)
@@ -135,7 +137,7 @@ export function buildRefPreview({
         type: 'Событие',
         title: e.title || `event=${id}`,
         meta: [when, e.all_day ? 'весь день' : ''].filter(Boolean) as string[],
-        body: plainExcerpt(e.description || '', 160),
+        body: previewMarkdown(e.description || '', 160) || undefined,
       }
     }
     if (kind === 'questline') {
@@ -147,7 +149,7 @@ export function buildRefPreview({
         type: 'Квестлайн',
         title: l.title || `questline=${id}`,
         meta: [`активных квестов: ${open}`],
-        body: plainExcerpt(l.description || '', 160),
+        body: previewMarkdown(l.description || '', 160) || undefined,
       }
     }
     return null
