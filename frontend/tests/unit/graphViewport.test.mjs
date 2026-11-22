@@ -7,6 +7,7 @@ import {
   viewportBounds,
   boxInViewport,
   edgeInViewport,
+  placeCardBoxes,
 } from '../../src/entities/graph/model/viewport.ts'
 
 test('viewport: screen buffer, partial cards, pan and zoom on a large map', () => {
@@ -73,6 +74,37 @@ test('computeTiers: крупная заметка на обзоре зоны у�
   expect(computeTiers({ ...opts, cam: { k: 0.05, x: 400, y: 200 } }).get('note:1')).toBe('lite')
   const titled = new Map([['note:1', 'title']])
   expect(computeTiers({ ...opts, cam: { k: 0.15, x: 400, y: 200 }, prev: titled }).has('note:1')).toBe(false)
+})
+
+test('viewport: a stretched card with an empty measured box stays visible and readable', () => {
+  const stage = { w: 1920, h: 1080 }
+  const cam = { k: 0.15, x: 400, y: 200 }
+  const bounds = viewportBounds(cam, stage)
+  const hanging = card('note:hang', bounds.x0 - 20, 600, { type: 'note', w: 0, h: 0, sw: 1500, sh: 400 })
+  expect(boxInViewport(hanging, bounds)).toBe(true)
+  expect(
+    boxInViewport(card('note:out', bounds.x1 + 40, 600, { type: 'note', w: 0, h: 0, sw: 30, sh: 30 }), bounds)
+  ).toBe(false)
+  const note = card('note:1', (bounds.x0 + bounds.x1) / 2, (bounds.y0 + bounds.y1) / 2, {
+    type: 'note',
+    w: 0,
+    h: 0,
+    sw: 1500,
+    sh: 1200,
+    desc: 'текст',
+  })
+  expect(computeTiers({ nodes: [note], cam, stage, ready: true, prev: new Map() }).has('note:1')).toBe(false)
+})
+
+test('placeCardBoxes: an empty measured box keeps the visible corner', () => {
+  const note = card('note:1', 100, 200, { type: 'note', w: 0, h: 0, sw: 1500, sh: 400 })
+  const saved = new Map([['note:1', { x: 100, y: 200 }]])
+  placeCardBoxes([note], new Map([['note:1', { x: 100, y: 200, w: 0, h: 0 }]]), saved)
+  expect(note).toMatchObject({ w: 1500, h: 400, x: 850, y: 400 })
+  expect(saved.get('note:1')).toEqual({ x: 850, y: 400 })
+  const kept = card('note:2', 10, 20, { w: 300, h: 80 })
+  placeCardBoxes([kept], new Map([['note:2', { x: 10, y: 20, w: 300, h: 80 }]]), new Map())
+  expect(kept).toMatchObject({ x: 10, y: 20, w: 300, h: 80 })
 })
 
 test('computeTiers: не готово — пусто; без изменений возвращает прежний Map; редактируемая — полная', () => {

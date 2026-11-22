@@ -1,7 +1,82 @@
 // Что показать на экране карты: уровень детализации карточек по видимой площади и модель миникарты.
+import { CARD, SQUARE } from './constants.ts'
 import { STUB, clampK } from './geometry.ts'
 import type { GraphEdgeView, GraphNodeView } from './types.ts'
 import type { GraphZone } from './zones.ts'
+
+type BoxNode = {
+  type?: string
+  desc?: string
+  x: number
+  y: number
+  w: number
+  h: number
+  sw?: number
+  sh?: number
+}
+
+function nominalW(n: BoxNode) {
+  if (n.type === 'attachment' || n.type === 'cluster') return SQUARE
+  if (n.type === 'quest' || n.type === 'note') return CARD[n.type].w
+  if (n.type === 'step' && n.desc) return CARD.stepBody.w
+  return n.w > 0 ? n.w : 160
+}
+
+function nominalH(n: BoxNode) {
+  if (n.type === 'attachment' || n.type === 'cluster') return SQUARE
+  if (n.type === 'quest' || n.type === 'note') return CARD[n.type].max
+  if (n.type === 'step' && n.desc) return CARD.stepBody.max
+  return n.h > 0 ? n.h : 36
+}
+
+/**
+ * Rectangle the card is actually painted with. Position follows the measured
+ * centre (`n.w` / `n.h`); width and height follow the stretched size, which
+ * can be set while the measured box is still 0.
+ */
+export function paintedRect(n: BoxNode) {
+  const w = n.sw ?? (n.w > 0 ? n.w : nominalW(n))
+  const h = n.sh ?? (n.h > 0 ? n.h : nominalH(n))
+  const left = n.x - n.w / 2
+  const top = n.y - n.h / 2
+  return { x: left + w / 2, y: top + h / 2, w, h }
+}
+
+/** Give a fresh node a real box before layout, so culling does not treat it as a point. */
+export function ensureCardBox(n: BoxNode) {
+  if (!(n.w > 0)) n.w = n.sw ?? nominalW(n)
+  if (!(n.h > 0)) n.h = n.sh ?? nominalH(n)
+}
+
+/**
+ * Copy the previous place onto a rebuilt node and fill an empty box.
+ * Growing that box moves the centre so the visible corner stays put.
+ */
+export function placeCardBoxes(
+  nodes: (BoxNode & { key: string })[],
+  previous: ReadonlyMap<string, BoxNode>,
+  saved: { get(key: string): { x: number; y: number } | undefined }
+) {
+  for (const n of nodes) {
+    const old = previous.get(n.key)
+    if (old) {
+      n.x = old.x
+      n.y = old.y
+      if (old.w > 0) n.w = old.w
+      if (old.h > 0) n.h = old.h
+    }
+    const hadW = n.w > 0
+    const hadH = n.h > 0
+    ensureCardBox(n)
+    if (!hadW) n.x += n.w / 2
+    if (!hadH) n.y += n.h / 2
+    const spot = old ? saved.get(n.key) : undefined
+    if (spot && old && spot.x === old.x && spot.y === old.y && (!hadW || !hadH)) {
+      spot.x = n.x
+      spot.y = n.y
+    }
+  }
+}
 
 // How much of a card is built right now, by its share of the map area on screen:
 // 'lite' — frame only (< 0.5%, or well outside the window); 'title' — the head
@@ -42,10 +117,11 @@ export function computeTiers({
     for (const n of nodes) {
       if (n.type !== 'quest' && n.type !== 'note' && !(n.type === 'step' && n.desc)) continue
       if (editingKey === n.key) continue
-      const sx = (n.x - n.w / 2) * k + cx
-      const sy = (n.y - n.h / 2) * k + cy
-      const sw = n.w * k
-      const sh = n.h * k
+      const box = paintedRect(n)
+      const sx = (box.x - box.w / 2) * k + cx
+      const sy = (box.y - box.h / 2) * k + cy
+      const sw = box.w * k
+      const sh = box.h * k
       // One window of margin each way, so panning does not reveal empty frames.
       const off = sx + sw < -W || sx > 2 * W || sy + sh < -H || sy > 2 * H
       if (off) {
@@ -81,7 +157,7 @@ export function minimapModel({
   cam: { k: number; x: number; y: number }
   stage: { w: number; h: number }
 }) {
-  const nodes = all.filter((n) => ready && Number.isFinite(n.x) && n.w)
+  const nodes = all.filter((n) => ready && Number.isFinite(n.x) && paintedRect(n).w)
   if ((!nodes.length && !zones.length) || !stage.w) return null
   const vx = -cam.x / cam.k
   const vy = -cam.y / cam.k
@@ -92,10 +168,11 @@ export function minimapModel({
     x1 = vx + vw,
     y1 = vy + vh
   for (const n of nodes) {
-    x0 = Math.min(x0, n.x - n.w / 2)
-    x1 = Math.max(x1, n.x + n.w / 2)
-    y0 = Math.min(y0, n.y - n.h / 2)
-    y1 = Math.max(y1, n.y + n.h / 2)
+    const box = paintedRect(n)
+    x0 = Math.min(x0, box.x - box.w / 2)
+    x1 = Math.max(x1, box.x + box.w / 2)
+    y0 = Math.min(y0, box.y - box.h / 2)
+    y1 = Math.max(y1, box.y + box.h / 2)
   }
   for (const z of zones) {
     x0 = Math.min(x0, z.x)
@@ -153,13 +230,14 @@ export function viewportBounds(
 
 type ViewportBounds = ReturnType<typeof viewportBounds>
 
-export function boxInViewport(n: { x: number; y: number; w: number; h: number }, bounds: ViewportBounds) {
+export function boxInViewport(n: BoxNode, bounds: ViewportBounds) {
+  const box = paintedRect(n)
   return (
     !bounds ||
-    (n.x + n.w / 2 >= bounds.x0 &&
-      n.x - n.w / 2 <= bounds.x1 &&
-      n.y + n.h / 2 >= bounds.y0 &&
-      n.y - n.h / 2 <= bounds.y1)
+    (box.x + box.w / 2 >= bounds.x0 &&
+      box.x - box.w / 2 <= bounds.x1 &&
+      box.y + box.h / 2 >= bounds.y0 &&
+      box.y - box.h / 2 <= bounds.y1)
   )
 }
 

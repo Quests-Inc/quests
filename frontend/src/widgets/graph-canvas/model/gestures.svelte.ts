@@ -1,6 +1,6 @@
 // Жесты на поле карты: панорама и зум колесом, щипок двумя пальцами, перетаскивание карточек, блоков и выделенного,
 // выделение рамкой. Контроллер держит камеру и текущий жест; всё остальное (выбор, связывание, позиции) — через deps.
-import { clampK, type GraphNodeView } from '@/entities/graph'
+import { clampK, paintedRect, type GraphNodeView } from '@/entities/graph'
 
 type Drag = {
   moved?: boolean
@@ -324,7 +324,9 @@ export function createGraphGestures(deps: {
         const y1 = (Math.max(m.y0, m.y1) - cam.y) / cam.k
         const next: Set<string> = drag.additive ? new Set(deps.getPicked()) : new Set()
         for (const n of deps.nodes()) {
-          if (n.x + n.w / 2 >= x0 && n.x - n.w / 2 <= x1 && n.y + n.h / 2 >= y0 && n.y - n.h / 2 <= y1) next.add(n.key)
+          const box = paintedRect(n)
+          if (box.x + box.w / 2 >= x0 && box.x - box.w / 2 <= x1 && box.y + box.h / 2 >= y0 && box.y - box.h / 2 <= y1)
+            next.add(n.key)
         }
         deps.setPicked(next)
       }

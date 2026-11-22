@@ -15,6 +15,7 @@ import {
   minimapModel,
   outgoingRefKeys,
   parentNoteOf,
+  placeCardBoxes,
   placedGroups,
   planHide,
   prepareGraph,
@@ -268,6 +269,7 @@ export function createGraphStage(deps: {
     const wasReady = untrack(() => ready)
     // The sizes are put on the plain nodes before they become state: reading `view` back here would make this effect depend on its own write.
     const fresh = prepareGraph(g, open, deps.folds.loose)
+    const previous = new Map((untrack(() => view?.nodes) ?? []).map((n) => [n.key, n]))
     for (const n of fresh.nodes) {
       const s = n.type === 'cluster' ? undefined : deps.prefs.sizes[n.key]
       if (s) {
@@ -275,9 +277,13 @@ export function createGraphStage(deps: {
         n.sh = s.h
       }
     }
+    // Keep each card where it already is, with the box it is painted as.
+    // A zero box is culled before it can be measured, and the card then vanishes on screen.
+    placeCardBoxes(fresh.nodes, previous, deps.saved)
     untrack(() => {
-      for (const n of wasReady ? (view?.nodes ?? []) : [])
-        if (!deps.saved.has(n.key)) deps.saved.set(n.key, { x: n.x, y: n.y })
+      if (!wasReady) return
+      for (const n of fresh.nodes)
+        if (previous.has(n.key) && !deps.saved.has(n.key)) deps.saved.set(n.key, { x: n.x, y: n.y })
     })
     previewing = false
     view = fresh
