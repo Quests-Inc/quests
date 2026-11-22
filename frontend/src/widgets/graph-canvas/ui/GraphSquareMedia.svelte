@@ -17,6 +17,7 @@
     raster = false,
     imagePixels = 128,
     imageGallery = [],
+    cardKey = '',
   }: {
     id: number | string
     title: string
@@ -24,6 +25,7 @@
     raster?: boolean
     imagePixels?: number
     imageGallery?: GalleryImage[]
+    cardKey?: string
   } = $props()
 
   let audioFile = $derived(
@@ -54,7 +56,7 @@
           coverBlob = tags.cover
         })
         .catch(() => {})
-    })
+    }, cardKey)
     return () => {
       cancel()
       ac.abort()
@@ -86,7 +88,7 @@
 
 {#if raster}
   <div class="media">
-    <GraphImage {id} pixels={imagePixels} />
+    <GraphImage {id} pixels={imagePixels} {cardKey} />
     <button
       type="button"
       class="media__open"

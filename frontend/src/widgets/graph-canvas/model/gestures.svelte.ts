@@ -4,7 +4,10 @@ import { clampK, paintedRect, type GraphNodeView } from '@/entities/graph'
 
 type Drag = {
   moved?: boolean
-  kind: 'pan' | 'pinch' | 'marquee' | 'node' | 'multi' | 'group'
+  kind: 'pan' | 'pinch' | 'marquee' | 'node' | 'multi' | 'group' | 'scroll'
+  el?: HTMLElement
+  top?: number
+  left?: number
   n?: any
   nx?: number
   ny?: number
@@ -158,6 +161,24 @@ export function createGraphGestures(deps: {
     const target = e.currentTarget as HTMLElement | null
     ;(target ?? deps.getStage())?.setPointerCapture(e.pointerId)
   }
+  /** Touch on note text scrolls that text from the first pixel and does not nudge the card. */
+  function holdTextScroll(e: PointerEvent, n: GraphNodeView) {
+    const body = (e.target as Element | null)?.closest?.('.gcard__body') as HTMLElement | null
+    if (!body || body.scrollHeight <= body.clientHeight + 1) return false
+    e.stopPropagation()
+    drag = {
+      kind: 'scroll',
+      n,
+      x: e.clientX,
+      y: e.clientY,
+      top: body.scrollTop,
+      left: body.scrollLeft,
+      el: body,
+      moved: false,
+    }
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') body.setPointerCapture?.(e.pointerId)
+    return true
+  }
   function onCardDown(e: PointerEvent, n: GraphNodeView) {
     deps.onInteract?.()
     if (deps.isLinking()) {
@@ -174,6 +195,7 @@ export function createGraphGestures(deps: {
       startPan(e)
       return
     }
+    if (e.button === 0 && holdTextScroll(e, n)) return
     if (deps.selectMode() || (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey))) {
       if (
         e.button !== 0 ||
@@ -204,9 +226,6 @@ export function createGraphGestures(deps: {
       )
     )
       return
-    const body = (e.target as Element).closest('.gcard__body')
-    // Inside the text area: let selection/scrolling happen; only the frame drags.
-    if (body && body.scrollHeight > body.clientHeight + 1 && e.offsetX > body.clientWidth - 14) return
     e.stopPropagation()
     drag = { kind: 'node', n, x: e.clientX, y: e.clientY, nx: n.x, ny: n.y, moved: false }
     captureCard(e)
@@ -243,6 +262,7 @@ export function createGraphGestures(deps: {
   }
   function onMove(e: {
     pointerId?: any
+    pointerType?: string
     clientX: any
     clientY: any
     preventDefault?: (() => void) | (() => void) | (() => void)
@@ -265,6 +285,14 @@ export function createGraphGestures(deps: {
     }
     if (deps.isLinking()) deps.setLinkCursor(worldAt(e))
     if (!drag) return
+    if (drag.kind === 'scroll') {
+      if ((e.pointerType === 'touch' || e.pointerType === 'pen') && drag.el) {
+        drag.el.scrollTop = (drag.top ?? 0) - (e.clientY - drag.y)
+        drag.el.scrollLeft = (drag.left ?? 0) - (e.clientX - drag.x)
+      }
+      if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 3) drag.moved = true
+      return
+    }
     if (drag.kind === 'marquee') {
       const r = deps.getStage()?.getBoundingClientRect()
       if (r && marquee) marquee = { ...marquee, x1: e.clientX - r.left, y1: e.clientY - r.top }
@@ -348,6 +376,14 @@ export function createGraphGestures(deps: {
     }
     if (drag?.kind === 'node' && drag.moved) deps.getSaved().set(drag.n.key, { x: drag.n.x, y: drag.n.y })
     if (drag?.kind === 'node' && !drag.moved) deps.select(drag.n)
+    if (drag?.kind === 'scroll' && !drag.moved && drag.n) {
+      if (deps.selectMode()) {
+        const next = new Set(deps.getPicked())
+        if (next.has(drag.n.key)) next.delete(drag.n.key)
+        else next.add(drag.n.key)
+        deps.setPicked(next)
+      } else deps.select(drag.n)
+    }
     if (drag?.kind === 'pan') endMove()
     drag = null
   }

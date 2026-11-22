@@ -247,3 +247,21 @@ test('selected cards move together at a zoom without panning; controls keep thei
     expect(nodes[0]).toMatchObject({ x: 40, y: 20 })
   }
 })
+
+test('touch on scrollable note text scrolls the text and leaves the card in place', () => {
+  const { g, nodes, state, ev } = make()
+  const body = document.createElement('div')
+  body.className = 'gcard__body'
+  Object.defineProperty(body, 'scrollHeight', { value: 400 })
+  Object.defineProperty(body, 'clientHeight', { value: 100 })
+  body.scrollTop = 20
+  const captures: number[] = []
+  body.setPointerCapture = (id) => captures.push(id)
+  g.onCardDown(ev(8, 8, { pointerType: 'touch', pointerId: 4, target: body }), nodes[0] as any)
+  g.onMove(ev(8, 38, { pointerType: 'touch', pointerId: 4 }))
+  expect(nodes[0]).toMatchObject({ x: 0, y: 0 })
+  expect(body.scrollTop).toBe(-10)
+  expect(captures).toEqual([4])
+  g.onUp(ev(8, 38, { pointerId: 4 }))
+  expect(state.selected).toEqual([])
+})

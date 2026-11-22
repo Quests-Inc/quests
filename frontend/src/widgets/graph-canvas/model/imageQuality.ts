@@ -20,6 +20,15 @@ export function imagePixels(
 
 export const imageLevel = (pixels: number) => [128, 256, 512, 1024, 2048].find((size) => size >= pixels) ?? 0
 
+/** Картинка внутри заметки: чёткость от коробки карточки, без масштаба камеры. Зум только растягивает тот же кадр. */
+export function noteImageLevel(
+  n: { x: number; y: number; w: number; h: number; sw?: number; sh?: number; type?: string; desc?: string },
+  dpr = 1
+) {
+  const box = paintedRect(n)
+  return imageLevel(Math.max(box.w, box.h) * Math.max(1, dpr))
+}
+
 /** Small JPEG of an audio cover. Level 0 keeps the embedded picture; otherwise it is scaled down. */
 export async function coverPreviewUrl(blob: Blob, level: number): Promise<string> {
   if (!level || typeof createImageBitmap !== 'function' || typeof document === 'undefined')

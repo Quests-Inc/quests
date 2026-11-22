@@ -6,7 +6,7 @@
  import {type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
   import { trackOf } from '@/shared/lib/player.svelte.ts'
   import { measureCardBox, revealCardBody } from '../model/cardReveal.ts'
-  import { imageLevel } from '../model/imageQuality.ts'
+  import { noteImageLevel } from '../model/imageQuality.ts'
   import { focusEditorAt, focusWhenShown, sourceCaretFromMarkdownClick } from '../model/noteEditCaret.ts'
  import GraphSquareMedia from './GraphSquareMedia.svelte'
  import NoteSilhouette from './NoteSilhouette.svelte'
@@ -140,12 +140,11 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
     focusEditorAt(ta, offset)
   })
   let contentReady = $state(!deferContent)
-  let imageThumb = $state(untrack(() => imageLevel(imagePixels)))
+  const imageThumb = $derived(noteImageLevel(n, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1))
   const publishSize = () => {
     if (!deferContent || !contentReady || !ready || editingHere || n.sh != null || !onContentMeasure) return
     measureCardBox(cardEl, (width, height) => onContentMeasure(n.key, width, height))
   }
-  $effect(() => { const next = imageLevel(imagePixels); const timer = setTimeout(() => (imageThumb = next), 160); return () => clearTimeout(timer) })
   $effect(() =>
     revealCardBody({
       defer: deferContent,
@@ -153,6 +152,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
       shown: untrack(() => contentReady),
       show: (value) => (contentReady = value),
       measure: publishSize,
+      key: n.key,
     })
   )
 
@@ -268,6 +268,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
                 {raster}
                 {imagePixels}
                 {imageGallery}
+                cardKey={n.key}
               />
             {/if}
             <span class="gcard__name">{n.type === 'cluster' ? 'вложений' : n.title}</span>
@@ -764,6 +765,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
 
   .gcard__body :global(img) {
     max-width: 100%;
+    height: auto;
   }
 
   .gcard__sq {

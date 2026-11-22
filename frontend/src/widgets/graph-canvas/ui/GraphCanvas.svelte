@@ -3,7 +3,8 @@
   import { planContent } from '../model/contentDwell.ts'
  import {attachmentImage} from '@/shared/lib/imageViewer.svelte.ts'
   import {imagePixels} from '../model/imageQuality.ts'
-  import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
+  import { setFrameRank } from '@/shared/lib/frameTasks.ts'
+  import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, paintedRect, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
   import type { Snippet } from 'svelte'
   import { createClusterFolds } from '../model/folds.svelte.ts'
   import { createGraphGestures } from '../model/gestures.svelte.ts'
@@ -144,6 +145,31 @@
       }, plan.wait > 0 ? plan.wait + 20 : 0)
       return () => clearTimeout(timer)
     }
+  })
+
+  // Rank is read when a frame runs, so a camera move reorders work already waiting.
+  $effect(() => {
+    const camera = gest.cam
+    const picked = stage.picked
+    const editingKey = editing?.key ?? ''
+    const nodes = stage.nodeMap
+    const size = stage.stageSize
+    setFrameRank((key) => {
+      if ((editingKey && key === editingKey) || picked.has(key)) return 0
+      const n = nodes.get(key)
+      if (!n) return null
+      const pad = viewportBounds(camera, size)
+      const strict = viewportBounds(camera, size, 0)
+      if (!strict || !boxInViewport(n, pad)) return null
+      if (!boxInViewport(n, strict)) return 3
+      const box = paintedRect(n)
+      const full =
+        box.x - box.w / 2 >= strict.x0 &&
+        box.x + box.w / 2 <= strict.x1 &&
+        box.y - box.h / 2 >= strict.y0 &&
+        box.y + box.h / 2 <= strict.y1
+      return full ? 1 : 2
+    })
   })
 
   // All cards mount during measurement. Once laid out, retain only the viewport and active editors.

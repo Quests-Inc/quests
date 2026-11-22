@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 
 import { revealCardBody } from '../../src/widgets/graph-canvas/model/cardReveal.ts'
-import { imageLevel, imagePixels } from '../../src/widgets/graph-canvas/model/imageQuality.ts'
+import { imageLevel, imagePixels, noteImageLevel } from '../../src/widgets/graph-canvas/model/imageQuality.ts'
 import { outlinePath } from '../../src/widgets/graph-canvas/model/silhouette.ts'
 test('note outlines preserve blanks and relative line lengths with bounded work', () => {
   const path = outlinePath('short\n\na much longer line')
@@ -22,6 +22,10 @@ test('image resolution follows scale, density and viewport intersection', () => 
   expect(imageLevel(100)).toBe(128)
   expect(imageLevel(2000)).toBe(2048)
   expect(imageLevel(4000)).toBe(0)
+  const note = { x: 0, y: 0, w: 400, h: 300, type: 'note' }
+  expect(noteImageLevel(note, 1)).toBe(noteImageLevel(note, 1))
+  expect(noteImageLevel(note, 1)).toBe(imageLevel(400))
+  expect(noteImageLevel(note, 2)).toBe(imageLevel(800))
 })
 
 test('revealCardBody measures a card that is already showing and defers a new one', () => {

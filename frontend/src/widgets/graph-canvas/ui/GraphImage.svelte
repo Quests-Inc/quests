@@ -3,7 +3,7 @@
   import { untrack } from 'svelte'
   import { imageLevel } from '../model/imageQuality.ts'
 
-  let { id, pixels, hold = false }: { id: number | string; pixels: number; hold?: boolean } = $props()
+  let { id, pixels, hold = false, cardKey = '' }: { id: number | string; pixels: number; hold?: boolean; cardKey?: string } = $props()
   let quality = $state(untrack(() => imageLevel(pixels)))
   let failed = $state(false)
   let src = $state('')
@@ -30,7 +30,7 @@
     const next = url
     return scheduleImage(() => {
       src = next
-    })
+    }, cardKey)
   })
 </script>
 

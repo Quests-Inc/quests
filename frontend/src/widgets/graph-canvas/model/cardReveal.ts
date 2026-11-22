@@ -20,6 +20,7 @@ export function revealCardBody(opts: {
   shown: boolean
   show: (value: boolean) => void
   measure: () => void
+  key?: string
 }) {
   if (!opts.defer) {
     opts.show(true)
@@ -36,5 +37,5 @@ export function revealCardBody(opts: {
   return afterPaint(() => {
     flushSync(() => opts.show(true))
     opts.measure()
-  })
+  }, opts.key)
 }
