@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { afterPaint } from '@/shared/lib/frameTasks.ts'
+import { afterPaint, resetFrameWork } from '@/shared/lib/frameTasks.ts'
 
 test('paint precedes content; frame work is bounded and cancelled mounts never execute', () => {
   const oldRequest = globalThis.requestAnimationFrame
@@ -21,11 +21,16 @@ test('paint precedes content; frame work is bounded and cancelled mounts never e
   }
   const log: number[] = []
   const cancels: (() => void)[] = []
+  let now = 0
+  const origNow = performance.now.bind(performance)
+  performance.now = () => now
   try {
+    resetFrameWork()
     for (let i = 0; i < 10; i++)
       cancels.push(
         afterPaint(() => {
           log.push(i)
+          now += 5
         })
       )
     cancels[3]()
@@ -38,6 +43,8 @@ test('paint precedes content; frame work is bounded and cancelled mounts never e
     expect(log).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9])
   } finally {
     cancels.forEach((cancel) => cancel())
+    resetFrameWork()
+    performance.now = origNow
     globalThis.requestAnimationFrame = oldRequest
     globalThis.cancelAnimationFrame = oldCancel
   }

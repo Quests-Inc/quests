@@ -65,15 +65,15 @@ test('computeTiers: далеко за экраном — lite, мелкая — 
   expect(out.has('step:plain')).toBe(false)
 })
 
-test('computeTiers: крупная заметка на обзоре зоны уже с текстом, далёкая карта — силуэт', () => {
+test('computeTiers: текст с 5% окна, обзор зоны ещё силуэт, дальняя карта — lite', () => {
   const stage = { w: 1920, h: 1080 }
   const nodes = [card('note:1', 800, 600, { type: 'note', w: 1500, h: 1200, desc: 'текст' })]
   const opts = { nodes, stage, ready: true, prev: new Map() }
-  expect(computeTiers({ ...opts, cam: { k: 0.15, x: 400, y: 200 } }).has('note:1')).toBe(false)
+  expect(computeTiers({ ...opts, cam: { k: 0.15, x: 400, y: 200 } }).get('note:1')).toBe('title')
   expect(computeTiers({ ...opts, cam: { k: 0.25, x: 400, y: 200 } }).has('note:1')).toBe(false)
   expect(computeTiers({ ...opts, cam: { k: 0.05, x: 400, y: 200 } }).get('note:1')).toBe('lite')
   const titled = new Map([['note:1', 'title']])
-  expect(computeTiers({ ...opts, cam: { k: 0.15, x: 400, y: 200 }, prev: titled }).has('note:1')).toBe(false)
+  expect(computeTiers({ ...opts, cam: { k: 0.15, x: 400, y: 200 }, prev: titled }).get('note:1')).toBe('title')
 })
 
 test('viewport: a stretched card with an empty measured box stays visible and readable', () => {
@@ -93,7 +93,9 @@ test('viewport: a stretched card with an empty measured box stays visible and re
     sh: 1200,
     desc: 'текст',
   })
-  expect(computeTiers({ nodes: [note], cam, stage, ready: true, prev: new Map() }).has('note:1')).toBe(false)
+  expect(
+    computeTiers({ nodes: [note], cam: { ...cam, k: 0.35 }, stage, ready: true, prev: new Map() }).has('note:1')
+  ).toBe(false)
 })
 
 test('placeCardBoxes: an empty measured box keeps the visible corner', () => {

@@ -1,36 +1,56 @@
-// Bound expensive component mounts to a small frame budget. Cancellation also
-// removes work for cards that left the viewport or a board that was replaced.
-// The task only flips state. Flushing it synchronously forced a layout per card
-// before the budget could notice, so a zone of notes turned into a long task
-// apiece. Two state updates a frame land in one commit, and the browser lays
-// that pair out once, after the script.
-const tasks = new Set<() => void>()
+// Один бюджет на всё отложенное рисование карты: markdown, адреса картинок, обложки.
+// Кадр длиннее бюджета останавливается, остаток переносится на следующий. 8 мс из 16.7
+// оставляют браузеру время на layout и paint, чтобы держаться около 60 кадров/с.
+// Одна задача, которая сама длиннее бюджета, всё равно дорисовывается — иначе она не сдвинется.
+export const FRAME_BUDGET_MS = 8
+
+type Job = { run: () => void; dropped: boolean }
+
+const jobs: Job[] = []
 let frame = 0
-function run() {
+
+function pump() {
   frame = 0
-  let count = 0
-  for (const task of tasks) {
-    tasks.delete(task)
-    task()
-    if (++count >= 2) break
+  const started = performance.now()
+  let ran = false
+  while (jobs.length) {
+    if (ran && performance.now() - started >= FRAME_BUDGET_MS) break
+    const job = jobs.shift()
+    if (!job || job.dropped) continue
+    job.run()
+    ran = true
   }
-  if (tasks.size) frame = requestAnimationFrame(run)
+  if (jobs.some((job) => !job.dropped)) frame = requestAnimationFrame(pump)
 }
+
+/** Поставить работу в ближайший кадр. Возврат снимает её, если она ещё не началась. */
+export function scheduleFrameWork(work: () => void) {
+  const job: Job = { run: work, dropped: false }
+  jobs.push(job)
+  if (!frame) frame = requestAnimationFrame(pump)
+  return () => {
+    job.dropped = true
+  }
+}
+
+export function resetFrameWork() {
+  for (const job of jobs) job.dropped = true
+  jobs.length = 0
+  if (frame) cancelAnimationFrame(frame)
+  frame = 0
+}
+
 export function afterPaint(task: () => void) {
-  // First give placeholders a paint; the following frame may build their content.
+  // Сначала кадр с силуэтом, потом сама работа — уже внутри бюджета.
   let cancelled = false
+  let cancelJob = () => {}
   const first = requestAnimationFrame(() => {
     if (cancelled) return
-    tasks.add(task)
-    if (!frame) frame = requestAnimationFrame(run)
+    cancelJob = scheduleFrameWork(task)
   })
   return () => {
     cancelled = true
     cancelAnimationFrame(first)
-    tasks.delete(task)
-    if (!tasks.size && frame) {
-      cancelAnimationFrame(frame)
-      frame = 0
-    }
+    cancelJob()
   }
 }

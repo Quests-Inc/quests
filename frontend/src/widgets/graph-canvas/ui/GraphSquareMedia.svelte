@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fetchId3Tags } from '@/shared/api/audioTags.ts'
   import { scheduleImage } from '@/shared/lib/imageStart.ts'
+  import { coverPreviewUrl, imageLevel } from '../model/imageQuality.ts'
   import { isAudioFile } from '@/shared/lib/audioFile.ts'
   import { attachmentImage, showImages, type GalleryImage } from '@/shared/lib/imageViewer.svelte.ts'
   import { audioSrc } from '@/shared/lib/player.svelte.ts'
@@ -28,13 +29,21 @@
   let audioFile = $derived(
     isAudioFile({ filename: title, mime }) ? { id, filename: title, mime } : null,
   )
+  let coverBlob = $state<Blob | null>(null)
   let coverUrl = $state('')
+  let coverSize = $state<number | null>(null)
+  $effect(() => {
+    const next = imageLevel(imagePixels)
+    const timer = setTimeout(() => {
+      if (coverSize !== next) coverSize = next
+    }, 160)
+    return () => clearTimeout(timer)
+  })
   $effect(() => {
     const file = audioFile
-    coverUrl = ''
+    coverBlob = null
     if (!file?.id) return
     const ac = new AbortController()
-    let objectUrl = ''
     const cancel = scheduleImage(() => {
       void fetchId3Tags(
         audioSrc({ id: Number(file.id), filename: file.filename || '', hidden: false, revision: 0 }),
@@ -42,15 +51,35 @@
       )
         .then((tags) => {
           if (ac.signal.aborted || !tags.cover) return
-          objectUrl = URL.createObjectURL(tags.cover)
-          coverUrl = objectUrl
+          coverBlob = tags.cover
         })
         .catch(() => {})
     })
     return () => {
       cancel()
       ac.abort()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  })
+  $effect(() => {
+    const blob = coverBlob
+    const size = coverSize
+    if (!blob || size == null) {
+      coverUrl = ''
+      return
+    }
+    let dead = false
+    let current = ''
+    void coverPreviewUrl(blob, size).then((url) => {
+      if (dead) {
+        URL.revokeObjectURL(url)
+        return
+      }
+      current = url
+      coverUrl = url
+    })
+    return () => {
+      dead = true
+      if (current) URL.revokeObjectURL(current)
     }
   })
 </script>

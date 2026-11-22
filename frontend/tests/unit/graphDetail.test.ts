@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import { imagePixels } from '../../src/widgets/graph-canvas/model/imageQuality.ts'
+import { revealCardBody } from '../../src/widgets/graph-canvas/model/cardReveal.ts'
+import { imageLevel, imagePixels } from '../../src/widgets/graph-canvas/model/imageQuality.ts'
 import { outlinePath } from '../../src/widgets/graph-canvas/model/silhouette.ts'
 test('note outlines preserve blanks and relative line lengths with bounded work', () => {
   const path = outlinePath('short\n\na much longer line')
@@ -18,4 +19,33 @@ test('image resolution follows scale, density and viewport intersection', () => 
   expect(imagePixels(n, { ...cam, k: 2 }, view)).toBe(200)
   expect(imagePixels({ ...n, x: 1000 }, cam, view)).toBeLessThan(100)
   expect(imagePixels({ ...n, x: 2000 }, cam, view)).toBeGreaterThan(0)
+  expect(imageLevel(100)).toBe(128)
+  expect(imageLevel(2000)).toBe(2048)
+  expect(imageLevel(4000)).toBe(0)
+})
+
+test('revealCardBody measures a card that is already showing and defers a new one', () => {
+  const shown: boolean[] = []
+  let measured = 0
+  revealCardBody({
+    defer: true,
+    enabled: true,
+    shown: true,
+    show: (value) => shown.push(value),
+    measure: () => {
+      measured++
+    },
+  })
+  expect(measured).toBe(1)
+  expect(shown).toEqual([])
+  revealCardBody({
+    defer: true,
+    enabled: false,
+    shown: true,
+    show: (value) => shown.push(value),
+    measure: () => {
+      measured++
+    },
+  })
+  expect(shown).toEqual([false])
 })

@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { afterPaint } from '@/shared/lib/frameTasks.ts'
   import { untrack } from 'svelte'
   import { getNote } from '@/shared/api/notes.ts'
   import Icon from '@/shared/ui/Icon.svelte'
 
  import {type GalleryImage} from '@/shared/lib/imageViewer.svelte.ts'
   import { trackOf } from '@/shared/lib/player.svelte.ts'
+  import { measureCardBox, revealCardBody } from '../model/cardReveal.ts'
+  import { imageLevel } from '../model/imageQuality.ts'
   import { focusEditorAt, focusWhenShown, sourceCaretFromMarkdownClick } from '../model/noteEditCaret.ts'
  import GraphSquareMedia from './GraphSquareMedia.svelte'
  import NoteSilhouette from './NoteSilhouette.svelte'
@@ -139,11 +140,21 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
     focusEditorAt(ta, offset)
   })
   let contentReady = $state(!deferContent)
-  $effect(() => {
-    const enabled = !deferContent || (ready && loadText && tier !== 'lite' && tier !== 'title')
-    contentReady = !deferContent
-    if (deferContent && enabled) return afterPaint(() => { contentReady = true })
-  })
+  let imageThumb = $state(untrack(() => imageLevel(imagePixels)))
+  const publishSize = () => {
+    if (!deferContent || !contentReady || !ready || editingHere || n.sh != null || !onContentMeasure) return
+    measureCardBox(cardEl, (width, height) => onContentMeasure(n.key, width, height))
+  }
+  $effect(() => { const next = imageLevel(imagePixels); const timer = setTimeout(() => (imageThumb = next), 160); return () => clearTimeout(timer) })
+  $effect(() =>
+    revealCardBody({
+      defer: deferContent,
+      enabled: !deferContent || (ready && loadText && tier !== 'lite' && tier !== 'title'),
+      shown: untrack(() => contentReady),
+      show: (value) => (contentReady = value),
+      measure: publishSize,
+    })
+  )
 
   let fullText = $state<{ preview: string; revision: number; text: string } | null>(null)
   let textError = $state(false)
@@ -177,6 +188,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
   const opened = $derived(n.private ? revealedBody(n.key) : undefined)
   const sealed = $derived(Boolean(n.private) && opened === undefined)
   const bodyText = $derived(sealed ? '' : opened !== undefined ? opened : !n.draft && !changed && fullText && fullText.preview === n.desc ? fullText.text : n.desc)
+  $effect(() => { void bodyText; if (contentReady) publishSize() })
   let revealing = $state(false)
   let revealError = $state(false)
   async function showPrivate(event: MouseEvent) {
@@ -192,20 +204,6 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
       onRevealed?.(n.key, text)
     } catch { revealError = true } finally { revealing = false }
   }
-
-  // Refine an automatic size once the real body exists; explicit user sizes stay fixed.
-  $effect(() => {
-    void bodyText
-    const el = cardEl
-    if (!deferContent || !contentReady || !ready || editingHere || n.sh != null || !el || !onContentMeasure) return
-    untrack(() => {
-      const previous = el.style.height
-      el.style.height = 'auto'
-      const width = el.offsetWidth, height = el.offsetHeight
-      el.style.height = previous
-      onContentMeasure?.(n.key, width, height)
-    })
-  })
 
   const t = $derived(TYPES[n.type] ?? TYPES.step)
   const square = $derived(n.type === 'attachment' || n.type === 'cluster')
@@ -336,7 +334,7 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
           {:else if n.type==='note'&& !n.private && (tier==='title' || !contentReady)}<NoteSilhouette text={n.desc||''}/>{/if}
           {#if bodyText && tier !== 'title' && contentReady}
             <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
-              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} {mapJump} onRef={(k, id) => onOpen?.(k, id)} />
+              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} {mapJump} imageThumb={imageThumb} onRef={(k, id) => onOpen?.(k, id)} />
               {#if textLoading}<p role="status">Загрузка полного текста…</p>{/if}
               {#if textError}<button type="button" onpointerdown={e => e.stopPropagation()} onclick={() => textRetry++}>Повторить загрузку полного текста</button>{/if}
             </div>

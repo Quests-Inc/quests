@@ -80,15 +80,14 @@ export function placeCardBoxes(
 
 // How much of a card is built right now, by its share of the map area on screen:
 // 'lite' — frame only (< 0.5%, or well outside the window); 'title' — the head
-// without the markdown body (0.5–1%); full (not in the map) — everything.
+// without the markdown body (0.5–5%); full (not in the map) — everything.
 // Cards keep their box, so nothing moves; the body is simply not built until
 // it matters. Each threshold has ±5% slack around the card's current tier, so
 // a card sitting right on a border does not flicker while zooming.
 // Letters scale with the card, so a line keeps the same number of characters
-// at every zoom. A zone overview still shows the text once the card covers
-// about 1% of the window. Farther out it stays a silhouette.
+// at every zoom. Full text waits until the card covers about 5% of the window.
 const LITE_AREA = 0.005
-const FULL_AREA = 0.01
+const FULL_AREA = 0.05
 const SLACK = 1.05
 
 export type Tier = 'lite' | 'title'

@@ -28,10 +28,13 @@ test('одновременно декодируются только две ка
   resetMediaQueue()
 })
 
-test('адрес картинки назначается по два за кадр и не ждёт загрузки', () => {
+test('адрес картинки занимает бюджет кадра и не ждёт загрузки', () => {
   resetImageStarts()
   const frames: Array<FrameRequestCallback> = []
   const orig = globalThis.requestAnimationFrame
+  const origNow = performance.now.bind(performance)
+  let now = 0
+  performance.now = () => now
   globalThis.requestAnimationFrame = (cb) => {
     frames.push(cb)
     return frames.length
@@ -40,7 +43,12 @@ test('адрес картинки назначается по два за кад
   const cancel: Array<() => void> = []
   for (let i = 0; i < 5; i++) {
     const n = i
-    cancel.push(scheduleImage(() => started.push(n)))
+    cancel.push(
+      scheduleImage(() => {
+        started.push(n)
+        now += 5
+      })
+    )
   }
   expect(started).toEqual([])
   expect(frames).toHaveLength(1)
@@ -51,6 +59,7 @@ test('адрес картинки назначается по два за кад
   cancel[4]()
   frames.shift()!(2)
   expect(started).toEqual([0, 1, 2, 3])
+  performance.now = origNow
   globalThis.requestAnimationFrame = orig
   resetImageStarts()
 })

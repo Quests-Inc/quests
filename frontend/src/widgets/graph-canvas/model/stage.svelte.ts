@@ -735,17 +735,20 @@ export function createGraphStage(deps: {
     },
     measureContent(key: string, width: number, height: number) {
       const n = nodesByKey().get(key)
-      if (
-        !ready ||
-        !n ||
-        n.sh != null ||
-        !width ||
-        !height ||
-        (Math.abs(n.w - width) < 1 && Math.abs(n.h - height) < 1)
-      )
-        return
+      if (!ready || !n || n.sh != null || !width || !height) return
+      const dw = width - n.w
+      const dh = height - n.h
+      if (Math.abs(dw) < 1 && Math.abs(dh) < 1) return
+      // Grow from the top-left, in the same turn as the new body, so the title does not jump.
       n.w = width
       n.h = height
+      n.x += dw / 2
+      n.y += dh / 2
+      const spot = deps.saved.get(key)
+      if (spot) {
+        spot.x = n.x
+        spot.y = n.y
+      }
       applyLayout()
     },
     focusNode,

@@ -31,6 +31,7 @@
     onRef,
     typing = false,
     mapJump = null,
+    imageThumb = undefined,
   }: {
     source?: string,
     class?: string,
@@ -44,6 +45,8 @@
     typing?: boolean,
     /** When the linked entity is on the same map, a button after the link focuses it there. */
     mapJump?: MapJump | null,
+    /** Longest side of the preview, in pixels. Unset keeps the original attachment image. */
+    imageThumb?: number,
   } = $props()
 
   let foreign = $state({} as Record<string, string>)
@@ -232,6 +235,20 @@
     return { destroy: () => node.removeEventListener('error', onImgError, true) }
   }
 
+  function fitMapImages(node: HTMLElement, spec: { thumb?: number; html: string }) {
+    const apply = (next: { thumb?: number; html: string }) => {
+      for (const img of node.querySelectorAll<HTMLImageElement>('img.md-attachment-img')) {
+        const match = /\/api\/attachments\/(\d+)\/image/.exec(img.getAttribute('src') || '')
+        if (!match) continue
+        const full = `/api/attachments/${match[1]}/image`
+        img.dataset.full = full
+        const src = next.thumb ? `${full}?preview=1&thumb=${next.thumb}` : full
+        if (img.getAttribute('src') !== src) img.setAttribute('src', src)
+      }
+    }
+    apply(spec)
+    return { update: apply }
+  }
   function imageAccess(node:HTMLElement,_html:string) {
     const apply=()=>{for(const img of node.querySelectorAll<HTMLImageElement>('img.md-attachment-img')){img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',`Открыть изображение ${img.alt}`);img.style.cursor='zoom-in'}}
     const key=(event:KeyboardEvent)=>{if((event.key==='Enter'||event.key===' ')&&event.target instanceof HTMLImageElement){event.preventDefault();event.target.click()}}
@@ -242,8 +259,8 @@
     const image=event.target
     if(image instanceof HTMLImageElement && image.classList.contains('md-attachment-img')) {
       event.preventDefault();event.stopPropagation()
-      const images=[...root?.querySelectorAll<HTMLImageElement>('img.md-attachment-img')||[]].map(img=>({src:img.getAttribute('src')||'',title:img.alt||'Изображение'}))
-      showImages(images,image.getAttribute('src')||'');return
+      const images=[...root?.querySelectorAll<HTMLImageElement>('img.md-attachment-img')||[]].map(img=>({src:img.dataset.full||img.getAttribute('src')||'',title:img.alt||'Изображение'}))
+      showImages(images,image.dataset.full||image.getAttribute('src')||'');return
     }
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
@@ -270,6 +287,7 @@
     bind:this={root}
     onclick={onClick}
     use:imageAccess={html}
+    use:fitMapImages={{ thumb: imageThumb, html }}
     use:captureImgErrors
     use:refIcons
     use:scriptEmbed={merged}

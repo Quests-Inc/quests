@@ -96,14 +96,12 @@
 
   const pendingScene = $derived(((switching || loading) && !stage.view) || stage.previewing || stage.sceneHidden)
 
-  // Markdown starts once the camera is still, two cards a frame. Photos take their address two a frame and do not wait for that.
+  // Markdown starts once the camera is still. Mounting it shares the frame budget with images.
   let warm = $state(new Set<string>())
   let dwellTick = $state(0)
   let seenCam = { x: Number.NaN, y: Number.NaN, k: Number.NaN }
   let idleSince = 0
   let clocks = new Map<string, number>()
-  let queued = new Set<string>()
-  let releaseToken = 0
   const mapKeys = $derived((stage.view?.nodes ?? []).map((n) => n.key).join('\n'))
   $effect(() => {
     void dwellTick
@@ -129,30 +127,15 @@
     const kept = new Set<string>()
     for (const key of warm) if (plan.warm.has(key)) kept.add(key)
     if (kept.size !== warm.size) warm = kept
-    if (!plan.idle) {
-      releaseToken++
-      queued = new Set()
-    } else {
-      const due = [...plan.warm].filter((key) => !warm.has(key) && !queued.has(key))
-      if (due.length) {
-        const token = ++releaseToken
-        queued = new Set([...queued, ...due])
-        let index = 0
-        const pump = () => {
-          if (token !== releaseToken || gest.moving) return
-          const batch = due.slice(index, index + 2)
-          index += batch.length
-          if (!batch.length) return
-          const next = new Set(warm)
-          for (const key of batch) {
-            queued.delete(key)
-            next.add(key)
-          }
-          warm = next
-          if (index < due.length) requestAnimationFrame(pump)
-        }
-        requestAnimationFrame(pump)
+    if (plan.idle) {
+      let grown = false
+      const next = new Set(warm)
+      for (const key of plan.warm) {
+        if (next.has(key)) continue
+        next.add(key)
+        grown = true
       }
+      if (grown) warm = next
     }
     // The frame that moved the camera is not idle. Recheck once it stops, even when the dwell is zero.
     if (plan.wait > 0 || camMoved) {
