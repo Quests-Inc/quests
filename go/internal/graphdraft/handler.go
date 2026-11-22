@@ -10,6 +10,7 @@ import (
 
 	"github.com/quests-inc/quests/go/internal/kernel"
 	"github.com/quests-inc/quests/go/internal/platform/clamav"
+	"github.com/quests-inc/quests/go/internal/platform/events"
 	"github.com/quests-inc/quests/go/internal/platform/httpx"
 	"github.com/quests-inc/quests/go/internal/platform/webdav"
 	"github.com/quests-inc/quests/go/internal/store"
@@ -22,6 +23,7 @@ import (
 // Handler serves the map draft endpoints: edits to the relations map kept on the server until committed.
 type Handler struct {
 	Store          *store.Store
+	Hub            *events.Hub
 	WebDAV         *webdav.Client
 	ClamAV         *clamav.Client
 	MaxUploadBytes int64

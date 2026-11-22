@@ -8,6 +8,7 @@ let scope = ''
 const db = new Map<number, { id: number; title: string; state: LayoutState; updated_at: string }>()
 const writes: { id: number; state?: LayoutState }[] = []
 mock.module('@/shared/api/graph.ts', () => ({
+  layoutClientId: 'test-client',
   setGraphDraftScope: (key: string) => (scope = key),
   listGraphLayouts: async () => [...db.values()],
   getGraphLayout: async (id: number) => db.get(id),

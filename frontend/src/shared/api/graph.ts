@@ -140,6 +140,9 @@ export function putGraphDraftOp(id: number, payload: any) {
 
 // --- Runners: devices that execute checks (quests-runner), and their job queue.
 
+/** Tab token sent with layout writes so that tab can ignore its own echo. */
+export const layoutClientId = crypto.randomUUID()
+
 /** A saved layout of the map (personal): the list has no `state`, one layout read by id has it. */
 export type GraphLayout = { id: number; title: string; state?: unknown; created_at: string; updated_at: string }
 
@@ -152,13 +155,24 @@ export function getGraphLayout(id: number) {
 }
 
 export function createGraphLayout(title: string, state: unknown) {
-  return request<GraphLayout>('/api/graph-layouts', { method: 'POST', body: JSON.stringify({ title, state }) })
+  return request<GraphLayout>('/api/graph-layouts', {
+    method: 'POST',
+    body: JSON.stringify({ title, state }),
+    headers: { 'X-Quests-Client': layoutClientId },
+  })
 }
 
 export function updateGraphLayout(id: number, patch: { title?: string; state?: unknown }) {
-  return request<GraphLayout>(`/api/graph-layouts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  return request<GraphLayout>(`/api/graph-layouts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+    headers: { 'X-Quests-Client': layoutClientId },
+  })
 }
 
 export function deleteGraphLayout(id: number) {
-  return request(`/api/graph-layouts/${id}`, { method: 'DELETE' })
+  return request(`/api/graph-layouts/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Quests-Client': layoutClientId },
+  })
 }

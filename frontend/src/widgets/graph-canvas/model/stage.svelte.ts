@@ -7,6 +7,7 @@ import {
   arrangeView,
   CENTERABLE,
   borderMarks,
+  cameraOnRect,
   childKeysOf,
   drawableEdges,
   fitCamera,
@@ -104,6 +105,26 @@ export function createGraphStage(deps: {
     if (cameraFrame) cancelAnimationFrame(cameraFrame)
     cameraFrame = 0
   }
+  function glideCam(to: { x: number; y: number; k: number }) {
+    const element = el
+    if (!ready || !element) return
+    const r = element.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) return
+    cancelCamera()
+    const from = { ...deps.getCam() }
+    const start = performance.now()
+    function frame(now: number) {
+      const t = Math.min(1, Math.max(0, (now - start) / 500))
+      const progress = 1 - (1 - t) ** 3
+      deps.setCam({
+        k: from.k + (to.k - from.k) * progress,
+        x: from.x + (to.x - from.x) * progress,
+        y: from.y + (to.y - from.y) * progress,
+      })
+      cameraFrame = t < 1 ? requestAnimationFrame(frame) : 0
+    }
+    cameraFrame = requestAnimationFrame(frame)
+  }
   function focusNode(key: string) {
     focusKey = key
     const n = nodesByKey().get(key),
@@ -113,18 +134,16 @@ export function createGraphStage(deps: {
     // Keep-alive map stays display:none off-tab; a zero box would aim the camera at nothing.
     if (r.width < 8 || r.height < 8) return
     focusKey = null
-    cancelCamera()
     selectedKey = key
-    const from = { ...deps.getCam() }
-    const to = { x: r.width / 2 - n.x * from.k, y: r.height / 2 - n.y * from.k }
-    const start = performance.now()
-    function frame(now: number) {
-      const t = Math.min(1, Math.max(0, (now - start) / 500))
-      const progress = 1 - (1 - t) ** 3
-      deps.setCam({ k: from.k, x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress })
-      cameraFrame = t < 1 ? requestAnimationFrame(frame) : 0
-    }
-    cameraFrame = requestAnimationFrame(frame)
+    const from = deps.getCam()
+    glideCam({ k: from.k, x: r.width / 2 - n.x * from.k, y: r.height / 2 - n.y * from.k })
+  }
+  function focusZone(zone: GraphZone) {
+    const element = el
+    if (!ready || !element) return
+    const r = element.getBoundingClientRect()
+    const to = cameraOnRect(zone, { w: r.width, h: r.height }, deps.getCam().k)
+    if (to) glideCam(to)
   }
   let flashTimer = 0
   let nativeFull = false
@@ -712,6 +731,7 @@ export function createGraphStage(deps: {
       applyLayout()
     },
     focusNode,
+    focusZone,
     cancelCamera,
     touch,
     /** Разложить заново с тем, что сейчас в `saved` (расклад поставил позиции карточек). */

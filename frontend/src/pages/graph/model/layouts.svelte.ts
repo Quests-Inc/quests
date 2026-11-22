@@ -8,6 +8,7 @@ import {
   createGraphLayout,
   deleteGraphLayout,
   getGraphLayout,
+  layoutClientId,
   listGraphLayouts,
   updateGraphLayout,
 } from '@/shared/api/graph.ts'
@@ -169,7 +170,18 @@ export async function applyLayoutState(d: LayoutDeps, s: LayoutState, prepared =
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Every visible board owns a draft UUID. Temporary boards exist only in this controller's memory. */
-export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?: boolean } = {}) {
+export type LayoutNotice = {
+  kind?: string
+  title?: string
+  layout_id?: number
+  client?: string
+  state?: boolean
+}
+
+export function createGraphLayouts(
+  deps: LayoutDeps,
+  options: { rememberActive?: boolean; readState?: (id: number) => Promise<LayoutState> } = {}
+) {
   type Tab = { id: number | string; title: string; updated_at: string; temporary?: boolean }
   let items = $state<Tab[]>([])
   let loaded = $state(false)
@@ -197,6 +209,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
       history.replaceState(history.state, '', url)
     } catch {}
   }
+  const readState = (id: number) => options.readState?.(id) ?? getGraphLayout(id).then((l) => l.state as LayoutState)
   let restoreId = 0
   if (options.rememberActive)
     try {
@@ -319,6 +332,59 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     remember(id)
     lastSaved = typeof id === 'number' && state.draft_scope ? JSON.stringify(capture()) : ''
   }
+  async function freshTemporary() {
+    const id = crypto.randomUUID()
+    const state = empty()
+    state.draft_scope = id
+    items = [
+      ...items,
+      { id, title: nextName('Временная раскладка'), temporary: true, updated_at: new Date().toISOString() },
+    ]
+    await activate(id, state)
+  }
+  /** Another tab of this user changed a layout. Our own write echoes the same client id and is ignored. */
+  function notice(msg: LayoutNotice) {
+    if (!msg || msg.client === layoutClientId) return
+    const id = Number(msg.layout_id)
+    if (!Number.isInteger(id) || id < 1) return
+    if (msg.kind === 'graph_layout_deleted') {
+      void run(async () => {
+        items = items.filter((i) => i.id !== id)
+        snapshots.delete(String(id))
+        if (current === id) await freshTemporary()
+      })
+      return
+    }
+    if (msg.kind !== 'graph_layout_created' && msg.kind !== 'graph_layout_updated') return
+    const title = (msg.title || '').trim() || 'Расклад'
+    if (!items.some((i) => i.id === id)) {
+      const temps = items.filter((i) => i.temporary)
+      items = [...temps, { id, title, updated_at: new Date().toISOString() }, ...items.filter((i) => !i.temporary)]
+    } else if (msg.title) {
+      items = items.map((i) => (i.id === id ? { ...i, title } : i))
+    }
+    if (!msg.state) return
+    if (current !== id) {
+      snapshots.delete(String(id))
+      return
+    }
+    if (saving || timer || JSON.stringify(capture()) !== lastSaved) return
+    void run(async () => {
+      if (current !== id || JSON.stringify(capture()) !== lastSaved) return
+      const state = await readState(id)
+      if (current !== id || JSON.stringify(capture()) !== lastSaved) return
+      await activate(id, state)
+    })
+  }
+  const onNotice = (e: Event) => notice((e as CustomEvent<LayoutNotice>).detail)
+  const onResync = () => {
+    if (!loaded) return
+    void load().catch((e) => {
+      failure = messageOf(e)
+    })
+  }
+  window.addEventListener('quests:layout', onNotice)
+  window.addEventListener('quests:layouts-resync', onResync)
   return {
     get items() {
       return items
@@ -374,6 +440,8 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
     },
     dispose() {
       clearTimeout(timer)
+      window.removeEventListener('quests:layout', onNotice)
+      window.removeEventListener('quests:layouts-resync', onResync)
     },
     placePosition(id: number | string, key: string, position: Spot) {
       return run(async () => {
@@ -478,7 +546,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
           (error): Error | null => (error instanceof Error ? error : new Error(String(error)))
         )
         const cached = snapshots.get(String(id))
-        const state = cached ?? (typeof id === 'number' ? ((await getGraphLayout(id)).state as LayoutState) : undefined)
+        const state = cached ?? (typeof id === 'number' ? await readState(id) : undefined)
         if (state) await activate(id, state)
         const saveError = await saved
         if (saveError) throw saveError
@@ -497,16 +565,7 @@ export function createGraphLayouts(deps: LayoutDeps, options: { rememberActive?:
         if (typeof id === 'number') await deleteGraphLayout(id)
         items = items.filter((i) => i.id !== id)
         snapshots.delete(String(id))
-        if (current === id) {
-          const next = crypto.randomUUID(),
-            state = empty()
-          state.draft_scope = next
-          items = [
-            ...items,
-            { id: next, title: nextName('Временная раскладка'), temporary: true, updated_at: new Date().toISOString() },
-          ]
-          await activate(next, state)
-        }
+        if (current === id) await freshTemporary()
       })
     },
   }

@@ -98,7 +98,7 @@ test('failed full text loading can be retried', async () => {
 test('measuring deferred cards show placeholders without requesting bodies', async () => {
   requests = 0
   const view = await show({ ready: false, deferContent: true })
-  expect(view.target.querySelector('.gcard__placeholder')).not.toBeNull()
+  expect(view.target.querySelector('.note-outline')).not.toBeNull()
   expect(view.target.querySelector('.md')).toBeNull()
   expect(requests).toBe(0)
   await view.close()

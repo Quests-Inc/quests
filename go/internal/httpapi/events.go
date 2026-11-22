@@ -30,7 +30,7 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 			since = n
 		}
 	}
-	ev := s.Hub.EventsSince(since, wsctx.From(r.Context()))
+	ev := s.Hub.EventsFor(since, wsctx.From(r.Context()), wsctx.UserFrom(r.Context()))
 	if ev == nil {
 		ev = []events.Payload{}
 	}
@@ -62,7 +62,7 @@ func (s *Server) wsEvents(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ws upgrade: %v", err)
 		return
 	}
-	client, hello := s.Hub.AddClient(conn, wsctx.From(r.Context()))
+	client, hello := s.Hub.AddClient(conn, wsctx.From(r.Context()), wsctx.UserFrom(r.Context()))
 	if err := client.WriteJSON(hello); err != nil {
 		s.Hub.RemoveClient(client)
 		return

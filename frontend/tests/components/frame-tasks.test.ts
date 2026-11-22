@@ -33,7 +33,7 @@ test('paint precedes content; frame work is bounded and cancelled mounts never e
     expect(log).toEqual([])
     draw()
     expect(log.length).toBeGreaterThan(0)
-    expect(log.length).toBeLessThanOrEqual(4)
+    expect(log.length).toBeLessThanOrEqual(2)
     for (let i = 0; i < 12 && frames.size; i++) draw()
     expect(log).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9])
   } finally {

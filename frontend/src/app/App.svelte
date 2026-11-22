@@ -290,6 +290,9 @@
           selectQuestFromUi(msg.quest_id)
           return
         }
+        if (msg?.type === 'quests_changed' && String(msg.kind ?? '').startsWith('graph_layout_')) {
+          window.dispatchEvent(new CustomEvent('quests:layout', { detail: msg })); return
+        }
         if (msg?.type === 'quests_changed' && msg.kind === 'values_changed') {
           // A runner, a script or another tab wrote a value: the open tables and texts read again; nothing else moved.
           touchValues(ANY_HOST)
@@ -303,20 +306,17 @@
             desk.noteRemote(msg.quest_id)
           }
           load({ silent: true })
-          if (nav.view === 'history') historyNonce += 1
-          if (nav.view === 'graph') graphNonce += 1
+          if (nav.view === 'history') historyNonce += 1; else if (nav.view === 'graph') graphNonce += 1
         }
       },
       {
         onStatus: (s) => (liveStatus = s),
         // The socket missed events while it was down or the tab was hidden.
         onResync: () => {
-          void load({ silent: true })
-          void refreshTemplates()
-          void refreshHealth()
+          void load({ silent: true }); void refreshTemplates(); void refreshHealth()
           touchValues(ANY_HOST)
-          if (nav.view === 'history') historyNonce += 1
-          if (nav.view === 'graph') graphNonce += 1
+          if (nav.view === 'history') historyNonce += 1; else if (nav.view === 'graph') graphNonce += 1
+          window.dispatchEvent(new CustomEvent('quests:layouts-resync'))
         },
       },
     )

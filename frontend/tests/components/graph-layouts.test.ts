@@ -3,9 +3,11 @@ import { expect, test } from 'bun:test'
 import {
   applyLayoutState,
   captureLayout,
+  createGraphLayouts,
   type LayoutDeps,
   type LayoutState,
 } from '@/pages/graph/model/layouts.svelte.ts'
+import { layoutClientId } from '@/shared/api/graph.ts'
 
 type Spot = { x: number; y: number }
 
@@ -192,3 +194,62 @@ test('restoring roots never waits for content or restores the camera after user 
   await pending
   expect(st.cam).toEqual({ x: 77, y: 88, k: 0.12 })
 }, 1000)
+
+function board(id: number): LayoutState {
+  return {
+    v: 1,
+    draft_scope: `scope-${id}`,
+    center: { type: 'note', id },
+    roots: [],
+    depth: 1,
+    layout: 'free',
+    statuses: ['active'],
+    types: ['note'],
+    hidden: [],
+    expand: [],
+    folds: { expanded: [], loose: [] },
+    positions: {},
+    view: { cx: 0, cy: 0, k: 1 },
+  }
+}
+
+test('чужой расклад появляется в списке; своё эхо и несохранённая правка не затирают карту', async () => {
+  const { st, deps } = fakeMap()
+  let remote = board(9)
+  const layouts = createGraphLayouts(deps, { readState: async () => remote })
+  const tell = (detail: Record<string, unknown>) => window.dispatchEvent(new CustomEvent('quests:layout', { detail }))
+  const settled = async () => {
+    await new Promise((r) => setTimeout(r, 0))
+    for (let i = 0; i < 30 && layouts.busy; i++) await new Promise((r) => setTimeout(r, 0))
+    if (layouts.busy) throw new Error('расклад не отпустил очередь')
+  }
+  tell({ kind: 'graph_layout_created', layout_id: 5, title: 'Сессия 2', client: 'other' })
+  expect(layouts.items.find((i) => i.id === 5)?.title).toBe('Сессия 2')
+  tell({ kind: 'graph_layout_updated', layout_id: 5, title: 'Дом', client: layoutClientId })
+  expect(layouts.items.find((i) => i.id === 5)?.title).toBe('Сессия 2')
+  tell({ kind: 'graph_layout_updated', layout_id: 5, title: 'Дом', client: 'other' })
+  expect(layouts.items.find((i) => i.id === 5)?.title).toBe('Дом')
+
+  await layouts.open(5)
+  expect(st.center).toEqual({ type: 'note', id: 9 })
+  remote = board(4)
+  tell({ kind: 'graph_layout_updated', layout_id: 5, title: 'Дом', state: true, client: layoutClientId })
+  await settled()
+  expect(st.center).toEqual({ type: 'note', id: 9 })
+
+  st.nodes = [{ key: 'note:9', x: 12, y: 12 }]
+  tell({ kind: 'graph_layout_updated', layout_id: 5, title: 'Дом', state: true, client: 'other' })
+  await settled()
+  expect(st.center).toEqual({ type: 'note', id: 9 })
+
+  st.nodes = []
+  tell({ kind: 'graph_layout_updated', layout_id: 5, title: 'Дом', state: true, client: 'other' })
+  await settled()
+  expect(st.center).toEqual({ type: 'note', id: 4 })
+
+  tell({ kind: 'graph_layout_deleted', layout_id: 5, client: 'other' })
+  await settled()
+  expect(layouts.items.some((i) => i.id === 5)).toBe(false)
+  expect(typeof layouts.current).toBe('string')
+  layouts.dispose()
+})

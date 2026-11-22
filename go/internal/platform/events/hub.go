@@ -21,7 +21,9 @@ type Client struct {
 	Conn *websocket.Conn
 	// Workspace is the workspace this peer listens to (0 = all, i.e. no workspaces).
 	Workspace int64
-	mu        sync.Mutex
+	// User is who this socket belongs to (0 = a server with sign-in off, one shared owner).
+	User int64
+	mu   sync.Mutex
 }
 
 // systemWide marks an event meant for every peer (server start). An event with no workspace
@@ -30,7 +32,12 @@ type Client struct {
 const systemWide int64 = -1
 
 // visible reports whether an event of workspace ws is for this peer.
-func (c *Client) visible(ws int64) bool {
+// A non-zero user is a personal event: only that person's sockets receive it,
+// even a peer that listens to every workspace.
+func (c *Client) visible(ws, user int64) bool {
+	if user != 0 && c.User != user {
+		return false
+	}
 	return ws == systemWide || c.Workspace == 0 || c.Workspace == ws
 }
 
@@ -80,8 +87,8 @@ func New() *Hub {
 	}
 }
 
-func (h *Hub) AddClient(conn *websocket.Conn, ws int64) (*Client, Payload) {
-	c := &Client{Conn: conn, Workspace: ws}
+func (h *Hub) AddClient(conn *websocket.Conn, ws, user int64) (*Client, Payload) {
+	c := &Client{Conn: conn, Workspace: ws, User: user}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[c] = struct{}{}
@@ -138,15 +145,26 @@ func (h *Hub) GetRevision() int {
 }
 
 // EventsSince returns recent events newer than revision since that are visible
-// from workspace ws (0 = all).
+// from workspace ws (0 = all). Personal events (user_id set) are not included:
+// those belong to EventsFor.
 func (h *Hub) EventsSince(since int, ws int64) []Payload {
+	return h.eventsSince(since, ws, 0)
+}
+
+// EventsFor is EventsSince plus the personal events of user (0 = the shared owner of a server with sign-in off).
+func (h *Hub) EventsFor(since int, ws, user int64) []Payload {
+	return h.eventsSince(since, ws, user)
+}
+
+func (h *Hub) eventsSince(since int, ws, user int64) []Payload {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	out := make([]Payload, 0)
 	for _, e := range h.recent {
 		rev := asInt(e["revision"])
 		ew := int64(asInt(e["workspace"]))
-		if rev > since && (ws == 0 || ew == systemWide || ew == ws) {
+		eu := int64(asInt(e["user_id"]))
+		if rev > since && (ws == 0 || ew == systemWide || ew == ws) && (eu == 0 || eu == user) {
 			out = append(out, e)
 		}
 	}
@@ -177,11 +195,11 @@ func (h *Hub) clientSnapshot() []*Client {
 }
 
 // send writes outside h.mu so a slow socket cannot stall Publish / HTTP.
-func (h *Hub) send(raw []byte, ws int64) int {
+func (h *Hub) send(raw []byte, ws, user int64) int {
 	clients := h.clientSnapshot()
 	delivered := 0
 	for _, c := range clients {
-		if !c.visible(ws) {
+		if !c.visible(ws, user) {
 			continue
 		}
 		if err := c.WriteRaw(websocket.TextMessage, raw); err != nil {
@@ -198,7 +216,7 @@ func (h *Hub) Broadcast(payload Payload, ws int64) int {
 	if err != nil {
 		return 0
 	}
-	return h.send(raw, ws)
+	return h.send(raw, ws, 0)
 }
 
 func (h *Hub) FocusQuest(questID, ws int64) int {
@@ -246,6 +264,12 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 	if target != 0 {
 		payload["workspace"] = target
 	}
+	user := opts.User
+	if user > 0 {
+		payload["user_id"] = user
+	} else {
+		user = 0
+	}
 	for k, v := range opts.Extra {
 		payload[k] = v
 	}
@@ -254,9 +278,12 @@ func (h *Hub) Publish(kind string, opts PublishOpts) Payload {
 		h.recent = h.recent[len(h.recent)-HistorySize:]
 	}
 	raw, _ := json.Marshal(payload)
-	observers := append([]func(Payload){}, h.observers...)
+	var observers []func(Payload)
+	if !opts.Personal {
+		observers = append([]func(Payload){}, h.observers...)
+	}
 	h.mu.Unlock()
-	h.send(raw, target)
+	h.send(raw, target, user)
 	// Fire-and-forget observers (user hooks and the like): each gets its own copy.
 	for _, fn := range observers {
 		go func(fn func(Payload), p Payload) {
@@ -315,6 +342,10 @@ func (h *Hub) PublishSilent(workspace int64, kind, title string, extra map[strin
 type PublishOpts struct {
 	// Workspace routes the event to that workspace's peers (0 = everyone).
 	Workspace int64
+	// User routes a Personal event to that person's sockets only. 0 is the shared owner when sign-in is off.
+	User int64
+	// Personal is not a workspace event: hooks are not told, and another user of the workspace does not receive it.
+	Personal bool
 	// System sends the event to every peer whatever its workspace (no private data!).
 	System       bool
 	QuestID      *int64

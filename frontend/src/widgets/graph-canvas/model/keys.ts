@@ -1,5 +1,5 @@
 // Клавиши, общие для полей карты и скриптов (по физической клавише, чтобы работали в любой раскладке):
-// V — выделение, F — вписать, + / − / 0 — зум, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y — отмена и повтор, Ctrl+A — выделить всё,
+// V — выделение, H — только панорама, F — вписать, + / − / 0 — зум, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y — отмена и повтор, Ctrl+A — выделить всё,
 // Delete — убрать выделенное, Esc — по очереди связь, режим выделения, полный экран. Чего у страницы нет — не передаётся, и клавиша не работает.
 
 export type CanvasKeyEvent = {
@@ -16,10 +16,12 @@ export type CanvasKeyEvent = {
 export type CanvasKeyEnv = {
   linking: boolean
   selectMode: boolean
+  panMode?: boolean
   full: boolean
   menuOpen?: boolean
   cancelLink: () => void
   toggleSelect: () => void
+  togglePan?: () => void
   toggleFull: () => void
   fit: () => void
   /** 1 — ближе, −1 — дальше, 0 — масштаб 1:1. */
@@ -49,6 +51,7 @@ const ZOOM_RESET = new Set(['Digit0', 'Numpad0'])
 export function handleCanvasKey(e: CanvasKeyEvent, env: CanvasKeyEnv): boolean {
   if (e.key === 'Escape') {
     if (env.linking) env.cancelLink()
+    else if (env.panMode && env.togglePan) env.togglePan()
     else if (env.selectMode) env.toggleSelect()
     else if (env.full && !env.menuOpen && !typing(e)) env.toggleFull()
     else return false
@@ -62,6 +65,7 @@ export function handleCanvasKey(e: CanvasKeyEvent, env: CanvasKeyEnv): boolean {
     else if (e.code === 'KeyY' && !e.shiftKey) run = env.redo
     else if (e.code === 'KeyA' && !e.shiftKey) run = env.selectAll
   } else if (e.code === 'KeyV' && !e.shiftKey) run = env.toggleSelect
+  else if (e.code === 'KeyH' && !e.shiftKey && env.togglePan) run = env.togglePan
   else if (e.code === 'KeyF' && !e.shiftKey) run = env.fit
   else if (ZOOM_IN.has(e.code)) run = () => env.zoom(1)
   else if (ZOOM_OUT.has(e.code)) run = () => env.zoom(-1)

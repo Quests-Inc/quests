@@ -69,6 +69,37 @@ function make(extra: Record<string, unknown> = {}) {
   return { g, nodes, state, ev, el }
 }
 
+test('режим перемещения: жест по карточке двигает камеру и не карточку', () => {
+  const { g, nodes, ev } = make({ panMode: () => true })
+  const card = document.createElement('div')
+  g.onCardDown(ev(100, 100, { currentTarget: card }), nodes[0] as any)
+  g.onMove(ev(150, 80))
+  g.onUp(ev(150, 80))
+  expect(nodes[0].x).toBe(0)
+  expect(nodes[0].y).toBe(0)
+  expect(g.cam).toMatchObject({ x: 50, y: -20 })
+})
+
+test('режим перемещения: колесо над текстом заметки зумит карту', () => {
+  const { g, ev } = make({ panMode: () => true })
+  const body = document.createElement('div')
+  body.className = 'gcard__body'
+  Object.defineProperty(body, 'scrollHeight', { value: 400 })
+  Object.defineProperty(body, 'clientHeight', { value: 100 })
+  const prevented = { value: false }
+  g.onWheel(
+    ev(200, 200, {
+      target: body,
+      deltaY: -1,
+      preventDefault() {
+        prevented.value = true
+      },
+    })
+  )
+  expect(prevented.value).toBe(true)
+  expect(g.cam.k).toBeGreaterThan(1)
+})
+
 test('панорама: перетаскивание фона сдвигает камеру', () => {
   const { g, ev } = make()
   g.onBgDown(ev(100, 100))

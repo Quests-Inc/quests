@@ -100,6 +100,13 @@ test('V, F, R и Shift+Del доходят до карты, модификато�
   expect(k.press({ code: 'KeyF' })).toBe(false)
 })
 
+test('H включает режим перемещения, Esc выключает его раньше выделения', () => {
+  const k = key({ panMode: true, selectMode: true, togglePan: () => k.calls.push('pan') })
+  expect(k.press({ code: 'KeyH' })).toBe(true)
+  k.press({ key: 'Escape', code: 'Escape' })
+  expect(k.calls).toEqual(['pan', 'pan'])
+})
+
 test('Esc сначала снимает подсветку линии, потом идёт обычная цепочка', () => {
   const k = key({ hasLit: true, clearLit: () => k.calls.push('unlit'), selectMode: true })
   k.press({ key: 'Escape', code: 'Escape' })

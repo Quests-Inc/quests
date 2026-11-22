@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/quests-inc/quests/go/internal/platform/events"
+	"github.com/quests-inc/quests/go/internal/platform/wsctx"
 	"github.com/quests-inc/quests/go/internal/store"
 )
 
@@ -114,6 +117,7 @@ func (h *Handler) createLayout(w http.ResponseWriter, r *http.Request) {
 		layoutErr(w, err)
 		return
 	}
+	h.publishLayout(r, "graph_layout_created", l.ID, l.Title, true)
 	writeJSON(w, 201, l)
 }
 
@@ -131,6 +135,7 @@ func (h *Handler) patchLayout(w http.ResponseWriter, r *http.Request) {
 		layoutErr(w, err)
 		return
 	}
+	h.publishLayout(r, "graph_layout_updated", l.ID, l.Title, in.State != nil)
 	writeJSON(w, 200, l)
 }
 
@@ -143,5 +148,40 @@ func (h *Handler) deleteLayout(w http.ResponseWriter, r *http.Request) {
 		layoutErr(w, err)
 		return
 	}
+	h.publishLayout(r, "graph_layout_deleted", id, "", false)
 	w.WriteHeader(204)
+}
+
+// layoutClientRe is the tab token a page sends so it can ignore its own echo.
+var layoutClientRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
+
+// publishLayout tells the author's open pages that a layout changed.
+// The payload carries the id and the title, never the state. Another user of the workspace is not a recipient,
+// and hooks are not woken: a layout is personal.
+func (h *Handler) publishLayout(r *http.Request, kind string, id int64, title string, state bool) {
+	if h.Hub == nil || id < 1 {
+		return
+	}
+	extra := map[string]any{"layout_id": id}
+	if state {
+		extra["state"] = true
+	}
+	if client := r.Header.Get("X-Quests-Client"); layoutClientRe.MatchString(client) {
+		extra["client"] = client
+	}
+	silent := ""
+	user := wsctx.UserFrom(r.Context())
+	if user < 1 {
+		user = 0
+	}
+	h.Hub.Publish(kind, events.PublishOpts{
+		Workspace: wsctx.From(r.Context()),
+		User:      user,
+		Personal:  true,
+		Title:     title,
+		Toast:     false,
+		Source:    "api",
+		Sound:     &silent,
+		Extra:     extra,
+	})
 }

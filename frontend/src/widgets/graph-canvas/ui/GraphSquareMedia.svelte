@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fetchId3Tags } from '@/shared/api/audioTags.ts'
+  import { enqueueMedia } from '@/shared/lib/mediaQueue.ts'
   import { isAudioFile } from '@/shared/lib/audioFile.ts'
   import { attachmentImage, showImages, type GalleryImage } from '@/shared/lib/imageViewer.svelte.ts'
   import { audioSrc } from '@/shared/lib/player.svelte.ts'
@@ -36,18 +37,29 @@
     if (!file?.id || !loadCover) return
     const ac = new AbortController()
     let objectUrl = ''
-    void fetchId3Tags(
-      audioSrc({ id: Number(file.id), filename: file.filename || '', hidden: false, revision: 0 }),
-      ac.signal,
-    )
-      .then((tags) => {
-        if (ac.signal.aborted || !tags.cover) return
-        objectUrl = URL.createObjectURL(tags.cover)
-        coverUrl = objectUrl
-      })
-      .catch(() => {})
+    let open: (() => void) | null = null
+    const release = () => {
+      open?.()
+      open = null
+    }
+    const cancel = enqueueMedia((done) => {
+      open = done
+      void fetchId3Tags(
+        audioSrc({ id: Number(file.id), filename: file.filename || '', hidden: false, revision: 0 }),
+        ac.signal,
+      )
+        .then((tags) => {
+          if (ac.signal.aborted || !tags.cover) return
+          objectUrl = URL.createObjectURL(tags.cover)
+          coverUrl = objectUrl
+        })
+        .catch(() => {})
+        .finally(release)
+    })
     return () => {
       ac.abort()
+      cancel()
+      release()
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   })
@@ -55,7 +67,7 @@
 
 {#if raster}
   <div class="media">
-    <GraphImage {id} pixels={imagePixels} />
+    <GraphImage {id} pixels={imagePixels} hold={!loadCover} paced={loadCover} />
     <button
       type="button"
       class="media__open"

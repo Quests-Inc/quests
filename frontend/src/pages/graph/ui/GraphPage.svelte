@@ -62,6 +62,7 @@
 
   const prefs = createGraphPrefs(null)
   let zoneDrawing = $state(false)
+  let panMode = $state(false)
   const saved = new Map<string, { x: number; y: number }>()
   // Поле, черновик и жесты читают друг друга только после сборки. Методы до этого не зовутся.
   let stage: ReturnType<typeof createGraphStage>
@@ -96,6 +97,7 @@
       lk.cursor = p
     },
     selectMode: () => stage.selectMode,
+    panMode: () => panMode,
     enterSelect: () => stage.enterSelect(),
     getPicked: () => stage.picked,
     setPicked: (s) => stage.setPicked(s),
@@ -459,7 +461,7 @@
     allowed: () => active && !layouts.busy && !ctx.open && !linking,
     move: (dx, dy, selected) => {
       stage.interact()
-      if (selected) {
+      if (selected && !panMode) {
         const keys = stage.picked.size ? stage.picked : new Set(stage.selectedKey ? [stage.selectedKey] : [])
         const cam = gest.cam
         for (const n of stage.nodes) if (keys.has(n.key)) {
@@ -477,6 +479,7 @@
       active,
       linking: !!linking,
       selectMode,
+      panMode,
       full,
       hasLit: stage.lit != null,
       clearLit: () => stage.clearLit(),
@@ -485,6 +488,7 @@
       canClear,
       cancelLink: () => lk.cancel(),
       toggleSelect: () => toggleSelectMode(),
+      togglePan: () => (panMode = !panMode),
       toggleFull: () => toggleFull(),
       save: () => gd.save(),
       undo: () => {
@@ -596,6 +600,8 @@
     onShowChanges={showChanges}
     onHidePicked={hidePicked}
     onToggleSelect={toggleSelectMode}
+    {panMode}
+    onTogglePan={() => (panMode = !panMode)}
     onClear={clearMap}
     onRecenter={() => selected && recenter(selected)}
   >

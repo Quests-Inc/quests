@@ -58,6 +58,61 @@ func TestGraphLayoutsOverHTTP(t *testing.T) {
 	}
 }
 
+// Creating, renaming, replacing and deleting a layout tells the author's open pages. The state itself stays out of the event.
+func TestGraphLayoutPublishesToTheAuthor(t *testing.T) {
+	h, s := secretsServer(t)
+	call := func(method, path, body string) (int, map[string]any) {
+		t.Helper()
+		var in any
+		if body != "" {
+			in = json.RawMessage(body)
+		}
+		return secretReq(h, method, path, in)
+	}
+	code, l := call(http.MethodPost, "/api/graph-layouts", `{"title":"Сессия 2","state":{"depth":1,"positions":{"note:1":{"x":1}}}}`)
+	if code != http.StatusCreated {
+		t.Fatalf("create: %d %v", code, l)
+	}
+	id := jsonNum(l["id"])
+	want := func(kind string, state bool) {
+		t.Helper()
+		var got map[string]any
+		for _, e := range s.Hub.EventsSince(0, 0) {
+			if e["kind"] == kind && jsonNum(e["layout_id"]) == id {
+				got = e
+			}
+		}
+		if got == nil {
+			t.Fatalf("no %s in %v", kind, s.Hub.EventsSince(0, 0))
+		}
+		if kind != "graph_layout_deleted" && got["title"] == "" {
+			t.Fatalf("%s has no title: %v", kind, got)
+		}
+		if _, leaked := got["positions"]; leaked {
+			t.Fatalf("state leaked in %s: %v", kind, got)
+		}
+		if state && got["state"] != true {
+			t.Fatalf("%s should name a state change: %v", kind, got)
+		}
+		if !state && got["state"] != nil {
+			t.Fatalf("%s should not name a state change: %v", kind, got)
+		}
+	}
+	want("graph_layout_created", true)
+	if code, l = call(http.MethodPatch, "/api/graph-layouts/"+id, `{"title":"Дом"}`); code != http.StatusOK {
+		t.Fatalf("rename: %d %v", code, l)
+	}
+	want("graph_layout_updated", false)
+	if code, _ = call(http.MethodPatch, "/api/graph-layouts/"+id, `{"state":{"depth":3}}`); code != http.StatusOK {
+		t.Fatalf("state: %d", code)
+	}
+	want("graph_layout_updated", true)
+	if code, _ = call(http.MethodDelete, "/api/graph-layouts/"+id, ""); code != http.StatusNoContent {
+		t.Fatalf("delete: %d", code)
+	}
+	want("graph_layout_deleted", false)
+}
+
 // A layout is its author's: another user of the workspace neither lists, reads, changes nor deletes it.
 func TestGraphLayoutsArePersonal(t *testing.T) {
 	_, s := secretsServer(t)

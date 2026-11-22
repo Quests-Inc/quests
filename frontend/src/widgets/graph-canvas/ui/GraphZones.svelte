@@ -3,11 +3,13 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import { centerPanel } from '@/shared/lib/centerPanel.ts'
   import { readZones, type GraphZone } from '@/entities/graph'
-  let { zones, cam, drawing = false, worldAt, onChange, onFinish, tools }: {
+  import GraphZoneMenu from './GraphZoneMenu.svelte'
+  let { zones, cam, drawing = false, worldAt, onChange, onFinish, onJump, tools }: {
     tools?: import('svelte').Snippet
     zones: GraphZone[]; cam: { x: number; y: number; k: number }; drawing?: boolean
     worldAt: (e: { clientX: number; clientY: number }) => { x: number; y: number }
     onChange: (zones: GraphZone[]) => void; onFinish: () => void
+    onJump?: (zone: GraphZone) => void
   } = $props()
   let selected = $state<string | null>(null)
   let editor = $state<HTMLDivElement | null>(null)
@@ -84,7 +86,10 @@
     <button type="button" class="zones__delete" aria-label="Удалить зону" title="Удалить зону" onclick={() => { onChange(zones.filter((z) => z.id !== selected)); selected = null }}><Icon name="delete" size={16} /></button>
   </div>
 {/if}
-<div class="zones__bottom">{@render tools?.()}</div>
+<div class="zones__bottom">
+  {#if zones.length && onJump}<GraphZoneMenu {zones} {onJump} />{/if}
+  {@render tools?.()}
+</div>
 
 <style>
   .zones { position: absolute; inset: 0; pointer-events: none; }
@@ -96,7 +101,7 @@
   .zone__resize { position: absolute; right: 0; bottom: 0; border: 0; background: transparent; color: var(--zone-color); cursor: nwse-resize; pointer-events: auto; touch-action: none; }
   .zones--drawing .zone__title, .zones--drawing .zone__resize { pointer-events: none; }
   .zones__hint { position: absolute; z-index: 13; top: 8px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 12px; border-radius: 6px; background: var(--color-bg-raised, #1a1a1a); pointer-events: none; font-size: var(--text-sm); }
-  .zones__bottom { position: absolute; z-index: 14; left: .6rem; right: .6rem; bottom: .6rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .6rem; pointer-events: none; }
+  .zones__bottom { position: absolute; z-index: 14; left: .6rem; right: .6rem; bottom: .6rem; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: flex-end; gap: .6rem; pointer-events: none; }
   .zones__bottom > :global(*) { pointer-events: auto; }
   .zones__bottom > :global(.gtools) { margin-left: auto; }
   .zones__editor { position: absolute; z-index: 14; min-height: 2rem; flex: 0 1 auto; width: max-content; max-width: calc(100% - 16px); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px; background: var(--color-bg-raised, #1a1a1a); border: 0; border-radius: 8px; font-size: var(--text-xs); }

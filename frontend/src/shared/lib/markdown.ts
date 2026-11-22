@@ -205,6 +205,8 @@ function ensureLinkHook() {
       const prev = /\bmd-img--(left|center|right)\b/.exec(node.getAttribute('class') || '')
       const align = m ? m[2].toLowerCase() : prev?.[1]
       node.setAttribute('class', align ? `md-attachment-img md-img--${align}` : 'md-attachment-img')
+      node.setAttribute('loading', 'lazy')
+      node.setAttribute('decoding', 'async')
       return
     }
     if (node.tagName === 'A') {

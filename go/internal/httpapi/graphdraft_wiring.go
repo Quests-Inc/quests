@@ -12,6 +12,7 @@ func (s *Server) graphdraftHandler() *graphdraft.Handler {
 		kh := s.knowledgeHTTP()
 		s.gdh = &graphdraft.Handler{
 			Store:          s.Store,
+			Hub:            s.Hub,
 			WebDAV:         s.WebDAV,
 			ClamAV:         s.ClamAV,
 			MaxUploadBytes: s.MaxUploadBytes,

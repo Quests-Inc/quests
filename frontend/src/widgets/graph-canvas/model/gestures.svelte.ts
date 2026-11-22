@@ -40,11 +40,23 @@ export function createGraphGestures(deps: {
   setPicked: (s: Set<string>) => void
   getSaved: () => Map<string, { x: number; y: number }>
   select: (n: GraphNodeView) => void
+  /** Pan and zoom only: cards stay put and note text does not scroll. */
+  panMode?: () => boolean
 }) {
   /** Camera: pan (x, y) and zoom (k) of the world. */
   let cam = $state({ x: 0, y: 0, k: 1 })
   let marquee = $state<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+  let moving = $state(false)
+  let wheelTimer = 0
   let drag: Drag | null = null
+
+  function beginMove() {
+    moving = true
+  }
+  function endMove() {
+    clearTimeout(wheelTimer)
+    moving = false
+  }
 
   /** Screen point → world coordinates (where a new thing should land). */
   function worldAt(e: { clientX: number; clientY: number }) {
@@ -77,6 +89,7 @@ export function createGraphGestures(deps: {
     deps.touchView()
   }
   function pinchStart() {
+    beginMove()
     const [a, b] = [...touches.values()]
     const r = deps.getStage()?.getBoundingClientRect()
     if (!r) return
@@ -109,14 +122,19 @@ export function createGraphGestures(deps: {
     pinchStart()
     deps.getStage()?.setPointerCapture(e.pointerId)
   }
+  function startPan(e: PointerEvent) {
+    beginMove()
+    drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
+    ;(e.currentTarget as HTMLElement | null)?.setPointerCapture?.(e.pointerId)
+    deps.getStage()?.setPointerCapture(e.pointerId)
+  }
   function onBgDown(e: PointerEvent) {
     deps.onInteract?.()
     if ((e.target as Element).closest('[data-gkey]')) return
     // Middle button always pans, also in selection mode.
-    if (e.button === 1) {
+    if (e.button === 1 || (e.button === 0 && deps.panMode?.())) {
       e.preventDefault()
-      drag = { kind: 'pan', x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }
-      deps.getStage()?.setPointerCapture(e.pointerId)
+      startPan(e)
       return
     }
     if (e.button !== 0) return
@@ -147,6 +165,13 @@ export function createGraphGestures(deps: {
         e.stopPropagation()
         void deps.finishLink(n)
       }
+      return
+    }
+    if (deps.panMode?.() && e.button === 0) {
+      if ((e.target as Element).closest('textarea, input, .gcard__editbar')) return
+      e.preventDefault()
+      e.stopPropagation()
+      startPan(e)
       return
     }
     if (deps.selectMode() || (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey))) {
@@ -188,9 +213,22 @@ export function createGraphGestures(deps: {
   }
   /** Dragging an expanded block by its frame moves all its cards together. */
   function onGroupDown(
-    e: { button: number; stopPropagation: () => void; clientX: any; clientY: any; pointerId: number },
+    e: {
+      button: number
+      stopPropagation: () => void
+      preventDefault?: () => void
+      clientX: any
+      clientY: any
+      pointerId: number
+      currentTarget?: EventTarget | null
+    },
     g: { key: any }
   ) {
+    if (deps.panMode?.() && e.button === 0) {
+      e.stopPropagation()
+      startPan(e as PointerEvent)
+      return
+    }
     if (e.button !== 0 || deps.isLinking() || deps.selectMode()) return
     e.stopPropagation()
     const members = deps.nodes().filter((n) => n.group === g.key)
@@ -212,6 +250,7 @@ export function createGraphGestures(deps: {
   }) {
     if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (drag?.kind === 'pinch') {
+      beginMove()
       if (touches.size < 2) return
       const [a, b] = [...touches.values()]
       const r = deps.getStage()?.getBoundingClientRect()
@@ -244,6 +283,7 @@ export function createGraphGestures(deps: {
       return
     }
     if (drag.kind === 'pan') {
+      beginMove()
       cam = { ...cam, x: drag.cx + dx, y: drag.cy + dy }
     } else if (drag.kind === 'group') {
       if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
@@ -267,6 +307,7 @@ export function createGraphGestures(deps: {
       // Lifting one finger keeps panning with the other one.
       const rest = [...touches.values()][0]
       drag = rest ? { kind: 'pan', x: rest.x, y: rest.y, cx: cam.x, cy: cam.y } : null
+      if (!drag) endMove()
       return
     }
     if (drag?.kind === 'marquee' && marquee) {
@@ -305,13 +346,22 @@ export function createGraphGestures(deps: {
     }
     if (drag?.kind === 'node' && drag.moved) deps.getSaved().set(drag.n.key, { x: drag.n.x, y: drag.n.y })
     if (drag?.kind === 'node' && !drag.moved) deps.select(drag.n)
+    if (drag?.kind === 'pan') endMove()
     drag = null
   }
   function onWheel(e: WheelEvent) {
     deps.onInteract?.()
-    // Over a card's scrollable text the wheel scrolls the text, not the map.
-    const body = e.target instanceof Element ? (e.target as Element).closest('.gcard__body, textarea') : null
-    if (body && body.scrollHeight > body.clientHeight + 1) return
+    const field = e.target instanceof Element ? e.target : null
+    if (deps.panMode?.()) {
+      if (field?.closest('textarea, input')) return
+    } else {
+      // Over a card's scrollable text the wheel scrolls the text, not the map.
+      const body = field?.closest('.gcard__body, textarea') ?? null
+      if (body && body.scrollHeight > body.clientHeight + 1) return
+    }
+    beginMove()
+    clearTimeout(wheelTimer)
+    wheelTimer = window.setTimeout(endMove, 160)
     e.preventDefault()
     const r = deps.getStage()?.getBoundingClientRect()
     if (!r) return
@@ -333,6 +383,9 @@ export function createGraphGestures(deps: {
   return {
     get cam() {
       return cam
+    },
+    get moving() {
+      return moving
     },
     set cam(v: { x: number; y: number; k: number }) {
       cam = v

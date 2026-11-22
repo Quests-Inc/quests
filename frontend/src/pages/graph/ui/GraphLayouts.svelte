@@ -36,7 +36,7 @@
     {/if}
   </div>
 {/snippet}
-{#if removing}<ConfirmModal title="Удалить расклад?" message={`Расклад «${removing.title}» будет удалён. Сущности и вложения останутся.`} onConfirm={async()=>{if(removing)await layouts.remove(removing.id);removing=null}} onCancel={()=>removing=null}/>{/if}
+{#if removing}<ConfirmModal open title="Удалить расклад?" message={`Расклад «${removing.title}» будет удалён. Сущности и вложения останутся.`} onConfirm={async()=>{if(removing)await layouts.remove(removing.id);removing=null}} onCancel={()=>removing=null}/>{/if}
 <style>
 .glay{display:flex;flex-direction:column;min-height:0;overflow:auto}.glay__status{font:var(--text-xs) var(--font-ui);padding:0 .6rem;color:var(--color-fg-muted)}.glay__item{display:flex;align-items:center;border-left:3px solid transparent}.glay__item--on{border-left-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 12%,transparent)}.glay__open{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;border:0;background:transparent;color:inherit;padding:.6rem;cursor:pointer}.glay__open span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.glay__open small{opacity:.55}.glay__actions{display:flex}.glay__actions :global(.btn){border:0;background:transparent;padding:.25rem;min-width:1.5rem}.glay__outside{border-bottom:1px solid var(--color-border);padding-bottom:.4rem}.glay__outside>small{padding:.5rem;opacity:.6}
 </style>

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { benchmarkRaster } from '../model/rasterBenchmark.ts'
+  import { planContent } from '../model/contentDwell.ts'
+  import { setMediaPaused } from '@/shared/lib/mediaQueue.ts'
  import {attachmentImage} from '@/shared/lib/imageViewer.svelte.ts'
   import {imagePixels} from '../model/imageQuality.ts'
   import { GraphMinimap, GraphTools, RASTER, tintOf, viewportBounds, boxInViewport, edgeInViewport, type GraphNoteEditing, type GraphZone } from '@/entities/graph'
@@ -45,6 +47,8 @@
     onShowChanges,
     onHidePicked,
     onToggleSelect,
+    panMode = false,
+    onTogglePan,
     onClear,
     onRecenter,
     resize,
@@ -84,6 +88,8 @@
     onShowChanges: (key: string) => void
     onHidePicked: () => void
     onToggleSelect: () => void
+    panMode?: boolean
+    onTogglePan?: () => void
     onClear: () => void
     onRecenter: () => void
     children?: Snippet
@@ -91,9 +97,77 @@
 
   const pendingScene = $derived((switching && !stage.view) || loading || stage.previewing || stage.sceneHidden)
 
+  // Photos, covers and markdown start once the camera is still. New work is staggered
+  // and paused while the camera moves; a flyover does not start fetches.
+  let warm = $state(new Set<string>())
+  let dwellTick = $state(0)
+  let seenCam = { x: Number.NaN, y: Number.NaN, k: Number.NaN }
+  let idleSince = 0
+  let clocks = new Map<string, number>()
+  let queued = new Set<string>()
+  let releaseToken = 0
+  const mapKeys = $derived((stage.view?.nodes ?? []).map((n) => n.key).join('\n'))
+  $effect(() => {
+    void dwellTick
+    const cam = gest.cam
+    const nodes = stage.view?.nodes ?? []
+    const now = performance.now()
+    const camMoved = cam.x !== seenCam.x || cam.y !== seenCam.y || cam.k !== seenCam.k
+    seenCam = { x: cam.x, y: cam.y, k: cam.k }
+    const pad = viewportBounds(cam, stage.stageSize)
+    const strict = viewportBounds(cam, stage.stageSize, 0)
+    const plan = planContent({
+      now,
+      idleSince,
+      pointer: gest.moving || !active || pendingScene,
+      camMoved,
+      visible: nodes.filter((n) => boxInViewport(n, strict)).map((n) => n.key),
+      mounted: nodes.filter((n) => boxInViewport(n, pad)).map((n) => n.key),
+      clocks,
+      warm,
+    })
+    idleSince = plan.idleSince
+    clocks = plan.clocks
+    setMediaPaused(!plan.idle)
+    const kept = new Set<string>()
+    for (const key of warm) if (plan.warm.has(key)) kept.add(key)
+    if (kept.size !== warm.size) warm = kept
+    if (!plan.idle) {
+      releaseToken++
+      queued = new Set()
+    } else {
+      const due = [...plan.warm].filter((key) => !warm.has(key) && !queued.has(key))
+      if (due.length) {
+        const token = ++releaseToken
+        queued = new Set([...queued, ...due])
+        let index = 0
+        const pump = () => {
+          if (token !== releaseToken || gest.moving) return
+          const batch = due.slice(index, index + 2)
+          index += batch.length
+          if (!batch.length) return
+          const next = new Set(warm)
+          for (const key of batch) {
+            queued.delete(key)
+            next.add(key)
+          }
+          warm = next
+          if (index < due.length) requestAnimationFrame(pump)
+        }
+        requestAnimationFrame(pump)
+      }
+    }
+    // The frame that moved the camera is not idle. Recheck once it stops, even when the dwell is zero.
+    if (plan.wait > 0 || camMoved) {
+      const timer = setTimeout(() => {
+        dwellTick++
+      }, plan.wait > 0 ? plan.wait + 20 : 0)
+      return () => clearTimeout(timer)
+    }
+  })
+
   // All cards mount during measurement. Once laid out, retain only the viewport and active editors.
   const bounds = $derived(stage.ready ? viewportBounds(gest.cam, stage.stageSize) : null)
-  const contentBounds = $derived(viewportBounds(gest.cam, stage.stageSize, 0))
   const renderedNodes = $derived((stage.previewing ? [] : stage.view?.nodes ?? []).filter((n) =>
     n.key === editing?.key || n.key === resize?.active || boxInViewport(n, bounds)))
   const renderedGroups = $derived(stage.groups.filter((g) => boxInViewport(g, bounds)))
@@ -121,6 +195,7 @@
 <div
   class="graph__stage"
   class:graph__stage--full={stage.full}
+  class:graph__stage--pan={panMode}
   data-swipe={stage.view?.nodes?.length ? undefined : 'free'}
   bind:this={stage.el}
   onpointerdowncapture={(e) => { if (!(e.target as Element).closest('.zones, .zones__editor')) gest.onTouchDown(e) }}
@@ -152,7 +227,7 @@
   {/if}
 
   {#if !stage.sceneHidden}
-  <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish}>
+  <GraphZones {zones} cam={gest.cam} drawing={zoneDrawing} worldAt={gest.worldAt} onChange={onZonesChange} onFinish={onZoneFinish} onJump={stage.focusZone}>
     {#snippet tools()}
   <GraphTools inline
     selectMode={stage.selectMode}
@@ -162,6 +237,8 @@
     {onHidePicked}
     onClearPicked={stage.clearPicked}
     {onToggleSelect}
+    {panMode}
+    {onTogglePan}
     onFit={stage.fit}
     onRelayout={stage.relayout}
     onToggleFull={stage.toggleFull}
@@ -203,7 +280,8 @@
         deferContent
         onContentMeasure={stage.measureContent}
         {textRevision}
-        loadText={active && !pendingScene && boxInViewport(n, contentBounds)}
+        loadText={n.key === editing?.key || warm.has(n.key)}
+        mapJump={{ keys: mapKeys, jump: (kind, id) => stage.focusNode(`${kind}:${id}`) }}
         raster={rasterOf(n)}
         imagePixels={imagePixels(n,gest.cam,stage.stageSize,typeof window!=='undefined'?window.devicePixelRatio||1:1)}
         tier={tier.get(n.key)}
@@ -221,7 +299,7 @@
         onOpenMore={stage.openMore}
         {onShowChanges}
         resizing={resize?.active === n.key}
-        onResizeStart={resize?.start}
+        onResizeStart={panMode ? undefined : resize?.start}
         onResizeReset={resize?.reset}
       />
     {/each}
@@ -283,6 +361,11 @@
     cursor: grab;
     touch-action: none;
     user-select: none;
+  }
+
+  .graph__stage--pan :global(.gcard),
+  .graph__stage--pan :global(.gcard__body) {
+    cursor: grab;
   }
 
   .graph__stage--full {

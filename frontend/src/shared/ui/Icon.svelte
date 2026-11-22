@@ -30,6 +30,7 @@
   import list from '@/assets/icons/list.svg?raw'
   import map from '@/assets/icons/map.svg?raw'
   import more from '@/assets/icons/more.svg?raw'
+  import pan from '@/assets/icons/pan.svg?raw'
   import pause from '@/assets/icons/pause.svg?raw'
   import pin from '@/assets/icons/pin.svg?raw'
   import play from '@/assets/icons/play.svg?raw'
@@ -95,6 +96,7 @@
     list,
     map,
     more,
+    pan,
     pause,
     pin,
     play,

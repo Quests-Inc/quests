@@ -1,5 +1,5 @@
 // Что показать на экране карты: уровень детализации карточек по видимой площади и модель миникарты.
-import { STUB } from './geometry.ts'
+import { STUB, clampK } from './geometry.ts'
 import type { GraphEdgeView, GraphNodeView } from './types.ts'
 import type { GraphZone } from './zones.ts'
 
@@ -9,8 +9,13 @@ import type { GraphZone } from './zones.ts'
 // Cards keep their box, so nothing moves; the body is simply not built until
 // it matters. Each threshold has ±5% slack around the card's current tier, so
 // a card sitting right on a border does not flicker while zooming.
+// Body text is 14px before the camera scale. A zone overview (~0.15) draws
+// glyphs at ~2px and was building dozens of documents; that stays a silhouette.
+// The working view is already readable around 0.4, so full text starts there
+// and does not wait for a closer zoom.
 const LITE_AREA = 0.005
 const FULL_AREA = 0.01
+const READABLE_K = 0.36
 const SLACK = 1.05
 
 export type Tier = 'lite' | 'title'
@@ -52,7 +57,8 @@ export function computeTiers({
       const share = (sw * sh) / (W * H)
       const was = prev.get(n.key) ?? 'full'
       const lite = share < (was === 'lite' ? LITE_AREA * SLACK : LITE_AREA / SLACK)
-      const full = share >= (was === 'full' ? FULL_AREA / SLACK : FULL_AREA * SLACK)
+      const readable = k >= (was === 'full' ? READABLE_K / SLACK : READABLE_K * SLACK)
+      const full = readable && share >= (was === 'full' ? FULL_AREA / SLACK : FULL_AREA * SLACK)
       if (lite) next.set(n.key, 'lite')
       else if (!full) next.set(n.key, 'title')
     }
@@ -158,6 +164,21 @@ export function boxInViewport(n: { x: number; y: number; w: number; h: number },
       n.y + n.h / 2 >= bounds.y0 &&
       n.y - n.h / 2 <= bounds.y1)
   )
+}
+
+/** Camera that fits a world rectangle in the stage, zooming out as far as needed and never closer than 2.5. */
+export function cameraOnRect(
+  rect: { x: number; y: number; w: number; h: number },
+  stage: { w: number; h: number },
+  fromK: number
+) {
+  if (!stage.w || !stage.h || rect.w < 1 || rect.h < 1) return null
+  const margin = 48
+  const wanted = Math.min((stage.w - margin * 2) / rect.w, (stage.h - margin * 2) / rect.h, 2.5)
+  const k = clampK(wanted, fromK, wanted)
+  const cx = rect.x + rect.w / 2
+  const cy = rect.y + rect.h / 2
+  return { k, x: stage.w / 2 - cx * k, y: stage.h / 2 - cy * k }
 }
 
 /** Include crossing edges even when both cards are outside. Cubic curves stay inside their control hull. */

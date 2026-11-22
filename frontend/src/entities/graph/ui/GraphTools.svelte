@@ -14,6 +14,8 @@
     onHidePicked,
     onClearPicked,
     onToggleSelect,
+    panMode = false,
+    onTogglePan,
     onFit,
     onRelayout,
     onToggleFull,
@@ -31,6 +33,8 @@
     onHidePicked?: () => void
     onClearPicked?: () => void
     onToggleSelect: () => void
+    panMode?: boolean
+    onTogglePan?: () => void
     onFit: () => void
     onRelayout?: () => void
     onToggleFull: () => void
@@ -73,6 +77,19 @@
     >
       <Icon name="select" size={16} />
     </button>
+    {#if onTogglePan}
+      <button
+        type="button"
+        class="gtool"
+        class:gtool--on={panMode}
+        aria-pressed={panMode}
+        title="Режим перемещения (H): только панорама и зум, без переноса карточек и прокрутки заметок. Esc — выйти"
+        aria-label="Режим перемещения"
+        onclick={onTogglePan}
+      >
+        <Icon name="pan" size={16} />
+      </button>
+    {/if}
     <button type="button" class="gtool" title="Вписать карту в окно (F)" aria-label="Вписать карту в окно" onclick={onFit}>
       <Icon name="fit" size={16} />
     </button>

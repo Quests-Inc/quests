@@ -64,6 +64,18 @@ test('computeTiers: далеко за экраном — lite, мелкая — 
   expect(out.has('step:plain')).toBe(false)
 })
 
+test('computeTiers: обзор зоны без текста, рабочий масштаб уже с markdown', () => {
+  const stage = { w: 1920, h: 1080 }
+  const nodes = [card('note:1', 800, 600, { type: 'note', w: 1500, h: 1200, desc: 'текст' })]
+  const opts = { nodes, stage, ready: true, prev: new Map() }
+  expect(computeTiers({ ...opts, cam: { k: 0.15, x: 400, y: 200 } }).get('note:1')).toBe('title')
+  expect(computeTiers({ ...opts, cam: { k: 0.25, x: 400, y: 200 } }).get('note:1')).toBe('title')
+  // Приближение с силуэта: порог чуть выше, чтобы карточка не мигала на границе.
+  const titled = new Map([['note:1', 'title']])
+  expect(computeTiers({ ...opts, cam: { k: 0.4, x: 400, y: 200 }, prev: titled }).has('note:1')).toBe(false)
+  expect(computeTiers({ ...opts, cam: { k: 0.45, x: 400, y: 200 } }).has('note:1')).toBe(false)
+})
+
 test('computeTiers: не готово — пусто; без изменений возвращает прежний Map; редактируемая — полная', () => {
   const stage = { w: 1000, h: 800 }
   const cam = { k: 1, x: 0, y: 0 }

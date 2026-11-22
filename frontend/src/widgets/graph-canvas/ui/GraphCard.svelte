@@ -12,6 +12,7 @@
   import { QuestlineIcon } from '@/entities/questline'
   import { MentionTextarea } from '@/entities/template'
   import { statusWord } from '@/shared/lib/questStatus.ts'
+  import type { MapJump } from '@/shared/lib/mapJumps.ts'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
 
   /**
@@ -51,6 +52,7 @@
     onStartEdit,
     onFinishEdit,
     onOpen,
+    mapJump = null,
     labels = {},
     onOpenMore,
     onShowChanges,
@@ -93,6 +95,8 @@
     onStartEdit(n: GraphNodeView, opts?: { caret?: number | null }): void
     onFinishEdit: (save: boolean) => void
     onOpen?: (kind: string, id: number) => void
+    /** Ссылки на сущности этого же холста получают кнопку перехода камеры. */
+    mapJump?: MapJump | null
     /** Подписи ссылок kind:id → заголовок, те же что в обычном просмотре. */
     labels?: Record<string, string>
     onOpenMore(n: GraphNodeView, type: string): void
@@ -308,14 +312,10 @@ function beginNoteEdit(event: MouseEvent, node: GraphNodeView) {
               <span class="gcard__prog">{n.progress}</span>
             {/if}
           </div>
-          {#if n.type==='note'&&tier==='title'}<NoteSilhouette text={n.desc||''}/>{/if}
-          {#if bodyText && tier !== 'title'}
+          {#if n.type==='note'&&(tier==='title' || !contentReady)}<NoteSilhouette text={n.desc||''}/>{/if}
+          {#if bodyText && tier !== 'title' && contentReady}
             <div class="gcard__body" style:max-height={n.sh != null ? undefined : `${big ? CARD[n.type].max : CARD.stepBody.max}px`}>
-              {#if contentReady}
-              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} onRef={(k, id) => onOpen?.(k, id)} />
-              {:else}
-                <div class="gcard__placeholder" aria-hidden="true">{bodyText}</div>
-              {/if}
+              <MarkdownBody source={bodyText} {labels} host={hostOf} ownValues={!!hostOf} {mapJump} paceMedia={deferContent} onRef={(k, id) => onOpen?.(k, id)} />
               {#if textLoading}<p role="status">Загрузка полного текста…</p>{/if}
               {#if textError}<button type="button" onpointerdown={e => e.stopPropagation()} onclick={() => textRetry++}>Повторить загрузку полного текста</button>{/if}
             </div>
