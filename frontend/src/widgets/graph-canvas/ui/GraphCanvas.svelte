@@ -94,7 +94,7 @@
     children?: Snippet
   } = $props()
 
-  const pendingScene = $derived((switching && !stage.view) || loading || stage.previewing || stage.sceneHidden)
+  const pendingScene = $derived(((switching || loading) && !stage.view) || stage.previewing || stage.sceneHidden)
 
   // Markdown starts once the camera is still, two cards a frame. Photos take their address two a frame and do not wait for that.
   let warm = $state(new Set<string>())
