@@ -186,6 +186,21 @@ test('сборка убирает квест вне статуса вместе 
   expect(cam().k).toBeGreaterThan(0)
 })
 
+test('an added image does not reset the ready state of the existing scene', async () => {
+  const { stage, data } = make()
+  stage.compose()
+  await flush()
+  expect(stage.ready).toBe(true)
+
+  data.nodes.push(node('attachment:5', 'attachment', { mime: 'image/png' }))
+  data.edges.push({ from: 'quest:1', to: 'attachment:5', kind: 'structure' })
+  stage.compose()
+  expect(stage.ready).toBe(true)
+  await flush()
+  expect(stage.ready).toBe(true)
+  expect(stage.nodeMap.has('attachment:5')).toBe(true)
+})
+
 test('скрытая вкладка откладывает сборку, poke её дожимает', async () => {
   const box = make()
   box.setActive(false)

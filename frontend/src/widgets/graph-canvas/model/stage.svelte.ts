@@ -262,11 +262,10 @@ export function createGraphStage(deps: {
     if (cam) deps.setCam(cam)
   }
 
-  /** Спрятать карточки, измерить, разложить, показать. Камера вписывается только при новом центре или глубине. */
+  /** Измерить и разложить карточки. Уже готовая сцена остаётся интерактивной, пока обновление собирается поверх неё. */
   async function rebuild(g: { root?: string; nodes: GraphNodeView[]; edges: ViewEdge[] }, open: Set<string>) {
     const mine = ++buildSeq
     const wasReady = untrack(() => ready)
-    ready = false
     // The sizes are put on the plain nodes before they become state: reading `view` back here would make this effect depend on its own write.
     const fresh = prepareGraph(g, open, deps.folds.loose)
     for (const n of fresh.nodes) {
