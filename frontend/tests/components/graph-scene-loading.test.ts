@@ -4,20 +4,34 @@ import { flushSync, mount, unmount } from 'svelte'
 
 import GraphCanvas from '@/widgets/graph-canvas/ui/GraphCanvas.svelte'
 
-function mountScene({ existing = true }: { existing?: boolean } = {}) {
-  const node = {
-    key: 'attachment:42',
-    id: 42,
-    type: 'attachment',
-    title: 'Image.png',
-    mime: 'image/png',
-    x: 100,
-    y: 100,
-    w: 96,
-    h: 96,
-    links: 0,
-    depth: 0,
-  }
+function mountScene({ existing = true, note = false }: { existing?: boolean; note?: boolean } = {}) {
+  const node = note
+    ? {
+        key: 'note:42',
+        id: 42,
+        type: 'note',
+        title: 'Note',
+        desc: 'Visible note text',
+        x: 100,
+        y: 100,
+        w: 320,
+        h: 240,
+        links: 0,
+        depth: 0,
+      }
+    : {
+        key: 'attachment:42',
+        id: 42,
+        type: 'attachment',
+        title: 'Image.png',
+        mime: 'image/png',
+        x: 100,
+        y: 100,
+        w: 96,
+        h: 96,
+        links: 0,
+        depth: 0,
+      }
   const nodes = existing ? [node] : []
   const view = existing ? { nodes, edges: [], groups: [] } : null
   const stage = {
@@ -108,6 +122,18 @@ test('background graph loading keeps the existing scene visible', async () => {
   expect(target.querySelector('.gworld')?.classList.contains('gworld--hidden')).toBe(false)
   expect(target.querySelector('[data-gkey="attachment:42"]')).not.toBeNull()
   expect(target.querySelector('.graph__foot')).not.toBeNull()
+  await unmount(app)
+  target.remove()
+})
+
+test('a visible note leaves its silhouette after the camera stops', async () => {
+  const { app, target } = mountScene({ note: true })
+  for (let i = 0; i < 20 && !target.querySelector('.md'); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    flushSync()
+  }
+  expect(target.querySelector('.note-outline')).toBeNull()
+  expect(target.querySelector('.md')?.textContent).toContain('Visible note text')
   await unmount(app)
   target.remove()
 })

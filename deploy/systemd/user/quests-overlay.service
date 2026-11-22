@@ -22,8 +22,9 @@ ExecStart=/usr/bin/env just run-overlay
 Restart=on-failure
 RestartSec=3
 # Leak guard (quest=478): kill+restart instead of throttling (MemoryHigh froze the HUD).
-MemoryMax=1G
-MemorySwapMax=512M
+# High enough for `just run-overlay` to rebuild gotk4/cgo in this unit (parallel cgo).
+MemoryMax=12G
+MemorySwapMax=4G
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=quests-overlay

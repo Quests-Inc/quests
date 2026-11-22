@@ -9,13 +9,11 @@ import type { GraphZone } from './zones.ts'
 // Cards keep their box, so nothing moves; the body is simply not built until
 // it matters. Each threshold has ±5% slack around the card's current tier, so
 // a card sitting right on a border does not flicker while zooming.
-// Body text is 14px before the camera scale. A zone overview (~0.15) draws
-// glyphs at ~2px and was building dozens of documents; that stays a silhouette.
-// The working view is already readable around 0.4, so full text starts there
-// and does not wait for a closer zoom.
+// Letters scale with the card, so a line keeps the same number of characters
+// at every zoom. A zone overview still shows the text once the card covers
+// about 1% of the window. Farther out it stays a silhouette.
 const LITE_AREA = 0.005
 const FULL_AREA = 0.01
-const READABLE_K = 0.36
 const SLACK = 1.05
 
 export type Tier = 'lite' | 'title'
@@ -57,8 +55,7 @@ export function computeTiers({
       const share = (sw * sh) / (W * H)
       const was = prev.get(n.key) ?? 'full'
       const lite = share < (was === 'lite' ? LITE_AREA * SLACK : LITE_AREA / SLACK)
-      const readable = k >= (was === 'full' ? READABLE_K / SLACK : READABLE_K * SLACK)
-      const full = readable && share >= (was === 'full' ? FULL_AREA / SLACK : FULL_AREA * SLACK)
+      const full = share >= (was === 'full' ? FULL_AREA / SLACK : FULL_AREA * SLACK)
       if (lite) next.set(n.key, 'lite')
       else if (!full) next.set(n.key, 'title')
     }
