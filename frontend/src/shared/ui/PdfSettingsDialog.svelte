@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte'
   import ModalShell from './ModalShell.svelte'
   import ModalHead from './ModalHead.svelte'
+  import Icon from './Icon.svelte'
  import PdfPreview from './PdfPreview.svelte'
   import ModalFoot from './ModalFoot.svelte'
   import { renderPdf } from '@/shared/api/exportPdf.ts'
@@ -45,8 +46,7 @@
   })
   function chooseBackground(event:Event){
     const select=event.currentTarget as HTMLSelectElement
-    if(select.value==='upload'){select.value=String(draft.background_image);uploadInput?.click()}
-    else draft.background_image=Number(select.value)
+    draft.background_image=Number(select.value)
   }
   async function uploadBackground(event:Event){
     const input=event.currentTarget as HTMLInputElement
@@ -178,13 +178,18 @@
           <summary>Фон</summary>
           <div class="settings-grid">
             <label class="field"><span class="label">Цвет фона</span><span class="color-input"><input type="color" bind:value={draft.background_color} /></span></label>
-            <label class="field"><span class="label">Фоновое изображение</span><select value={draft.background_image} onchange={chooseBackground}><option value={0}>Без изображения</option>{#each images as image (image.id)}<option value={image.id}>{image.filename}</option>{/each}{#if session.attachmentOwner}<option value="upload">Загрузить изображение…</option>{/if}</select></label>
+            <div class="field">
+              <label class="label" for="pdf-background-image">Фоновое изображение</label>
+              <div class="background-picker">
+                <select id="pdf-background-image" value={draft.background_image} onchange={chooseBackground}><option value={0}>Без изображения</option>{#each images as image (image.id)}<option value={image.id}>{image.filename}</option>{/each}</select>
+                {#if session.attachmentOwner}<button type="button" class="btn btn--ghost btn--icon background-upload" onclick={()=>uploadInput?.click()} disabled={busy} aria-label="Загрузить изображение" title="Загрузить изображение вложением"><Icon name="add" size={16} /></button>{/if}
+              </div>
+            </div>
             <label class="field"><span class="label">Непрозрачность, %</span><input type="number" min="0" max="100" step="5" value={Math.round(draft.background_opacity*100)} oninput={e=>draft.background_opacity=Number(e.currentTarget.value)/100} /></label>
             <label class="field"><span class="label">Размещение</span><select bind:value={draft.background_fit}><option value="contain">Вписать целиком</option><option value="cover">Заполнить с обрезкой</option></select></label>
           </div>
           {#if session.attachmentOwner}
             <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" bind:this={uploadInput} onchange={uploadBackground} hidden aria-label="Загрузить фоновое изображение" />
-            <button type="button" class="btn" onclick={()=>uploadInput?.click()} disabled={busy}>Загрузить изображение…</button>
             <p class="hint">{session.attachmentOwner.kind==='note'?'Изображение будет загружено вложением к этой заметке.':'Изображение будет загружено вложением к этому квесту.'} После загрузки оно автоматически выберется фоном.</p>
           {/if}
           <p class="hint">Фон повторяется на каждой странице. PNG, JPEG, GIF или WebP.</p>
@@ -223,6 +228,9 @@
   .pdf-controls{--field-h:calc(var(--text-sm, 0.875rem) * 1.45 + 0.9rem + 2px)}
   .field{min-width:0}.field input,.field select{width:100%;box-sizing:border-box;min-width:0}
   .field input:not([type='color']),.field select{height:var(--field-h)}
+  .background-picker{display:flex;align-items:center;gap:.35rem;min-width:0}
+  .background-picker select{flex:1;min-width:0}
+  .background-upload{flex:none;width:var(--field-h);height:var(--field-h);padding:0;box-sizing:border-box}
   .color-input{display:flex;align-items:center;box-sizing:border-box;width:100%;height:var(--field-h);padding:0 .55rem;border:1px solid var(--color-border, #333);border-radius:var(--radius-md, 4px);background:var(--color-bg, #121212)}
   .color-input input{appearance:none;-webkit-appearance:none;width:100%;height:1.05rem;margin:0;padding:0;border:0;background:transparent;cursor:pointer}
   .color-input input::-webkit-color-swatch-wrapper{padding:0}

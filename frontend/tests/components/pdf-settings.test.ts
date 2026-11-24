@@ -107,9 +107,7 @@ test('background upload belongs to the exported note and is selected immediately
       flushSync()
     }
     expect(uploads.at(-1)).toEqual({ kind: 'note', id: 15, name: 'my-background.png' })
-    const selector = [...target.querySelectorAll('select')].find((select) =>
-      [...select.options].some((option) => option.value === 'upload')
-    )!
+    const selector = target.querySelector('#pdf-background-image') as HTMLSelectElement
     expect(selector.value).toBe('99')
     expect(selector.textContent).toContain('my-background.png')
     expect(localStorage.getItem('upload-test')).toBeNull()
