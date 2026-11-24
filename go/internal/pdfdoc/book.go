@@ -72,7 +72,7 @@ func (r *Renderer) book(chapters []Chapter) {
 		src := []byte(c.Markdown)
 		doc := md.Parser().Parse(text.NewReader(src))
 		table := ""
-		ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 			if !entering {
 				return ast.WalkContinue, nil
 			}
