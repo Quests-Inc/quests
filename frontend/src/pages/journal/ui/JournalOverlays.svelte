@@ -1,4 +1,5 @@
 <script lang="ts">
+ import PdfExportSettings from '@/shared/ui/PdfExportSettings.svelte'
   import { attachmentCatalog, flattenAttachmentIndex } from '@/entities/attachment'
   import { noteCatalog } from '@/entities/note'
   import { questCatalog } from '@/entities/quest'
@@ -105,3 +106,5 @@
   onCancel={desk.del.cancelLine}
   onConfirm={desk.del.confirmLine}
 />
+
+<PdfExportSettings />

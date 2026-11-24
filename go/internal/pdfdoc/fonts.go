@@ -13,9 +13,10 @@ import (
 var fontFS embed.FS
 
 const (
-	famSerif = "dvserif"
-	famSans  = "dvsans"
-	famMono  = "dvmono"
+	famSerif  = "dvserif"
+	famSans   = "dvsans"
+	famMono   = "dvmono"
+	famGothic = "gothic"
 )
 
 func registerFonts(pdf *fpdf.Fpdf) error {
@@ -28,6 +29,8 @@ func registerFonts(pdf *fpdf.Fpdf) error {
 		{famSans, "B", "DejaVuSans-Bold.ttf"},
 		{famMono, "", "DejaVuSansMono.ttf"},
 		{famMono, "B", "DejaVuSansMono-Bold.ttf"},
+		{famGothic, "", "CyrillicGothSHA.ttf"},
+		{famGothic, "B", "CyrillicGothSHA-Bold.ttf"},
 	} {
 		b, err := fontFS.ReadFile("fonts/" + f.file)
 		if err != nil {

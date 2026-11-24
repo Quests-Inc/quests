@@ -46,7 +46,7 @@ test('PDF: идёт с прогрессом, пока занято — повт�
   release()
   await first
   expect(exp.busy).toBe(false)
-  expect(exp.items[1].label).toBe('PDF')
+  expect(exp.items[1].label).toBe('PDF · Стандартный')
   expect(log).toEqual([])
 })
 
@@ -79,4 +79,17 @@ test('меню: открывается под кнопкой', () => {
   expect([exp.menuX, exp.menuY]).toEqual([40, 104])
   exp.menuOpen = false
   expect(exp.menuOpen).toBe(false)
+})
+
+test('PDF menu exposes single-note and book exports, book flag reaches downloader', async () => {
+  const calls: boolean[] = []
+  const { exp } = make({
+    downloadPdf: async (_p: unknown, book: boolean) => {
+      calls.push(book)
+    },
+  })
+  expect(exp.items[1].children?.map((item) => item.id)).toEqual(['pdf', 'pdf-book', 'pdf-settings'])
+  await exp.run(payload, 'pdf-book')
+  await exp.run(payload, 'pdf')
+  expect(calls).toEqual([true, false])
 })

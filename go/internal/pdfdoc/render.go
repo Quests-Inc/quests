@@ -18,11 +18,25 @@ func Render(ctx context.Context, doc Document, loader ImageLoader, w io.Writer) 
 			total += len(s.Markdown) + len(s.Title)
 		}
 	}
+	for _, c := range doc.Chapters {
+		total += len(c.Title) + len(c.Markdown)
+	}
+	if len(doc.Chapters) > 1000 {
+		return fmt.Errorf("pdfdoc: too many chapters")
+	}
 	if total > MaxMarkdownBytes {
 		return fmt.Errorf("pdfdoc: document is larger than %d MB", MaxMarkdownBytes>>20)
 	}
 
-	pdf := fpdf.New("P", "mm", "A4", "")
+	options := DefaultOptions()
+	if doc.Options != nil {
+		options = *doc.Options
+	}
+	if err := options.validate(); err != nil {
+		return err
+	}
+	width, height := options.dimensions()
+	pdf := fpdf.NewCustom(&fpdf.InitType{OrientationStr: "P", UnitStr: "mm", Size: fpdf.SizeType{Wd: width, Ht: height}})
 	pdf.SetMargins(marginX, marginTop, marginX)
 	pdf.SetAutoPageBreak(false, 0)
 	pdf.SetCompression(true)
@@ -33,16 +47,20 @@ func Render(ctx context.Context, doc Document, loader ImageLoader, w io.Writer) 
 		return err
 	}
 	pdf.AliasNbPages("{nb}")
-	pdf.SetFooterFunc(func() {
-		pdf.SetY(-11)
-		pdf.SetFont(famSans, "", 7.5)
-		pdf.SetTextColor(colMuted[0], colMuted[1], colMuted[2])
-		pdf.CellFormat(0, 4, fmt.Sprintf("%d / {nb}", pdf.PageNo()), "", 0, "C", false, 0, "")
-	})
+	r := &Renderer{ctx: ctx, pdf: pdf, loader: loader, labels: doc.Labels, options: options, x0: options.Left + options.Binding, w: width - options.Left - options.Right - options.Binding}
+	if err := r.prepareBackground(); err != nil {
+		return err
+	}
+	pdf.SetFooterFunc(func() { r.pageNumber() })
 
-	r := &Renderer{ctx: ctx, pdf: pdf, loader: loader, labels: doc.Labels, x0: marginX, w: pageW - 2*marginX}
+	if strings.HasPrefix(doc.ReferenceBase, "https://") || strings.HasPrefix(doc.ReferenceBase, "http://") {
+		r.referenceBase = doc.ReferenceBase
+	}
 	r.newPage()
 	r.header(doc)
+	if doc.Book {
+		r.book(doc.Chapters)
+	}
 	for _, b := range doc.Blocks {
 		if !r.ok() {
 			break
@@ -60,7 +78,7 @@ func (r *Renderer) header(doc Document) {
 	if title == "" {
 		title = "Без названия"
 	}
-	ts := style{fam: famSans, bold: true, size: 19, color: rgb{17, 17, 17}}
+	ts := style{fam: r.headingFamily(), bold: true, size: r.fontSize(19), color: r.textColor()}
 	var toks []token
 	r.textTokens(ts, title, &toks)
 	r.paragraph(toks, "")
@@ -70,15 +88,15 @@ func (r *Renderer) header(doc Document) {
 		var meta []token
 		for i, c := range doc.Meta {
 			if i > 0 {
-				r.textTokens(style{fam: famSans, size: 8.8, color: colMuted}, "  ·  ", &meta)
+				r.textTokens(style{fam: famSans, size: r.fontSize(8.8), color: colMuted}, "  ·  ", &meta)
 			}
-			r.textTokens(style{fam: famSans, size: 8.8, color: hexColor(c.Color, colMuted)}, c.Text, &meta)
+			r.textTokens(style{fam: famSans, size: r.fontSize(8.8), color: hexColor(c.Color, colMuted)}, c.Text, &meta)
 		}
 		r.paragraph(meta, "")
 	}
 	if doc.Footnote != "" {
 		var foot []token
-		r.textTokens(style{fam: famSans, size: 8, color: colMuted}, doc.Footnote, &foot)
+		r.textTokens(style{fam: famSans, size: r.fontSize(8), color: colMuted}, doc.Footnote, &foot)
 		r.paragraph(foot, "")
 	}
 	r.gap(4)
@@ -91,7 +109,7 @@ func (r *Renderer) sectionLabel(label string) {
 	r.gap(3)
 	r.ensure(12)
 	var toks []token
-	r.textTokens(style{fam: famSans, bold: true, size: 7.8, color: colMuted}, strings.ToUpper(label), &toks)
+	r.textTokens(style{fam: r.headingFamily(), bold: true, size: r.fontSize(7.8), color: colMuted}, strings.ToUpper(label), &toks)
 	r.paragraph(toks, "")
 	y := r.pdf.GetY() + 0.4
 	r.pdf.SetDrawColor(colRule[0], colRule[1], colRule[2])
@@ -102,7 +120,7 @@ func (r *Renderer) sectionLabel(label string) {
 
 func (r *Renderer) muted(text string) {
 	var toks []token
-	r.textTokens(style{fam: famSerif, italic: true, size: 9.5, color: colMuted}, text, &toks)
+	r.textTokens(style{fam: famSerif, italic: true, size: r.fontSize(9.5), color: colMuted}, text, &toks)
 	r.paragraph(toks, "")
 }
 
@@ -144,8 +162,8 @@ func (r *Renderer) block(b Block) {
 		r.sectionLabel(b.Label)
 		for _, it := range b.Items {
 			var toks []token
-			st := bodyStyle()
-			st.size = 9.8
+			st := r.bodyStyle()
+			st.size = r.fontSize(9.8)
 			r.textTokens(st, "•  "+it, &toks)
 			r.paragraph(toks, "")
 		}
@@ -166,8 +184,8 @@ func (r *Renderer) step(s Step) {
 	if s.Done {
 		mark, markCol = "✓", colGreen
 	}
-	title := bodyStyle()
-	title.size = 10.2
+	title := r.bodyStyle()
+	title.size = r.fontSize(10.2)
 	if s.Done {
 		title.color = colMuted
 	}
@@ -182,12 +200,12 @@ func (r *Renderer) step(s Step) {
 		return
 	}
 	y := r.pdf.GetY()
-	ms := style{fam: famSans, size: 10.5, color: markCol}
+	ms := style{fam: famSans, size: r.fontSize(10.5), color: markCol}
 	r.setStyle(ms)
 	fontMM := 10.5 * ptMM
 	r.pdf.Text(r.x0, y+(lines[0].h-fontMM)/2+fontMM*0.8, mark)
 	if s.Progress != "" {
-		ps := style{fam: famSans, size: 8.5, color: colMuted}
+		ps := style{fam: famSans, size: r.fontSize(8.5), color: colMuted}
 		pw := r.measure(ps, s.Progress)
 		r.setStyle(ps)
 		r.pdf.Text(r.x0+r.w-pw, y+(lines[0].h-8.5*ptMM)/2+8.5*ptMM*0.8, s.Progress)
@@ -201,21 +219,21 @@ func (r *Renderer) step(s Step) {
 		r.pageTop = false
 	}
 	if strings.TrimSpace(s.Markdown) != "" {
-		saveX, saveW := r.x0, r.w
+		saveX, saveW, saveLeft := r.x0, r.w, r.leftMargin(r.pdf.PageNo())
 		r.x0 += markW
 		r.w -= markW
 		r.gap(0.8)
 		r.markdown(s.Markdown)
-		r.x0, r.w = saveX, saveW
+		r.x0, r.w = saveX+r.leftMargin(r.pdf.PageNo())-saveLeft, saveW
 	}
 	r.gap(1.6)
 }
 
 func (r *Renderer) fact(f Fact) {
 	const labelW = 44.0
-	ls := style{fam: famSans, size: 8.6, color: colMuted}
-	vs := bodyStyle()
-	vs.size = 9.8
+	ls := style{fam: famSans, size: r.fontSize(8.6), color: colMuted}
+	vs := r.bodyStyle()
+	vs.size = r.fontSize(9.8)
 	var lt, vt []token
 	r.textTokens(ls, f.Label, &lt)
 	r.textTokens(vs, f.Value, &vt)

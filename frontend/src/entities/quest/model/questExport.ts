@@ -66,7 +66,10 @@ export async function downloadQuestMarkdown(quest: any) {
 }
 
 /** Renders the quest to PDF on the server. */
-export async function downloadQuestPdf(quest: any, opts: { labels?: Record<string, string>; tzLabel?: string } = {}) {
+export async function downloadQuestPdf(
+  quest: any,
+  opts: { labels?: Record<string, string>; tzLabel?: string; configure?: boolean } = {}
+) {
   if (!quest) return
   quest = await withBakedScripts(quest)
   let attachments: AttachmentView[] = []
@@ -75,8 +78,9 @@ export async function downloadQuestPdf(quest: any, opts: { labels?: Record<strin
   } catch {
     // attachments are a nice-to-have in the export; don't block on them
   }
-  await downloadPdf(
+  return downloadPdf(
     buildQuestPdfDocument(quest, { ...opts, attachments }, { significanceLabel, periodBadge, quantifiedProgress }),
-    questExportFilename(quest)
+    questExportFilename(quest),
+    { configure: opts.configure }
   )
 }

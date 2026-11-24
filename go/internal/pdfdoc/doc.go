@@ -9,13 +9,17 @@ package pdfdoc
 
 // Document is what one PDF is made of.
 type Document struct {
-	Title string     `json:"title"`
-	Meta  []MetaChip `json:"meta,omitempty"`
+	Options  *Options   `json:"options,omitempty"`
+	Title    string     `json:"title"`
+	Book     bool       `json:"book,omitempty"`
+	Chapters []Chapter  `json:"chapters,omitempty"`
+	Meta     []MetaChip `json:"meta,omitempty"`
 	// Footnote is a small gray line under the title ("Выгрузка: …").
 	Footnote string  `json:"footnote,omitempty"`
 	Blocks   []Block `json:"blocks"`
 	// Labels turn journal refs in markdown (`note=12`) into titles: "note:12" → "Деплой".
-	Labels map[string]string `json:"labels,omitempty"`
+	Labels        map[string]string `json:"labels,omitempty"`
+	ReferenceBase string            `json:"reference_base,omitempty"`
 }
 
 // MetaChip is one fragment of the line under the title; Color is #rrggbb or empty.
@@ -70,3 +74,11 @@ const (
 	MaxImageBytes    = 12 << 20
 	maxImagePixels   = 40_000_000
 )
+
+// Chapter retains the source note's identity and position in its tree.
+type Chapter struct {
+	NoteID   int64  `json:"note_id"`
+	Title    string `json:"title"`
+	Depth    int    `json:"depth"`
+	Markdown string `json:"markdown"`
+}

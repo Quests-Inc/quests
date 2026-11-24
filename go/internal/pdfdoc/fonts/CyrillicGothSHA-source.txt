@@ -1,0 +1,6 @@
+CyrillicGothSHA regular and bold were supplied by the workspace user for Quests
+PDF export on 2026-11-24, in cyrillicgothsha.zip:
+- CyrillicGothSHA_1.otf
+- CyrillicGothSHA Bold_1.otf
+Both have TrueType outlines and a TrueType sfnt signature. They are stored
+unmodified with .ttf suffixes for the existing embedded-font pipeline.

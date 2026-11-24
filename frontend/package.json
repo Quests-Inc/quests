@@ -24,6 +24,7 @@
     "jspdf": "^4.2.1",
     "katex": "^0.19.1",
     "marked": "^18.0.13",
+    "pdfjs-dist": "^6.5.438",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {

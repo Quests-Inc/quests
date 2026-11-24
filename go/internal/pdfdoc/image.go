@@ -92,7 +92,7 @@ func isProgressive(b []byte) bool {
 // image paints an attachment image as a block (or a placeholder when it cannot).
 func (r *Renderer) image(ref imageRef) {
 	placeholder := func(string) {
-		st := bodyStyle()
+		st := r.bodyStyle()
 		st.color, st.italic = colMuted, true
 		var toks []token
 		r.textTokens(st, fmt.Sprintf("▢ вложение недоступно (attachment=%d)", ref.id), &toks)
@@ -118,7 +118,7 @@ func (r *Renderer) image(ref imageRef) {
 	if wmm > r.w {
 		hmm, wmm = hmm*r.w/wmm, r.w
 	}
-	if maxH := (pageH - marginTop - marginBottom) * 0.8; hmm > maxH {
+	if maxH := (r.pageHeight() - r.topMargin() - r.bottomMargin()) * 0.8; hmm > maxH {
 		wmm, hmm = wmm*maxH/hmm, maxH
 	}
 	r.ensure(hmm + 2)

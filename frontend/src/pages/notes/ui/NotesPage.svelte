@@ -1,4 +1,5 @@
 <script lang="ts">
+ import { pdfPreferences } from '@/shared/lib/pdfSettings.svelte.ts'
   import { QuestlineIcon } from '@/entities/questline'
   import { uiPreferences } from '@/shared/model/uiPreferences.svelte.ts'
   import { createEntitySearch, searchFilters } from '@/shared/lib/entitySearch.svelte.ts'
@@ -414,8 +415,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
   }
 
   const noteExport = createNoteExport({
-    downloadMarkdown: downloadNoteMarkdown,
-    downloadPdf: (payload) => downloadNotePdf(payload, { labels }),
+    downloadMarkdown: async (payload) => downloadNoteMarkdown(payload.id === selectedId ? payload : await getNote(payload.id)),
+    downloadPdf: async (payload, book, configure) => downloadNotePdf(payload.id === selectedId ? payload : await getNote(payload.id), { labels, book, configure }),
     setError: (message) => (ed.error = message),
   })
   let exportBusy = $derived(noteExport.busy)
@@ -445,6 +446,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       note: ctxNote,
       searchActive,
       exportBusy,
+      exportPresetName:pdfPreferences.name,
       moveTargets: moveTargetItems(ctxNote, notes, hasChildren),
       moveSearch: ctxNote ? moveSearchItems([ctxNote.id], notes) : [],
     }),
@@ -559,6 +561,8 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     'move-up': moveNoteUp,
     'export-md': (id) => exportNoteById(id, 'md'),
     'export-pdf': (id) => exportNoteById(id, 'pdf'),
+    'export-pdf-book': (id) => exportNoteById(id, 'pdf-book'),
+    'export-pdf-settings': (id) => exportNoteById(id, 'pdf-settings'),
     icon: (id) => ((iconModalNoteId = id), (iconModalOpen = true)),
     delete: requestDelete,
   }

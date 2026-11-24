@@ -250,7 +250,7 @@
     max-width: min(22rem, calc(100vw - 16px));
     padding: 0.35rem;
     border: 1px solid var(--color-border-strong, #4a4a4a);
-    border-radius: var(--radius-md, 4px);
+    border-radius: var(--radius-lg, 12px);
     background: var(--color-bg-raised, #1a1a1a);
     box-shadow: 0 10px 28px color-mix(in srgb, #000 45%, transparent);
   }
@@ -260,7 +260,7 @@
     width: 100%;
     padding: 0.35rem 0.5rem;
     border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-sm, 2px);
+    border-radius: max(0px, calc(var(--radius-lg, 12px) - 0.35rem));
     background: var(--color-bg, #121212);
     color: var(--color-fg, #e8e8e8);
     font-family: var(--font-ui, sans-serif);

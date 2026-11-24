@@ -416,7 +416,7 @@
     margin: 0.2rem 0.2rem 0.3rem;
     padding: 0.35rem 0.5rem;
     border: 1px solid var(--color-border, #333);
-    border-radius: var(--radius-md, 4px);
+    border-radius: max(0px, calc(var(--radius-lg, 12px) - 0.45rem));
     background: var(--color-bg, #121212);
     color: var(--color-fg, #e8e8e8);
     font: inherit;

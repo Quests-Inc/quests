@@ -17,7 +17,7 @@ import (
 var md = goldmark.New(goldmark.WithExtensions(extension.Table, extension.Strikethrough, extension.TaskList), goldmark.WithParserOptions(parser.WithInlineParsers(util.Prioritized(mathParser{}, 50)), parser.WithBlockParsers(util.Prioritized(mathBlockParser{}, 50))))
 
 // refRe is the journal's own reference syntax (frontend/src/lib/js/refs.js).
-var refRe = regexp.MustCompile(`\b(note|quest|questline|step|attachment|template)=(\d+)\b`)
+var refRe = regexp.MustCompile(`\b(note|quest|questline|step|attachment|template)=(\d+)\b(?:#([a-z][a-z0-9_-]{0,63}(?:/[a-z][a-z0-9_-]{0,63})?))?`)
 
 // attachmentDest is how markdown names an image: ![alt|center](attachment=12).
 var attachmentDest = regexp.MustCompile(`^attachment=(\d+)$`)
@@ -43,16 +43,16 @@ func (r *Renderer) blocks(parent ast.Node, src []byte) {
 				continue
 			}
 			var toks []token
-			r.mathTokens(&mathNode{source: v.source, display: false}, bodyStyle(), &toks)
+			r.mathTokens(&mathNode{source: v.source, display: false}, r.bodyStyle(), &toks)
 			r.paragraph(toks, "center")
 			r.gap(2.4)
 		case *ast.Heading:
 			r.heading(v, src)
 		case *ast.Paragraph:
-			r.paragraph(r.inlineTokens(v, src, bodyStyle()), "")
+			r.paragraph(r.inlineTokens(v, src, r.bodyStyle()), "")
 			r.gap(2.4)
 		case *ast.TextBlock:
-			r.paragraph(r.inlineTokens(v, src, bodyStyle()), "")
+			r.paragraph(r.inlineTokens(v, src, r.bodyStyle()), "")
 			r.gap(0.8)
 		case *ast.List:
 			r.list(v, src)
@@ -73,6 +73,7 @@ func (r *Renderer) blocks(parent ast.Node, src []byte) {
 		case *ast.HTMLBlock:
 			raw := strings.TrimSpace(strings.Join(blockLines(v, src), "\n"))
 			if strings.HasPrefix(raw, "<!--") && strings.HasSuffix(raw, "-->") {
+				r.blockMarkers(raw)
 				continue
 			}
 			// Raw HTML is not rendered (the app sanitizes it away too): show it as text.
@@ -100,18 +101,18 @@ func blockLines(n ast.Node, src []byte) []string {
 var headingSizes = [...]float64{0, 17, 14.5, 12.5, 11, 10.5, 10}
 
 func (r *Renderer) heading(h *ast.Heading, src []byte) {
-	lvl := h.Level
+	lvl := h.Level + r.headingOffset
 	if lvl < 1 {
 		lvl = 1
 	}
 	if lvl > 6 {
 		lvl = 6
 	}
-	st := style{fam: famSans, bold: true, size: headingSizes[lvl], color: rgb{17, 17, 17}}
+	st := style{fam: r.headingFamily(), bold: true, size: r.fontSize(headingSizes[lvl]), color: r.textColor()}
 	toks := r.inlineTokens(h, src, st)
 	r.gap(3.2)
 	// keep a heading with the first lines of what follows it
-	r.ensure(r.lineHeight(st.size) + 2*r.lineHeight(bodyStyle().size))
+	r.ensure(r.lineHeight(st.size) + 2*r.lineHeight(r.bodyStyle().size))
 	r.paragraph(toks, "")
 	r.gap(1.3)
 }
@@ -140,7 +141,7 @@ func (r *Renderer) list(l *ast.List, src []byte) {
 		if startsWithCheckbox(item) {
 			marker = ""
 		}
-		body := bodyStyle()
+		body := r.bodyStyle()
 		r.ensure(r.lineHeight(body.size))
 		y := r.pdf.GetY()
 		fontMM := body.size * ptMM
@@ -150,11 +151,11 @@ func (r *Renderer) list(l *ast.List, src []byte) {
 			r.setStyle(body)
 			r.pdf.Text(r.x0+indent-1.2-mw, y+(lh-fontMM)/2+fontMM*0.8, marker)
 		}
-		saveX, saveW := r.x0, r.w
+		saveX, saveW, saveLeft := r.x0, r.w, r.leftMargin(r.pdf.PageNo())
 		r.x0 += indent
 		r.w -= indent
 		r.blocks(item, src)
-		r.x0, r.w = saveX, saveW
+		r.x0, r.w = saveX+r.leftMargin(r.pdf.PageNo())-saveLeft, saveW
 	}
 	r.gap(1.2)
 }
@@ -162,17 +163,17 @@ func (r *Renderer) list(l *ast.List, src []byte) {
 func (r *Renderer) blockquote(q *ast.Blockquote, src []byte) {
 	const indent = 4.5
 	startPage, startY := r.pdf.PageNo(), r.pdf.GetY()
-	saveX, saveW := r.x0, r.w
+	saveX, saveW, saveLeft := r.x0, r.w, r.leftMargin(r.pdf.PageNo())
 	r.x0 += indent
 	r.w -= indent
 	r.blocks(q, src)
-	r.x0, r.w = saveX, saveW
+	r.x0, r.w = saveX+r.leftMargin(r.pdf.PageNo())-saveLeft, saveW
 	endPage, endY := r.pdf.PageNo(), r.pdf.GetY()
 	cur := r.pdf.PageNo()
 	r.pdf.SetDrawColor(colRule[0]-25, colRule[1]-25, colRule[2]-25)
 	r.pdf.SetLineWidth(0.8)
 	for p := startPage; p <= endPage; p++ {
-		y0, y1 := marginTop, pageH-marginBottom
+		y0, y1 := r.topMargin(), r.pageHeight()-r.bottomMargin()
 		if p == startPage {
 			y0 = startY
 		}
@@ -180,7 +181,8 @@ func (r *Renderer) blockquote(q *ast.Blockquote, src []byte) {
 			y1 = endY
 		}
 		r.pdf.SetPage(p)
-		r.pdf.Line(r.x0+0.6, y0, r.x0+0.6, y1-1.2)
+		lineX := saveX - saveLeft + r.leftMargin(p) + 0.6
+		r.pdf.Line(lineX, y0, lineX, y1-1.2)
 	}
 	r.pdf.SetPage(cur)
 	r.pdf.SetY(endY)
@@ -223,7 +225,7 @@ func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 			r.textTokens(s, plainText(v, src), out)
 		case *ast.Link:
 			s := st
-			s.color, s.underline = colLink, true
+			s.color, s.underline = colExternalLink, true
 			dest := string(v.Destination)
 			if strings.HasPrefix(dest, "http://") || strings.HasPrefix(dest, "https://") || strings.HasPrefix(dest, "mailto:") {
 				s.link = dest
@@ -231,7 +233,7 @@ func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 			r.inline(v, src, s, out)
 		case *ast.AutoLink:
 			s := st
-			s.color, s.underline = colLink, true
+			s.color, s.underline = colExternalLink, true
 			url := string(v.URL(src))
 			if v.AutoLinkType == ast.AutoLinkURL {
 				s.link = url
@@ -251,6 +253,9 @@ func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 				b.Write(seg.Value(src))
 			}
 			raw := b.String()
+			if key := r.inlineMarker(raw); key != "" {
+				*out = append(*out, token{anchor: key, st: st})
+			}
 			if !strings.HasPrefix(strings.TrimSpace(raw), "<!--") {
 				r.textTokens(st, raw, out)
 			}
@@ -270,7 +275,7 @@ func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 
 // textWithRefs writes text, replacing journal refs that have a label by that label.
 func (r *Renderer) textWithRefs(st style, text string, out *[]token) {
-	if len(r.labels) == 0 || !refRe.MatchString(text) {
+	if (len(r.labels) == 0 && len(r.bookLinks) == 0) || !refRe.MatchString(text) {
 		r.textTokens(st, text, out)
 		return
 	}
@@ -278,12 +283,30 @@ func (r *Renderer) textWithRefs(st style, text string, out *[]token) {
 	for _, m := range refRe.FindAllStringSubmatchIndex(text, -1) {
 		kind, id := text[m[2]:m[3]], text[m[4]:m[5]]
 		label, ok := r.labels[kind+":"+id]
-		if !ok {
+		key := kind + ":" + id
+		if m[6] >= 0 {
+			key += "#" + text[m[6]:m[7]]
+		}
+		link := r.bookLinks[key]
+		if link == 0 {
+			link = r.bookLinks[kind+":"+id]
+		}
+		if !ok && link == 0 {
 			continue
+		}
+		if !ok {
+			label = text[m[0]:m[1]]
 		}
 		r.textTokens(st, text[last:m[0]], out)
 		s := st
 		s.color = colLink
+		s.internal = link
+		if link == 0 {
+			s.color = colExternalLink
+		}
+		if link == 0 && r.referenceBase != "" {
+			s.link = r.referenceBase + "?" + text[m[0]:m[1]]
+		}
 		r.textTokens(s, label, out)
 		last = m[1]
 	}

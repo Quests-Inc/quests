@@ -1,4 +1,5 @@
 // Выгрузка заметки: меню «Скачать», Markdown и PDF с прогрессом в тостах.
+import { pdfPreferences } from '@/shared/lib/pdfSettings.svelte.ts'
 import { toast, toastDone, toastProgress } from '@/shared/lib/toasts.svelte.ts'
 
 export interface ExportPayload {
@@ -9,7 +10,7 @@ export interface ExportPayload {
 
 export function createNoteExport(deps: {
   downloadMarkdown: (payload: ExportPayload) => void | Promise<void>
-  downloadPdf: (payload: ExportPayload) => Promise<unknown>
+  downloadPdf: (payload: ExportPayload, book?: boolean, configure?: boolean) => Promise<unknown>
   /** Сообщение об ошибке для страницы ('' — очистить). */
   setError: (message: string) => void
 }) {
@@ -26,12 +27,12 @@ export function createNoteExport(deps: {
       if (action === 'md') {
         await deps.downloadMarkdown(payload)
         toast('Markdown сохранён', { kind: 'success' })
-      } else if (action === 'pdf') {
+      } else if (action === 'pdf' || action === 'pdf-book' || action === 'pdf-settings') {
         const tid = 'pdf-note'
-        toastProgress(tid, 'Генерация PDF…')
+        if (action !== 'pdf-settings') toastProgress(tid, 'Генерация PDF…')
         try {
-          await deps.downloadPdf(payload)
-          toastDone(tid, 'PDF сохранён')
+          const saved = await deps.downloadPdf(payload, action === 'pdf-book', action === 'pdf-settings')
+          toastDone(tid, saved === false ? 'Экспорт отменён' : 'PDF сохранён')
         } catch (e) {
           toastDone(tid, (e as Error)?.message || 'Не удалось сохранить PDF', 'error')
           throw e
@@ -41,7 +42,7 @@ export function createNoteExport(deps: {
       const message = (e as Error)?.message || String(e)
       deps.setError(message)
       // Для PDF причину уже показал тост прогресса.
-      if (action !== 'pdf') toast(message, { kind: 'error' })
+      if (action !== 'pdf' && action !== 'pdf-book' && action !== 'pdf-settings') toast(message, { kind: 'error' })
     } finally {
       busy = false
     }
@@ -66,7 +67,15 @@ export function createNoteExport(deps: {
     get items() {
       return [
         { id: 'md', label: 'Markdown (.md)' },
-        { id: 'pdf', label: busy ? 'PDF…' : 'PDF' },
+        {
+          id: 'pdf-menu',
+          label: busy ? 'PDF…' : `PDF · ${pdfPreferences.name}`,
+          children: [
+            { id: 'pdf', label: 'Только эта заметка', disabled: busy },
+            { id: 'pdf-book', label: 'Сшить вложенные заметки в книгу', disabled: busy },
+            { id: 'pdf-settings', label: 'Настроить экспорт…', disabled: busy },
+          ],
+        },
       ]
     },
     /** Меню открывается под кнопкой. */

@@ -105,3 +105,17 @@ func TestExportPDFEmbedsAttachmentImages(t *testing.T) {
 		t.Fatal("the uploaded png was not embedded")
 	}
 }
+
+func TestExportPDFRejectsInvalidOptions(t *testing.T) {
+	s := newAttachmentServer(t, "", "", 0)
+	for _, options := range []map[string]any{
+		{"left": 100, "right": 100},
+		{"font": "unknown"},
+		{"background_image": 12345},
+	} {
+		w := postPDF(t, s, map[string]any{"document": map[string]any{"title": "Test", "options": options}})
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("invalid options: %d %s", w.Code, w.Body.String())
+		}
+	}
+}

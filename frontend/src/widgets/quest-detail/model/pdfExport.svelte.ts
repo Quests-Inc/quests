@@ -1,9 +1,10 @@
+import { pdfPreferences } from '@/shared/lib/pdfSettings.svelte.ts'
 // Выгрузка открытого квеста в PDF: меню выбора вида («простой» / «с оформлением») и прогресс в тостах.
 type Quest = Record<string, unknown>
 
 export function createQuestPdf(deps: {
   simple: (q: Quest) => Promise<unknown>
-  rich: (q: Quest) => Promise<unknown>
+  rich: (q: Quest, configure?: boolean) => Promise<unknown>
   progress: (id: string, message: string) => void
   done: (id: string, message: string, kind?: 'error') => void
 }) {
@@ -19,10 +20,16 @@ export function createQuestPdf(deps: {
     if (!q || busy) return
     busy = true
     const tid = 'pdf-quest'
-    deps.progress(tid, 'Генерация PDF…')
+    if (mode !== 'settings') deps.progress(tid, 'Генерация PDF…')
     try {
       if (mode === 'simple') await deps.simple(q)
-      else await deps.rich(q)
+      else {
+        const saved = await deps.rich(q, mode === 'settings')
+        if (saved === false) {
+          deps.done(tid, 'Экспорт отменён')
+          return
+        }
+      }
       deps.done(tid, 'PDF сохранён')
     } catch (e) {
       console.error(e)
@@ -33,6 +40,13 @@ export function createQuestPdf(deps: {
   }
 
   return {
+    get items() {
+      return [
+        { id: 'rich', label: `PDF · ${pdfPreferences.name}` },
+        { id: 'simple', label: 'PDF (просто)' },
+        { id: 'settings', label: 'Настроить экспорт…' },
+      ]
+    },
     get busy() {
       return busy
     },

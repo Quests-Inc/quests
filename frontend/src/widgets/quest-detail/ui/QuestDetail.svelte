@@ -101,7 +101,7 @@
   const tzLabel = localTimeZone()
   const pdf = createQuestPdf({
     simple: (q) => downloadQuestPdfSimple(q),
-    rich: (q) => downloadQuestPdfRich(q, { labels, tzLabel }),
+    rich: (q, configure) => downloadQuestPdfRich(q, { labels, tzLabel, configure }),
     progress: toastProgress,
     done: toastDone,
   })
@@ -791,10 +791,7 @@
   open={pdf.menu.open}
   x={pdf.menu.x}
   y={pdf.menu.y}
-  items={[
-    { id: 'rich', label: 'PDF' },
-    { id: 'simple', label: 'PDF (просто)' },
-  ]}
+  items={pdf.items}
   onSelect={pdf.select}
   onClose={pdf.closeMenu}
 />

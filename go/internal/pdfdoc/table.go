@@ -33,8 +33,8 @@ func (r *Renderer) table(t *east.Table, src []byte) {
 		}
 		col := 0
 		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-			st := bodyStyle()
-			st.size = 9.3
+			st := r.bodyStyle()
+			st.size = r.fontSize(9.3)
 			st.bold = bold
 			ce := cell{toks: r.inlineTokens(c, src, st)}
 			if tc, ok := c.(*east.TableCell); ok {

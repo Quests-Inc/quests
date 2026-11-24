@@ -106,3 +106,53 @@ the graph's shared palette (`shared/lib/entityColors.ts`). Only scripts with the
 script insertions. Choosing one opens its insertion dialog with that script selected; confirmation replaces the `@query`
 with `script=N{…}` and its chosen flags. Cancelling keeps the original text. There is no separate script-insertion button
 inside the text field. Regular entity choices still insert their usual `kind=N` references.
+
+## Note PDF books
+
+Both note export menus offer PDF → «Только эта заметка» and
+«Сшить вложенные заметки в книгу». A book includes the selected note and every
+accessible descendant, independent of current search or collapsed tree.
+Sibling order matches the notes tree (children first, pinned, sort_order, id).
+References do not add other notes. Full bodies are loaded before export;
+a failed read aborts instead of silently omitting a chapter. The open root uses
+its editor text, including unsaved edits; children use saved text.
+
+Each note is baked in its own variable/script context once. Images, tables,
+code and math use the existing renderer. Title and clickable contents precede
+the text; direct children start on new pages, deeper descendants form sections.
+Contents have page numbers; PDF bookmarks follow the note hierarchy. A matching
+first Markdown heading is omitted to avoid repeating the card title. Included
+note references link to chapters; span and row markers provide local targets.
+Other labelled references link to Quests. Existing PDF limits apply, plus a
+1000-note ceiling.
+
+## PDF export settings and presets
+
+Quick actions export immediately with the browser's selected quick profile.
+«Настроить экспорт…» opens the shared settings dialog for notes, books and quests;
+its composition selector can switch a note export into a book. Merely adjusting
+or saving a preset does not change quick export: the explicit quick-export
+checkbox applies the profile when a PDF is downloaded. Five built-in profiles
+(Standard, Compact, Reading, Print, Book A5) and up to 20 custom presets are stored
+in localStorage by username and workspace ID. They are local browser preferences,
+not server settings or workspace-export contents.
+
+Document `options` support page sides (80–600 mm), orientation, four margins and
+binding (0–100 mm), font (serif/sans/mono/gothic), proportional font size (6–24 pt),
+line spacing (1–2.5), text and background RGB colours, page number format/position/
+alignment, chapter breaks and mirrored margins. Content must retain at least
+40 × 40 mm. A visible page number needs at least a 10 mm margin on its side.
+Omitted options retain the historical defaults; invalid values return HTTP 422.
+
+Backgrounds use a workspace attachment ID and the same authorized raster loader
+as inline images, once per document. The prepared image repeats on every page,
+with opacity 0–1 and contain/cover fitting. An inaccessible requested background
+fails explicitly instead of silently generating an unframed document.
+CyrillicGothSHA regular and bold faces are embedded in the server binary; symbols
+outside their character coverage fall back to DejaVu. Code remains monospaced.
+
+The explicit preview action renders the real PDF, then displays its pages using
+a locally bundled PDF.js worker. Downloading an unchanged preview reuses its Blob
+and does not rerun variable/script baking. Changing typography or composition
+marks the preview stale. The dialog and page preview scroll independently on a
+wide display; a narrow display uses one settings/preview column.

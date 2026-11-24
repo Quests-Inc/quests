@@ -152,10 +152,20 @@ export function createQuestActions(deps: {
       }
       pdfBusy = true
       const tid = 'pdf-quest'
-      toastProgress(tid, 'Генерация PDF…')
+      if (mode !== 'settings') toastProgress(tid, 'Генерация PDF…')
       try {
         if (mode === 'simple') await downloadQuestPdfSimple(quest)
-        else await downloadQuestPdf(quest, { labels: deps.refLabels(), tzLabel: localTimeZone() })
+        else {
+          const saved = await downloadQuestPdf(quest, {
+            labels: deps.refLabels(),
+            tzLabel: localTimeZone(),
+            configure: mode === 'settings',
+          })
+          if (saved === false) {
+            toastDone(tid, 'Экспорт отменён')
+            return
+          }
+        }
         toastDone(tid, 'PDF сохранён')
       } catch (e) {
         console.error(e)

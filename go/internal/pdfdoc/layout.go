@@ -26,14 +26,15 @@ var ErrTooLong = errors.New("pdfdoc: document is too long")
 type rgb [3]int
 
 var (
-	colText    = rgb{26, 26, 26}
-	colMuted   = rgb{110, 110, 110}
-	colLink    = rgb{26, 95, 180}
-	colRule    = rgb{205, 205, 205}
-	colCodeBG  = rgb{244, 244, 244}
-	colHeadBG  = rgb{240, 240, 240}
-	colInlineB = rgb{234, 234, 234}
-	colGreen   = rgb{38, 140, 70}
+	colText         = rgb{26, 26, 26}
+	colMuted        = rgb{110, 110, 110}
+	colLink         = rgb{26, 95, 180}
+	colExternalLink = rgb{186, 35, 35}
+	colRule         = rgb{205, 205, 205}
+	colCodeBG       = rgb{244, 244, 244}
+	colHeadBG       = rgb{240, 240, 240}
+	colInlineB      = rgb{234, 234, 234}
+	colGreen        = rgb{38, 140, 70}
 )
 
 // style is the look of a run of text.
@@ -45,6 +46,7 @@ type style struct {
 	color     rgb
 	bg        *rgb
 	link      string // external URL: becomes a link annotation
+	internal  int
 	strike    bool
 	underline bool
 }
@@ -65,6 +67,7 @@ func bodyStyle() style { return style{fam: famSerif, size: 10, color: colText} }
 // token is a word, a space or a forced break; img marks an image (laid out as its own block).
 type token struct {
 	text      string
+	anchor    string
 	st        style
 	w         float64
 	space     bool
@@ -93,17 +96,24 @@ type line struct {
 
 // Renderer lays text and blocks out on a fpdf page.
 type Renderer struct {
-	ctx    context.Context
-	pdf    *fpdf.Fpdf
-	loader ImageLoader
-	labels map[string]string
-	err    error
+	options                  Options
+	backgroundW, backgroundH float64
+	ctx                      context.Context
+	pdf                      *fpdf.Fpdf
+	loader                   ImageLoader
+	labels                   map[string]string
+	err                      error
 
-	x0, w     float64 // current left edge and width of the content column
-	mathCount int
-	images    int
-	imgSeq    int
-	pageTop   bool // nothing drawn on the current page yet
+	x0, w         float64 // current left edge and width of the content column
+	mathCount     int
+	images        int
+	imgSeq        int
+	bookLinks     map[string]int
+	referenceBase string
+	noteID        int64
+	tableID       string
+	headingOffset int
+	pageTop       bool // nothing drawn on the current page yet
 }
 
 func (r *Renderer) fail(err error) {
@@ -132,8 +142,11 @@ func (r *Renderer) newPage() {
 		r.fail(ErrTooLong)
 		return
 	}
+	previousLeft := r.leftMargin(max(1, r.pdf.PageNo()))
 	r.pdf.AddPage()
-	r.pdf.SetY(marginTop)
+	r.x0 += r.leftMargin(r.pdf.PageNo()) - previousLeft
+	r.paintBackground()
+	r.pdf.SetY(r.topMargin())
 	r.pageTop = true
 }
 
@@ -142,7 +155,7 @@ func (r *Renderer) ensure(h float64) {
 	if !r.ok() {
 		return
 	}
-	if r.pdf.GetY()+h > pageH-marginBottom && !r.pageTop {
+	if r.pdf.GetY()+h > r.pageHeight()-r.bottomMargin() && !r.pageTop {
 		r.newPage()
 	}
 }
@@ -165,10 +178,44 @@ func (r *Renderer) measure(st style, text string) float64 {
 	return r.pdf.GetStringWidth(text)
 }
 
-func (r *Renderer) lineHeight(size float64) float64 { return size * ptMM * lineFactor }
+func (r *Renderer) lineHeight(size float64) float64 {
+	factor := r.options.LineSpacing
+	if factor == 0 {
+		factor = lineFactor
+	}
+	return size * ptMM * factor
+}
 
 // textTokens splits text into word and space tokens of style st.
 func (r *Renderer) textTokens(st style, text string, out *[]token) {
+	if st.fam == famGothic {
+		known := true
+		var segment strings.Builder
+		flushSegment := func() {
+			if segment.Len() > 0 {
+				s := st
+				if !known {
+					s.fam = famSerif
+				}
+				r.textTokensPlain(s, segment.String(), out)
+				segment.Reset()
+			}
+		}
+		for _, ch := range text {
+			supported := gothicHasRune(ch) || ch == '\n' || ch == '\r' || ch == '\t'
+			if supported != known {
+				flushSegment()
+				known = supported
+			}
+			segment.WriteRune(ch)
+		}
+		flushSegment()
+		return
+	}
+	r.textTokensPlain(st, text, out)
+}
+
+func (r *Renderer) textTokensPlain(st style, text string, out *[]token) {
 	var cur strings.Builder
 	flush := func() {
 		if cur.Len() > 0 {
@@ -205,7 +252,7 @@ func (r *Renderer) layout(toks []token, width float64) []line {
 	var lines []line
 	var cur line
 	x := 0.0
-	defSize := bodyStyle().size
+	defSize := r.bodyStyle().size
 	finish := func() {
 		// drop trailing spaces
 		for len(cur.items) > 0 && cur.items[len(cur.items)-1].tok.space {
@@ -315,6 +362,9 @@ func (r *Renderer) drawLine(l line, x, y, width float64, align string) {
 			r.pdf.SetFillColor(t.st.bg[0], t.st.bg[1], t.st.bg[2])
 			r.pdf.Rect(tx, base-fontMM*0.85, t.w, fontMM*1.2, "F")
 		}
+		if t.anchor != "" {
+			r.placeAnchor(t.anchor, y)
+		}
 		if t.text == "" {
 			continue
 		}
@@ -329,6 +379,9 @@ func (r *Renderer) drawLine(l line, x, y, width float64, align string) {
 			if t.st.strike {
 				r.pdf.Line(tx, base-fontMM*0.28, tx+t.w, base-fontMM*0.28)
 			}
+		}
+		if t.st.internal != 0 {
+			r.pdf.Link(tx, base-fontMM*0.85, t.w, fontMM*1.2, t.st.internal)
 		}
 		if t.st.link != "" {
 			r.pdf.LinkString(tx, base-fontMM*0.85, t.w, fontMM*1.2, t.st.link)

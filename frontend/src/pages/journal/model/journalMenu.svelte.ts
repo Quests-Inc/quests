@@ -1,3 +1,4 @@
+import { pdfPreferences } from '@/shared/lib/pdfSettings.svelte.ts'
 // Контекстное меню журнала (квестлайн, квест, шаг): где открыто, для чего, и что делает выбранный пункт.
 // Сами действия (правка, удаление, статус…) приходят снаружи — здесь только разбор пункта меню.
 import { contextMenuItems } from './contextMenu.ts'
@@ -37,7 +38,7 @@ export function createJournalMenu(deps: {
     postpone: (q: Quest, minutes: number) => unknown
     patchStatus: (q: Quest, status: string) => unknown
     patchSignificance: (q: Quest, value: string) => unknown
-    exportQuest: (q: Quest, mode: 'md' | 'rich' | 'simple') => unknown
+    exportQuest: (q: Quest, mode: 'md' | 'rich' | 'simple' | 'settings') => unknown
     ackFailure?: (q: Quest) => unknown
     pin?: (q: Quest, value: boolean) => unknown
     pinMany?: (qs: Quest[], value: boolean) => unknown
@@ -63,6 +64,7 @@ export function createJournalMenu(deps: {
   const items = $derived(
     contextMenuItems({
       kind,
+      exportPresetName: pdfPreferences.name,
       lineId,
       quest: deps.quests().find((q) => q.id === questId),
       questId,
@@ -157,6 +159,7 @@ export function createJournalMenu(deps: {
     } else if (action.startsWith('sig:')) deps.quest.patchSignificance(quest, action.slice('sig:'.length))
     else if (action === 'export-md') deps.quest.exportQuest(quest, 'md')
     else if (action === 'export-pdf') deps.quest.exportQuest(quest, 'rich')
+    else if (action === 'export-pdf-settings') deps.quest.exportQuest(quest, 'settings')
     else if (action === 'export-pdf-simple') deps.quest.exportQuest(quest, 'simple')
     else if (action === 'ack-failure') deps.quest.ackFailure?.(quest)
     else if (action === 'delete') deps.askDeleteQuest(quest)

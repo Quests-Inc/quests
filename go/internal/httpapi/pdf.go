@@ -61,6 +61,8 @@ func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
 	var out bytes.Buffer
 	if err := pdfdoc.Render(ctx, req.Document, s.attachmentImageLoader(ctx), &out); err != nil {
 		switch {
+		case isInvalidPDFOptions(err):
+			writeErr(w, http.StatusUnprocessableEntity, err.Error())
 		case errors.Is(err, pdfdoc.ErrTooLong):
 			writeErr(w, http.StatusRequestEntityTooLarge, "документ слишком длинный для PDF")
 		case errors.Is(err, context.DeadlineExceeded):
@@ -132,4 +134,9 @@ func sanitizeFilename(name string) string {
 		return "export.pdf"
 	}
 	return string(out)
+}
+
+func isInvalidPDFOptions(err error) bool {
+	var invalid *pdfdoc.InvalidOptionsError
+	return errors.As(err, &invalid)
 }

@@ -19,6 +19,12 @@ function inlineRaw(source: string, from: string): string {
 plugin({
   name: 'svelte-client',
   setup(build) {
+    // Vite asset imports return URLs, not the JavaScript exports of the asset.
+    build.onResolve({ filter: /\?url$/ }, (args) => ({ path: args.path, namespace: 'vite-asset' }))
+    build.onLoad({ filter: /.*/, namespace: 'vite-asset' }, () => ({
+      contents: 'export default "about:blank"',
+      loader: 'js',
+    }))
     build.onLoad({ filter: /\.svelte$/ }, async ({ path }) => {
       const source = inlineRaw(await Bun.file(path).text(), path)
       const { js } = compile(source, { filename: path, generate: 'client', css: 'injected', dev: false })

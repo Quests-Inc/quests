@@ -8,6 +8,7 @@ export interface MenuItem {
   sep?: boolean
   danger?: boolean
   checked?: boolean
+  disabled?: boolean
   children?: MenuItem[]
   /** Подменю с полем поиска: полный список, из которого берутся совпадения. */
   search?: MenuItem[]
@@ -139,6 +140,7 @@ export function noteMenuItems({
   note,
   searchActive,
   exportBusy,
+  exportPresetName,
   moveTargets,
   moveSearch,
 }: {
@@ -146,6 +148,7 @@ export function noteMenuItems({
   note: Row | null
   searchActive: boolean
   exportBusy: boolean
+  exportPresetName?: string
   moveTargets: MenuItem[]
   moveSearch?: MenuItem[]
 }): MenuItem[] {
@@ -175,7 +178,15 @@ export function noteMenuItems({
       label: 'Экспорт',
       children: [
         { id: 'export-md', label: 'Markdown (.md)' },
-        { id: 'export-pdf', label: exportBusy ? 'PDF…' : 'PDF' },
+        {
+          id: 'export-pdf-menu',
+          label: exportBusy ? 'PDF…' : exportPresetName ? `PDF · ${exportPresetName}` : 'PDF',
+          children: [
+            { id: 'export-pdf', label: 'Только эта заметка', disabled: exportBusy },
+            { id: 'export-pdf-book', label: 'Сшить вложенные заметки в книгу', disabled: exportBusy },
+            { id: 'export-pdf-settings', label: 'Настроить экспорт…', disabled: exportBusy },
+          ],
+        },
       ],
     },
     { id: 'sep-icon', sep: true },

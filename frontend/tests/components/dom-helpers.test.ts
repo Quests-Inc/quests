@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 
 import { foldRow, moveRow } from '@/shared/lib/listNav.ts'
 import { downloadPdf } from '@/shared/lib/pdfExport.ts'
+import { defaultPdfOptions } from '@/shared/lib/pdfOptions.ts'
 import { placePopover, watchPopover } from '@/shared/lib/popover.ts'
 import { animateText } from '@/shared/lib/typewriter.ts'
 
@@ -102,6 +103,8 @@ test('pdfExport: отправляет документ на сервер и ск
   const sent: any[] = []
   const realFetch = globalThis.fetch
   globalThis.fetch = (async (url: string, init: any) => {
+    if (url === '/api/auth/state') return Response.json({ username: 'test' })
+    if (url === '/api/workspaces') return Response.json({ current: 1, workspaces: [] })
     sent.push([url, JSON.parse(init.body)])
     return new Response(new Blob(['%PDF']), { status: 200 })
   }) as any
@@ -117,10 +120,28 @@ test('pdfExport: отправляет документ на сервер и ск
   try {
     await downloadPdf({ title: 'Т', footnote: '', labels: {}, blocks: [] }, 'a.pdf')
     expect(sent).toEqual([
-      ['/api/export/pdf', { document: { title: 'Т', footnote: '', labels: {}, blocks: [] }, filename: 'a.pdf' }],
+      [
+        '/api/export/pdf',
+        {
+          document: {
+            reference_base: 'http://localhost/',
+            title: 'Т',
+            footnote: '',
+            labels: {},
+            blocks: [],
+            options: defaultPdfOptions,
+          },
+          filename: 'a.pdf',
+        },
+      ],
     ])
     expect(downloads).toEqual(['a.pdf'])
-    globalThis.fetch = (async () => new Response('нет шрифта', { status: 500 })) as any
+    globalThis.fetch = (async (url: string) =>
+      url === '/api/auth/state'
+        ? Response.json({ username: 'test' })
+        : url === '/api/workspaces'
+          ? Response.json({ current: 1, workspaces: [] })
+          : new Response('нет шрифта', { status: 500 })) as any
     await expect(downloadPdf({ title: 'Т', footnote: '', labels: {}, blocks: [] }, 'a.pdf')).rejects.toThrow(
       'PDF render failed (500): нет шрифта'
     )

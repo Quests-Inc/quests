@@ -31,8 +31,10 @@ export function contextMenuItems({
   count = 0,
   lines = [],
   allPinned = false,
+  exportPresetName,
 }: {
   kind: string
+  exportPresetName?: string
   lineId: number | null
   quest?: { status?: string; significance?: string; failure_inbox?: boolean; pinned?: boolean }
   questId: number | null
@@ -132,8 +134,9 @@ export function contextMenuItems({
         label: 'Экспорт',
         children: [
           { id: 'export-md', label: 'Markdown (.md)' },
-          { id: 'export-pdf', label: 'PDF' },
+          { id: 'export-pdf', label: exportPresetName ? `PDF · ${exportPresetName}` : 'PDF' },
           { id: 'export-pdf-simple', label: 'PDF (просто)' },
+          { id: 'export-pdf-settings', label: 'Настроить экспорт…' },
         ],
       },
     ]

@@ -62,7 +62,8 @@ func highlight(lang string, lines []string) [][]codeSeg {
 
 // code paints a fenced or indented code block with a grey background, wrapping long lines by columns.
 func (r *Renderer) code(lang string, lines []string) {
-	const padX, size = 2.2, 8.6
+	const padX = 2.2
+	size := r.fontSize(8.6)
 	st := style{fam: famMono, size: size, color: rgb{40, 40, 40}}
 	lh := r.lineHeight(size) * 0.92
 	charW := r.measure(st, "0")
@@ -81,7 +82,7 @@ func (r *Renderer) code(lang string, lines []string) {
 			return
 		}
 		fillRow(4.2)
-		ts := style{fam: famSans, size: 6.5, color: rgb{140, 140, 140}}
+		ts := style{fam: famSans, size: r.fontSize(6.5), color: rgb{140, 140, 140}}
 		r.setStyle(ts)
 		r.pdf.Text(r.x0+padX, r.pdf.GetY()+3, tag)
 		r.pdf.SetY(r.pdf.GetY() + 4.2)
