@@ -52,5 +52,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        // A tab may request its PDF worker long after the SPA was rebuilt.
+        assetFileNames: (asset) =>
+          asset.names.some((name) => name === 'pdf.worker.min.mjs')
+            ? 'assets/pdf.worker.min.mjs'
+            : 'assets/[name]-[hash][extname]',
+      },
+    },
   },
 })

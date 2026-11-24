@@ -83,6 +83,25 @@ func TestPDFLinkColors(t *testing.T) {
 	}
 }
 
+func TestInlineCodeStaysMono(t *testing.T) {
+	pdf := fpdf.New("P", "mm", "A4", "")
+	if err := registerFonts(pdf); err != nil {
+		t.Fatal(err)
+	}
+	o := DefaultOptions()
+	o.Font = "gothic"
+	r := Renderer{ctx: context.Background(), pdf: pdf, options: o}
+	src := []byte("поле `квест`")
+	doc := md.Parser().Parse(text.NewReader(src))
+	toks := r.inlineTokens(doc.FirstChild(), src, r.bodyStyle())
+	for _, tok := range toks {
+		if tok.text == "квест" && tok.st.fam == famMono {
+			return
+		}
+	}
+	t.Fatal("inline code left the monospace face")
+}
+
 func TestGothicKeepsCyrillicAndFallsBackForSymbols(t *testing.T) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	if err := registerFonts(pdf); err != nil {

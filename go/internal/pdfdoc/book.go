@@ -118,7 +118,6 @@ func (r *Renderer) book(chapters []Chapter) {
 		}
 		indent := float64(min(c.Depth, 8)) * 4
 		st := r.bodyStyle()
-		st.fam = famSans
 		st.size = r.fontSize(10)
 		st.internal = r.bookLinks[noteKey(c.NoteID)]
 		st.color = colLink
@@ -181,7 +180,8 @@ func (r *Renderer) book(chapters []Chapter) {
 	lastPage, lastY := r.pdf.PageNo(), r.pdf.GetY()
 	for i, e := range entries {
 		r.pdf.SetPage(e.page)
-		st := style{fam: famSans, size: r.fontSize(9), color: colMuted, internal: r.bookLinks[noteKey(chapters[i].NoteID)]}
+		st := r.bodyStyle()
+		st.size, st.color, st.internal = r.fontSize(9), colMuted, r.bookLinks[noteKey(chapters[i].NoteID)]
 		var toks []token
 		r.textTokens(st, strconv.Itoa(pages[i]), &toks)
 		lines := r.layout(toks, 12)

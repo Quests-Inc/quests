@@ -221,7 +221,7 @@ func (r *Renderer) inline(parent ast.Node, src []byte, st style, out *[]token) {
 			r.inline(v, src, s, out)
 		case *ast.CodeSpan:
 			s := st
-			s.fam, s.size, s.bg = famMono, st.size*0.88, &colInlineB
+			s.fam, s.size, s.bg, s.bold = famMono, st.size*0.88, &colInlineB, false
 			r.textTokens(s, plainText(v, src), out)
 		case *ast.Link:
 			s := st

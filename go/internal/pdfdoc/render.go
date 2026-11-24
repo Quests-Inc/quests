@@ -96,7 +96,9 @@ func (r *Renderer) header(doc Document) {
 	}
 	if doc.Footnote != "" {
 		var foot []token
-		r.textTokens(style{fam: famSans, size: r.fontSize(8), color: colMuted}, doc.Footnote, &foot)
+		st := r.bodyStyle()
+		st.size, st.color = r.fontSize(8), colMuted
+		r.textTokens(st, doc.Footnote, &foot)
 		r.paragraph(foot, "")
 	}
 	r.gap(4)
@@ -109,7 +111,9 @@ func (r *Renderer) sectionLabel(label string) {
 	r.gap(3)
 	r.ensure(12)
 	var toks []token
-	r.textTokens(style{fam: r.headingFamily(), bold: true, size: r.fontSize(7.8), color: colMuted}, strings.ToUpper(label), &toks)
+	st := r.bodyStyle()
+	st.bold, st.size, st.color = true, r.fontSize(7.8), colMuted
+	r.textTokens(st, strings.ToUpper(label), &toks)
 	r.paragraph(toks, "")
 	y := r.pdf.GetY() + 0.4
 	r.pdf.SetDrawColor(colRule[0], colRule[1], colRule[2])
