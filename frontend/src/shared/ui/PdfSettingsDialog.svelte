@@ -5,7 +5,7 @@
  import PdfPreview from './PdfPreview.svelte'
   import ModalFoot from './ModalFoot.svelte'
   import { renderPdf } from '@/shared/api/exportPdf.ts'
-  import { listAllAttachments } from '@/shared/api/attachments.ts'
+  import { listAllAttachments, uploadAttachment } from '@/shared/api/attachments.ts'
   import { closePdfSettings, writePdfPreferences, type PdfExportSession } from '@/shared/lib/pdfSettings.svelte.ts'
   import { builtinPdfPresets, pdfOptionsError, savePdfBlob, type PdfOptions, type PdfPreset } from '@/shared/lib/pdfOptions.ts'
   import type { PdfDocument } from '@/shared/lib/pdfExport.ts'
@@ -23,6 +23,7 @@
   let notice=$state('')
   let previewBlob=$state<Blob|null>(null)
   let previewSignature=$state('')
+  let uploadInput=$state<HTMLInputElement|null>(null)
   let images=$state<{id:number;filename:string}[]>([])
   const presets=$derived([{...session.preferences.quick,id:'quick',name:session.preferences.quick.name+' (быстрый экспорт)'},...builtinPdfPresets,...custom])
   const validation=$derived(pdfOptionsError(draft))
@@ -35,12 +36,32 @@
     try {
       const groups=await listAllAttachments()
       const seen=new Set<number>()
-      images=Object.values(groups).flatMap(owners=>Object.values(owners).flat()).filter(a=>{
+      const loaded=Object.values(groups).flatMap(owners=>Object.values(owners).flat()).filter(a=>{
         if(seen.has(a.id)||a.hidden||!/^image\/(png|jpeg|gif|webp)$/.test(a.content_type_detected||''))return false
         seen.add(a.id);return true
       }).map(a=>({id:a.id,filename:a.filename}))
+      images=[...new Map([...loaded,...images].map(image=>[image.id,image])).values()]
     }catch{notice='Список фоновых изображений недоступен. Остальные настройки работают.'}
   })
+  function chooseBackground(event:Event){
+    const select=event.currentTarget as HTMLSelectElement
+    if(select.value==='upload'){select.value=String(draft.background_image);uploadInput?.click()}
+    else draft.background_image=Number(select.value)
+  }
+  async function uploadBackground(event:Event){
+    const input=event.currentTarget as HTMLInputElement
+    const file=input.files?.[0];input.value=''
+    const owner=session.attachmentOwner
+    if(!file||!owner||busy)return
+    busy=true;error='';notice=''
+    try{
+      const image=await uploadAttachment(owner.kind,owner.id,file,'Фон экспорта PDF')
+      if(!/^image\/(png|jpeg|gif|webp)$/.test(image.content_type_detected||''))throw new Error('Файл сохранён во вложениях, но не поддерживается как фон. Выберите PNG, JPEG, GIF или WebP.')
+      images=[...images.filter(item=>item.id!==image.id),{id:image.id,filename:image.filename}]
+      draft.background_image=image.id
+      notice=owner.kind==='note'?'Изображение загружено вложением к заметке и выбрано фоном.':'Изображение загружено вложением к квесту и выбрано фоном.'
+    }catch(e){error=e instanceof Error?e.message:String(e)}finally{busy=false}
+  }
   function selectPreset(id:string){
     const p=presets.find(p=>p.id===id);if(!p)return
     draft={...p.options};presetId=p.id;presetName=p.name;error='';notice=''
@@ -157,11 +178,16 @@
           <summary>Фон</summary>
           <div class="settings-grid">
             <label class="field"><span class="label">Цвет фона</span><span class="color-input"><input type="color" bind:value={draft.background_color} /></span></label>
-            <label class="field"><span class="label">Фоновое изображение</span><select bind:value={draft.background_image}><option value={0}>Без изображения</option>{#each images as image (image.id)}<option value={image.id}>{image.filename}</option>{/each}</select></label>
+            <label class="field"><span class="label">Фоновое изображение</span><select value={draft.background_image} onchange={chooseBackground}><option value={0}>Без изображения</option>{#each images as image (image.id)}<option value={image.id}>{image.filename}</option>{/each}{#if session.attachmentOwner}<option value="upload">Загрузить изображение…</option>{/if}</select></label>
             <label class="field"><span class="label">Непрозрачность, %</span><input type="number" min="0" max="100" step="5" value={Math.round(draft.background_opacity*100)} oninput={e=>draft.background_opacity=Number(e.currentTarget.value)/100} /></label>
             <label class="field"><span class="label">Размещение</span><select bind:value={draft.background_fit}><option value="contain">Вписать целиком</option><option value="cover">Заполнить с обрезкой</option></select></label>
           </div>
-          <p class="hint">Фон повторяется на каждой странице. Сначала загрузите картинку во вложения Quests.</p>
+          {#if session.attachmentOwner}
+            <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" bind:this={uploadInput} onchange={uploadBackground} hidden aria-label="Загрузить фоновое изображение" />
+            <button type="button" class="btn" onclick={()=>uploadInput?.click()} disabled={busy}>Загрузить изображение…</button>
+            <p class="hint">{session.attachmentOwner.kind==='note'?'Изображение будет загружено вложением к этой заметке.':'Изображение будет загружено вложением к этому квесту.'} После загрузки оно автоматически выберется фоном.</p>
+          {/if}
+          <p class="hint">Фон повторяется на каждой странице. PNG, JPEG, GIF или WebP.</p>
         </details>
         {#if book}
           <details open><summary>Книга</summary>

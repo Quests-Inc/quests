@@ -11,7 +11,14 @@ mock.module('@/shared/api/exportPdf.ts', () => ({
     return new Blob(['%PDF-test'], { type: 'application/pdf' })
   },
 }))
-mock.module('@/shared/api/attachments.ts', () => ({ listAllAttachments: async () => ({}) }))
+const uploads: { kind: string; id: number; name: string }[] = []
+mock.module('@/shared/api/attachments.ts', () => ({
+  listAllAttachments: async () => ({}),
+  uploadAttachment: async (kind: string, id: number, file: File) => {
+    uploads.push({ kind, id, name: file.name })
+    return { id: 99, filename: file.name, content_type_detected: 'image/png' }
+  },
+}))
 const { default: Dialog } = await import('@/shared/ui/PdfSettingsDialog.svelte')
 const { readPdfPreferences, writePdfPreferences, pdfSettings } = await import('@/shared/lib/pdfSettings.svelte.ts')
 const preferences = () => ({
@@ -71,5 +78,43 @@ test('preview and download share the same PDF; one-off settings do not change qu
     URL.createObjectURL = originalCreate
     URL.revokeObjectURL = originalRevoke
     HTMLAnchorElement.prototype.click = originalClick
+  }
+})
+
+test('background upload belongs to the exported note and is selected immediately', async () => {
+  const target = document.createElement('div')
+  document.body.appendChild(target)
+  const session = {
+    document: { title: 'Root note', footnote: '', labels: {}, blocks: [] },
+    filename: 'note.pdf',
+    storageKey: 'upload-test',
+    preferences: preferences(),
+    attachmentOwner: { kind: 'note' as const, id: 15 },
+    resolve: () => {},
+  }
+  const component = mount(Dialog, { target, props: { session } })
+  try {
+    flushSync()
+    expect(target.textContent).toContain('Изображение будет загружено вложением к этой заметке.')
+    const input = target.querySelector('input[type=file]') as HTMLInputElement
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'my-background.png', { type: 'image/png' })],
+      configurable: true,
+    })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve()
+      flushSync()
+    }
+    expect(uploads.at(-1)).toEqual({ kind: 'note', id: 15, name: 'my-background.png' })
+    const selector = [...target.querySelectorAll('select')].find((select) =>
+      [...select.options].some((option) => option.value === 'upload')
+    )!
+    expect(selector.value).toBe('99')
+    expect(selector.textContent).toContain('my-background.png')
+    expect(localStorage.getItem('upload-test')).toBeNull()
+  } finally {
+    await unmount(component)
+    target.remove()
   }
 })

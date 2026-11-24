@@ -144,6 +144,11 @@ alignment, chapter breaks and mirrored margins. Content must retain at least
 40 × 40 mm. A visible page number needs at least a 10 mm margin on its side.
 Omitted options retain the historical defaults; invalid values return HTTP 422.
 
+The background selector includes «Загрузить изображение…». Uploads become attachments
+of the exported note (the root note for a book), or of the exported quest. The
+dialog explains the destination before upload and selects the new background
+automatically; uploading does not change quick-export preferences.
+
 Backgrounds use a workspace attachment ID and the same authorized raster loader
 as inline images, once per document. The prepared image repeats on every page,
 with opacity 0–1 and contain/cover fitting. An inaccessible requested background

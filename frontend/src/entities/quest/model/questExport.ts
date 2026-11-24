@@ -81,6 +81,6 @@ export async function downloadQuestPdf(
   return downloadPdf(
     buildQuestPdfDocument(quest, { ...opts, attachments }, { significanceLabel, periodBadge, quantifiedProgress }),
     questExportFilename(quest),
-    { configure: opts.configure }
+    { configure: opts.configure, attachmentOwner: { kind: 'quest', id: quest.id } }
   )
 }

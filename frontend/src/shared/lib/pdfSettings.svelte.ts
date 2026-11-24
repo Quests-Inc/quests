@@ -15,6 +15,7 @@ export interface PdfExportSession {
   storageKey: string
   preferences: PdfPreferences
   buildBook?: () => Promise<PdfDocument>
+  attachmentOwner?: { kind: 'note' | 'quest'; id: number }
   resolve: (saved: boolean) => void
 }
 export const pdfSettings = $state({ session: null as PdfExportSession | null })
@@ -63,13 +64,25 @@ export async function refreshPdfPreferences() {
 export async function exportPdfDocument(
   document: PdfDocument,
   filename: string,
-  options: { configure?: boolean; buildBook?: () => Promise<PdfDocument> } = {}
+  options: {
+    configure?: boolean
+    buildBook?: () => Promise<PdfDocument>
+    attachmentOwner?: { kind: 'note' | 'quest'; id: number }
+  } = {}
 ) {
   const { key, preferences } = await preferencesContext()
   if (options.configure) {
     if (pdfSettings.session) throw new Error('Закройте открытые настройки PDF.')
     return new Promise<boolean>((resolve) => {
-      pdfSettings.session = { document, filename, storageKey: key, preferences, buildBook: options.buildBook, resolve }
+      pdfSettings.session = {
+        document,
+        filename,
+        storageKey: key,
+        preferences,
+        buildBook: options.buildBook,
+        attachmentOwner: options.attachmentOwner,
+        resolve,
+      }
     })
   }
   const blob = await renderPdf({ ...document, options: preferences.quick.options }, filename)

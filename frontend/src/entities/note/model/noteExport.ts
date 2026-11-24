@@ -62,7 +62,11 @@ export async function downloadNotePdf(
       ],
     },
     noteExportFilename(note, 'pdf'),
-    { configure: opts.configure, buildBook: () => buildNoteBook(note, opts.labels, markdown) }
+    {
+      configure: opts.configure,
+      attachmentOwner: { kind: 'note', id: note.id },
+      buildBook: () => buildNoteBook(note, opts.labels, markdown),
+    }
   )
 }
 

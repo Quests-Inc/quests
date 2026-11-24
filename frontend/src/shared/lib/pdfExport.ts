@@ -68,7 +68,11 @@ export type PdfDocument = {
 export async function downloadPdf(
   document_: PdfDocument,
   filename: string,
-  options: { configure?: boolean; buildBook?: () => Promise<PdfDocument> } = {}
+  options: {
+    configure?: boolean
+    buildBook?: () => Promise<PdfDocument>
+    attachmentOwner?: { kind: 'note' | 'quest'; id: number }
+  } = {}
 ) {
   const { exportPdfDocument } = await import('./pdfSettings.svelte.ts')
   return exportPdfDocument(
