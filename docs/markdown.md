@@ -10,7 +10,9 @@ The same sanitized renderer is used for notes and descriptions. UI explanations 
 | Headings | `#` through `######` | Six styled levels | Six levels |
 | Emphasis | `**bold**`, `*italic*`, `~~deleted~~` | Yes | Yes |
 | Lists | `-`, `1.`, nested lists | Yes | Yes |
-| Task list | `- [ ]`, `- [x]` | Disabled, read-only checkboxes | Printed check marks |
+| Task list | `- [ ]`, `- [x]` | Tickable scratch marks; «Перенести в текст» bakes them into the source | Printed check marks of the saved text |
+| Collapsible block | `<details>` / `<summary>Заголовок</summary>` | Real collapsible plate, closed unless `<details open>` | Always expanded; the summary becomes a bold lead line |
+| Diagram | ```` ```mermaid ```` fence | Rendered to a sanitized SVG, lazy-loaded | Source as a code block with an explicit «диаграмма не рендерится в PDF» marker |
 | Explanation / quote | `> text`, `>` between paragraphs | Left border and muted text, no rounded plate | Left border |
 | Code | Backticks / fenced blocks | Highlighting, language label, copy | Highlighting and wrapping |
 | Table | Pipe table, column alignment | Local horizontal scroll when needed | Wrapped cells |
@@ -20,7 +22,11 @@ The same sanitized renderer is used for notes and descriptions. UI explanations 
 | Math | `$inline$`, `$$display$$` | KaTeX, local fonts | Native vector layout, embedded DejaVu fonts |
 
 Soft newlines remain line breaks. Raw HTML is restricted; it is not an extension API. External images are not loaded.
-No new interactive Markdown syntax is added in this pass. Further research lives in quest=528.
+Of the interactive extensions researched in quest=528, exactly three were added: collapsible blocks, browser-only
+mermaid diagrams, and task ticks that are scratch state until they are explicitly transferred into the note text.
+Task markers inside code and math never count; a transfer rewrites `- [ ]` ↔ `- [x]` positionally and refuses when the
+note changed under the ticks. Mermaid renders with `securityLevel: 'strict'`, root `htmlLabels: false` and a DOMPurify
+SVG pass; a failed render keeps the source with a visible note instead of breaking the document.
 
 ## Quotes are prose, not UI panels
 

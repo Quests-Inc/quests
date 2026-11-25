@@ -40,6 +40,20 @@ export function followScrollPosition(current: number, target: number, elapsedMs:
 }
 
 /** The raw text/page owns scrolling; the preview follows the middle visible line. */
+
+/** textContent of `root` without svg <style> blobs (see the caller in syncNoteColumns). */
+export function alignableText(root: HTMLElement): string {
+  let out = ''
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return node.parentElement?.closest('style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    },
+  })
+  let n: Node | null
+  while ((n = walker.nextNode())) out += n.textContent ?? ''
+  return out
+}
+
 export function syncNoteColumns(node: HTMLElement, initial: Options) {
   let options = initial,
     frame = 0,
@@ -153,9 +167,62 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
     if (!lines.length) return
     const middle = top + visible * fraction - a.top + ta.scrollTop
     const anchors = sourceLineAnchors(lines, middle)
-    const rendered = md.textContent ?? ''
+    // Mermaid bakes its theme into a <style> inside every svg; its CSS words sit mid-document
+    // in textContent and derail the monotonic word alignment, so diagrams contribute their
+    // labels but not their stylesheet.
+    const rendered = alignableText(md)
     const box = preview.getBoundingClientRect()
+    // Source spans of ```mermaid fences, in order; the Nth fence maps to the Nth diagram block.
+    const fences: { start: number; end: number }[] = []
+    {
+      const re = /^[ \t]*```[ \t]*mermaid[^\n]*\n[\s\S]*?\n[ \t]*```[ \t]*$/gim
+      let m: RegExpExecArray | null
+      while ((m = re.exec(options.source))) fences.push({ start: m.index, end: m.index + m[0].length })
+    }
+    const mermaidBlocks = Array.from(md.querySelectorAll<HTMLElement>('.md-codeblock[data-lang="mermaid"]'))
+    // Source spans of <details>…</details> blocks, in order: every source line of a hidden
+    // block targets the block's header line, so the preview locks onto it without drift.
+    const detailSpans: { start: number; end: number }[] = []
+    {
+      const re = /^[ \t]*<details\b[^>]*>[^\n]*\n[\s\S]*?\n[ \t]*<\/details>[ \t]*$/gim
+      let m: RegExpExecArray | null
+      while ((m = re.exec(options.source))) detailSpans.push({ start: m.index, end: m.index + m[0].length })
+    }
+    const detailEls = Array.from(md.querySelectorAll<HTMLDetailsElement>('details'))
+    // A closed <details> keeps its content laid out but unpainted: anchor at the plate itself.
+    function closedDetailsY(from: Element | null): number | null {
+      for (let up = from; up && up !== md; up = up.parentElement) {
+        if (up.tagName === 'DETAILS' && !(up as HTMLDetailsElement).open) {
+          const r = up.getBoundingClientRect()
+          if (r.height) return preview.scrollTop + r.top - box.top
+        }
+      }
+      return null
+    }
     function renderedY(offset: number) {
+      // A hidden block's whole source span — its markers, summary line and content — aims at
+      // the block header (summary); an open block falls through to normal line mapping.
+      const span = detailSpans.find((s) => offset >= s.start && offset <= s.end)
+      const plate = span ? detailEls[detailSpans.indexOf(span)] : undefined
+      if (span && plate && !plate.open) {
+        const head = plate.querySelector(':scope > summary')
+        const r = (head ?? plate).getBoundingClientRect()
+        if (r.height) return preview.scrollTop + r.top - box.top
+      }
+      // A mermaid fence maps proportionally onto the rendered diagram: scrolling through its
+      // source lines sweeps the picture instead of sticking to one edge.
+      const fence = fences.find((f) => offset >= f.start && offset <= f.end)
+      const block = fence ? mermaidBlocks[fences.indexOf(fence)] : undefined
+      if (fence && block) {
+        const hidden = closedDetailsY(block)
+        if (hidden != null) return hidden
+        const r = block.getBoundingClientRect()
+        if (r.height) {
+          const f = Math.max(0, Math.min(1, (offset - fence.start) / Math.max(1, fence.end - fence.start)))
+          return preview.scrollTop + r.top - box.top + r.height * f
+        }
+        return null
+      }
       let target = orderedTextOffset(options.source, rendered, offset, true, true)
       if (target == null) return null
       for (let tries = 0; tries < 64 && target < rendered.length; target++, tries++) {
@@ -167,6 +234,12 @@ export function syncNoteColumns(node: HTMLElement, initial: Options) {
           range.startOffset < (range.startContainer.textContent?.length ?? 0)
         )
           range.setEnd(range.startContainer, range.startOffset + 1)
+        const el =
+          range.startContainer.nodeType === Node.ELEMENT_NODE
+            ? (range.startContainer as Element)
+            : range.startContainer.parentElement
+        const hidden = closedDetailsY(el)
+        if (hidden != null) return hidden
         const rect = range.getBoundingClientRect()
         if (rect.height) return preview.scrollTop + rect.top - box.top
       }

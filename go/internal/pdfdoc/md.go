@@ -59,7 +59,20 @@ func (r *Renderer) blocks(parent ast.Node, src []byte) {
 		case *ast.Blockquote:
 			r.blockquote(v, src)
 		case *ast.FencedCodeBlock:
-			r.code(string(v.Language(src)), blockLines(v, src))
+			lang := string(v.Language(src))
+			if strings.EqualFold(strings.TrimSpace(lang), "mermaid") {
+				// The browser renders mermaid; the PDF keeps the source, with an explicit marker.
+				r.code("mermaid", blockLines(v, src))
+				st := r.bodyStyle()
+				st.size = r.fontSize(7.5)
+				st.color = colMuted
+				var note []token
+				r.textTokens(st, "[диаграмма не рендерится в PDF — показан исходник]", &note)
+				r.paragraph(note, "")
+				r.gap(1.2)
+				continue
+			}
+			r.code(lang, blockLines(v, src))
 		case *ast.CodeBlock:
 			r.code("", blockLines(v, src))
 		case *ast.ThematicBreak:
@@ -74,6 +87,18 @@ func (r *Renderer) blocks(parent ast.Node, src []byte) {
 			raw := strings.TrimSpace(strings.Join(blockLines(v, src), "\n"))
 			if strings.HasPrefix(raw, "<!--") && strings.HasSuffix(raw, "-->") {
 				r.blockMarkers(raw)
+				continue
+			}
+			// <details> always opens in the PDF; the summary becomes a bold lead line.
+			if summary, ok := htmlDisclosure(raw); ok {
+				if summary != "" {
+					st := r.bodyStyle()
+					st.bold = true
+					var toks []token
+					r.textTokens(st, summary, &toks)
+					r.paragraph(toks, "")
+					r.gap(0.8)
+				}
 				continue
 			}
 			// Raw HTML is not rendered (the app sanitizes it away too): show it as text.
@@ -96,6 +121,34 @@ func blockLines(n ast.Node, src []byte) []string {
 		lines = append(lines, strings.TrimRight(string(seg.Value(src)), "\r\n"))
 	}
 	return lines
+}
+
+// htmlDisclosure recognizes a collapsible `<details>` block: opener/closer lines are dropped
+// and a one-line `<summary>…</summary>` becomes the returned lead text. ok=false leaves any
+// other raw HTML to the literal-text path. The PDF cannot collapse, so nothing is hidden:
+// the content after the block renders as ordinary markdown.
+func htmlDisclosure(raw string) (summary string, ok bool) {
+	if !strings.Contains(raw, "<details") && !strings.Contains(raw, "<summary") && !strings.Contains(raw, "</details>") {
+		return "", false
+	}
+	shown := ""
+	for _, line := range strings.Split(raw, "\n") {
+		t := strings.TrimSpace(line)
+		switch {
+		case t == "", strings.HasPrefix(t, "<details"), t == "</details>", t == "</summary>", strings.HasPrefix(t, "<!--"):
+			continue
+		case strings.HasPrefix(t, "<summary>") && strings.HasSuffix(t, "</summary>"):
+			if inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(t, "<summary>"), "</summary>")); inner != "" {
+				if shown != "" {
+					shown += " · "
+				}
+				shown += inner
+			}
+		default:
+			return "", false
+		}
+	}
+	return shown, true
 }
 
 var headingSizes = [...]float64{0, 17, 14.5, 12.5, 11, 10.5, 10}

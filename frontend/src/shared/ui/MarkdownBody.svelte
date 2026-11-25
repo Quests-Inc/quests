@@ -3,7 +3,7 @@
   import { showImages } from '@/shared/lib/imageViewer.svelte.ts'
   import { untrack } from 'svelte'
   import { listValues, type ValueRow } from '@/shared/api/client.ts'
-  import { foreignValueRefs, renderMarkdown } from '@/shared/lib/markdown.ts'
+  import { foreignValueRefs, renderMarkdown, taskMarksFromSource } from '@/shared/lib/markdown.ts'
   import { hostKey, publishValues, valueRev } from '@/shared/lib/valueLive.svelte.ts'
   import { valueHover, type ValueEditTarget } from '@/shared/lib/valueHover.ts'
   import { proseValue } from '@/shared/lib/valueText.ts'
@@ -16,6 +16,7 @@
   import { refPreview } from '@/shared/lib/refPreview.ts'
   import { scriptEmbed } from '@/shared/lib/scriptEmbed.ts'
   import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
+  import { renderMermaidDiagrams } from '@/shared/lib/markdownMermaid.ts'
   import { mapJumps, type MapJump } from '@/shared/lib/mapJumps.ts'
   import copySvg from '@/assets/icons/copy.svg?raw'
   import checkSvg from '@/assets/icons/checkmark.svg?raw'
@@ -32,6 +33,8 @@
     typing = false,
     mapJump = null,
     imageThumb = undefined,
+    onTaskState,
+    onSaveMarks,
   }: {
     source?: string,
     class?: string,
@@ -47,6 +50,10 @@
     mapJump?: MapJump | null,
     /** Longest side of the preview, in pixels. Unset keeps the original attachment image. */
     imageThumb?: number,
+    /** Report the task-tick state so the host can render its own bar (a sticky bar cannot
+     * escape an overflow-clipped ancestor, so the plate must live outside this element). */
+    onTaskState?: (state: { count: number; edited: boolean }) => void,
+    onSaveMarks?: (marks: boolean[]) => void,
   } = $props()
 
   let foreign = $state({} as Record<string, string>)
@@ -140,6 +147,68 @@
 
   let merged = $derived({ ...foreign, ...own, ...values })
   let html = $derived(renderMarkdown(source, { labels:{...repositoryRefs.labels,...labels}, values: merged, valuesLoading }))
+
+  /** Task ticks are viewing-only scratch state: they live in the DOM until «Перенести в текст» bakes them into the source. */
+  let taskCount = $state(0)
+  let taskEdited = $state(false)
+
+  function taskInputs(): HTMLInputElement[] {
+    return root ? Array.from(root.querySelectorAll('input.md-task')) : []
+  }
+
+  /** Sync the per-item phantom stars and the bar's buttons with the DOM ticks vs the source. */
+  function refreshTaskMarks() {
+    const defaults = taskMarksFromSource(source)
+    let edited = false
+    for (const [i, input] of taskInputs().entries()) {
+      const li = input.closest('li') ?? input.parentElement
+      const changed = input.checked !== (defaults[i] ?? false)
+      li?.classList.toggle('md-task--edited', changed)
+      if (!li) continue
+      if (changed && !li.querySelector('.md-task__unsaved')) {
+        const star = document.createElement('span')
+        star.className = 'md-task__unsaved'
+        star.textContent = '*'
+        star.setAttribute('title', 'Отметка не в тексте — ЛКМ сохранить, ПКМ сбросить')
+        const holder = li.querySelector('p:last-of-type') ?? li
+        holder.append(star)
+      } else if (!changed) {
+        li.querySelector('.md-task__unsaved')?.remove()
+      }
+      if (changed) edited = true
+    }
+    taskEdited = edited
+  }
+
+  function saveMarks() {
+    onSaveMarks?.(taskInputs().map((input) => input.checked))
+  }
+
+  /** Save a single item's tick (the phantom star's LMB): defaults + this one change. */
+  function saveOneMark(input: HTMLInputElement) {
+    const i = taskInputs().indexOf(input)
+    if (i === -1) return
+    const marks = taskMarksFromSource(source)
+    if (marks[i] === undefined) return
+    marks[i] = input.checked
+    onSaveMarks?.(marks)
+  }
+
+  /** Reset a single item's tick back to the source (the phantom star's RMB). */
+  function resetOneMark(input: HTMLInputElement) {
+    const defaults = taskMarksFromSource(source)
+    const i = taskInputs().indexOf(input)
+    if (i === -1 || defaults[i] === undefined) return
+    input.checked = defaults[i]
+    refreshTaskMarks()
+  }
+
+  /** Reset every tick back to the source (the bar's «Сбросить»). */
+  function resetMarks() {
+    const defaults = taskMarksFromSource(source)
+    for (const [i, input] of taskInputs().entries()) if (defaults[i] !== undefined) input.checked = defaults[i]
+    refreshTaskMarks()
+  }
   let valueSig = $derived(
     Object.keys(merged)
       .sort()
@@ -172,7 +241,22 @@
     const el = root
     const _ = html
     if (!el) return
-    untrack(() => enhanceCodeBlocks(el))
+    untrack(() => {
+      enhanceCodeBlocks(el)
+      void renderMermaidDiagrams(el)
+    })
+  })
+
+  // A new render replaces the DOM: scratch ticks and their «edited» flag reset with it.
+  $effect(() => {
+    void html
+    taskCount = untrack(() => taskInputs().length)
+    taskEdited = false
+  })
+
+  // The host renders the bar (outside this clipped element) from this state.
+  $effect(() => {
+    onTaskState?.({ count: taskCount, edited: taskEdited })
   })
 
   function enhanceCodeBlocks(rootEl: HTMLElement) {
@@ -255,12 +339,31 @@
     node.addEventListener('keydown',key);queueMicrotask(apply)
     return {update(){queueMicrotask(apply)},destroy(){node.removeEventListener('keydown',key)}}
   }
+  /** RMB on a phantom star resets that item's tick back to the source. */
+  function onTaskContext(event: MouseEvent) {
+    const star = event.target instanceof Element ? event.target.closest('.md-task__unsaved') : null
+    if (!star) return
+    event.preventDefault()
+    const input = star.closest('li')?.querySelector<HTMLInputElement>('input.md-task')
+    if (input) resetOneMark(input)
+  }
+
   function onClick(event: MouseEvent) {
     const image=event.target
     if(image instanceof HTMLImageElement && image.classList.contains('md-attachment-img')) {
       event.preventDefault();event.stopPropagation()
       const images=[...root?.querySelectorAll<HTMLImageElement>('img.md-attachment-img')||[]].map(img=>({src:img.dataset.full||img.getAttribute('src')||'',title:img.alt||'Изображение'}))
       showImages(images,image.dataset.full||image.getAttribute('src')||'');return
+    }
+    if (event.target instanceof Element && event.target.closest('input.md-task')) {
+      // The checkbox has already toggled itself; sync the phantom stars and the bar's buttons.
+      refreshTaskMarks()
+      return
+    }
+    if (event.target instanceof Element && event.target.closest('.md-task__unsaved')) {
+      const input = event.target.closest('li')?.querySelector<HTMLInputElement>('input.md-task')
+      if (input) saveOneMark(input)
+      return
     }
     const a = event.target instanceof Element ? event.target.closest('a') : null
     if (!a) return
@@ -286,6 +389,7 @@
     data-value-sig={valueSig}
     bind:this={root}
     onclick={onClick}
+    oncontextmenu={onTaskContext}
     use:imageAccess={html}
     use:fitMapImages={{ thumb: imageThumb, html }}
     use:captureImgErrors

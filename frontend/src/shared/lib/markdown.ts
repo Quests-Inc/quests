@@ -75,6 +75,8 @@ const PURIFY_OPTS = {
     'h6',
     'del',
     'input',
+    'details',
+    'summary',
     'blockquote',
     'hr',
     'table',
@@ -186,8 +188,10 @@ function ensureLinkHook() {
         node.remove()
         return
       }
-      node.setAttribute('disabled', '')
-      node.removeAttribute('class')
+      // Task checkboxes stay enabled: a tick is viewing-only scratch state until
+      // "перенести отметки в текст" bakes it into the source (see applyTaskMarks).
+      node.removeAttribute('disabled')
+      node.setAttribute('class', 'md-task')
       return
     }
     if (node.tagName === 'IMG') {
@@ -374,4 +378,49 @@ export function renderMarkdown(
   renderCache.set(key, html)
   if (renderCache.size > RENDER_CACHE_MAX) renderCache.delete(renderCache.keys().next().value as string)
   return html
+}
+
+/** GFM task item: `- [ ]`, `* [x]`, `7. [X]` — the checkbox must open the list item. */
+const TASK_MARK_RE = /^([ \t]*(?:[-*+]|\d+[.)])[ \t]+\[)([ xX])(\])/gm
+
+/**
+ * Visits the prose parts of `source` — splitCode() alternates prose and literal
+ * code/math, and task markers in code must not count as list checkboxes.
+ */
+function eachProsePart<T>(source: string, visit: (part: string) => T): T[] {
+  const out: T[] = []
+  const parts = splitCode(source)
+  for (let i = 0; i < parts.length; i += 2) out.push(visit(parts[i] ?? ''))
+  return out
+}
+
+/**
+ * Checked flags of the task markers in source order, outside code and math.
+ * The rendered checkboxes come in the same order, so position N in this array is position N in the DOM.
+ */
+export function taskMarksFromSource(source: string): boolean[] {
+  const marks: boolean[] = []
+  for (const part of eachProsePart(String(source), (p) => p)) {
+    TASK_MARK_RE.lastIndex = 0
+    for (const m of part.matchAll(TASK_MARK_RE)) marks.push(m[2].toLowerCase() === 'x')
+  }
+  return marks
+}
+
+/**
+ * Rewrite the source so task marks match `marks` (`- [ ]` ↔ `- [x]`). Markers inside code and math are left alone.
+ * Returns null when the source has fewer markers than `marks` — the note changed under the ticks, do not guess.
+ */
+export function applyTaskMarks(source: string, marks: boolean[]): string | null {
+  let i = 0
+  const parts = splitCode(String(source)).map((part, index) => {
+    if (index % 2 === 1) return part // literal code/math keeps its `[x]` as text
+    return part.replace(TASK_MARK_RE, (full, open: string, state: string, close: string) => {
+      if (i >= marks.length) return full
+      const next = marks[i++] ? 'x' : ' '
+      return next === state.toLowerCase() ? full : open + next + close
+    })
+  })
+  if (i < marks.length) return null
+  return parts.join('')
 }

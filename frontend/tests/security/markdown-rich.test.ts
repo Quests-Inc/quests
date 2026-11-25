@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test'
 
-import { renderMarkdown } from '@/shared/lib/markdown.ts'
+import { applyTaskMarks, renderMarkdown, taskMarksFromSource } from '@/shared/lib/markdown.ts'
 import { readMath } from '@/shared/lib/markdownMath.ts'
 import { findMarkdownTarget, targetResult } from '@/shared/lib/markdownTargets.ts'
 
-test('static GFM preserves quotes, headings, strikethrough and disabled checkboxes', () => {
+test('static GFM preserves quotes, headings, strikethrough and tickable task checkboxes', () => {
   const html = renderMarkdown(
     '##### Пятый\n\n###### Шестой\n\n> Пояснение **важное**\n\n~~было~~\n\n- [x] Готово\n- [ ] Нет\n\n<input type="text"><input type="checkbox" onclick="alert(1)">'
   )
@@ -17,9 +17,47 @@ test('static GFM preserves quotes, headings, strikethrough and disabled checkbox
   expect(root.querySelectorAll('input')).toHaveLength(3)
   for (const input of root.querySelectorAll('input')) {
     expect(input.type).toBe('checkbox')
-    expect(input.disabled).toBe(true)
+    // Ticks are viewing-only scratch state: enabled, but never a script vector.
+    expect(input.disabled).toBe(false)
+    expect(input.classList.contains('md-task')).toBe(true)
   }
+  expect((root.querySelectorAll('input')[0] as HTMLInputElement).checked).toBe(true)
+  expect((root.querySelectorAll('input')[1] as HTMLInputElement).checked).toBe(false)
   expect(html).not.toContain('onclick')
+})
+test('details/summary survive sanitization with markdown content inside; scripts do not', () => {
+  const html = renderMarkdown(
+    '<details>\n<summary>Таблица переходов</summary>\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n</details>'
+  )
+  expect(html).toContain('<details>')
+  expect(html).toContain('<summary>Таблица переходов</summary>')
+  expect(html).toContain('<table>')
+  const evil = renderMarkdown(
+    '<details open onclick="alert(1)"><summary>x</summary><script>alert(1)</script></details>'
+  )
+  expect(evil).not.toContain('onclick')
+  expect(evil).not.toContain('<script')
+})
+test('mermaid fences stay ordinary code blocks in the sync render', () => {
+  const html = renderMarkdown('```mermaid\nflowchart TD\n  a --> b\n```')
+  expect(html).toContain('data-lang="mermaid"')
+  expect(html).toContain('flowchart TD')
+  expect(html).not.toContain('<svg')
+})
+test('task marks rewrite the source positionally and skip code; mismatch returns null', () => {
+  const src =
+    'До:\n\n- [ ] Один\n- [x] Два\n\n```md\n- [ ] не список, а текст\n```\n\n1. [ ] Три\n\nПосле `$x$` и `- [ ]` в коде.'
+  expect(taskMarksFromSource(src)).toEqual([false, true, false])
+  const next = applyTaskMarks(src, [true, false, true])!
+  expect(next).toContain('- [x] Один')
+  expect(next).toContain('- [ ] Два')
+  expect(next).toContain('1. [x] Три')
+  expect(next).toContain('```md\n- [ ] не список, а текст\n```')
+  expect(taskMarksFromSource(next)).toEqual([true, false, true])
+  expect(next).toBe(
+    src.replace('- [ ] Один', '- [x] Один').replace('- [x] Два', '- [ ] Два').replace('1. [ ] Три', '1. [x] Три')
+  )
+  expect(applyTaskMarks(src, [true, false, true, false])).toBeNull()
 })
 test('math supports note137 and multiline display; code and currency stay literal', () => {
   const html = renderMarkdown(

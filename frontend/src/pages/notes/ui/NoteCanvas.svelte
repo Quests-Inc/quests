@@ -11,6 +11,7 @@
   import Icon from '@/shared/ui/Icon.svelte'
   import RefText from '@/shared/ui/RefText.svelte'
   import MarkdownBody from '@/shared/ui/MarkdownBody.svelte'
+  import { applyTaskMarks, taskMarksFromSource } from '@/shared/lib/markdown.ts'
   import NoteHead from './NoteHead.svelte'
   import NoteLinks from './NoteLinks.svelte'
 
@@ -20,6 +21,22 @@
   let noteValues = $state({} as Record<string, string>)
   let valuesNoteId = $state<number | null>(null)
   let valuesLoading = $state(true)
+  let taskState = $state({ count: 0, edited: false })
+
+  function taskInputs(): HTMLInputElement[] {
+    return previewEl ? Array.from(previewEl.querySelectorAll('input.md-task')) : []
+  }
+
+  /** The bar's «Перенести в текст»: bake every tick into the note text and save. */
+  function saveAllMarks() {
+    saveMarksToText(taskInputs().map((input) => input.checked))
+  }
+
+  /** The bar's «Сбросить»: every tick back to the source markers. */
+  function resetAllMarks() {
+    const defaults = taskMarksFromSource(ed.description)
+    for (const [i, input] of taskInputs().entries()) if (defaults[i] !== undefined) input.checked = defaults[i]
+  }
 
   /** Тело открытой заметки: шапка, редактор, предпросмотр, ссылки и вложения. Раскладка страницы остаётся у NotesPage. */
   let {
@@ -113,6 +130,18 @@
     if (!ed.detail?.is_sample) return false
     toast(`Заметка «${ed.title}» помечена как образец. Редактирование запрещено`, { kind: 'error' })
     return true
+  }
+
+  /** Bake the preview's scratch checkbox ticks into the note text, then save. Marks outside code and math are positional. */
+  function saveMarksToText(marks: boolean[]) {
+    if (sampleBlocked()) return
+    const next = applyTaskMarks(ed.description, marks)
+    if (next == null) {
+      toast('Текст заметки изменился — отметки не перенесены, обновите превью', { kind: 'error' })
+      return
+    }
+    if (next !== ed.description) ed.description = next
+    onSave()
   }
 </script>
 
@@ -227,6 +256,17 @@
         />
       {/if}
       {#if viewMode !== 'raw'}
+        <!-- The tick bar lives outside .notes__preview on purpose: a sticky plate cannot
+             escape an overflow-clipped ancestor, so it would stop following the page scroll. -->
+        {#if taskState.count > 0 && taskState.edited}
+          <div class="md-taskbar" role="status">
+            <span class="md-taskbar__hint">Отметки временные — пока их не перенести в текст</span>
+            <button type="button" class="md-taskbar__btn" disabled={!taskState.edited} onclick={saveAllMarks}>Перенести в текст</button>
+            {#if taskState.edited}
+              <button type="button" class="md-taskbar__btn md-taskbar__btn--ghost" onclick={resetAllMarks}>Сбросить</button>
+            {/if}
+          </div>
+        {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="notes__preview block--prose"
@@ -234,7 +274,7 @@
           bind:this={previewEl}
           ondblclick={(e) => { if (!sampleBlocked()) onStartBodyEdit(e) }}
         >
-          <MarkdownBody source={ed.description} {labels} {onRef} values={valuesNoteId === selectedId ? noteValues : {}} valuesLoading={valuesNoteId !== selectedId || valuesLoading} host={selectedId ? { kind: 'note', id: selectedId } : undefined} />
+          <MarkdownBody source={ed.description} {labels} {onRef} values={valuesNoteId === selectedId ? noteValues : {}} valuesLoading={valuesNoteId !== selectedId || valuesLoading} host={selectedId ? { kind: 'note', id: selectedId } : undefined} onTaskState={(s) => (taskState = s)} onSaveMarks={saveMarksToText} />
         </div>
       {/if}
     </div>
@@ -347,7 +387,20 @@
 
   .notes__split--combined {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'bar bar'
+      'edit preview';
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 0 1.1rem;
+  }
+  .notes__split--combined .md-taskbar {
+    grid-area: bar;
+  }
+  .notes__split--combined :global(.mention-field) {
+    grid-area: edit;
+  }
+  .notes__split--combined .notes__preview.block--prose {
+    grid-area: preview;
   }
 
   .notes__split--combined .notes__preview.block--prose { position: sticky; top: calc(-1 * var(--space-5, 1.5rem)); align-self: start; height: calc(100dvh - 3.5rem); scrollbar-width: none; min-height: 0; box-sizing: border-box; overflow: hidden; }

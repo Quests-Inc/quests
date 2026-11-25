@@ -35,7 +35,13 @@ function offsetInRoot(root: ParentNode, node: Node, offset: number) {
 }
 
 export function rangeFromTextOffset(root: ParentNode, offset: number): Range | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  // Skip text inside <style> (mermaid bakes its theme there): it is invisible CSS,
+  // and text offsets computed from the visible text must not land in it.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      return n.parentElement?.closest('style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    },
+  })
   let left = Math.max(0, offset)
   let n: Node | null
   let last: Text | null = null

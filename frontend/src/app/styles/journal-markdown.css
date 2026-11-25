@@ -688,3 +688,160 @@ a:has(> .md-ref__ico) {
   border-width: 0 2px 2px 0;
   transform: translateY(-0.06em) rotate(45deg);
 }
+
+/* Task checkboxes are clickable scratch state until «Перенести в текст» rewrites the note. */
+.md input.md-task {
+  cursor: pointer;
+  /* Anchor to the text line instead of floating with varying inline content. */
+  vertical-align: middle;
+  margin-bottom: 0.12em;
+}
+.md input.md-task:hover {
+  border-color: var(--color-accent);
+}
+/* A changed item carries a phantom star (like a note's unsaved-title marker): zero-width,
+   so it never shifts the layout. LMB saves the tick into the text, RMB resets it. */
+.md li:has(input.md-task) {
+  list-style: none;
+}
+.md .md-task__unsaved {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  margin-left: 0.2em;
+  color: var(--color-accent);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* <details>/<summary>: a quiet disclosure plate, not a UI panel. */
+.md details {
+  margin: 0 0 0.6em;
+  padding: 0.35em 0.75em;
+  border: 1px solid var(--color-border, #3a3a3a);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-fg, #e8e8e8) 3%, transparent);
+}
+.md details > summary {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-fg-muted);
+  font-weight: 600;
+  padding-block: 0.15em;
+  /* Room for the chevron, which lives inside the plate's own padding zone. */
+  padding-right: 1.7em;
+  list-style: none;
+}
+.md details > summary::-webkit-details-marker {
+  display: none;
+}
+/* The header's chevron-right, painted through a mask: same shape, follows currentColor. */
+.md details > summary::after {
+  content: '';
+  position: absolute;
+  right: 0.2em;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin-top: -5.5px;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 4.5 9.5 8 6 11.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 4.5 9.5 8 6 11.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform 0.15s ease;
+}
+.md details[open] > summary::after {
+  transform: rotate(90deg);
+}
+.md details > summary:hover {
+  color: var(--color-fg);
+}
+.md details[open] > summary {
+  color: var(--color-fg);
+  margin-bottom: 0.25em;
+}
+.md details > :last-child {
+  margin-bottom: 0;
+}
+
+/* Rendered mermaid diagrams replace the fenced source in place. */
+.md .md-mermaid {
+  overflow-x: auto;
+  padding: 0.35em 0.15em;
+}
+.md .md-mermaid svg {
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+}
+.md .md-codeblock[data-md-mermaid='error'] pre {
+  display: revert;
+}
+.md .md-codeblock[data-md-mermaid='error']::after {
+  content: 'Диаграмма не отрисовалась — показан исходник';
+  display: block;
+  margin-top: 0.3em;
+  font-size: 0.85em;
+  color: var(--color-fg-muted);
+}
+
+/* Hint plate above the rendered body: ticks are scratch state until saved to the text.
+   Sticky flush under the app header; spans the split's grid row so it never breaks the columns. */
+.md-taskbar {
+  position: sticky;
+  top: 0.3em;
+  grid-column: 1 / -1;
+  z-index: 6; /* above the floating note outline (4) */
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin: 0 0 0.6em;
+  padding: 0.3em 0.7em;
+  border: 1px solid var(--color-border, #3a3a3a);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg, #1a1a1a) 94%, transparent);
+  backdrop-filter: blur(6px);
+  font-size: 0.88em;
+}
+.md-taskbar__hint {
+  color: var(--color-fg-muted);
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-taskbar__btn {
+  border: 1px solid var(--color-border-strong, #4a4a4a);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fg);
+  padding: 0.15em 0.6em;
+  font: inherit;
+  font-size: 0.92em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.md-taskbar__btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.md-taskbar__btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.md-taskbar__btn--ghost {
+  border-color: transparent;
+  color: var(--color-fg-muted);
+}
+@media print {
+  .md-taskbar {
+    display: none;
+  }
+}
