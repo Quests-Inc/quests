@@ -13,6 +13,8 @@
     checked?: boolean,
     disabled?: boolean,
     children?: CtxItem[],
+    /** Следующая панель — сетка n×n, выбор отдаёт `${id}-${столбцы}x${строки}`. */
+    grid?: number,
     /** Подменю с полем поиска: пока поле пустое видны `children`, с запросом — совпадения из этого полного списка. */
     search?: CtxItem[],
   }
@@ -20,7 +22,7 @@
 
   let { open = false, x = 0, y = 0, center = false, items = [], onSelect, onClose, anchor = null }: { open: boolean, x: number, y: number, anchor?: HTMLElement | null, /** x — середина якоря: меню встаёт по центру под ним, в пределах экрана. */ center?: boolean, items: CtxItem[], onSelect: (id: string) => void, onClose: () => void } = $props()
 
-  type Branch = { id: string, items: CtxItem[], search?: CtxItem[], left: number, right: number, top: number, query: string }
+  type Branch = { id: string, items: CtxItem[], search?: CtxItem[], grid?: number, left: number, right: number, top: number, query: string }
 
   let menuEl = $state((null as HTMLDivElement | null))
   let posX = $state(0)
@@ -28,6 +30,8 @@
   let placed = $state(false)
   /** Открытые подменю по глубине: [0] — от пункта корня, [1] — от пункта в нём и т.д. */
   let branches: Branch[] = $state([])
+  let gridOver = $state({ c: 0, r: 0 })
+  let gridSize = $state(5)
   const searchedBranch = $derived(branches.findLast(b=>b.query.trim() && b.search?.some(i=>i.entity)))
   const menuSearch = createEntitySearch(() => {
     if (!open || !searchedBranch) return null
@@ -65,15 +69,17 @@
   }
 
   function openBranch(item: CtxItem, el: HTMLElement, depth: number) {
-    if (!item.children?.length) return
+    if (!item.children?.length && !item.grid) return
     if (branches[depth]?.id === item.id) {
       branches = branches.slice(0, depth + 1)
       return
     }
     const rect = el.getBoundingClientRect()
+    gridOver = { c: 0, r: 0 }
+    gridSize = Math.min(5, item.grid ?? 5)
     branches = [
       ...branches.slice(0, depth),
-      { id: item.id, items: item.children, search: item.search, left: rect.left, right: rect.right, top: rect.top, query: '' },
+      { id: item.id, items: item.children ?? [], search: item.search, grid: item.grid, left: rect.left, right: rect.right, top: rect.top, query: '' },
     ]
   }
 
@@ -100,7 +106,7 @@
 
   function onRowEnter(item: CtxItem, el: HTMLElement, depth: number) {
     if (item.sep || item.disabled) return
-    if (item.children?.length) openBranch(item, el, depth)
+    if (item.children?.length || item.grid) openBranch(item, el, depth)
     else branches = branches.slice(0, depth)
   }
 
@@ -182,7 +188,7 @@
   {#each list as item (item.id)}
     {#if item.sep}
       <div class="ctx-menu__sep" role="separator"></div>
-    {:else if item.children?.length}
+    {:else if item.children?.length || item.grid}
       <button
         type="button"
         class="ctx-menu__item ctx-menu__item--branch"
@@ -247,7 +253,31 @@
       {#if b.search && !shown.length}
         <div class="ctx-menu__empty">Ничего не найдено</div>
       {/if}
-      {@render rows(shown, i + 1)}
+      {#if b.grid}
+        <div class="ctx-grid" style:grid-template-columns="repeat({gridSize}, 0.85rem)">
+          {#each { length: gridSize } as _, r}
+            {#each { length: gridSize } as _, c}
+              <button
+                type="button"
+                class="ctx-grid__cell"
+                class:ctx-grid__cell--on={c < gridOver.c && r < gridOver.r}
+                aria-label="{c + 1} на {r + 1}"
+                onmouseenter={() => {
+                  const next = c + 1
+                  const down = r + 1
+                  gridOver = { c: next, r: down }
+                  const max = b.grid ?? gridSize
+                  if ((next === gridSize || down === gridSize) && gridSize < max) gridSize += 1
+                }}
+                onclick={() => { onSelect(`${b.id}-${c + 1}x${r + 1}`); onClose() }}
+              ></button>
+            {/each}
+          {/each}
+        </div>
+        <div class="ctx-grid__label">{gridOver.c ? `${gridOver.c} × ${gridOver.r}` : 'Размер'}</div>
+      {:else}
+        {@render rows(shown, i + 1)}
+      {/if}
     </div>
   {/each}
 {/if}
@@ -346,6 +376,31 @@
   .ctx-menu__mark {
     flex: none;
     opacity: 0.6;
+  }
+
+  .ctx-grid {
+    display: grid;
+    gap: 2px;
+    padding: 0.15rem;
+  }
+  .ctx-grid__cell {
+    width: 0.85rem;
+    height: 0.85rem;
+    padding: 0;
+    border: 1px solid var(--color-border-strong, #4a4a4a);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .ctx-grid__cell--on {
+    border-color: var(--color-accent, #c9a227);
+    background: color-mix(in srgb, var(--color-accent, #c9a227) 35%, transparent);
+  }
+  .ctx-grid__label {
+    padding: 0.15rem 0.2rem 0.05rem;
+    color: var(--color-fg-muted, #9a9a9a);
+    font-size: var(--text-sm, 0.875rem);
+    text-align: center;
   }
 
   .ctx-menu__sep {

@@ -30,6 +30,7 @@
     el = $bindable(null),
     onkeydown,
     oninput,
+    oncontextmenu,
   }: {
     value?: string,
     quests?: any[],
@@ -51,6 +52,7 @@
     el?: HTMLTextAreaElement | null,
     onkeydown?: (event: KeyboardEvent) => void,
     oninput?: (event: Event) => void,
+    oncontextmenu?: (event: MouseEvent) => void,
   } = $props()
 
   let mentionOpen = $state(false)
@@ -241,10 +243,18 @@
   }
 
   function onFieldKeydown(event: KeyboardEvent) {
+    if (pairs && markdownField && !disabled && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey && el && event.key === 'Backspace') {
+      const edit = pairBackspace(el.value, el.selectionStart ?? 0, el.selectionEnd ?? 0)
+      if (edit) {
+        event.preventDefault()
+        applyPair(edit)
+        return
+      }
+    }
     if (pairs && markdownField && !disabled && !mentionOpen && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey && el) {
       const a = el.selectionStart ?? 0
       const b = el.selectionEnd ?? a
-      const edit = event.key === 'Backspace' ? pairBackspace(el.value, a, b) : pairKey(el.value, a, b, event.key)
+      const edit = pairKey(el.value, a, b, event.key)
       if (edit) {
         event.preventDefault()
         applyPair(edit)
@@ -297,6 +307,7 @@
     class={className}
     oninput={onFieldInput}
     onkeydown={onFieldKeydown}
+    oncontextmenu={oncontextmenu}
     onscroll={syncLayer}
   ></textarea>
   {#if mentionOpen}

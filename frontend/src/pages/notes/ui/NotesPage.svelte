@@ -51,7 +51,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     historyIds = [],
     historyIndex = -1,
     historyCount = 0,
-    onHistory = () => {},
+    onHistory = () => {}, onDismissHistory = () => {},
     labels = {},
     questlines = [],
     onSelect,
@@ -66,7 +66,7 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
     historyIds?: number[],
     historyIndex?: number,
     historyCount?: number,
-    onHistory?: (index: number) => void,
+    onHistory?: (index: number) => void, onDismissHistory?: (id: number) => void,
     labels?: Record<string, string>,
     questlines?: any[],
     onSelect: (id: number | null) => void,
@@ -645,10 +645,11 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
       <nav class="notes__visits" aria-label="История открытых заметок">
         {#each historyIds as id, i}
           {#if i > 0}<span class="notes__visit-separator" aria-hidden="true">/</span>{/if}
-          <button type="button" class="notes__visit" title={notes.find(n => n.id === id)?.title ?? `Заметка ${id}`} aria-current={id === selectedId ? 'page' : undefined} onclick={() => onSelect(id)}>{#if !uiPreferences.hideNoteHistoryIcons}<span class="notes__visit-icon" style:--line-color={notes.find(n => n.id === id)?.color || undefined}><QuestlineIcon icon={notes.find(n => n.id === id)?.icon || 'document'} iconUrl={notes.find(n => n.id === id)?.icon_url} size="sm" /></span>{/if}<span class="notes__visit-title">{notes.find(n => n.id === id)?.title ?? `Заметка ${id}`}</span></button>
+          <span class="notes__visit" aria-current={id === selectedId ? 'page' : undefined}>
+            <button type="button" class="notes__visit-open" title={notes.find(n => n.id === id)?.title ?? `Заметка ${id}`} onclick={() => onSelect(id)}>{#if !uiPreferences.hideNoteHistoryIcons}<span class="notes__visit-icon" style:--line-color={notes.find(n => n.id === id)?.color || undefined}><QuestlineIcon icon={notes.find(n => n.id === id)?.icon || 'document'} iconUrl={notes.find(n => n.id === id)?.icon_url} size="sm" /></span>{/if}<span class="notes__visit-title">{notes.find(n => n.id === id)?.title ?? `Заметка ${id}`}</span></button>
+            <button type="button" class="notes__visit-x" aria-label="Убрать из истории" title="Убрать из истории" onclick={() => onDismissHistory(id)}>×</button>
+          </span>
         {/each}
-        <button type="button" class="notes__history-back" disabled={historyIndex <= 0} onclick={() => onHistory(historyIndex - 1)} aria-label="Предыдущая заметка">←</button>
-        <button type="button" disabled={historyIndex >= historyCount - 1} onclick={() => onHistory(historyIndex + 1)} aria-label="Следующая заметка">→</button>
       </nav>
     {/if}
     <NoteCanvas
@@ -783,10 +784,13 @@ import type { NotePayload } from '@/shared/api/knowledge_http.gen.ts'
 
 .notes__visits{display:flex;gap:.35rem;align-items:center;overflow:hidden;min-width:0;flex-shrink:0;padding:0 0 .2rem;font-size:.85rem;color:var(--color-fg-muted)}
 .notes__visits button{appearance:none;background:none;border:0;border-radius:0;padding:.15rem .25rem;font:inherit;color:inherit;cursor:pointer;flex-shrink:0;overflow:hidden;text-overflow:clip;white-space:nowrap}
-.notes__visits .notes__visit{display:flex;align-items:center;gap:.3rem;flex:0 1 auto;min-width:0;max-width:18rem;text-align:left}
-.notes__visit-separator{flex-shrink:0;opacity:.5}.notes__visit-icon{display:inline-flex;flex-shrink:0;color:var(--line-color, #9a9a9a)}.notes__visit-title{min-width:0;overflow:hidden;white-space:nowrap}
-.notes__visits .notes__history-back{margin-left:auto}
+.notes__visits .notes__visit{position:relative;display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;max-width:18rem}
+.notes__visit-open{display:flex;align-items:center;gap:.3rem;min-width:0;padding-right:.15rem;text-align:left}
+.notes__visit-x{position:absolute;right:0;top:50%;transform:translateY(-50%);width:auto;padding:0;opacity:0;pointer-events:none;line-height:1;text-decoration:none}.notes__visit:hover .notes__visit-x,.notes__visit:focus-within .notes__visit-x{opacity:.85;pointer-events:auto}
+.notes__visit:hover .notes__visit-title,.notes__visit:focus-within .notes__visit-title{padding-right:.7rem;margin-right:-.7rem}
+.notes__visit-separator{flex-shrink:0;opacity:.5}.notes__visit-icon{display:inline-flex;flex-shrink:0;color:var(--line-color, #9a9a9a)}.notes__visit-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes__visits button:hover:not(:disabled),.notes__visits [aria-current]{color:var(--color-fg);text-decoration:underline;text-underline-offset:.2em}
+.notes__visits .notes__visit-x:hover{text-decoration:none}
 .notes__visits button:disabled{opacity:.35;cursor:default}.notes__visits button:focus-visible{outline:1px solid currentColor;outline-offset:2px}
 
 </style>

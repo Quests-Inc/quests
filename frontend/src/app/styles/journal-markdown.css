@@ -690,6 +690,40 @@ a:has(> .md-ref__ico) {
 }
 
 /* Task checkboxes are clickable scratch state until «Перенести в текст» rewrites the note. */
+.md button.md-audio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  max-width: 100%;
+  margin: 0.3em 0;
+  padding: 0.12em 0.55em 0.12em 0.28em;
+  border: 1px solid var(--color-border, #3a3a3a);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.md button.md-audio .md-audio__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 1.05em;
+  height: 1.05em;
+}
+.md button.md-audio .md-audio__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.md button.md-audio .md-audio__time:empty {
+  display: none;
+}
+.md button.md-audio:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
 .md input.md-task {
   cursor: pointer;
   /* Anchor to the text line instead of floating with varying inline content. */
@@ -789,59 +823,4 @@ a:has(> .md-ref__ico) {
   margin-top: 0.3em;
   font-size: 0.85em;
   color: var(--color-fg-muted);
-}
-
-/* Hint plate above the rendered body: ticks are scratch state until saved to the text.
-   Sticky flush under the app header; spans the split's grid row so it never breaks the columns. */
-.md-taskbar {
-  position: sticky;
-  top: 0.3em;
-  grid-column: 1 / -1;
-  z-index: 6; /* above the floating note outline (4) */
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-  margin: 0 0 0.6em;
-  padding: 0.3em 0.7em;
-  border: 1px solid var(--color-border, #3a3a3a);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-bg, #1a1a1a) 94%, transparent);
-  backdrop-filter: blur(6px);
-  font-size: 0.88em;
-}
-.md-taskbar__hint {
-  color: var(--color-fg-muted);
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.md-taskbar__btn {
-  border: 1px solid var(--color-border-strong, #4a4a4a);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-fg);
-  padding: 0.15em 0.6em;
-  font: inherit;
-  font-size: 0.92em;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.md-taskbar__btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-.md-taskbar__btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.md-taskbar__btn--ghost {
-  border-color: transparent;
-  color: var(--color-fg-muted);
-}
-@media print {
-  .md-taskbar {
-    display: none;
-  }
 }

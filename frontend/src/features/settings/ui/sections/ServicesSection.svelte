@@ -1,5 +1,6 @@
 <script lang="ts">
   import SettingsBlock from './SettingsBlock.svelte'
+  import { sttSettings } from '@/shared/model/sttSettings.svelte.ts'
 
   let { health, liveStatus = 'off' }: { health: { api: string, overlay: string, telegram: string, webdav?: string, detail?: any }, liveStatus?: string } = $props()
 
@@ -66,6 +67,18 @@
   </ul>
 </SettingsBlock>
 
+<SettingsBlock title="Распознавание речи" hint="Адрес хранится на сервере Квестов. Само не запускается: правый клик по плееру в заметке, пункт «Распознать». Сервер вызывает OpenAI-совместимый /v1/audio/transcriptions. Пустой адрес — распознать нельзя.">
+  <label class="stt">Адрес
+    <input class="stt__in" bind:value={sttSettings.baseUrl} placeholder="http://192.168.1.152:8000" autocomplete="off" />
+  </label>
+  <label class="stt">Модель
+    <input class="stt__in" bind:value={sttSettings.model} placeholder="whisper-1" autocomplete="off" />
+  </label>
+  <label class="stt">Ключ
+    <input class="stt__in" type="password" bind:value={sttSettings.apiKey} placeholder={sttSettings.hasKey ? 'сохранён на сервере' : 'не нужен для своего сервера'} autocomplete="off" />
+  </label>
+</SettingsBlock>
+
 <style>
   .svc-list {
     list-style: none;
@@ -74,6 +87,8 @@
     display: grid;
     gap: 0.35rem;
   }
+  .stt { display: grid; gap: 0.2rem; margin-top: 0.55rem; color: var(--color-fg-muted); font-size: 0.85rem; }
+  .stt__in { width: 100%; box-sizing: border-box; }
   .svc {
     display: grid;
     grid-template-columns: auto 1fr auto;

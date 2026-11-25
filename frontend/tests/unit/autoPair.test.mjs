@@ -65,6 +65,8 @@ test('выделение оборачивается и остаётся выде
 
 test('Backspace внутри пустой пары убирает обе половины', () => {
   expect(type('{|}', ['BS'])).toBe('|')
+  expect(type('{{|}}', ['BS'])).toBe('{|}')
+  expect(type('|', ['{', '{', 'BS', 'BS'])).toBe('|')
   expect(type('**|**', ['BS'])).toBe('*|*')
   expect(type('*a|*', ['BS'])).toBe('*|*')
   expect(type('x|', ['BS'])).toBe('|')

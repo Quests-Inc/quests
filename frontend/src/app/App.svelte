@@ -634,7 +634,7 @@
         selectedId={nav.selectedNoteId}
         historyIds={nav.recentNotes} historyCount={nav.noteHistory.length}
         historyIndex={nav.noteHistoryIndex}
-        onHistory={nav.goNoteHistory}
+        onHistory={nav.goNoteHistory} onDismissHistory={(id) => nav.dismissRecentNote(id)}
         labels={refLabels}
         onSelect={(id) => selectNoteFromUi(id)}
         onChanged={() => load({ silent: true })}

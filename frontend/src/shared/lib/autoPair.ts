@@ -77,8 +77,16 @@ export function pairBackspace(text: string, start: number, end: number): PairEdi
   if (start !== end || start < 1) return null
   const prev = text[start - 1]
   const next = text[start]
-  if (prev in CLOSE && next === CLOSE[prev])
-    return { kind: 'edit', start: start - 1, end: start + 1, text: '', caret: start - 1 }
+  if (prev in CLOSE) {
+    const close = CLOSE[prev]
+    let opens = 0
+    while (text[start - 1 - opens] === prev) opens++
+    let closes = 0
+    while (text[start + closes] === close) closes++
+    // `{{|}}` is two empty pairs: the first backspace takes one opener and its closer, leaving `{|}`.
+    if (opens > 0 && closes > 0 && (next === close || opens === closes))
+      return { kind: 'edit', start: start - 1, end: start + 1, text: '', caret: start - 1 }
+  }
   if (MARKS.has(prev) && next === prev) {
     const { before, after } = runs(text, start, prev)
     if (before === after) return { kind: 'edit', start: start - 1, end: start + 1, text: '', caret: start - 1 }

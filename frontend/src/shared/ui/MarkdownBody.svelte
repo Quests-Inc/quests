@@ -17,6 +17,10 @@
   import { scriptEmbed } from '@/shared/lib/scriptEmbed.ts'
   import { refIcons } from '@/shared/lib/refIcons.svelte.ts'
   import { renderMermaidDiagrams } from '@/shared/lib/markdownMermaid.ts'
+  import { attachmentIsAudio } from '@/shared/api/stt.ts'
+  import { playAttachment, player } from '@/shared/lib/player.svelte.ts'
+  import pauseSvg from '@/assets/icons/pause.svg?raw'
+  import playSvg from '@/assets/icons/play.svg?raw'
   import { mapJumps, type MapJump } from '@/shared/lib/mapJumps.ts'
   import copySvg from '@/assets/icons/copy.svg?raw'
   import checkSvg from '@/assets/icons/checkmark.svg?raw'
@@ -35,6 +39,7 @@
     imageThumb = undefined,
     onTaskState,
     onSaveMarks,
+    onAudioMenu,
   }: {
     source?: string,
     class?: string,
@@ -54,6 +59,8 @@
      * escape an overflow-clipped ancestor, so the plate must live outside this element). */
     onTaskState?: (state: { count: number; edited: boolean }) => void,
     onSaveMarks?: (marks: boolean[]) => void,
+    /** Right click on an inline player. The host opens its menu. */
+    onAudioMenu?: (id: number, point: { x: number; y: number }) => void,
   } = $props()
 
   let foreign = $state({} as Record<string, string>)
@@ -148,7 +155,7 @@
   let merged = $derived({ ...foreign, ...own, ...values })
   let html = $derived(renderMarkdown(source, { labels:{...repositoryRefs.labels,...labels}, values: merged, valuesLoading }))
 
-  /** Task ticks are viewing-only scratch state: they live in the DOM until «Перенести в текст» bakes them into the source. */
+  /** A plain click is scratch state (a star until saved). Ctrl+click writes that one tick into the note immediately. */
   let taskCount = $state(0)
   let taskEdited = $state(false)
 
@@ -247,6 +254,15 @@
     })
   })
 
+  $effect(() => {
+    void player.playing
+    void player.current
+    void player.track?.id
+    const el = root
+    if (!el) return
+    paintAudioButtons(el)
+  })
+
   // A new render replaces the DOM: scratch ticks and their «edited» flag reset with it.
   $effect(() => {
     void html
@@ -303,13 +319,67 @@
    * attachment (or a non-image one) becomes a visible placeholder instead of a
    * blank hole.
    */
-  function onImgError(event: Event) {
+  function paintAudioButtons(el: HTMLElement) {
+    const track = player.track
+    for (const btn of el.querySelectorAll<HTMLButtonElement>('button.md-audio')) {
+      const id = Number(btn.dataset.audioId)
+      const on = track?.id === id && player.playing
+      const name = btn.dataset.audioName || `attachment=${id}`
+      const time = track?.id === id && player.duration > 0 ? clock(player.current) : ''
+      const icon = btn.querySelector('.md-audio__icon')
+      const label = btn.querySelector('.md-audio__name')
+      const clockEl = btn.querySelector('.md-audio__time')
+      if (icon) icon.innerHTML = on ? pauseSvg : playSvg
+      if (label) label.textContent = name
+      if (clockEl) clockEl.textContent = time
+      btn.setAttribute('aria-label', `${on ? 'Пауза' : 'Играть'}: ${name}`)
+    }
+  }
+
+  function clock(seconds: number) {
+    const t = Math.max(0, Math.floor(seconds))
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
+  }
+
+  function audioButton(id: string, alt: string) {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'md-audio'
+    btn.dataset.audioId = id
+    btn.dataset.audioName = alt || `attachment=${id}`
+    btn.innerHTML = '<span class="md-audio__icon" aria-hidden="true"></span><span class="md-audio__name"></span><span class="md-audio__time"></span>'
+    btn.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      playAttachment({ id: Number(id), filename: btn.dataset.audioName || `attachment-${id}.webm`, mime: 'audio/webm' })
+    })
+    btn.addEventListener('contextmenu', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onAudioMenu?.(Number(id), { x: event.clientX, y: event.clientY })
+    })
+    return btn
+  }
+
+  async function onImgError(event: Event) {
     const img = event.target
     if (!(img instanceof HTMLImageElement) || !img.classList.contains('md-attachment-img')) return
-    const ph = document.createElement('span')
-    ph.className = 'md-img-missing'
     const m = /\/api\/attachments\/(\d+)\/image/.exec(img.getAttribute('src') || '')
     const alt = img.getAttribute('alt') || ''
+    if (m) {
+      try {
+        if (await attachmentIsAudio(m[1])) {
+          const btn = audioButton(m[1], alt)
+          img.replaceWith(btn)
+          if (root) paintAudioButtons(root)
+          return
+        }
+      } catch {
+        /* Fall through to the missing-image placeholder. */
+      }
+    }
+    const ph = document.createElement('span')
+    ph.className = 'md-img-missing'
     ph.textContent = `▢ вложение недоступно${m ? ` (attachment=${m[1]})` : ''}${alt ? ` — ${alt}` : ''}`
     img.replaceWith(ph)
   }
@@ -341,6 +411,13 @@
   }
   /** RMB on a phantom star resets that item's tick back to the source. */
   function onTaskContext(event: MouseEvent) {
+    const audio = event.target instanceof Element ? event.target.closest('button.md-audio') : null
+    if (audio instanceof HTMLButtonElement) {
+      event.preventDefault()
+      const id = Number(audio.dataset.audioId)
+      if (id) onAudioMenu?.(id, { x: event.clientX, y: event.clientY })
+      return
+    }
     const star = event.target instanceof Element ? event.target.closest('.md-task__unsaved') : null
     if (!star) return
     event.preventDefault()
@@ -356,7 +433,11 @@
       showImages(images,image.dataset.full||image.getAttribute('src')||'');return
     }
     if (event.target instanceof Element && event.target.closest('input.md-task')) {
-      // The checkbox has already toggled itself; sync the phantom stars and the bar's buttons.
+      const input = event.target.closest('input.md-task')
+      if (input instanceof HTMLInputElement && (event.ctrlKey || event.metaKey)) {
+        saveOneMark(input)
+        return
+      }
       refreshTaskMarks()
       return
     }

@@ -60,6 +60,16 @@ export function createNavigation(deps: {
     if (!recentNotes.includes(id)) return
     persistRecent(recentNotes.filter((previous) => previous !== id))
   }
+  /** Take one chip off the visit strip. The open note yields to a neighbour. */
+  function dismissRecentNote(id: number) {
+    const index = recentNotes.indexOf(id)
+    if (index < 0) return
+    const rest = recentNotes.filter((previous) => previous !== id)
+    persistRecent(rest)
+    if (selectedNoteId !== id) return
+    const next = rest[Math.min(index, rest.length - 1)]
+    if (next != null) selectNote(next)
+  }
   /** The note cannot be opened. It leaves the visit strip; leaving the page also drops the address entry. */
   function noteMissing(id: number) {
     missingNotes.add(id)
@@ -444,6 +454,7 @@ export function createNavigation(deps: {
       return noteHistoryIndex
     },
     goNoteHistory,
+    dismissRecentNote,
     onPopState,
     searchFor,
     start,
