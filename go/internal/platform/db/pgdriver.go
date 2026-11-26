@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -307,6 +308,8 @@ func OpenPostgresOpts(url string, opts PGOptions) (*sql.DB, SchemaStatus, error)
 	sqlDB := sql.OpenDB(pgConnector{inner: stdlib.GetConnector(*cfg), defaultWS: opts.DefaultWorkspace, owner: opts.Owner})
 	sqlDB.SetMaxOpenConns(10)
 	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 	if err := sqlDB.Ping(); err != nil {
 		_ = sqlDB.Close()
 		return nil, zero, err
