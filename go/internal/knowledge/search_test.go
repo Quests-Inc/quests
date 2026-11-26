@@ -113,6 +113,33 @@ func TestSearchOwnVariablesNotFormulasOrParents(t *testing.T) {
 	}
 }
 
+// The stored search_vec must follow writes: the note itself and its own variables.
+func TestSearchVectorFollowsWrites(t *testing.T) {
+	st := seedSearchNotes(t)
+	if hits, _ := st.SearchNotes(context.Background(), "табличка", SearchOpts{}); len(hits) != 0 {
+		t.Fatalf("nothing to find yet: %+v", hits)
+	}
+	if _, err := st.DB.Exec(`UPDATE note SET description = description || ' и табличка в цеху' WHERE id = 4`); err != nil {
+		t.Fatal(err)
+	}
+	if hits, _ := st.SearchNotes(context.Background(), "табличка", SearchOpts{}); len(hits) != 1 || hits[0].ID != 4 {
+		t.Fatalf("note edit must refresh the vector: %+v", hits)
+	}
+	if _, err := st.DB.Exec(`INSERT INTO named_value (note_id, name, type, value, created_at, updated_at) VALUES
+ (4, 'место', 'str', 'б yOffset', '2026-10-04 10:00:00', '2026-10-04 10:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	if hits, _ := st.SearchNotes(context.Background(), "б yOffset", SearchOpts{}); len(hits) != 1 || hits[0].ID != 4 {
+		t.Fatalf("variable write must refresh the vector: %+v", hits)
+	}
+	if _, err := st.DB.Exec(`DELETE FROM named_value WHERE note_id = 4`); err != nil {
+		t.Fatal(err)
+	}
+	if hits, _ := st.SearchNotes(context.Background(), "б yOffset", SearchOpts{}); len(hits) != 0 {
+		t.Fatalf("variable delete must refresh the vector: %+v", hits)
+	}
+}
+
 func TestSearchInNote(t *testing.T) {
 	st := &Store{DB: pgtest.New(t)}
 	body := "Как выкатить сервис.\n\nДеплой делает ci-deploy.sh.\n\nБорщ и пельмени"
