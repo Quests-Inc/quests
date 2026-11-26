@@ -35,10 +35,11 @@ async function mermaid(theme: 'dark' | 'default') {
       theme,
       themeVariables: {
         dropShadow: 'none',
-        // The dark theme strokes node borders with a light gradient
-        // (primaryBorderColor → secondaryBorderColor) that reads as an uneven white
-        // halo: flatten it to one gray matching the edge lines.
-        ...(theme === 'dark' ? { primaryBorderColor: '#999999', secondaryBorderColor: '#999999' } : {}),
+        // The neo look strokes node borders with a gradient (gradientStart →
+        // gradientStop; the theme copies them from the border colors at construct
+        // time). In the dark theme that gradient is #ccc → #2e2e2e and reads as an
+        // uneven white rim: flatten it to one gray matching the edge lines.
+        ...(theme === 'dark' ? { gradientStart: '#999999', gradientStop: '#999999' } : {}),
       },
       // SVG text labels, not foreignObject HTML: safer to sanitize, same look.
       // Since mermaid 12 this only works at the root level, where it overrides the defaults.
