@@ -845,3 +845,10 @@ a:has(> .md-ref__ico) {
     display: none;
   }
 }
+
+/* Mermaid: node rects sit on fractional coordinates (x=-68.45…), so a 1px stroke
+   anti-aliases unevenly — some sides crisp, others washed out. A wider stroke
+   keeps all four sides equally visible. */
+.md-mermaid svg .label-container {
+  stroke-width: 1.5px;
+}

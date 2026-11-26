@@ -1,6 +1,8 @@
 import DOMPurify from 'dompurify'
 import type { Mermaid } from 'mermaid'
 
+import { THEMES, currentThemeId } from '@/shared/lib/theme.ts'
+
 /**
  * ```mermaid fenced blocks: the renderer keeps them as ordinary code blocks, and
  * this pass replaces each with a sanitized SVG. Lazy: `mermaid` is a dynamic
@@ -14,16 +16,14 @@ let counter = 0
 const svgCache = new Map<string, string>()
 const SVG_CACHE_MAX = 40
 
-function preferredTheme(): 'dark' | 'default' {
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
-  } catch {
-    return 'default'
-  }
+/** Mermaid follows the SITE theme's scheme (dark themes → dark, light → default), not the OS setting. */
+function siteScheme(): 'dark' | 'default' {
+  const scheme = THEMES.find((t) => t.id === currentThemeId())?.scheme
+  return scheme === 'light' ? 'default' : 'dark'
 }
 
 /** Init (or re-init) for a theme; themes may switch between renders (PDF export wants light on white pages). */
-async function mermaid(theme: 'dark' | 'default' = preferredTheme()) {
+async function mermaid(theme: 'dark' | 'default') {
   if (!mod) {
     mod = (await import('mermaid')).default
     initializedTheme = null
@@ -65,22 +65,30 @@ function injectSvg(block: HTMLElement, svg: string) {
 export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
   const blocks = Array.from(root.querySelectorAll<HTMLElement>('.md-codeblock[data-lang="mermaid"]'))
   if (!blocks.length) return
+  const scheme = siteScheme()
   let m: Mermaid | null = null
   for (const block of blocks) {
-    if (block.dataset.mdMermaid) continue
+    // Rendered already — but a different site theme needs a re-render: diagram
+    // colors are baked into the SVG at render time, CSS can not retint them.
+    if (block.dataset.mdMermaid === 'done' && block.dataset.mdMermaidTheme === scheme) continue
     block.dataset.mdMermaid = 'pending'
-    const code = block.querySelector('pre')?.textContent ?? ''
-    const cached = svgCache.get(code)
+    block.dataset.mdMermaidTheme = scheme
+    block.querySelector('.md-mermaid')?.remove()
+    const pre = block.querySelector('pre')
+    if (pre) pre.style.display = ''
+    const code = pre?.textContent ?? ''
+    const key = `${scheme}\u0000${code}`
+    const cached = svgCache.get(key)
     if (cached) {
       injectSvg(block, cached)
       continue
     }
     const id = `md-mermaid-${++counter}`
     try {
-      m = m ?? (await mermaid(preferredTheme()))
+      m = m ?? (await mermaid(scheme))
       const { svg } = await m.render(id, code)
       if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
-      svgCache.set(code, svg)
+      svgCache.set(key, svg)
       injectSvg(block, svg)
     } catch {
       // A failed render leaves mermaid's own error element in the body: remove it and keep the source.
@@ -91,6 +99,13 @@ export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
   }
 }
 
+// A site theme switch repaints every rendered diagram with the new scheme.
+if (typeof document !== 'undefined') {
+  document.addEventListener('quests-theme', () => {
+    void renderMermaidDiagrams(document.body)
+  })
+}
+
 /** Rasterize one diagram source to PNG bytes for the PDF export (2x, capped at 2048 px);
  * null when the render or the rasterization fails — the PDF then keeps the source. */
 export async function renderDiagramPng(
@@ -99,12 +114,14 @@ export async function renderDiagramPng(
 ): Promise<Uint8Array | null> {
   const id = `md-mermaid-${++counter}`
   try {
-    const m = await mermaid(opts.theme ?? preferredTheme())
-    const cached = svgCache.get(code)
+    const theme = opts.theme ?? siteScheme()
+    const m = await mermaid(theme)
+    const key = `${theme}\u0000${code}`
+    const cached = svgCache.get(key)
     const svg = cached ?? (await m.render(id, code)).svg
     if (!cached) {
       if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
-      svgCache.set(code, svg)
+      svgCache.set(key, svg)
     }
     return await svgToPng(sanitizeSvg(svg), opts.scale ?? 2, opts.background)
   } catch {
