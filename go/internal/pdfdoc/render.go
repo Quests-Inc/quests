@@ -27,6 +27,10 @@ func Render(ctx context.Context, doc Document, loader ImageLoader, w io.Writer) 
 	if total > MaxMarkdownBytes {
 		return fmt.Errorf("pdfdoc: document is larger than %d MB", MaxMarkdownBytes>>20)
 	}
+	diagrams, err := doc.diagramIndex()
+	if err != nil {
+		return err
+	}
 
 	options := DefaultOptions()
 	if doc.Options != nil {
@@ -47,7 +51,7 @@ func Render(ctx context.Context, doc Document, loader ImageLoader, w io.Writer) 
 		return err
 	}
 	pdf.AliasNbPages("{nb}")
-	r := &Renderer{ctx: ctx, pdf: pdf, loader: loader, labels: doc.Labels, options: options, x0: options.Left + options.Binding, w: width - options.Left - options.Right - options.Binding}
+	r := &Renderer{ctx: ctx, pdf: pdf, loader: loader, diagrams: diagrams, labels: doc.Labels, options: options, x0: options.Left + options.Binding, w: width - options.Left - options.Right - options.Binding}
 	if err := r.prepareBackground(); err != nil {
 		return err
 	}

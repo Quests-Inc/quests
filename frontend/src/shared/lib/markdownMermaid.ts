@@ -86,3 +86,54 @@ export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
     }
   }
 }
+
+/** Rasterize one diagram source to PNG bytes for the PDF export (2x, capped at 2048 px);
+ * null when the render or the rasterization fails — the PDF then keeps the source. */
+export async function renderDiagramPng(code: string, scale = 2): Promise<Uint8Array | null> {
+  const id = `md-mermaid-${++counter}`
+  try {
+    const m = await mermaid()
+    const cached = svgCache.get(code)
+    const svg = cached ?? (await m.render(id, code)).svg
+    if (!cached) {
+      if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
+      svgCache.set(code, svg)
+    }
+    return await svgToPng(sanitizeSvg(svg), scale)
+  } catch {
+    // A failed render leaves mermaid's own error element in the body: remove it.
+    document.getElementById(`d${id}`)?.remove()
+    document.getElementById(id)?.remove()
+    return null
+  }
+}
+
+async function svgToPng(svg: string, scale: number): Promise<Uint8Array | null> {
+  const vb = /viewBox="([\d.\s]+)"/.exec(svg)
+  let w = 0
+  let h = 0
+  if (vb) {
+    const p = vb[1].trim().split(/\s+/)
+    w = +p[2]
+    h = +p[3]
+  }
+  if (!w || !h || typeof document === 'undefined') return null
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    const s = Math.min(scale, 2048 / Math.max(w, h))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(w * s))
+    canvas.height = Math.max(1, Math.round(h * s))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return null
+    return new Uint8Array(await blob.arrayBuffer())
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
