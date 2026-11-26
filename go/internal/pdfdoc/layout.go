@@ -101,8 +101,10 @@ type Renderer struct {
 	ctx                      context.Context
 	pdf                      *fpdf.Fpdf
 	loader                   ImageLoader
-	labels                   map[string]string
-	err                      error
+	// diagrams are the client-rendered mermaid PNGs keyed by sha256 of the trimmed source.
+	diagrams map[string][]byte
+	labels   map[string]string
+	err      error
 
 	x0, w         float64 // current left edge and width of the content column
 	mathCount     int

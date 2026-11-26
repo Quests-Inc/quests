@@ -2,12 +2,15 @@ package pdfdoc
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"strings"
 
 	"github.com/go-pdf/fpdf"
 	xdraw "golang.org/x/image/draw"
@@ -113,6 +116,31 @@ func (r *Renderer) image(ref imageRef) {
 		placeholder(err.Error())
 		return
 	}
+	r.placeImage(data, typ, pw, ph, ref.align)
+}
+
+// drawDiagram paints a client-rendered mermaid diagram when the document carried
+// the PNG for this exact source; reports whether anything was drawn.
+func (r *Renderer) drawDiagram(lines []string) bool {
+	if len(r.diagrams) == 0 || !r.ok() {
+		return false
+	}
+	sum := sha256.Sum256([]byte(strings.TrimSpace(strings.Join(lines, "\n"))))
+	raw, ok := r.diagrams[hex.EncodeToString(sum[:])]
+	if !ok || len(raw) == 0 || len(raw) > MaxDiagramBytes {
+		return false
+	}
+	data, typ, pw, ph, err := prepareImage(raw)
+	if err != nil {
+		return false
+	}
+	r.placeImage(data, typ, pw, ph, "center")
+	return true
+}
+
+// placeImage draws prepared image bytes at 96 dpi, never wider than the column
+// or taller than most of a page.
+func (r *Renderer) placeImage(data []byte, typ string, pw, ph int, align string) {
 	// 96 dpi, but never wider than the column or taller than most of a page
 	wmm, hmm := float64(pw)*25.4/96, float64(ph)*25.4/96
 	if wmm > r.w {
@@ -129,7 +157,7 @@ func (r *Renderer) image(ref imageRef) {
 	name := fmt.Sprintf("img%d", r.imgSeq)
 	r.pdf.RegisterImageOptionsReader(name, imageOptions(typ), bytes.NewReader(data))
 	x := r.x0
-	switch ref.align {
+	switch align {
 	case "center":
 		x += (r.w - wmm) / 2
 	case "right":

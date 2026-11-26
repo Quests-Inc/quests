@@ -61,7 +61,11 @@ func (r *Renderer) blocks(parent ast.Node, src []byte) {
 		case *ast.FencedCodeBlock:
 			lang := string(v.Language(src))
 			if strings.EqualFold(strings.TrimSpace(lang), "mermaid") {
-				// The browser renders mermaid; the PDF keeps the source, with an explicit marker.
+				if r.drawDiagram(blockLines(v, src)) {
+					continue
+				}
+				// No client raster for this diagram (server-side export, failed or
+				// unsupported render): the PDF keeps the source, with an explicit marker.
 				r.code("mermaid", blockLines(v, src))
 				st := r.bodyStyle()
 				st.size = r.fontSize(7.5)

@@ -36,7 +36,7 @@ type renderPDFRequest struct {
 // is in-process Go and never reads the network or the disk: the only things that reach the page besides
 // the text are attachment images, fetched here under the caller's own workspace.
 func (s *Server) postRenderPDF(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, pdfdoc.MaxMarkdownBytes+(1<<20))
+	r.Body = http.MaxBytesReader(w, r.Body, pdfdoc.MaxMarkdownBytes+pdfdoc.MaxDiagramsBytes+(1<<20))
 	var req renderPDFRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON or document too large")

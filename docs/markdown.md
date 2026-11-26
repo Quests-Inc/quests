@@ -12,7 +12,7 @@ The same sanitized renderer is used for notes and descriptions. UI explanations 
 | Lists | `-`, `1.`, nested lists | Yes | Yes |
 | Task list | `- [ ]`, `- [x]` | Tickable scratch marks; «Перенести в текст» bakes them into the source | Printed check marks of the saved text |
 | Collapsible block | `<details>` / `<summary>Заголовок</summary>` | Real collapsible plate, closed unless `<details open>` | Always expanded; the summary becomes a bold lead line |
-| Diagram | ```` ```mermaid ```` fence | Rendered to a sanitized SVG, lazy-loaded | Source as a code block with an explicit «диаграмма не рендерится в PDF» marker |
+| Diagram | ```` ```mermaid ```` fence | Rendered to a sanitized SVG, lazy-loaded | With a browser export the client renders each diagram to PNG and sends it along; the PDF embeds the raster. Otherwise (server-side export, failed render) — source as a code block with an explicit «диаграмма не рендерится в PDF» marker |
 | Explanation / quote | `> text`, `>` between paragraphs | Left border and muted text, no rounded plate | Left border |
 | Code | Backticks / fenced blocks | Highlighting, language label, copy | Highlighting and wrapping |
 | Table | Pipe table, column alignment | Local horizontal scroll when needed | Wrapped cells |
