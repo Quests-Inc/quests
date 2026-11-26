@@ -7,7 +7,7 @@ import type { Mermaid } from 'mermaid'
  * import, so the library loads only when a note actually has a diagram.
  */
 let mod: Mermaid | null = null
-let initialized = false
+let initializedTheme: 'dark' | 'default' | null = null
 let counter = 0
 /** Rendered diagrams by source, so a re-render (saving a tick, value chips) reinstates them
  * instantly instead of blanking the layout and re-drawing after the fact. */
@@ -22,21 +22,25 @@ function preferredTheme(): 'dark' | 'default' {
   }
 }
 
-async function mermaid() {
+/** Init (or re-init) for a theme; themes may switch between renders (PDF export wants light on white pages). */
+async function mermaid(theme: 'dark' | 'default' = preferredTheme()) {
   if (!mod) {
     mod = (await import('mermaid')).default
-    initialized = false
+    initializedTheme = null
   }
-  if (!initialized) {
+  if (initializedTheme !== theme) {
     mod.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
-      theme: preferredTheme(),
+      theme,
+      // The themes' dropShadow is a light-gray halo (rgba(185,185,185,1)) that reads as a white
+      // glow around dark nodes: turned off everywhere.
+      themeVariables: { dropShadow: 'none' },
       // SVG text labels, not foreignObject HTML: safer to sanitize, same look.
       // Since mermaid 12 this only works at the root level, where it overrides the defaults.
       htmlLabels: false,
     })
-    initialized = true
+    initializedTheme = theme
   }
   return mod
 }
@@ -73,7 +77,7 @@ export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
     }
     const id = `md-mermaid-${++counter}`
     try {
-      m = m ?? (await mermaid())
+      m = m ?? (await mermaid(preferredTheme()))
       const { svg } = await m.render(id, code)
       if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
       svgCache.set(code, svg)
@@ -89,17 +93,20 @@ export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
 
 /** Rasterize one diagram source to PNG bytes for the PDF export (2x, capped at 2048 px);
  * null when the render or the rasterization fails — the PDF then keeps the source. */
-export async function renderDiagramPng(code: string, scale = 2): Promise<Uint8Array | null> {
+export async function renderDiagramPng(
+  code: string,
+  opts: { scale?: number; theme?: 'dark' | 'default'; background?: string } = {}
+): Promise<Uint8Array | null> {
   const id = `md-mermaid-${++counter}`
   try {
-    const m = await mermaid()
+    const m = await mermaid(opts.theme ?? preferredTheme())
     const cached = svgCache.get(code)
     const svg = cached ?? (await m.render(id, code)).svg
     if (!cached) {
       if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
       svgCache.set(code, svg)
     }
-    return await svgToPng(sanitizeSvg(svg), scale)
+    return await svgToPng(sanitizeSvg(svg), opts.scale ?? 2, opts.background)
   } catch {
     // A failed render leaves mermaid's own error element in the body: remove it.
     document.getElementById(`d${id}`)?.remove()
@@ -108,7 +115,7 @@ export async function renderDiagramPng(code: string, scale = 2): Promise<Uint8Ar
   }
 }
 
-async function svgToPng(svg: string, scale: number): Promise<Uint8Array | null> {
+async function svgToPng(svg: string, scale: number, background?: string): Promise<Uint8Array | null> {
   const vb = /viewBox="([\d.\s]+)"/.exec(svg)
   let w = 0
   let h = 0
@@ -129,6 +136,10 @@ async function svgToPng(svg: string, scale: number): Promise<Uint8Array | null> 
     canvas.height = Math.max(1, Math.round(h * s))
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
+    if (background) {
+      ctx.fillStyle = background
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
     if (!blob) return null
