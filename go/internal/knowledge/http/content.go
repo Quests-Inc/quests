@@ -112,7 +112,9 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 	detected := a.ContentTypeDetected
 	size := a.SizeBytes
 	revision, uploaded := a.CurrentRevision, a.UploadedAt
+	versioned := false
 	if revStr := strings.TrimSpace(r.URL.Query().Get("revision")); revStr != "" {
+		versioned = true
 		revN, err := strconv.Atoi(revStr)
 		if err != nil || revN < 1 {
 			writeErr(w, 422, "revision must be a positive integer")
@@ -145,7 +147,14 @@ func (h *Handler) getAttachmentImage(w http.ResponseWriter, r *http.Request) {
 		etag = strings.TrimSuffix(etag, `"`) + fmt.Sprintf(`-thumb%d"`, thumbnail)
 	}
 	w.Header().Set("ETag", etag)
-	w.Header().Set("Cache-Control", "private, no-cache")
+	if versioned {
+		// The URL is pinned to a revision: its bytes never change, cache without revalidation.
+		w.Header().Set("Cache-Control", "private, max-age=604800")
+	} else {
+		// The address of an image in a text never names a revision, so a cached copy could not tell that a newer one was
+		// uploaded. The tag does: it is the card, the revision and its upload time, and a browser asks again each time.
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
 	if match := r.Header.Get("If-None-Match"); match != "" && strings.Contains(match, etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return

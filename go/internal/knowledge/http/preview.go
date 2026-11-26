@@ -29,7 +29,9 @@ func (h *Handler) getAttachmentPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	path, name, mime, size, scan := a.WebDAVPath, a.Filename, a.ContentTypeDetected, a.SizeBytes, a.ScanStatus
 	revision, uploaded := a.CurrentRevision, a.UploadedAt
+	versioned := false
 	if raw := r.URL.Query().Get("revision"); raw != "" {
+		versioned = true
 		n, e := strconv.Atoi(raw)
 		if e != nil || n < 1 {
 			writeErr(w, 422, "invalid revision")
@@ -47,7 +49,11 @@ func (h *Handler) getAttachmentPreview(w http.ResponseWriter, r *http.Request) {
 		path, name, mime, size, scan = rev.WebDAVPath, rev.Filename, rev.ContentTypeDetected, rev.SizeBytes, rev.ScanStatus
 		revision, uploaded = rev.Revision, rev.UploadedAt
 	}
-	w.Header().Set("Cache-Control", "private, no-cache")
+	if versioned {
+		w.Header().Set("Cache-Control", "private, max-age=604800")
+	} else {
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	kind := filepreview.Kind(name, mime)
 	empty := func() {
