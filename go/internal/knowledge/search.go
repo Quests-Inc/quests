@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/platform/search"
@@ -67,11 +68,20 @@ func (s *Store) SearchNotes(ctx context.Context, q string, o SearchOpts) ([]Sear
 	if err != nil {
 		return nil, err
 	}
+	page := search.Paginate(found, req).Hits
+	ids := make([]int64, len(page))
+	for i, h := range page {
+		ids[i] = h.ID
+	}
+	notes, err := s.GetNotesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := []SearchHit{}
-	for _, h := range search.Paginate(found, req).Hits {
-		n, err := s.GetNote(ctx, h.ID)
-		if err != nil {
-			return nil, err
+	for _, h := range page {
+		n, ok := notes[h.ID]
+		if !ok {
+			continue // the note vanished (or left the workspace) between match and fetch
 		}
 		out = append(out, SearchHit{ID: h.ID, Title: h.Title, Score: h.Score, Where: h.Where, Snippet: h.Snippet, ParentID: n.ParentID, UpdatedAt: n.UpdatedAt, CreatedAt: n.CreatedAt, Private: n.IsPrivate})
 	}
@@ -114,6 +124,33 @@ func (s *Store) rankByReading(ctx context.Context, hits []SearchHit, o SearchOpt
 		}
 	}
 	return hits
+}
+
+// GetNotesByIDs loads notes in one query, keyed by id. Notes the RLS/current
+// workspace does not see are simply absent from the result.
+func (s *Store) GetNotesByIDs(ctx context.Context, ids []int64) (map[int64]Note, error) {
+	out := make(map[int64]Note, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	ph := strings.Repeat("?,", len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+noteCols+` FROM note WHERE id IN (`+ph[:len(ph)-1]+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		n, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[n.ID] = n
+	}
+	return out, rows.Err()
 }
 
 // SearchVariants and prefixTerm also serve in-document search.

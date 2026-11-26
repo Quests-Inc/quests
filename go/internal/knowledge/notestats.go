@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/quests-inc/quests/go/internal/platform/timeutil"
@@ -82,6 +83,38 @@ type statRow struct {
 	scoreAt, human, ag  sql.NullString
 	opensH, opensA, shn int
 	up, down, manual    int
+}
+
+// loadStatsByIDs loads note_stat rows for many notes in one query, keyed by note id.
+func (s *Store) loadStatsByIDs(ctx context.Context, ids []int64) (map[int64]statRow, error) {
+	out := make(map[int64]statRow, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	ph := strings.Repeat("?,", len(ids))
+	rows, err := s.DB.QueryContext(ctx, `SELECT note_id, score, score_at, last_human_at, last_agent_at, opens_human, opens_agent, shown, rated_up, rated_down, manual
+		FROM note_stat WHERE note_id IN (`+ph[:len(ph)-1]+`)`, toArgs(ids)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var r statRow
+		if err := rows.Scan(&id, &r.score, &r.scoreAt, &r.human, &r.ag, &r.opensH, &r.opensA, &r.shn, &r.up, &r.down, &r.manual); err != nil {
+			return nil, err
+		}
+		out[id] = r
+	}
+	return out, rows.Err()
+}
+
+func toArgs(ids []int64) []any {
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	return args
 }
 
 func (s *Store) loadStat(ctx context.Context, noteID int64) (statRow, bool, error) {
@@ -178,13 +211,17 @@ func (s *Store) ResetNoteStats(ctx context.Context, noteID int64) error {
 func (s *Store) Popularity(ctx context.Context, created map[int64]time.Time) (map[int64]NotePopularity, error) {
 	out := make(map[int64]NotePopularity, len(created))
 	now := timeutil.NowUTC()
+	ids := make([]int64, 0, len(created))
+	for id := range created {
+		ids = append(ids, id)
+	}
+	stats, err := s.loadStatsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	for id, born := range created {
 		p := NotePopularity{}
-		r, ok, err := s.loadStat(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
+		if r, ok := stats[id]; ok {
 			p.Score = Decay(r.score, parseTime(r.scoreAt), now)
 			p.OpensHuman, p.OpensAgent, p.Shown = r.opensH, r.opensA, r.shn
 			p.RatedUp, p.RatedDown, p.Manual = r.up, r.down, r.manual
