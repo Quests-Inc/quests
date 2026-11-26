@@ -52,6 +52,12 @@ type Page struct {
 type Source struct {
 	Kind, From, ID, Title, Body, Where, ParentKind, ParentID string
 	RankFactor                                               string // optional bounded domain relevance multiplier, applied before LIMIT
+	// Vector is an indexed tsvector expression over the source rows (trusted SQL,
+	// e.g. "n.search_vec"), maintained on write by the schema. When set, the matcher
+	// narrows rows by `Vector @@ terms.ts` plus a title substring tier before scoring
+	// and moves word similarity into a separate title-only pass; when empty, every
+	// candidate row is scored inline as before.
+	Vector string
 	// Fields are scalar expressions. Tests handle enumerated/boolean flags.
 	// Predicates are trusted SQL with exactly one ? per filter value.
 	Fields     map[string]string
@@ -167,6 +173,9 @@ func Prefix(q string) string {
 	return strings.ToLower(w) + ":*"
 }
 
+// Query matches one source against the request and returns its hits; the caller
+// sorts and paginates the combined list (see Paginate). Sources with a Vector go
+// through the index-backed matcher, the rest score every candidate row inline.
 func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) {
 	if !slices.Contains(r.Types, s.Kind) {
 		return []Hit{}, nil
@@ -178,6 +187,51 @@ func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) 
 	if r.ExcludePrivate && s.Kind == "note" {
 		s.Where = "(" + s.Where + ") AND n.is_private=0"
 	}
+	variants := Variants(r.Query)
+	if s.Vector != "" {
+		return queryIndexed(ctx, db, s, r, typed, id, isID, variants)
+	}
+	return queryInline(ctx, db, s, r, typed, id, isID, variants)
+}
+
+// termsHead builds the shared variants/terms CTE: each query variant and its search
+// prefix enter as bound values, so every tsquery is parsed once per request.
+func termsHead(variants []string) (string, []any) {
+	valueRows := []string{}
+	args := []any{}
+	for _, v := range variants {
+		valueRows = append(valueRows, "(?::text,?::text)")
+		args = append(args, v, Prefix(v))
+	}
+	return `WITH variants(raw,pref) AS (VALUES ` + strings.Join(valueRows, ",") + `),
+ terms AS (SELECT raw, (websearch_to_tsquery('russian',raw)||websearch_to_tsquery('english',raw)||CASE WHEN pref='' THEN ''::tsquery ELSE to_tsquery('russian',pref)||to_tsquery('english',pref) END) AS ts FROM variants)`, args
+}
+
+func scanHits(ctx context.Context, db *sql.DB, s Source, sqlText string, args []any, r Request) ([]Hit, error) {
+	rows, err := db.QueryContext(ctx, sqlText, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Hit{}
+	for rows.Next() {
+		h := Hit{Kind: s.Kind, ParentKind: s.ParentKind}
+		if err := rows.Scan(&h.ID, &h.Title, &h.ParentID, &h.Snippet, &h.Score, &h.Where); err != nil {
+			return nil, err
+		}
+
+		if r.Query == "" {
+			h.Where = "title"
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+// constrain narrows a source by the request's explicit scope and filters: allowed
+// and excluded ids, plus every understood filter key. Returns the SQL to AND after
+// the source's own Where and the bound values.
+func constrain(s Source, r Request) (string, []any) {
 	where := []string{s.Where}
 	args := []any{}
 	// Constrain the source before matching/ranking/limiting.
@@ -244,6 +298,16 @@ func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) 
 		}
 		where = append(where, test)
 	}
+	return strings.Join(where, " AND "), args
+}
+
+// queryInline scores every candidate row inline: title and body substring strpos,
+// to_tsvector over the title and over left(body, 300000) in two language configs,
+// word similarity on the title. Correct, but each of these runs against the whole
+// source on every request — keep it for the small sources.
+func queryInline(ctx context.Context, db *sql.DB, s Source, r Request, typed string, id int64, isID bool, variants []string) ([]Hit, error) {
+	head, headArgs := termsHead(variants)
+	where, cargs := constrain(s, r)
 	factor := "1.0"
 	if s.RankFactor != "" {
 		factor = s.RankFactor
@@ -252,19 +316,10 @@ func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) 
 	if s.ParentID != "" {
 		parent = s.ParentID
 	}
-	// Match expressions use bound values in a CTE so each variant is parsed once per request.
-	variants := Variants(r.Query)
-	valueRows := []string{}
-	inputArgs := []any{}
-	for _, v := range variants {
-		valueRows = append(valueRows, "(?::text,?::text)")
-		inputArgs = append(inputArgs, v, Prefix(v))
-	}
 	title := "COALESCE(" + s.Title + ",'')"
 	body := "COALESCE(" + s.Body + ",'')"
-	sqlText := `WITH variants(raw,pref) AS (VALUES ` + strings.Join(valueRows, ",") + `),
- terms AS (SELECT raw, (websearch_to_tsquery('russian',raw)||websearch_to_tsquery('english',raw)||CASE WHEN pref='' THEN ''::tsquery ELSE to_tsquery('russian',pref)||to_tsquery('english',pref) END) AS ts FROM variants),
- candidates AS (SELECT ` + s.ID + ` AS id,` + title + ` AS title,` + body + ` AS body,` + parent + ` AS parent_id,` + factor + ` AS factor FROM ` + s.From + ` WHERE ` + strings.Join(where, " AND ") + `),
+	sqlText := head + `,
+ candidates AS (SELECT ` + s.ID + ` AS id,` + title + ` AS title,` + body + ` AS body,` + parent + ` AS parent_id,` + factor + ` AS factor FROM ` + s.From + ` WHERE ` + where + `),
  matched AS (SELECT c.*, CASE WHEN id=? AND ?::int=1 THEN 10000
  WHEN ?::int=1 THEN 1
  WHEN EXISTS(SELECT 1 FROM terms t WHERE strpos(lower(c.title),lower(t.raw))>0 OR (to_tsvector('russian',c.title)||to_tsvector('english',c.title))@@t.ts) THEN 100
@@ -272,7 +327,7 @@ func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) 
  WHEN EXISTS(SELECT 1 FROM terms t WHERE length(t.raw)>=4 AND t.raw !~ '["-]' AND lower(t.raw) NOT LIKE '% or %' AND word_similarity(lower(t.raw),lower(c.title))>0.45) THEN 1
  ELSE 0 END AS score FROM candidates c)
  SELECT id,title,parent_id,CASE WHEN score IN (10,100) THEN ts_headline('russian',left(body,20000),(SELECT ts FROM terms LIMIT 1),'StartSel=⟪, StopSel=⟫, MaxWords=26, MinWords=8, MaxFragments=2') ELSE left(body,200) END,score*CASE WHEN score IN(1,10000) THEN 1.0 ELSE factor END AS relevance,CASE score WHEN 10000 THEN 'id' WHEN 100 THEN 'title' WHEN 10 THEN 'body' ELSE 'fuzzy' END FROM matched WHERE score>0`
-	allArgs := append(inputArgs, args...)
+	allArgs := append(headArgs, cargs...)
 	allArgs = append(allArgs, id, isID, r.Query == "")
 	if isID && typed != "" {
 		sqlText += " AND id=?"
@@ -280,22 +335,77 @@ func Query(ctx context.Context, db *sql.DB, s Source, r Request) ([]Hit, error) 
 	}
 	sqlText += ` ORDER BY relevance DESC,title COLLATE "C",id LIMIT ?`
 	allArgs = append(allArgs, r.Offset+r.Limit+1)
-	rows, err := db.QueryContext(ctx, sqlText, allArgs...)
+	return scanHits(ctx, db, s, sqlText, allArgs, r)
+}
+
+// queryIndexed narrows candidates by the indexed tsvector and the title substring
+// first, then applies the legacy scoring weights to those rows only; word similarity
+// runs as a separate title-only pass over the rows the cheap tiers did not admit.
+// Tier weights (id 10000, title 100, body 10, fuzzy 1), labels and relevance match
+// queryInline; the caller re-sorts the merged list anyway (see Paginate).
+func queryIndexed(ctx context.Context, db *sql.DB, s Source, r Request, typed string, id int64, isID bool, variants []string) ([]Hit, error) {
+	head, headArgs := termsHead(variants)
+	qempty := r.Query == ""
+	factor := "1.0"
+	if s.RankFactor != "" {
+		factor = s.RankFactor
+	}
+	parent := "NULL::bigint"
+	if s.ParentID != "" {
+		parent = s.ParentID
+	}
+	title := "COALESCE(" + s.Title + ",'')"
+	body := "COALESCE(" + s.Body + ",'')"
+	// Cheap admit tiers: an empty query (everything), the indexed vector (morphology
+	// and last-word prefix over title+body) and a substring hit in the short title.
+	whereExpr, cargs := constrain(s, r)
+	narrow := `(?::int=1
+   OR EXISTS(SELECT 1 FROM terms t WHERE ` + s.Vector + ` @@ t.ts)
+   OR EXISTS(SELECT 1 FROM terms t WHERE strpos(lower(` + title + `),lower(t.raw))>0))`
+	sqlText := head + `,
+ pre AS (SELECT ` + s.ID + ` AS id,` + title + ` AS title,` + body + ` AS body,` + parent + ` AS parent_id,` + factor + ` AS factor FROM ` + s.From + ` WHERE ` + whereExpr + ` AND ` + narrow + `),
+ scored AS (SELECT id,title,body,parent_id,factor, CASE WHEN id=? AND ?::int=1 THEN 10000
+ WHEN ?::int=1 THEN 1
+ WHEN EXISTS(SELECT 1 FROM terms t WHERE strpos(lower(title),lower(t.raw))>0 OR (to_tsvector('russian',title)||to_tsvector('english',title))@@t.ts) THEN 100
+ ELSE 10 END AS score FROM pre)
+ SELECT id,title,parent_id,CASE WHEN score IN (10,100) THEN ts_headline('russian',left(body,20000),(SELECT ts FROM terms LIMIT 1),'StartSel=⟪, StopSel=⟫, MaxWords=26, MinWords=8, MaxFragments=2') ELSE left(body,200) END,score*CASE WHEN score IN(1,10000) THEN 1.0 ELSE factor END AS relevance,CASE score WHEN 10000 THEN 'id' WHEN 100 THEN 'title' ELSE 'body' END FROM scored WHERE score>0`
+	args := append(headArgs, cargs...)
+	args = append(args, qempty, id, isID, qempty)
+	if isID && typed != "" {
+		sqlText += " AND id=?"
+		args = append(args, id)
+	}
+	sqlText += ` ORDER BY relevance DESC,title COLLATE "C",id LIMIT ?`
+	args = append(args, r.Offset+r.Limit+1)
+	hits, err := scanHits(ctx, db, s, sqlText, args, r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fuzzy tier: title word similarity over the rows the cheap tiers did not admit.
+	// Titles are short, so this stays cheap over the whole source.
+	fuzzySQL := head + `,
+ rest AS (SELECT ` + s.ID + ` AS id,` + title + ` AS title,` + body + ` AS body,` + parent + ` AS parent_id FROM ` + s.From + ` WHERE ` + whereExpr + ` AND NOT ` + narrow + `
+ AND EXISTS(SELECT 1 FROM terms t WHERE length(t.raw)>=4 AND t.raw !~ '["-]' AND lower(t.raw) NOT LIKE '% or %' AND word_similarity(lower(t.raw),lower(title))>0.45))`
+	fuzzyArgs := append(headArgs, cargs...)
+	fuzzyArgs = append(fuzzyArgs, qempty)
+	if isID && typed != "" {
+		fuzzySQL += " AND id=?"
+		fuzzyArgs = append(fuzzyArgs, id)
+	}
+	fuzzySQL += ` SELECT id,title,parent_id,left(body,200),1.0::float8,'fuzzy' FROM rest LIMIT ?`
+	fuzzyArgs = append(fuzzyArgs, r.Offset+r.Limit+1)
+	rows, err := db.QueryContext(ctx, fuzzySQL, fuzzyArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []Hit{}
 	for rows.Next() {
-		h := Hit{Kind: s.Kind, ParentKind: s.ParentKind}
+		h := Hit{Kind: s.Kind, ParentKind: s.ParentKind, Score: 1, Where: "fuzzy"}
 		if err := rows.Scan(&h.ID, &h.Title, &h.ParentID, &h.Snippet, &h.Score, &h.Where); err != nil {
 			return nil, err
 		}
-
-		if r.Query == "" {
-			h.Where = "title"
-		}
-		out = append(out, h)
+		hits = append(hits, h)
 	}
-	return out, rows.Err()
+	return hits, rows.Err()
 }
