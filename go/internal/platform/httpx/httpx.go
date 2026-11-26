@@ -98,5 +98,8 @@ func ServeIcon(w http.ResponseWriter, r *http.Request, path string) {
 	hd.Set("X-Content-Type-Options", "nosniff")
 	hd.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
 	hd.Set("Content-Disposition", "inline")
+	// Icon URLs always carry a version (?v=<updated_at>): a changed icon is a new
+	// URL, so a week of private caching costs no freshness.
+	hd.Set("Cache-Control", "private, max-age=604800")
 	http.ServeFile(w, r, path)
 }
