@@ -1,42 +1,51 @@
 import DOMPurify from 'dompurify'
 import type { Mermaid } from 'mermaid'
 
+import { THEMES, currentThemeId } from '@/shared/lib/theme.ts'
+
 /**
  * ```mermaid fenced blocks: the renderer keeps them as ordinary code blocks, and
  * this pass replaces each with a sanitized SVG. Lazy: `mermaid` is a dynamic
  * import, so the library loads only when a note actually has a diagram.
  */
 let mod: Mermaid | null = null
-let initialized = false
+let initializedTheme: 'dark' | 'default' | null = null
 let counter = 0
 /** Rendered diagrams by source, so a re-render (saving a tick, value chips) reinstates them
  * instantly instead of blanking the layout and re-drawing after the fact. */
 const svgCache = new Map<string, string>()
 const SVG_CACHE_MAX = 40
 
-function preferredTheme(): 'dark' | 'default' {
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
-  } catch {
-    return 'default'
-  }
+/** Mermaid follows the SITE theme's scheme (dark themes → dark, light → default), not the OS setting. */
+function siteScheme(): 'dark' | 'default' {
+  const scheme = THEMES.find((t) => t.id === currentThemeId())?.scheme
+  return scheme === 'light' ? 'default' : 'dark'
 }
 
-async function mermaid() {
+/** Init (or re-init) for a theme; themes may switch between renders (PDF export wants light on white pages). */
+async function mermaid(theme: 'dark' | 'default') {
   if (!mod) {
     mod = (await import('mermaid')).default
-    initialized = false
+    initializedTheme = null
   }
-  if (!initialized) {
+  if (initializedTheme !== theme) {
     mod.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
-      theme: preferredTheme(),
+      theme,
+      themeVariables: {
+        dropShadow: 'none',
+        // The neo look strokes node borders with a gradient (gradientStart →
+        // gradientStop; the theme copies them from the border colors at construct
+        // time). In the dark theme that gradient is #ccc → #2e2e2e and reads as an
+        // uneven white rim: flatten it to one gray matching the edge lines.
+        ...(theme === 'dark' ? { gradientStart: '#999999', gradientStop: '#999999' } : {}),
+      },
       // SVG text labels, not foreignObject HTML: safer to sanitize, same look.
       // Since mermaid 12 this only works at the root level, where it overrides the defaults.
       htmlLabels: false,
     })
-    initialized = true
+    initializedTheme = theme
   }
   return mod
 }
@@ -61,22 +70,30 @@ function injectSvg(block: HTMLElement, svg: string) {
 export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
   const blocks = Array.from(root.querySelectorAll<HTMLElement>('.md-codeblock[data-lang="mermaid"]'))
   if (!blocks.length) return
+  const scheme = siteScheme()
   let m: Mermaid | null = null
   for (const block of blocks) {
-    if (block.dataset.mdMermaid) continue
+    // Rendered already — but a different site theme needs a re-render: diagram
+    // colors are baked into the SVG at render time, CSS can not retint them.
+    if (block.dataset.mdMermaid === 'done' && block.dataset.mdMermaidTheme === scheme) continue
     block.dataset.mdMermaid = 'pending'
-    const code = block.querySelector('pre')?.textContent ?? ''
-    const cached = svgCache.get(code)
+    block.dataset.mdMermaidTheme = scheme
+    block.querySelector('.md-mermaid')?.remove()
+    const pre = block.querySelector('pre')
+    if (pre) pre.style.display = ''
+    const code = pre?.textContent ?? ''
+    const key = `${scheme}\u0000${code}`
+    const cached = svgCache.get(key)
     if (cached) {
       injectSvg(block, cached)
       continue
     }
     const id = `md-mermaid-${++counter}`
     try {
-      m = m ?? (await mermaid())
+      m = m ?? (await mermaid(scheme))
       const { svg } = await m.render(id, code)
       if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
-      svgCache.set(code, svg)
+      svgCache.set(key, svg)
       injectSvg(block, svg)
     } catch {
       // A failed render leaves mermaid's own error element in the body: remove it and keep the source.
@@ -87,19 +104,31 @@ export async function renderMermaidDiagrams(root: HTMLElement): Promise<void> {
   }
 }
 
+// A site theme switch repaints every rendered diagram with the new scheme.
+if (typeof document !== 'undefined') {
+  document.addEventListener('quests-theme', () => {
+    void renderMermaidDiagrams(document.body)
+  })
+}
+
 /** Rasterize one diagram source to PNG bytes for the PDF export (2x, capped at 2048 px);
  * null when the render or the rasterization fails — the PDF then keeps the source. */
-export async function renderDiagramPng(code: string, scale = 2): Promise<Uint8Array | null> {
+export async function renderDiagramPng(
+  code: string,
+  opts: { scale?: number; theme?: 'dark' | 'default'; background?: string } = {}
+): Promise<Uint8Array | null> {
   const id = `md-mermaid-${++counter}`
   try {
-    const m = await mermaid()
-    const cached = svgCache.get(code)
+    const theme = opts.theme ?? siteScheme()
+    const m = await mermaid(theme)
+    const key = `${theme}\u0000${code}`
+    const cached = svgCache.get(key)
     const svg = cached ?? (await m.render(id, code)).svg
     if (!cached) {
       if (svgCache.size >= SVG_CACHE_MAX) svgCache.delete(svgCache.keys().next().value as string)
-      svgCache.set(code, svg)
+      svgCache.set(key, svg)
     }
-    return await svgToPng(sanitizeSvg(svg), scale)
+    return await svgToPng(sanitizeSvg(svg), opts.scale ?? 2, opts.background)
   } catch {
     // A failed render leaves mermaid's own error element in the body: remove it.
     document.getElementById(`d${id}`)?.remove()
@@ -108,7 +137,7 @@ export async function renderDiagramPng(code: string, scale = 2): Promise<Uint8Ar
   }
 }
 
-async function svgToPng(svg: string, scale: number): Promise<Uint8Array | null> {
+async function svgToPng(svg: string, scale: number, background?: string): Promise<Uint8Array | null> {
   const vb = /viewBox="([\d.\s]+)"/.exec(svg)
   let w = 0
   let h = 0
@@ -129,6 +158,10 @@ async function svgToPng(svg: string, scale: number): Promise<Uint8Array | null> 
     canvas.height = Math.max(1, Math.round(h * s))
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
+    if (background) {
+      ctx.fillStyle = background
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
     if (!blob) return null

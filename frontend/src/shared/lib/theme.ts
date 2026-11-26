@@ -98,6 +98,8 @@ export function applyTheme(name = DEFAULT_THEME) {
   } catch {
     /* ignore */
   }
+  // Baked-color passengers (mermaid diagrams) repaint on this event.
+  document.dispatchEvent(new CustomEvent('quests-theme', { detail: id }))
   return id
 }
 

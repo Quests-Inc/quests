@@ -47,7 +47,9 @@ async function collectDiagrams(doc: unknown): Promise<PdfDiagram[]> {
   let total = 0
   for (const source of sources) {
     if (out.length >= MAX_PDF_DIAGRAMS || total >= MAX_PDF_DIAGRAMS_BYTES) break
-    const png = await renderDiagramPng(source)
+    // PDF pages are white: render light-theme diagrams on a white ground, so the
+    // (light) edges and text of the dark theme stay visible.
+    const png = await renderDiagramPng(source, { theme: 'default', background: '#ffffff' })
     if (!png || png.byteLength > MAX_PDF_DIAGRAM_BYTES) continue
     total += png.byteLength
     out.push({ source, png: base64(png) })
