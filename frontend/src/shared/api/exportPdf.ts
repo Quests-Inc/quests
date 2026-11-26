@@ -21,7 +21,10 @@ function harvestMermaid(markdown: string, acc: Set<string>) {
 }
 
 function gatherMarkdown(doc: unknown, acc: Set<string>) {
-  const d = doc as { blocks?: Array<{ markdown?: unknown; steps?: Array<{ markdown?: unknown }> }>; chapters?: unknown[] }
+  const d = doc as {
+    blocks?: Array<{ markdown?: unknown; steps?: Array<{ markdown?: unknown }> }>
+    chapters?: unknown[]
+  }
   for (const b of d?.blocks ?? []) {
     if (typeof b?.markdown === 'string') harvestMermaid(b.markdown, acc)
     for (const st of b?.steps ?? []) if (typeof st?.markdown === 'string') harvestMermaid(st.markdown, acc)
