@@ -33,9 +33,13 @@ async function mermaid(theme: 'dark' | 'default') {
       startOnLoad: false,
       securityLevel: 'strict',
       theme,
-      // The themes' dropShadow is a light-gray halo (rgba(185,185,185,1)) that reads as a white
-      // glow around dark nodes: turned off everywhere.
-      themeVariables: { dropShadow: 'none' },
+      themeVariables: {
+        dropShadow: 'none',
+        // The dark theme strokes node borders with a light gradient
+        // (primaryBorderColor → secondaryBorderColor) that reads as an uneven white
+        // halo: flatten it to one gray matching the edge lines.
+        ...(theme === 'dark' ? { primaryBorderColor: '#999999', secondaryBorderColor: '#999999' } : {}),
+      },
       // SVG text labels, not foreignObject HTML: safer to sanitize, same look.
       // Since mermaid 12 this only works at the root level, where it overrides the defaults.
       htmlLabels: false,
